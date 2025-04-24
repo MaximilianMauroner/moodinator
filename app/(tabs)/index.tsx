@@ -27,6 +27,7 @@ import {
 } from "../../db/db";
 import type { MoodEntry } from "../../db/types";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { getCalendars, getLocales } from "expo-localization";
 
 // Mood scale with color and label
 const moodScale = [
@@ -98,7 +99,12 @@ const moodScale = [
   },
 ];
 
-const screenHeight = Dimensions.get("window").height;
+// Helper to format date/time using device locale and timezone
+function formatDateTime(date: Date | string) {
+  const d = typeof date === "string" ? new Date(date) : date;
+  // Fallback if expo-localization native module is not available
+  return d.toLocaleString();
+}
 
 function NoteModal({
   visible,
@@ -391,7 +397,7 @@ export default function HomeScreen() {
                             {mood.note ? ` • ${mood.note}` : ""}
                           </Text>
                           <Text className="text-xs text-gray-500 mt-1">
-                            {new Date(mood.timestamp).toLocaleString()}
+                            {formatDateTime(mood.timestamp)}
                           </Text>
                         </View>
                       </Animated.View>
