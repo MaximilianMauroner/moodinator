@@ -243,7 +243,7 @@ export default function HomeScreen() {
       exiting={SlideOutRight}
       className="flex justify-center items-end h-full"
     >
-      <View className="rounded-2xl shadow-lg h-full px-6 justify-center bg-red-50">
+      <View className="h-full px-6 justify-center bg-red-50 rounded-xl">
         <Text className="text-red-500 font-bold">Delete</Text>
       </View>
     </Animated.View>
@@ -256,7 +256,7 @@ export default function HomeScreen() {
       exiting={SlideOutLeft}
       className="flex justify-center items-start h-full"
     >
-      <View className="rounded-2xl shadow-lg h-full px-6 justify-center bg-blue-50">
+      <View className="h-full px-6 justify-center bg-blue-50 rounded-xl">
         <Text className="text-blue-500 font-bold">Add Note</Text>
       </View>
     </Animated.View>
@@ -377,14 +377,14 @@ export default function HomeScreen() {
                       overshootLeft={false}
                       overshootRight={false}
                       friction={2}
-                      shouldCancelWhenOutside={true}
+                      containerStyle={{ borderRadius: 12 }}
                       rightThreshold={SWIPE_THRESHOLD}
                       leftThreshold={SWIPE_THRESHOLD}
                       onSwipeableOpen={(direction) =>
                         runOnJS(onSwipeableWillOpen)(direction, mood)
                       }
                     >
-                      <Animated.View className="p-4 rounded-xl shadow-sm bg-white flex-row justify-between items-center">
+                      <Animated.View className="p-4 rounded-xl bg-white flex-row justify-between items-center">
                         <View>
                           <Text className="text-lg font-bold text-blue-800">
                             Mood: {mood.mood}
