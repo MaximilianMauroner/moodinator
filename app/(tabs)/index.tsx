@@ -7,6 +7,8 @@ import {
   Dimensions,
   Modal,
   TextInput,
+  SafeAreaView,
+  RefreshControl,
 } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import Animated, {
@@ -17,8 +19,14 @@ import Animated, {
   runOnJS,
 } from "react-native-reanimated";
 import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable";
-import { insertMood, getAllMoods, deleteMood } from "../../db/db";
+import {
+  insertMood,
+  getAllMoods,
+  deleteMood,
+  updateMoodNote,
+} from "../../db/db";
 import type { MoodEntry } from "../../db/types";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // Mood scale with color and label
 const moodScale = [
@@ -92,6 +100,61 @@ const moodScale = [
 
 const screenHeight = Dimensions.get("window").height;
 
+function NoteModal({
+  visible,
+  noteText,
+  setNoteText,
+  onCancel,
+  onSave,
+}: {
+  visible: boolean;
+  noteText: string;
+  setNoteText: (text: string) => void;
+  onCancel: () => void;
+  onSave: () => void;
+}) {
+  return (
+    <Modal
+      animationType="fade"
+      transparent={true}
+      visible={visible}
+      onRequestClose={onCancel}
+      statusBarTranslucent
+    >
+      <View className="flex-1 justify-center items-center bg-black/50">
+        <View className="bg-white p-6 rounded-2xl w-[90%] m-4 shadow-xl">
+          <Text className="text-xl font-bold mb-4 text-blue-800">
+            Add Note {}
+          </Text>
+          <TextInput
+            className="border border-gray-300 rounded-lg p-4 mb-4 text-base"
+            multiline
+            numberOfLines={4}
+            value={noteText}
+            onChangeText={setNoteText}
+            placeholder="Enter your note here..."
+            autoFocus
+          />
+          <View className="flex-row justify-end space-x-3">
+            <Pressable
+              className="bg-gray-100 px-6 py-3 rounded-xl"
+              onPress={onCancel}
+            >
+              <Text className="text-gray-600 font-medium">Cancel</Text>
+            </Pressable>
+            <Pressable
+              className="bg-blue-500 px-6 py-3 rounded-xl"
+              onPress={onSave}
+            >
+              <Text className="text-white font-medium">Save</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 export default function HomeScreen() {
   const [moods, setMoods] = useState<MoodEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -99,18 +162,10 @@ export default function HomeScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [noteText, setNoteText] = useState("");
   const [selectedMood, setSelectedMood] = useState<number | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const SWIPE_THRESHOLD = 100; // pixels to trigger action
-
-  const swipeableRefs = useRef<{
-    [key: number]: React.RefObject<typeof Swipeable>;
-  }>({}).current;
-
-  const closeSwipeable = (id: number) => {
-    if (swipeableRefs[id] && swipeableRefs[id].current) {
-      swipeableRefs[id].current.close();
-    }
-  };
+  const insets = useSafeAreaInsets();
 
   const fetchMoods = async () => {
     setLoading(true);
@@ -122,16 +177,22 @@ export default function HomeScreen() {
       }
     } finally {
       setLoading(false);
+      setRefreshing(false); // <-- ensure refreshing is reset
     }
   };
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchMoods();
+  }, []);
 
   useEffect(() => {
     fetchMoods();
   }, []);
 
   const handleMoodPress = async (mood: number, note?: string) => {
-    await insertMood(mood, note);
-    fetchMoods();
+    const newMood = await insertMood(mood, note);
+    setMoods((prev) => [newMood, ...prev]);
   };
 
   const handleLongPress = (mood: number) => {
@@ -140,9 +201,16 @@ export default function HomeScreen() {
     setModalVisible(true);
   };
 
-  const handleAddNote = () => {
+  const handleAddNote = async () => {
     if (selectedMood !== null) {
-      handleMoodPress(selectedMood, noteText);
+      const updatedMood = await updateMoodNote(selectedMood, noteText);
+      if (updatedMood) {
+        setMoods((prev) =>
+          prev.map((m) =>
+            m.id === updatedMood.id ? { ...m, note: noteText } : m
+          )
+        );
+      }
       setModalVisible(false);
       setNoteText("");
       setSelectedMood(null);
@@ -159,12 +227,10 @@ export default function HomeScreen() {
     (direction: "left" | "right", mood: MoodEntry) => {
       if (direction === "right") {
         handleDeleteMood(mood.id);
-        closeSwipeable(mood.id);
       } else if (direction === "left") {
-        setSelectedMood(mood.mood);
+        setSelectedMood(mood.id);
         setNoteText(mood.note || "");
         setModalVisible(true);
-        closeSwipeable(mood.id);
       }
     },
     []
@@ -177,7 +243,7 @@ export default function HomeScreen() {
       exiting={SlideOutRight}
       className="flex justify-center items-end h-full"
     >
-      <View className="bg-white rounded-2xl shadow-lg h-full px-6 justify-center bg-red-50">
+      <View className="rounded-2xl shadow-lg h-full px-6 justify-center bg-red-50">
         <Text className="text-red-500 font-bold">Delete</Text>
       </View>
     </Animated.View>
@@ -190,179 +256,164 @@ export default function HomeScreen() {
       exiting={SlideOutLeft}
       className="flex justify-center items-start h-full"
     >
-      <View className="bg-white rounded-2xl shadow-lg h-full px-6 justify-center bg-blue-50">
+      <View className="rounded-2xl shadow-lg h-full px-6 justify-center bg-blue-50">
         <Text className="text-blue-500 font-bold">Add Note</Text>
       </View>
     </Animated.View>
   );
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <View className="flex-1 bg-gradient-to-b from-blue-50 to-white p-4 space-y-4">
-        <Text className="text-3xl font-extrabold text-center mb-2 text-blue-700">
-          Thought Tracker
-        </Text>
-        <View className="bg-white rounded-2xl shadow-lg p-4 mb-2">
-          <Text className="text-lg font-semibold text-center mb-1 text-blue-800">
-            How many bad thoughts are you having?
-          </Text>
-          <Text className="text-xs text-gray-500 text-center mb-2">
-            0 = No bad thoughts, 10 = Only bad thoughts
-          </Text>
-          {lastTracked && (
-            <Text className="text-xs text-gray-400 text-center mb-2">
-              Last tracked: {lastTracked.toLocaleTimeString()}
+    <>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaView className="flex-1 bg-gradient-to-b from-blue-50 to-white">
+          <View className="flex-1 p-4 space-y-4">
+            <Text className="text-3xl font-extrabold text-center mb-2 text-blue-700">
+              Moodinator
             </Text>
-          )}
-
-          <View className="flex-row flex-wrap justify-between mb-2">
-            <View className="w-full flex-row justify-between mb-2">
-              {moodScale.slice(0, 4).map((mood) => (
-                <Pressable
-                  key={mood.value}
-                  className={`items-center justify-center h-16 rounded-lg shadow-sm ${mood.bg}`}
-                  style={{ width: "23%" }}
-                  onPress={() => handleMoodPress(mood.value)}
-                  onLongPress={() => handleLongPress(mood.value)}
-                  delayLongPress={500}
-                >
-                  <Text className={`text-lg font-bold ${mood.color}`}>
-                    {mood.value}
-                  </Text>
-                  <Text className={`text-xs font-medium ${mood.color}`}>
-                    {mood.value * 10}%
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-            <View className="w-full flex-row justify-between mb-2">
-              {moodScale.slice(4, 8).map((mood) => (
-                <Pressable
-                  key={mood.value}
-                  className={`items-center justify-center h-16 rounded-lg shadow-sm ${mood.bg}`}
-                  style={{ width: "23%" }}
-                  onPress={() => handleMoodPress(mood.value)}
-                  onLongPress={() => handleLongPress(mood.value)}
-                  delayLongPress={500}
-                >
-                  <Text className={`text-lg font-bold ${mood.color}`}>
-                    {mood.value}
-                  </Text>
-                  <Text className={`text-xs font-medium ${mood.color}`}>
-                    {mood.value * 10}%
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-            <View className="w-full flex-row justify-evenly">
-              {moodScale.slice(8).map((mood) => (
-                <Pressable
-                  key={mood.value}
-                  className={`items-center justify-center h-16 rounded-lg shadow-sm ${mood.bg}`}
-                  style={{ width: "23%" }}
-                  onPress={() => handleMoodPress(mood.value)}
-                  onLongPress={() => handleLongPress(mood.value)}
-                  delayLongPress={500}
-                >
-                  <Text className={`text-lg font-bold ${mood.color}`}>
-                    {mood.value}
-                  </Text>
-                  <Text className={`text-xs font-medium ${mood.color}`}>
-                    {mood.value * 10}%
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-        </View>
-
-        <Modal
-          animationType="fade"
-          transparent={true}
-          visible={modalVisible}
-          onRequestClose={() => setModalVisible(false)}
-          statusBarTranslucent
-        >
-          <View
-            className="flex-1 justify-center items-center bg-black/50"
-            style={{ elevation: 5 }}
-          >
-            <View className="bg-white p-6 rounded-2xl w-[90%] m-4 shadow-xl">
-              <Text className="text-xl font-bold mb-4 text-blue-800">
-                Add Note
+            <View className="bg-white rounded-2xl shadow-lg p-4 mb-2">
+              <Text className="text-xs text-gray-500 text-center mb-2">
+                0 = No bad thoughts, 10 = Only bad thoughts
               </Text>
-              <TextInput
-                className="border border-gray-300 rounded-lg p-4 mb-4 text-base"
-                multiline
-                numberOfLines={4}
-                value={noteText}
-                onChangeText={setNoteText}
-                placeholder="Enter your note here..."
-                autoFocus
-              />
-              <View className="flex-row justify-end space-x-3">
-                <Pressable
-                  className="bg-gray-100 px-6 py-3 rounded-xl"
-                  onPress={() => setModalVisible(false)}
-                >
-                  <Text className="text-gray-600 font-medium">Cancel</Text>
-                </Pressable>
-                <Pressable
-                  className="bg-blue-500 px-6 py-3 rounded-xl"
-                  onPress={handleAddNote}
-                >
-                  <Text className="text-white font-medium">Save</Text>
-                </Pressable>
+              {lastTracked && (
+                <Text className="text-xs text-gray-400 text-center mb-2">
+                  Last tracked: {lastTracked.toLocaleTimeString()}
+                </Text>
+              )}
+
+              <View className="flex-row flex-wrap justify-between mb-2">
+                <View className="w-full flex-row justify-between mb-2">
+                  {moodScale.slice(0, 4).map((mood) => (
+                    <Pressable
+                      key={mood.value}
+                      className={`items-center justify-center h-16 rounded-lg shadow-sm ${mood.bg}`}
+                      style={{ width: "23%" }}
+                      onPress={() => handleMoodPress(mood.value)}
+                      onLongPress={() => handleLongPress(mood.value)}
+                      delayLongPress={500}
+                    >
+                      <Text className={`text-lg font-bold ${mood.color}`}>
+                        {mood.value}
+                      </Text>
+                      <Text className={`text-xs font-medium ${mood.color}`}>
+                        {mood.value * 10}%
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+                <View className="w-full flex-row justify-between mb-2">
+                  {moodScale.slice(4, 8).map((mood) => (
+                    <Pressable
+                      key={mood.value}
+                      className={`items-center justify-center h-16 rounded-lg shadow-sm ${mood.bg}`}
+                      style={{ width: "23%" }}
+                      onPress={() => handleMoodPress(mood.value)}
+                      onLongPress={() => handleLongPress(mood.value)}
+                      delayLongPress={500}
+                    >
+                      <Text className={`text-lg font-bold ${mood.color}`}>
+                        {mood.value}
+                      </Text>
+                      <Text className={`text-xs font-medium ${mood.color}`}>
+                        {mood.value * 10}%
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+                <View className="w-full flex-row justify-evenly">
+                  {moodScale.slice(8).map((mood) => (
+                    <Pressable
+                      key={mood.value}
+                      className={`items-center justify-center h-16 rounded-lg shadow-sm ${mood.bg}`}
+                      style={{ width: "23%" }}
+                      onPress={() => handleMoodPress(mood.value)}
+                      onLongPress={() => handleLongPress(mood.value)}
+                      delayLongPress={500}
+                    >
+                      <Text className={`text-lg font-bold ${mood.color}`}>
+                        {mood.value}
+                      </Text>
+                      <Text className={`text-xs font-medium ${mood.color}`}>
+                        {mood.value * 10}%
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
               </View>
             </View>
-          </View>
-        </Modal>
 
-        <View className="flex-1 bg-white rounded-2xl shadow-lg p-4">
-          <Text className="font-bold text-xl mb-2 text-blue-800">
-            Mood History
-          </Text>
-          {loading ? (
-            <Text className="text-center py-4 text-gray-500">Loading...</Text>
-          ) : moods.length === 0 ? (
-            <Text className="text-center py-4 text-gray-500">
-              No moods tracked yet.
-            </Text>
-          ) : (
-            <ScrollView>
-              {moods.map((mood) => (
-                <Swipeable
-                  key={mood.id}
-                  ref={(ref) => (swipeableRefs[mood.id] = ref)}
-                  renderRightActions={renderRightActions}
-                  renderLeftActions={renderLeftActions}
-                  overshootLeft={false}
-                  overshootRight={false}
-                  friction={2}
-                  rightThreshold={SWIPE_THRESHOLD}
-                  leftThreshold={SWIPE_THRESHOLD}
-                  onSwipeableWillOpen={(direction) =>
-                    runOnJS(onSwipeableWillOpen)(direction, mood)
+            <View className="flex-1 bg-white rounded-2xl shadow-lg p-4">
+              <View className="flex-row justify-between items-center mb-2">
+                <Text className="font-bold text-xl text-blue-800">
+                  Mood History
+                </Text>
+              </View>
+              {loading ? (
+                <Text className="text-center py-4 text-gray-500">
+                  Loading...
+                </Text>
+              ) : moods.length === 0 ? (
+                <Text className="text-center py-4 text-gray-500">
+                  No moods tracked yet.
+                </Text>
+              ) : (
+                <ScrollView
+                  contentContainerStyle={{
+                    paddingBottom: insets.bottom + 24, // Add extra space for tab bar
+                  }}
+                  refreshControl={
+                    <RefreshControl
+                      refreshing={refreshing}
+                      onRefresh={onRefresh}
+                      colors={["#3b82f6"]}
+                      tintColor="#3b82f6"
+                    />
                   }
-                  containerStyle={{ marginBottom: 8 }}
                 >
-                  <Animated.View className="p-4 rounded-2xl shadow-sm bg-white flex-row justify-between items-center">
-                    <View>
-                      <Text className="text-lg font-bold text-blue-800">
-                        Mood: {mood.mood}
-                        {mood.note ? ` • ${mood.note}` : ""}
-                      </Text>
-                      <Text className="text-xs text-gray-500 mt-1">
-                        {new Date(mood.timestamp).toLocaleString()}
-                      </Text>
-                    </View>
-                  </Animated.View>
-                </Swipeable>
-              ))}
-            </ScrollView>
-          )}
+                  {moods.map((mood) => (
+                    <Swipeable
+                      key={mood.id}
+                      renderRightActions={renderRightActions}
+                      renderLeftActions={renderLeftActions}
+                      overshootLeft={false}
+                      overshootRight={false}
+                      friction={2}
+                      shouldCancelWhenOutside={true}
+                      rightThreshold={SWIPE_THRESHOLD}
+                      leftThreshold={SWIPE_THRESHOLD}
+                      onSwipeableOpen={(direction) =>
+                        runOnJS(onSwipeableWillOpen)(direction, mood)
+                      }
+                    >
+                      <Animated.View className="p-4 rounded-xl shadow-sm bg-white flex-row justify-between items-center">
+                        <View>
+                          <Text className="text-lg font-bold text-blue-800">
+                            Mood: {mood.mood}
+                            {mood.note ? ` • ${mood.note}` : ""}
+                          </Text>
+                          <Text className="text-xs text-gray-500 mt-1">
+                            {new Date(mood.timestamp).toLocaleString()}
+                          </Text>
+                        </View>
+                      </Animated.View>
+                    </Swipeable>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
+          </View>
+        </SafeAreaView>
+      </GestureHandlerRootView>
+      {modalVisible && (
+        <View>
+          <NoteModal
+            visible={modalVisible}
+            noteText={noteText}
+            setNoteText={setNoteText}
+            onCancel={() => setModalVisible(false)}
+            onSave={handleAddNote}
+          />
         </View>
-      </View>
-    </GestureHandlerRootView>
+      )}
+    </>
   );
 }

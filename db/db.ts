@@ -34,13 +34,32 @@ export async function createMoodTable() {
  * @param note - Optional note
  * @returns Promise with the SQLite result
  */
-export async function insertMood(mood: number, note?: string) {
+export async function insertMood(mood: number, note?: string): Promise<MoodEntry> {
     const db = await getDb();
-    return db.runAsync(
+    const result = await db.runAsync(
         'INSERT INTO moods (mood, note) VALUES (?, ?);',
         mood,
         note ?? null
     );
+    const inserted = await db.getFirstAsync('SELECT * FROM moods WHERE id = ?;', result.lastInsertRowId);
+    return inserted as MoodEntry;
+}
+
+/**
+ * Updates only the note of a mood entry by its ID and returns the updated mood entry.
+ * @param id - The ID of the mood entry to update
+ * @param note - The new note
+ * @returns Promise resolving to the updated MoodEntry
+ */
+export async function updateMoodNote(id: number, note: string): Promise<MoodEntry | undefined> {
+    const db = await getDb();
+    await db.runAsync(
+        'UPDATE moods SET note = ? WHERE id = ?;',
+        note,
+        id
+    );
+    const updated = await db.getFirstAsync('SELECT * FROM moods WHERE id = ?;', id);
+    return updated as MoodEntry | undefined;
 }
 
 /**
