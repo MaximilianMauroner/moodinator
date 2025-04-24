@@ -23,7 +23,7 @@ export async function createMoodTable() {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             mood INTEGER NOT NULL,
             note TEXT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            timestamp DATETIME
         );
     `);
 }
@@ -37,9 +37,10 @@ export async function createMoodTable() {
 export async function insertMood(mood: number, note?: string): Promise<MoodEntry> {
     const db = await getDb();
     const result = await db.runAsync(
-        'INSERT INTO moods (mood, note) VALUES (?, ?);',
+        'INSERT INTO moods (mood, note, timestamp) VALUES (?, ?, ?);',
         mood,
-        note ?? null
+        note ?? null,
+        new Date().getTime() // Use current timestamp
     );
     const inserted = await db.getFirstAsync('SELECT * FROM moods WHERE id = ?;', result.lastInsertRowId);
     return inserted as MoodEntry;
