@@ -1,50 +1,67 @@
-# Welcome to your Expo app 👋
+# Moodinator
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A React Native app for tracking your daily mood and thoughts.
 
-## Get started
+## Features
 
-1. Install dependencies
+- Track your mood on a scale from 0-10
+- Add notes to your mood entries
+- View your mood history
+- Swipe actions for quick interactions
+- Dark mode support
+- Charts and statistics (coming soon)
 
-   ```bash
-   npm install
-   ```
+## Tech Stack
 
-2. Start the app
+- React Native with Expo
+- TypeScript
+- SQLite for local storage
+- TailwindCSS (NativeWind)
+- React Navigation
+- Reanimated for animations
 
-   ```bash
-    npx expo start
-   ```
+## Development
 
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
+1. Install dependencies:
 ```bash
-npm run reset-project
+npm install
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+2. Start the development server:
+```bash
+npm start
+```
 
-## Learn more
+3. Use Expo Go app to run on your device or use a simulator
 
-To learn more about developing your project with Expo, look at the following resources:
+## Project Structure
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+- `/app` - Main app screens and navigation
+- `/components` - Reusable React components
+- `/db` - Database operations and types
+- `/hooks` - Custom React hooks
+- `/types` - TypeScript type definitions
+- `/utils` - Utility functions
 
-## Join the community
+## TODO List
 
-Join our community of developers creating universal apps.
+- [ ] Implement chart visualization for mood trends
+- [ ] Add a calendar view for mood entries
+- [ ] Add a widget for quick mood entry
+- [ ] Add weekly/monthly mood averages
+- [ ] Add mood labels/categories
+- [ ] Add data export functionality
+- [ ] Implement mood reminders/notifications
+- [ ] Add data backup/sync feature
+- [ ] Implement settings screen
+- [ ] Add mood insights and statistics
+- [ ] Support sharing "critical" mood entries - e.g. > 8 send email to X
+- [ ] Add password protection(and fingerprint/face ID)
+- [ ] Create app icon and splash screen
+- [ ] Make buttons have haptic feedback
+- [ ] Add onboarding tutorial
+- [ ] Prepare for app store submission
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## License
+
+MIT
