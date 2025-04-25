@@ -1,37 +1,27 @@
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   View,
   Text,
-  ScrollView,
-  Pressable,
-  Dimensions,
-  Modal,
-  TextInput,
   SafeAreaView,
   RefreshControl,
+  FlatList,
 } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import Animated, {
-  FadeInRight,
-  FadeInLeft,
-  SlideOutRight,
-  SlideOutLeft,
-  runOnJS,
-} from "react-native-reanimated";
-import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 import {
   insertMood,
   getAllMoods,
   deleteMood,
   updateMoodNote,
 } from "../../db/db";
-import type { MoodEntry } from "../../db/types";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { getCalendars, getLocales } from "expo-localization";
-import { fromZonedTime, toZonedTime } from "date-fns-tz";
+import { HapticTab } from "@/components/HapticTab";
+import { DisplayMoodItem } from "@/components/DisplayMoodItem";
+import { NoteModal } from "@/components/NoteModal";
+import { MoodScale, SwipeDirection } from "@/types/mood";
+import { MoodEntry } from "@/db/types";
 
-// Mood scale with color and label
-const moodScale = [
+// Move moodScale to a separate constants file if needed
+const moodScale: MoodScale[] = [
   {
     value: 0,
     label: "No bad thoughts (0%)",
@@ -100,61 +90,6 @@ const moodScale = [
   },
 ];
 
-function NoteModal({
-  visible,
-  noteText,
-  setNoteText,
-  onCancel,
-  onSave,
-}: {
-  visible: boolean;
-  noteText: string;
-  setNoteText: (text: string) => void;
-  onCancel: () => void;
-  onSave: () => void;
-}) {
-  return (
-    <Modal
-      animationType="fade"
-      transparent={true}
-      visible={visible}
-      onRequestClose={onCancel}
-      statusBarTranslucent
-    >
-      <View className="flex-1 justify-center items-center bg-black/50">
-        <View className="bg-white p-6 rounded-2xl w-[90%] m-4 shadow-xl">
-          <Text className="text-xl font-bold mb-4 text-blue-800">
-            Add Note {}
-          </Text>
-          <TextInput
-            className="border border-gray-300 rounded-lg p-4 mb-4 text-base"
-            multiline
-            numberOfLines={4}
-            value={noteText}
-            onChangeText={setNoteText}
-            placeholder="Enter your note here..."
-            autoFocus
-          />
-          <View className="flex-row justify-end space-x-3">
-            <Pressable
-              className="bg-gray-100 px-6 py-3 rounded-xl"
-              onPress={onCancel}
-            >
-              <Text className="text-gray-600 font-medium">Cancel</Text>
-            </Pressable>
-            <Pressable
-              className="bg-blue-500 px-6 py-3 rounded-xl"
-              onPress={onSave}
-            >
-              <Text className="text-white font-medium">Save</Text>
-            </Pressable>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
 export default function HomeScreen() {
   const [moods, setMoods] = useState<MoodEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -191,8 +126,20 @@ export default function HomeScreen() {
   }, []);
 
   const handleMoodPress = async (mood: number, note?: string) => {
+    const tempId = Date.now();
+    const tempMood: MoodEntry = {
+      id: tempId,
+      mood,
+      note: note || "",
+      timestamp: new Date().toISOString(),
+    };
+    setMoods((prev) => [tempMood, ...prev]);
     const newMood = await insertMood(mood, note);
-    setMoods((prev) => [newMood, ...prev]);
+    setMoods((prev) =>
+      prev.map((m) =>
+        m.id === tempId ? { ...newMood, note: newMood.note ?? "" } : m
+      )
+    );
   };
 
   const handleLongPress = (mood: number) => {
@@ -224,7 +171,7 @@ export default function HomeScreen() {
   };
 
   const onSwipeableWillOpen = useCallback(
-    (direction: "left" | "right", mood: MoodEntry) => {
+    (direction: SwipeDirection, mood: MoodEntry) => {
       if (direction === "right") {
         handleDeleteMood(mood.id);
       } else if (direction === "left") {
@@ -236,30 +183,15 @@ export default function HomeScreen() {
     []
   );
 
-  // Render right swipe action for delete
-  const renderRightActions = () => (
-    <Animated.View
-      entering={FadeInRight}
-      exiting={SlideOutRight}
-      className="flex justify-center items-end h-full"
-    >
-      <View className="h-full px-6 justify-center bg-red-50 rounded-xl">
-        <Text className="text-red-500 font-bold">Delete</Text>
-      </View>
-    </Animated.View>
-  );
-
-  // Render left swipe action for adding note
-  const renderLeftActions = () => (
-    <Animated.View
-      entering={FadeInLeft}
-      exiting={SlideOutLeft}
-      className="flex justify-center items-start h-full"
-    >
-      <View className="h-full px-6 justify-center bg-blue-50 rounded-xl">
-        <Text className="text-blue-500 font-bold">Add Note</Text>
-      </View>
-    </Animated.View>
+  const renderMoodItem = useCallback(
+    ({ item }: { item: MoodEntry }) => (
+      <DisplayMoodItem
+        mood={item}
+        onSwipeableWillOpen={onSwipeableWillOpen}
+        swipeThreshold={SWIPE_THRESHOLD}
+      />
+    ),
+    [onSwipeableWillOpen]
   );
 
   return (
@@ -283,7 +215,7 @@ export default function HomeScreen() {
               <View className="flex-row flex-wrap justify-between mb-2">
                 <View className="w-full flex-row justify-between mb-2">
                   {moodScale.slice(0, 4).map((mood) => (
-                    <Pressable
+                    <HapticTab
                       key={mood.value}
                       className={`items-center justify-center h-16 rounded-lg shadow-sm ${mood.bg}`}
                       style={{ width: "23%" }}
@@ -297,12 +229,12 @@ export default function HomeScreen() {
                       <Text className={`text-xs font-medium ${mood.color}`}>
                         {mood.value * 10}%
                       </Text>
-                    </Pressable>
+                    </HapticTab>
                   ))}
                 </View>
                 <View className="w-full flex-row justify-between mb-2">
                   {moodScale.slice(4, 8).map((mood) => (
-                    <Pressable
+                    <HapticTab
                       key={mood.value}
                       className={`items-center justify-center h-16 rounded-lg shadow-sm ${mood.bg}`}
                       style={{ width: "23%" }}
@@ -316,12 +248,12 @@ export default function HomeScreen() {
                       <Text className={`text-xs font-medium ${mood.color}`}>
                         {mood.value * 10}%
                       </Text>
-                    </Pressable>
+                    </HapticTab>
                   ))}
                 </View>
                 <View className="w-full flex-row justify-evenly">
                   {moodScale.slice(8).map((mood) => (
-                    <Pressable
+                    <HapticTab
                       key={mood.value}
                       className={`items-center justify-center h-16 rounded-lg shadow-sm ${mood.bg}`}
                       style={{ width: "23%" }}
@@ -335,7 +267,7 @@ export default function HomeScreen() {
                       <Text className={`text-xs font-medium ${mood.color}`}>
                         {mood.value * 10}%
                       </Text>
-                    </Pressable>
+                    </HapticTab>
                   ))}
                 </View>
               </View>
@@ -344,7 +276,7 @@ export default function HomeScreen() {
             <View className="flex-1 bg-white rounded-2xl shadow-lg p-4">
               <View className="flex-row justify-between items-center mb-2">
                 <Text className="font-bold text-xl text-blue-800">
-                  Mood History
+                  Mood History {moods.length > 0 ? `(${moods.length})` : ""}
                 </Text>
               </View>
               {loading ? (
@@ -356,10 +288,14 @@ export default function HomeScreen() {
                   No moods tracked yet.
                 </Text>
               ) : (
-                <ScrollView
+                <FlatList
+                  data={moods}
+                  initialNumToRender={10}
                   contentContainerStyle={{
                     paddingBottom: insets.bottom + 24, // Add extra space for tab bar
                   }}
+                  renderItem={renderMoodItem}
+                  keyExtractor={(item) => item.id.toString()}
                   refreshControl={
                     <RefreshControl
                       refreshing={refreshing}
@@ -368,51 +304,25 @@ export default function HomeScreen() {
                       tintColor="#3b82f6"
                     />
                   }
-                >
-                  {moods.map((mood) => (
-                    <Swipeable
-                      key={mood.id}
-                      renderRightActions={renderRightActions}
-                      renderLeftActions={renderLeftActions}
-                      overshootLeft={false}
-                      overshootRight={false}
-                      friction={2}
-                      containerStyle={{ borderRadius: 12 }}
-                      rightThreshold={SWIPE_THRESHOLD}
-                      leftThreshold={SWIPE_THRESHOLD}
-                      onSwipeableOpen={(direction) =>
-                        runOnJS(onSwipeableWillOpen)(direction, mood)
-                      }
-                    >
-                      <Animated.View className="p-4 rounded-xl bg-white flex-row justify-between items-center">
-                        <View>
-                          <Text className="text-lg font-bold text-blue-800">
-                            Mood: {mood.mood}
-                            {mood.note ? ` • ${mood.note}` : ""}
-                          </Text>
-                          <Text className="text-xs text-gray-500 mt-1">
-                            {new Date(mood.timestamp).toLocaleString()}
-                          </Text>
-                        </View>
-                      </Animated.View>
-                    </Swipeable>
-                  ))}
-                </ScrollView>
+                  removeClippedSubviews={true}
+                  windowSize={7}
+                  maxToRenderPerBatch={10}
+                  updateCellsBatchingPeriod={50}
+                  extraData={moods}
+                />
               )}
             </View>
           </View>
         </SafeAreaView>
       </GestureHandlerRootView>
       {modalVisible && (
-        <View>
-          <NoteModal
-            visible={modalVisible}
-            noteText={noteText}
-            setNoteText={setNoteText}
-            onCancel={() => setModalVisible(false)}
-            onSave={handleAddNote}
-          />
-        </View>
+        <NoteModal
+          visible={modalVisible}
+          noteText={noteText}
+          setNoteText={setNoteText}
+          onCancel={() => setModalVisible(false)}
+          onSave={handleAddNote}
+        />
       )}
     </>
   );

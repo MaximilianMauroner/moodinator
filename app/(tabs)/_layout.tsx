@@ -32,6 +32,19 @@ export default function TabLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="charts"
+        options={{
+          title: "Charts",
+          tabBarIcon: ({ color }) => (
+            <IconSymbol
+              size={28}
+              name="chart.line.uptrend.xyaxis"
+              color={color}
+            />
+          ),
+        }}
+      />
     </Tabs>
   );
 }
