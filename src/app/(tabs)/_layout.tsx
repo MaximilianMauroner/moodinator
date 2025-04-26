@@ -37,11 +37,7 @@ export default function TabLayout() {
         options={{
           title: "Charts",
           tabBarIcon: ({ color }) => (
-            <IconSymbol
-              size={28}
-              name="chart.line.uptrend.xyaxis"
-              color={color}
-            />
+            <IconSymbol size={28} name="chart.bar" color={color} />
           ),
         }}
       />

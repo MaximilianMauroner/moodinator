@@ -9,7 +9,7 @@ import Animated, {
 } from "react-native-reanimated";
 import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 import { SwipeDirection } from "../types/mood";
-import { MoodEntry } from "@/db/types";
+import { MoodEntry } from "@db/types";
 import { moodScale } from "@/constants/moodScale";
 
 interface Props {
