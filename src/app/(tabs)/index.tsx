@@ -7,18 +7,13 @@ import {
   FlatList,
 } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import {
-  insertMood,
-  getAllMoods,
-  deleteMood,
-  updateMoodNote,
-} from "../../db/db";
+import { insertMood, getAllMoods, deleteMood, updateMoodNote } from "@db/db";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { HapticTab } from "@/components/HapticTab";
 import { DisplayMoodItem } from "@/components/DisplayMoodItem";
 import { NoteModal } from "@/components/NoteModal";
 import { MoodScale, SwipeDirection } from "@/types/mood";
-import { MoodEntry } from "@/db/types";
+import { MoodEntry } from "@db/types";
 import { moodScale } from "@/constants/moodScale";
 
 export default function HomeScreen() {

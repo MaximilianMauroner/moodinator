@@ -92,7 +92,7 @@ export async function seedMoods() {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - 365); // Go back 365 days
 
-    for (let i = 0; i < 365; i++) {
+    for (let i = 0; i < 180; i++) {
         // Random number of entries per day (0-9)
         const entriesCount = Math.floor(Math.random() * 10);
 
