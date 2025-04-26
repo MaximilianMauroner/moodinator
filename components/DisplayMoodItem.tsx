@@ -10,6 +10,7 @@ import Animated, {
 import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 import { SwipeDirection } from "../types/mood";
 import { MoodEntry } from "@/db/types";
+import { moodScale } from "@/constants/moodScale";
 
 interface Props {
   mood: MoodEntry;
@@ -43,6 +44,9 @@ const renderLeftActions = () => (
 
 export const DisplayMoodItem = React.memo(
   ({ mood, onSwipeableWillOpen, swipeThreshold }: Props) => {
+    const moodColor =
+      moodScale.find((m) => m.value === mood.mood)?.color ?? "text-blue-800";
+
     return (
       <Swipeable
         key={mood.id}
@@ -60,7 +64,7 @@ export const DisplayMoodItem = React.memo(
       >
         <Animated.View className="p-4 rounded-xl bg-white flex-row justify-between items-center">
           <View>
-            <Text className="text-lg font-bold text-blue-800">
+            <Text className={`text-lg font-bold ${moodColor}`}>
               Mood: {mood.mood}
               {mood.note ? ` • ${mood.note}` : ""}
             </Text>
