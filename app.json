@@ -29,7 +29,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/icon-with-text.png.png",
+          "image": "./assets/images/icon-with-text.png",
           "imageWidth": 250,
           "resizeMode": "contain",
           "backgroundColor": "#FFDA61"

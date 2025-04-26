@@ -172,53 +172,55 @@ const DisplayMoodChart = () => {
   }
 
   return (
-    <ScrollView horizontal={true} showsHorizontalScrollIndicator={true}>
-      <View className="w-min h-[500px] mx-4">
-        <LineChart
-          data={chartData}
-          width={Math.max(
-            Dimensions.get("window").width * 1.5,
-            moods.length * 60
-          )}
-          height={300}
-          chartConfig={{
-            backgroundColor: "#F5F5DC",
-            backgroundGradientFrom: "#9B59B6",
-            backgroundGradientTo: "#9B59B6",
-            decimalPlaces: 0,
-            color: (opacity = 1) => `rgba(245, 245, 220, ${opacity})`,
-            labelColor: (opacity = 1) => `rgba(245, 245, 220, ${opacity})`,
-            style: {
-              borderRadius: 16,
-            },
-            propsForDots: {
-              r: "4", // Slightly smaller dots
-              strokeWidth: "1",
-            },
-            propsForLabels: {
-              fontSize: 10, // Smaller font size for labels
-            },
-            fillShadowGradientFrom: "#9B59B6",
-            fillShadowGradientTo: "transparent",
-          }}
-          style={{
+    <ScrollView
+      className="mx-4"
+      horizontal={true}
+      showsHorizontalScrollIndicator={true}
+    >
+      <LineChart
+        data={chartData}
+        width={Math.max(
+          Dimensions.get("window").width * 1.5,
+          moods.length * 60
+        )}
+        height={300}
+        chartConfig={{
+          backgroundColor: "#F5F5DC",
+          backgroundGradientFrom: "#9B59B6",
+          backgroundGradientTo: "#9B59B6",
+          decimalPlaces: 0,
+          color: (opacity = 1) => `rgba(245, 245, 220, ${opacity})`,
+          labelColor: (opacity = 1) => `rgba(245, 245, 220, ${opacity})`,
+          style: {
             borderRadius: 16,
-          }}
-          withVerticalLines={true}
-          segments={10}
-          bezier
-          renderDotContent={({ x, y, index }) => (
-            <Circle
-              key={index}
-              cx={x}
-              cy={y}
-              r="5"
-              fill={chartData.datasets[0].dotColor[index]}
-              stroke={chartData.datasets[0].dotColor[index]}
-            />
-          )}
-        />
-      </View>
+          },
+          propsForDots: {
+            r: "4", // Slightly smaller dots
+            strokeWidth: "1",
+          },
+          propsForLabels: {
+            fontSize: 10, // Smaller font size for labels
+          },
+          fillShadowGradientFrom: "#9B59B6",
+          fillShadowGradientTo: "transparent",
+        }}
+        style={{
+          borderRadius: 16,
+        }}
+        withVerticalLines={true}
+        segments={10}
+        bezier
+        renderDotContent={({ x, y, index }) => (
+          <Circle
+            key={index}
+            cx={x}
+            cy={y}
+            r="5"
+            fill={chartData.datasets[0].dotColor[index]}
+            stroke={chartData.datasets[0].dotColor[index]}
+          />
+        )}
+      />
     </ScrollView>
   );
 };
