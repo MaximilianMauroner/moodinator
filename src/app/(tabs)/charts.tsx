@@ -64,8 +64,8 @@ export default function ChartsScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        <View className="mt-1 flex gap-2 flex-row justify-between items-center p-4">
-          {__DEV__ && (
+        <View className="mt-1 flex gap-2 flex-row justify-center items-center p-4">
+          {/* {__DEV__ && (
             <Pressable
               onPress={handleSeedMoods}
               className="bg-blue-500 px-4 py-2 rounded "
@@ -76,19 +76,19 @@ export default function ChartsScreen() {
                 <Text className="text-white font-semibold">Seed Moods</Text>
               )}
             </Pressable>
-          )}
+          )} */}
           <View className="flex flex-row justify-center items-center">
             <Text
-              className="text-3xl font-extrabold text-center mb-2"
+              className="text-3xl font-extrabold text-center"
               style={{ color: "#5DADE2" }}
             >
               Chart
             </Text>
-            <Text className="font-semibold" style={{ color: "#9B59B6" }}>
+            <Text className="font-semibold pl-2" style={{ color: "#9B59B6" }}>
               ({moodCount})
             </Text>
           </View>
-          {__DEV__ && (
+          {/* {__DEV__ && (
             <Pressable
               onPress={handleClearMoods}
               className="bg-red-500 px-4 py-2 rounded"
@@ -99,7 +99,7 @@ export default function ChartsScreen() {
                 <Text className="text-white font-semibold">Clear Moods</Text>
               )}
             </Pressable>
-          )}
+          )} */}
         </View>
         {moodCount > 0 && <DisplayMoodChart />}
       </ScrollView>
