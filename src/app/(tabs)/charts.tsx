@@ -173,7 +173,7 @@ const DisplayMoodChart = () => {
 
   return (
     <ScrollView horizontal={true} showsHorizontalScrollIndicator={true}>
-      <View className="w-min px-4">
+      <View className="w-min h-[500px] mx-4">
         <LineChart
           data={chartData}
           width={Math.max(
