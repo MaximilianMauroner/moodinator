@@ -138,3 +138,38 @@ export async function getMoodCount(): Promise<number> {
     return result?.count ?? 0;
 }
 
+/**
+ * Exports all mood entries to a JSON string
+ * @returns Promise resolving to a JSON string of all mood entries
+ */
+export async function exportMoods(): Promise<string> {
+    const moods = await getAllMoods();
+    return JSON.stringify(moods);
+}
+
+/**
+ * Imports mood entries from a JSON string
+ * @param jsonData - JSON string containing mood entries
+ * @returns Promise resolving to the number of imported entries
+ */
+export async function importMoods(jsonData: string): Promise<number> {
+    try {
+        const moods = JSON.parse(jsonData) as MoodEntry[];
+        const db = await getDb();
+
+        for (const mood of moods) {
+            await db.runAsync(
+                'INSERT INTO moods (mood, note, timestamp) VALUES (?, ?, ?);',
+                mood.mood,
+                mood.note,
+                mood.timestamp
+            );
+        }
+
+        return moods.length;
+    } catch (error) {
+        console.error('Error importing moods:', error);
+        throw new Error('Invalid mood data format');
+    }
+}
+
