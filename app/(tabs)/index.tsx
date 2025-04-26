@@ -273,8 +273,8 @@ export default function HomeScreen() {
               </View>
             </View>
 
-            <View className="flex-1 bg-white rounded-2xl shadow-lg p-4">
-              <View className="flex-row justify-between items-center mb-2">
+            <View className="flex-1 bg-white rounded-2xl shadow-lg overflow-hidden">
+              <View className="p-4">
                 <Text className="font-bold text-xl text-blue-800">
                   Mood History {moods.length > 0 ? `(${moods.length})` : ""}
                 </Text>
@@ -292,7 +292,8 @@ export default function HomeScreen() {
                   data={moods}
                   initialNumToRender={10}
                   contentContainerStyle={{
-                    paddingBottom: insets.bottom + 24, // Add extra space for tab bar
+                    padding: 16,
+                    paddingBottom: insets.bottom + 24,
                   }}
                   renderItem={renderMoodItem}
                   keyExtractor={(item) => item.id.toString()}

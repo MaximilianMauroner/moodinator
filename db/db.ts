@@ -93,8 +93,8 @@ export async function seedMoods() {
     startDate.setDate(startDate.getDate() - 365); // Go back 365 days
 
     for (let i = 0; i < 365; i++) {
-        // Random number of entries per day (0-5)
-        const entriesCount = Math.floor(Math.random() * 6);
+        // Random number of entries per day (0-9)
+        const entriesCount = Math.floor(Math.random() * 10);
 
         for (let j = 0; j < entriesCount; j++) {
             const currentDate = new Date(startDate);
@@ -125,95 +125,16 @@ export async function clearMoods() {
     await db.runAsync('DELETE FROM moods;');
 }
 
-/**
- * Retrieves mood entries grouped by day for charting with date range.
- */
-export async function getMoodsForChart(): Promise<{ data: { date: string; avgMood: number }[]; dateRange: { start: number | null; end: number | null } }> {
-    const db = await getDb();
-    const result = await db.getAllAsync(`
-        SELECT 
-            date(datetime(timestamp/1000, 'unixepoch')) as date,
-            avg(mood) as avgMood,
-            min(timestamp) as firstEntry,
-            max(timestamp) as lastEntry
-        FROM moods 
-        GROUP BY date
-        ORDER BY date ASC;
-    `) as { date: string; avgMood: number }[];
-
-    const firstEntry = await db.getFirstAsync<{ first: number | null }>('SELECT MIN(timestamp) as first FROM moods;');
-    const lastEntry = await db.getFirstAsync<{ last: number | null }>('SELECT MAX(timestamp) as last FROM moods;');
-
-    return {
-        data: result,
-        dateRange: {
-            start: firstEntry?.first ?? null,
-            end: lastEntry?.last ?? null
-        }
-    };
-}
-
-/**
- * Retrieves mood entries grouped by a flexible time scale for charting with date range.
- */
-export type TimeScale = 'hour' | 'day' | 'week' | 'month' | 'year';
-
-export async function getMoodsForChartWithScale(scale: TimeScale = 'day'): Promise<ChartData> {
-    const db = await getDb();
-
-    const timeFormat = {
-        hour: "strftime('%Y-%m-%d %H:00', datetime(timestamp/1000, 'unixepoch', 'localtime'))",
-        day: "strftime('%Y-%m-%d', datetime(timestamp/1000, 'unixepoch', 'localtime'))",
-        week: "strftime('%Y-W%W', datetime(timestamp/1000, 'unixepoch', 'localtime'))",
-        month: "strftime('%Y-%m', datetime(timestamp/1000, 'unixepoch', 'localtime'))",
-        year: "strftime('%Y', datetime(timestamp/1000, 'unixepoch', 'localtime'))"
-    }[scale];
-
-    // Modified query to show individual entries instead of averages
-    const result = await db.getAllAsync<ChartDataPoint>(`
-        WITH chart_data AS (
-            SELECT 
-                ${timeFormat} as date,
-                mood as avgMood,  -- Use actual mood value instead of average
-                timestamp as firstEntry,
-                timestamp as lastEntry,
-                1 as entryCount
-            FROM moods 
-            ORDER BY timestamp DESC
-        )
-        SELECT * FROM chart_data;
-    `);
-
-    const dateRange = result.reduce((acc, curr) => ({
-        start: acc.start === null ? curr.firstEntry : Math.min(acc.start, curr.firstEntry),
-        end: acc.end === null ? curr.lastEntry : Math.max(acc.end, curr.lastEntry)
-    }), { start: null as number | null, end: null as number | null });
-
-    return { data: result, dateRange };
-}
-
-/**
- * Retrieves detailed mood entries for a specific time point.
- * @param date - The date string of the time point
- * @param scale - The time scale (hour, day, week, month, year)
- * @returns Promise resolving to an array of MoodEntry
- */
-export async function getMoodsForTimePoint(date: string, scale: TimeScale): Promise<MoodEntry[]> {
-    const db = await getDb();
-    const timeFormat = {
-        hour: "strftime('%Y-%m-%d %H:00', datetime(timestamp/1000, 'unixepoch', 'localtime'))",
-        day: "strftime('%Y-%m-%d', datetime(timestamp/1000, 'unixepoch', 'localtime'))",
-        week: "strftime('%Y-W%W', datetime(timestamp/1000, 'unixepoch', 'localtime'))",
-        month: "strftime('%Y-%m', datetime(timestamp/1000, 'unixepoch', 'localtime'))",
-        year: "strftime('%Y', datetime(timestamp/1000, 'unixepoch', 'localtime'))"
-    }[scale];
-
-    return db.getAllAsync(`
-        SELECT * FROM moods 
-        WHERE ${timeFormat} = ?
-        ORDER BY timestamp DESC;
-    `, date);
-}
-
 // Ensure the moods table exists as soon as this module is loaded
 void createMoodTable();
+
+/**
+ * Retrieves the total count of mood entries in the database.
+ * @returns Promise resolving to the count of mood entries
+ */
+export async function getMoodCount(): Promise<number> {
+    const db = await getDb();
+    const result = await db.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM moods;');
+    return result?.count ?? 0;
+}
+
