@@ -28,15 +28,32 @@ export default function SettingsScreen() {
       await FileSystem.writeAsStringAsync(fileUri, jsonData);
 
       // Check if sharing is available on the device
-      const canShare = await Sharing.isAvailableAsync();
-      if (canShare) {
-        await Sharing.shareAsync(fileUri, {
-          mimeType: "application/json",
-          dialogTitle: "Export Mood Data",
-        });
-      } else {
-        Alert.alert("Error", "Sharing is not available on this device");
+      // Instead of sharing, prompt the user to pick a location to save the file
+      const permissions =
+        await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+      if (!permissions.granted) {
+        Alert.alert(
+          "Permission Denied",
+          "Cannot access storage to save the file."
+        );
+        return;
       }
+      await FileSystem.StorageAccessFramework.createFileAsync(
+        permissions.directoryUri,
+        fileName,
+        "application/json"
+      )
+        .then(async (uri) => {
+          await FileSystem.writeAsStringAsync(uri, jsonData, {
+            encoding: FileSystem.EncodingType.UTF8,
+          });
+          Alert.alert("Export Successful", "Mood data exported successfully.");
+        })
+        .catch((err) => {
+          Alert.alert("Export Error", "Failed to save the file.");
+          console.error(err);
+        });
+      return;
     } catch (error) {
       Alert.alert("Export Error", "Failed to export mood data");
       console.error(error);
