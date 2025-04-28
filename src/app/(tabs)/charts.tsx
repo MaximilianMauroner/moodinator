@@ -11,10 +11,11 @@ import {
 import { LineChart } from "react-native-chart-kit";
 import { seedMoods, clearMoods, getAllMoods } from "@db/db";
 import type { MoodEntry } from "@db/types";
-import { format } from "date-fns";
+import { format, min } from "date-fns";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Circle } from "react-native-svg";
 import { moodScale } from "@/constants/moodScale";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 export default function ChartsScreen() {
   const [loading, setLoading] = useState<"seed" | "clear" | null>(null);
@@ -57,53 +58,55 @@ export default function ChartsScreen() {
   }, []);
 
   return (
-    <SafeAreaView className="flex-1 bg-gradient-to-b from-blue-50 to-white">
-      <ScrollView
-        className="flex-1"
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-      >
-        <View className="mt-1 flex gap-2 flex-row justify-center items-center p-4">
-          {/* {__DEV__ && (
-            <Pressable
-              onPress={handleSeedMoods}
-              className="bg-blue-500 px-4 py-2 rounded "
-            >
-              {loading === "seed" ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text className="text-white font-semibold">Seed Moods</Text>
-              )}
-            </Pressable>
-          )} */}
-          <View className="flex flex-row justify-center items-center">
-            <Text
-              className="text-3xl font-extrabold text-center"
-              style={{ color: "#5DADE2" }}
-            >
-              Chart
-            </Text>
-            <Text className="font-semibold pl-2" style={{ color: "#9B59B6" }}>
-              ({moodCount})
-            </Text>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaView className="flex-1 bg-gradient-to-b from-blue-50 to-white">
+        <ScrollView
+          className="flex-1"
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
+          <View className="mt-1 flex gap-2 flex-row justify-center items-center p-4">
+            {__DEV__ && (
+              <Pressable
+                onPress={handleSeedMoods}
+                className="bg-blue-500 px-4 py-2 rounded "
+              >
+                {loading === "seed" ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text className="text-white font-semibold">Seed Moods</Text>
+                )}
+              </Pressable>
+            )}
+            <View className="flex flex-row justify-center items-center">
+              <Text
+                className="text-3xl font-extrabold text-center"
+                style={{ color: "#5DADE2" }}
+              >
+                Chart
+              </Text>
+              <Text className="font-semibold pl-2" style={{ color: "#9B59B6" }}>
+                ({moodCount})
+              </Text>
+            </View>
+            {__DEV__ && (
+              <Pressable
+                onPress={handleClearMoods}
+                className="bg-red-500 px-4 py-2 rounded"
+              >
+                {loading === "clear" ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text className="text-white font-semibold">Clear Moods</Text>
+                )}
+              </Pressable>
+            )}
           </View>
-          {/* {__DEV__ && (
-            <Pressable
-              onPress={handleClearMoods}
-              className="bg-red-500 px-4 py-2 rounded"
-            >
-              {loading === "clear" ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text className="text-white font-semibold">Clear Moods</Text>
-              )}
-            </Pressable>
-          )} */}
-        </View>
-        {moodCount > 0 && <DisplayMoodChart />}
-      </ScrollView>
-    </SafeAreaView>
+          {moodCount > 0 && <DisplayMoodChart />}
+        </ScrollView>
+      </SafeAreaView>
+    </GestureHandlerRootView>
   );
 }
 
@@ -151,6 +154,14 @@ const DisplayMoodChart = () => {
             getColorFromTailwind(moodScale[m.mood].color)
           ),
         },
+        {
+          data: [0], // min
+          withDots: false,
+        },
+        {
+          data: [10], // max
+          withDots: false,
+        },
       ],
     };
   }, [moods]);
@@ -176,13 +187,11 @@ const DisplayMoodChart = () => {
       className="mx-4"
       horizontal={true}
       showsHorizontalScrollIndicator={true}
+      scrollEventThrottle={16}
     >
       <LineChart
         data={chartData}
-        width={Math.max(
-          Dimensions.get("window").width * 1.5,
-          moods.length * 60
-        )}
+        width={Math.max(Dimensions.get("window").width, moods.length * 60)}
         height={300}
         chartConfig={{
           backgroundColor: "#F5F5DC",
@@ -210,16 +219,20 @@ const DisplayMoodChart = () => {
         withVerticalLines={true}
         segments={10}
         bezier
-        renderDotContent={({ x, y, index }) => (
-          <Circle
-            key={index}
-            cx={x}
-            cy={y}
-            r="5"
-            fill={chartData.datasets[0].dotColor[index]}
-            stroke={chartData.datasets[0].dotColor[index]}
-          />
-        )}
+        renderDotContent={({ x, y, index }) =>
+          chartData.datasets[0] &&
+          Array.isArray(chartData.datasets[0].dotColor) &&
+          chartData.datasets[0].dotColor[index] && (
+            <Circle
+              key={index}
+              cx={x}
+              cy={y}
+              r="5"
+              fill={chartData.datasets[0].dotColor[index]}
+              stroke={chartData.datasets[0].dotColor[index]}
+            />
+          )
+        }
       />
     </ScrollView>
   );
