@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { HapticTab } from "@/components/HapticTab";
 import { DisplayMoodItem } from "@/components/DisplayMoodItem";
 import { NoteModal } from "@/components/NoteModal";
-import { MoodScale, SwipeDirection } from "@/types/mood";
+import { SwipeDirection } from "@/types/mood";
 import { MoodEntry } from "@db/types";
 import { moodScale } from "@/constants/moodScale";
 
@@ -22,8 +22,11 @@ export default function HomeScreen() {
   const [lastTracked, setLastTracked] = useState<Date | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [noteText, setNoteText] = useState("");
-  const [selectedMood, setSelectedMood] = useState<number | null>(null);
+  const [selectedMoodId, setSelectedMoodId] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [currentMoodPressed, setCurrentMoodPressed] = useState<number | null>(
+    null
+  );
 
   const SWIPE_THRESHOLD = 100; // pixels to trigger action
   const insets = useSafeAreaInsets();
@@ -51,32 +54,21 @@ export default function HomeScreen() {
     fetchMoods();
   }, []);
 
-  const handleMoodPress = async (mood: number, note?: string) => {
-    const tempId = Date.now();
-    const tempMood: MoodEntry = {
-      id: tempId,
-      mood,
-      note: note || "",
-      timestamp: new Date().toISOString(),
-    };
-    setMoods((prev) => [tempMood, ...prev]);
-    const newMood = await insertMood(mood, note);
-    setMoods((prev) =>
-      prev.map((m) =>
-        m.id === tempId ? { ...newMood, note: newMood.note ?? "" } : m
-      )
-    );
+  const handleMoodPress = async (mood: number) => {
+    const newMood = await insertMood(mood);
+    setMoods((prev) => [newMood, ...prev]);
   };
 
   const handleLongPress = (mood: number) => {
-    setSelectedMood(mood);
+    setCurrentMoodPressed(mood);
+    setSelectedMoodId(null);
     setNoteText("");
     setModalVisible(true);
   };
 
   const handleAddNote = async () => {
-    if (selectedMood !== null) {
-      const updatedMood = await updateMoodNote(selectedMood, noteText);
+    if (selectedMoodId !== null) {
+      const updatedMood = await updateMoodNote(selectedMoodId, noteText);
       if (updatedMood) {
         setMoods((prev) =>
           prev.map((m) =>
@@ -84,10 +76,15 @@ export default function HomeScreen() {
           )
         );
       }
-      setModalVisible(false);
-      setNoteText("");
-      setSelectedMood(null);
     }
+    if (currentMoodPressed !== null) {
+      const newMood = await insertMood(currentMoodPressed, noteText);
+      setMoods((prev) => [newMood, ...prev]);
+    }
+    setCurrentMoodPressed(null);
+    setModalVisible(false);
+    setNoteText("");
+    setSelectedMoodId(null);
   };
 
   // Delete mood entry by id
@@ -101,7 +98,7 @@ export default function HomeScreen() {
       if (direction === "right") {
         handleDeleteMood(mood.id);
       } else if (direction === "left") {
-        setSelectedMood(mood.id);
+        setSelectedMoodId(mood.id);
         setNoteText(mood.note || "");
         setModalVisible(true);
       }
@@ -122,7 +119,7 @@ export default function HomeScreen() {
 
   return (
     <>
-      <GestureHandlerRootView style={{ flex: 1 }}>
+      <GestureHandlerRootView>
         <SafeAreaView className="flex-1 bg-gradient-to-b from-blue-50 to-white">
           <View className="flex-1 p-4 space-y-4">
             <Text className="text-3xl font-extrabold text-center mb-2 text-blue-700">
