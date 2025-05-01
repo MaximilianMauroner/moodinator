@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -6,14 +6,47 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
+  Switch,
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { exportMoods, importMoods } from "@db/db";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+// Storage key for show labels preference
+const SHOW_LABELS_KEY = "showLabelsPreference";
 
 export default function SettingsScreen() {
   const [loading, setLoading] = useState<"export" | "import" | null>(null);
+  const [showDetailedLabels, setShowDetailedLabels] = useState(false);
+
+  // Load saved preference on component mount
+  useEffect(() => {
+    loadShowLabelsPreference();
+  }, []);
+
+  // Load the saved preference
+  const loadShowLabelsPreference = async () => {
+    try {
+      const value = await AsyncStorage.getItem(SHOW_LABELS_KEY);
+      if (value !== null) {
+        setShowDetailedLabels(value === "true");
+      }
+    } catch (error) {
+      console.error("Failed to load label preference:", error);
+    }
+  };
+
+  // Save preference when changed
+  const handleToggleLabels = async (value: boolean) => {
+    setShowDetailedLabels(value);
+    try {
+      await AsyncStorage.setItem(SHOW_LABELS_KEY, value.toString());
+    } catch (error) {
+      console.error("Failed to save label preference:", error);
+    }
+  };
 
   const handleExport = async () => {
     try {
@@ -153,6 +186,29 @@ export default function SettingsScreen() {
                       </Text>
                     )}
                   </Pressable>
+                </View>
+              </View>
+            </View>
+
+            <View className="space-y-4">
+              <Text className="text-lg font-semibold mb-2 text-gray-700">
+                Preferences
+              </Text>
+
+              <View className="bg-white rounded-xl p-4 shadow-sm">
+                <View className="space-y-4">
+                  <View>
+                    <Text className="text-base font-medium text-gray-800 mb-1">
+                      Show Detailed Labels
+                    </Text>
+                    <Text className="text-sm text-gray-600 mb-2">
+                      Toggle whether detailed labels are displayed in the app
+                    </Text>
+                    <Switch
+                      value={showDetailedLabels}
+                      onValueChange={handleToggleLabels}
+                    />
+                  </View>
                 </View>
               </View>
             </View>

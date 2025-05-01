@@ -47,6 +47,23 @@ export async function insertMood(mood: number, note?: string): Promise<MoodEntry
 }
 
 /**
+ * Inserts a new mood entry with all its fields into the database.
+ * @param entry - MoodEntry object containing all fields
+ * @returns Promise with the inserted MoodEntry
+ */
+export async function insertMoodEntry(entry: MoodEntry): Promise<MoodEntry> {
+    const db = await getDb();
+    const result = await db.runAsync(
+        'INSERT INTO moods (mood, note, timestamp) VALUES (?, ?, ?);',
+        entry.mood,
+        entry.note ?? null,
+        entry.timestamp
+    );
+    const inserted = await db.getFirstAsync('SELECT * FROM moods WHERE id = ?;', result.lastInsertRowId);
+    return inserted as MoodEntry;
+}
+
+/**
  * Updates only the note of a mood entry by its ID and returns the updated mood entry.
  * @param id - The ID of the mood entry to update
  * @param note - The new note
