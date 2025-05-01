@@ -145,7 +145,7 @@ const DisplayMoodChart = ({ refreshTrigger }: { refreshTrigger: boolean }) => {
 
   const chartData = useMemo(() => {
     return {
-      labels: moods.map((m) => format(new Date(m.timestamp), "HH d/M")),
+      labels: moods.map((m) => format(new Date(m.timestamp), "HH:MM d/M")),
       datasets: [
         {
           data: moods.map((m) => m.mood),
