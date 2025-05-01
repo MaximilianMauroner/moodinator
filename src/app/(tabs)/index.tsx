@@ -168,7 +168,6 @@ export default function HomeScreen() {
       visibilityTime: 3000,
       progressBarColor: "#3b82f6",
       onPress: async () => {
-        console.log("Toast pressed", moodToDelete, index);
         if (moodToDelete && index !== -1) {
           const crmood = await insertMoodEntry(moodToDelete);
           setMoods((prev) => {
