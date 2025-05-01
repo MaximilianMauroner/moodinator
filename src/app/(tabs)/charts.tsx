@@ -103,14 +103,14 @@ export default function ChartsScreen() {
               </Pressable>
             )}
           </View>
-          {moodCount > 0 && <DisplayMoodChart />}
+          {moodCount > 0 && <DisplayMoodChart refreshTrigger={refreshing} />}
         </ScrollView>
       </SafeAreaView>
     </GestureHandlerRootView>
   );
 }
 
-const DisplayMoodChart = () => {
+const DisplayMoodChart = ({ refreshTrigger }: { refreshTrigger: boolean }) => {
   const [moods, setMoods] = useState<MoodEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -123,7 +123,7 @@ const DisplayMoodChart = () => {
   useEffect(() => {
     setLoading(true);
     fetchMoods();
-  }, []);
+  }, [refreshTrigger]); // Re-fetch when refreshTrigger changes
 
   // Add helper function to get color from Tailwind class
   const getColorFromTailwind = (colorClass: string) => {
@@ -155,11 +155,11 @@ const DisplayMoodChart = () => {
           ),
         },
         {
-          data: [0], // min
+          data: [moodScale[0].value], // min
           withDots: false,
         },
         {
-          data: [10], // max
+          data: [moodScale[moodScale.length - 1].value], // max
           withDots: false,
         },
       ],

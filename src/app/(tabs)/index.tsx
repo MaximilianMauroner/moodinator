@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -7,14 +7,67 @@ import {
   FlatList,
 } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { insertMood, getAllMoods, deleteMood, updateMoodNote } from "@db/db";
+import {
+  insertMood,
+  getAllMoods,
+  deleteMood,
+  updateMoodNote,
+  insertMoodEntry,
+} from "@db/db";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { HapticTab } from "@/components/HapticTab";
 import { DisplayMoodItem } from "@/components/DisplayMoodItem";
 import { NoteModal } from "@/components/NoteModal";
+import { MoodButtonsDetailed } from "@/components/MoodButtonsDetailed";
+import { MoodButtonsCompact } from "@/components/MoodButtonsCompact";
 import { SwipeDirection } from "@/types/mood";
 import { MoodEntry } from "@db/types";
-import { moodScale } from "@/constants/moodScale";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useFocusEffect } from "@react-navigation/native";
+import ToastManager, { Toast } from "toastify-react-native";
+import { IconSymbol } from "@/components/ui/IconSymbol";
+import { HapticTab } from "@/components/HapticTab";
+
+const SHOW_LABELS_KEY = "showLabelsPreference";
+
+const toastConfig = {
+  success: ({
+    text1,
+    text2,
+    hide,
+    onPress,
+  }: {
+    text1: string;
+    text2?: string;
+    hide: () => void;
+    onPress: () => void;
+  }) => (
+    <View className="flex-row items-center bg-blue-600 rounded-xl px-4 py-3 shadow-lg m-2">
+      <View className="flex-1 flex-row items-center" style={{ minHeight: 48 }}>
+        <View className="flex-1 ml-3">
+          <Text className="text-white font-bold text-base">{text1}</Text>
+          {text2 ? <Text className="text-white text-xs">{text2}</Text> : null}
+        </View>
+        <HapticTab onPress={onPress}>
+          <Text
+            className="text-blue-600 font-bold text-sm px-2 py-1 bg-white rounded-lg ml-2"
+            accessibilityRole="button"
+          >
+            Undo
+          </Text>
+        </HapticTab>
+      </View>
+      <HapticTab onPress={hide}>
+        <IconSymbol
+          name="xmark"
+          size={20}
+          color="#fff"
+          style={{ marginLeft: 8 }}
+        />
+      </HapticTab>
+    </View>
+  ),
+  // Add other toast types if needed
+};
 
 export default function HomeScreen() {
   const [moods, setMoods] = useState<MoodEntry[]>([]);
@@ -27,9 +80,11 @@ export default function HomeScreen() {
   const [currentMoodPressed, setCurrentMoodPressed] = useState<number | null>(
     null
   );
+  const [recentlyDeletedMood, setRecentlyDeletedMood] =
+    useState<MoodEntry | null>(null);
+  const [showDetailedLabels, setShowDetailedLabels] = useState(false);
 
   const SWIPE_THRESHOLD = 100; // pixels to trigger action
-  const insets = useSafeAreaInsets();
 
   const fetchMoods = async () => {
     setLoading(true);
@@ -44,7 +99,6 @@ export default function HomeScreen() {
       setRefreshing(false); // <-- ensure refreshing is reset
     }
   };
-
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchMoods();
@@ -57,6 +111,7 @@ export default function HomeScreen() {
   const handleMoodPress = async (mood: number) => {
     const newMood = await insertMood(mood);
     setMoods((prev) => [newMood, ...prev]);
+    setLastTracked(new Date());
   };
 
   const handleLongPress = (mood: number) => {
@@ -87,12 +142,6 @@ export default function HomeScreen() {
     setSelectedMoodId(null);
   };
 
-  // Delete mood entry by id
-  const handleDeleteMood = async (id: number) => {
-    await deleteMood(id);
-    setMoods((prev) => prev.filter((m) => m.id !== id));
-  };
-
   const onSwipeableWillOpen = useCallback(
     (direction: SwipeDirection, mood: MoodEntry) => {
       if (direction === "right") {
@@ -106,6 +155,33 @@ export default function HomeScreen() {
     []
   );
 
+  const handleDeleteMood = async (id: number) => {
+    const index = moods.findIndex((mood) => mood.id === id);
+    const moodToDelete = moods.find((mood) => mood.id === id);
+    deleteMood(id);
+    setMoods((prev) => [...prev.filter((mood) => mood.id !== id)]);
+    Toast.show({
+      type: "success",
+      text1: "Mood deleted",
+      text2: "You can undo this action",
+      autoHide: true,
+      visibilityTime: 3000,
+      progressBarColor: "#3b82f6",
+      onPress: async () => {
+        console.log("Toast pressed", moodToDelete, index);
+        if (moodToDelete && index !== -1) {
+          const crmood = await insertMoodEntry(moodToDelete);
+          setMoods((prev) => {
+            const newMoods = [...prev];
+            newMoods.splice(index, 0, crmood);
+            return newMoods;
+          });
+        }
+        Toast.hide();
+      },
+    });
+  };
+
   const renderMoodItem = useCallback(
     ({ item }: { item: MoodEntry }) => (
       <DisplayMoodItem
@@ -117,124 +193,110 @@ export default function HomeScreen() {
     [onSwipeableWillOpen]
   );
 
+  // Toggle labels preference
+  const toggleLabelsPreference = async () => {
+    const newValue = !showDetailedLabels;
+    setShowDetailedLabels(newValue);
+    try {
+      await AsyncStorage.setItem(SHOW_LABELS_KEY, newValue.toString());
+    } catch (error) {
+      console.error("Failed to save label preference:", error);
+    }
+  };
+
+  // Load show labels preference from AsyncStorage
+  useEffect(() => {
+    loadShowLabelsPreference();
+  }, []);
+
+  // Also check for label preference changes when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadShowLabelsPreference();
+    }, [])
+  );
+
+  const loadShowLabelsPreference = async () => {
+    try {
+      const value = await AsyncStorage.getItem(SHOW_LABELS_KEY);
+      if (value !== null) {
+        setShowDetailedLabels(value === "true");
+      }
+    } catch (error) {
+      console.error("Failed to load label preference:", error);
+    }
+  };
+
   return (
     <>
       <GestureHandlerRootView>
         <SafeAreaView className="flex-1 bg-gradient-to-b from-blue-50 to-white">
-          <View className="flex-1 p-4 space-y-4">
-            <Text className="text-3xl font-extrabold text-center mb-2 text-blue-700">
-              Moodinator
-            </Text>
-            <View className="bg-white rounded-2xl shadow-lg p-4 mb-2">
-              <Text className="text-xs text-gray-500 text-center mb-2">
-                0 = No bad thoughts, 10 = Only bad thoughts
+          <View className="grid grid-rows-3 p-4 space-y-4">
+            <View className="row-span-1">
+              <Text className="text-3xl font-extrabold text-center mb-2 text-blue-700">
+                Moodinator
               </Text>
-              {lastTracked && (
-                <Text className="text-xs text-gray-400 text-center mb-2">
-                  Last tracked: {lastTracked.toLocaleTimeString()}
-                </Text>
-              )}
+              <View className="bg-white rounded-2xl shadow-lg p-4 mb-2">
+                {lastTracked && (
+                  <Text className="text-xs text-gray-400 text-center mb-2">
+                    Last tracked: {lastTracked.toLocaleTimeString()}
+                  </Text>
+                )}
 
-              <View className="flex-row flex-wrap justify-between mb-2">
-                <View className="w-full flex-row justify-between mb-2">
-                  {moodScale.slice(0, 4).map((mood) => (
-                    <HapticTab
-                      key={mood.value}
-                      className={`items-center justify-center h-16 rounded-lg shadow-sm ${mood.bg}`}
-                      style={{ width: "23%" }}
-                      onPress={() => handleMoodPress(mood.value)}
-                      onLongPress={() => handleLongPress(mood.value)}
-                      delayLongPress={500}
-                    >
-                      <Text className={`text-lg font-bold ${mood.color}`}>
-                        {mood.value}
-                      </Text>
-                      <Text className={`text-xs font-medium ${mood.color}`}>
-                        {mood.value * 10}%
-                      </Text>
-                    </HapticTab>
-                  ))}
-                </View>
-                <View className="w-full flex-row justify-between mb-2">
-                  {moodScale.slice(4, 8).map((mood) => (
-                    <HapticTab
-                      key={mood.value}
-                      className={`items-center justify-center h-16 rounded-lg shadow-sm ${mood.bg}`}
-                      style={{ width: "23%" }}
-                      onPress={() => handleMoodPress(mood.value)}
-                      onLongPress={() => handleLongPress(mood.value)}
-                      delayLongPress={500}
-                    >
-                      <Text className={`text-lg font-bold ${mood.color}`}>
-                        {mood.value}
-                      </Text>
-                      <Text className={`text-xs font-medium ${mood.color}`}>
-                        {mood.value * 10}%
-                      </Text>
-                    </HapticTab>
-                  ))}
-                </View>
-                <View className="w-full flex-row justify-evenly">
-                  {moodScale.slice(8).map((mood) => (
-                    <HapticTab
-                      key={mood.value}
-                      className={`items-center justify-center h-16 rounded-lg shadow-sm ${mood.bg}`}
-                      style={{ width: "23%" }}
-                      onPress={() => handleMoodPress(mood.value)}
-                      onLongPress={() => handleLongPress(mood.value)}
-                      delayLongPress={500}
-                    >
-                      <Text className={`text-lg font-bold ${mood.color}`}>
-                        {mood.value}
-                      </Text>
-                      <Text className={`text-xs font-medium ${mood.color}`}>
-                        {mood.value * 10}%
-                      </Text>
-                    </HapticTab>
-                  ))}
-                </View>
+                {showDetailedLabels ? (
+                  <MoodButtonsDetailed
+                    onMoodPress={handleMoodPress}
+                    onLongPress={handleLongPress}
+                  />
+                ) : (
+                  <MoodButtonsCompact
+                    onMoodPress={handleMoodPress}
+                    onLongPress={handleLongPress}
+                  />
+                )}
               </View>
             </View>
 
-            <View className="flex-1 bg-white rounded-2xl shadow-lg overflow-hidden">
-              <View className="p-4">
-                <Text className="font-bold text-xl text-blue-800">
-                  Mood History {moods.length > 0 ? `(${moods.length})` : ""}
-                </Text>
+            <View className="row-span-2 bg-white rounded-2xl shadow-lg overflow-hidden">
+              <View className="h-full">
+                <View className="p-4 flex-row justify-between items-center">
+                  <Text className="font-bold text-xl text-blue-800">
+                    Mood History {moods.length > 0 ? `(${moods.length})` : ""}
+                  </Text>
+                </View>
+                {loading ? (
+                  <Text className="text-center py-4 text-gray-500">
+                    Loading...
+                  </Text>
+                ) : moods.length === 0 ? (
+                  <Text className="text-center py-4 text-gray-500">
+                    No moods tracked yet.
+                  </Text>
+                ) : (
+                  <FlatList
+                    data={moods}
+                    initialNumToRender={10}
+                    contentContainerStyle={{
+                      padding: 16,
+                    }}
+                    renderItem={renderMoodItem}
+                    keyExtractor={(item) => item.id.toString()}
+                    refreshControl={
+                      <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        colors={["#3b82f6"]}
+                        tintColor="#3b82f6"
+                      />
+                    }
+                    removeClippedSubviews={true}
+                    windowSize={7}
+                    maxToRenderPerBatch={10}
+                    updateCellsBatchingPeriod={50}
+                    extraData={moods}
+                  />
+                )}
               </View>
-              {loading ? (
-                <Text className="text-center py-4 text-gray-500">
-                  Loading...
-                </Text>
-              ) : moods.length === 0 ? (
-                <Text className="text-center py-4 text-gray-500">
-                  No moods tracked yet.
-                </Text>
-              ) : (
-                <FlatList
-                  data={moods}
-                  initialNumToRender={10}
-                  contentContainerStyle={{
-                    padding: 16,
-                    paddingBottom: insets.bottom + 24,
-                  }}
-                  renderItem={renderMoodItem}
-                  keyExtractor={(item) => item.id.toString()}
-                  refreshControl={
-                    <RefreshControl
-                      refreshing={refreshing}
-                      onRefresh={onRefresh}
-                      colors={["#3b82f6"]}
-                      tintColor="#3b82f6"
-                    />
-                  }
-                  removeClippedSubviews={true}
-                  windowSize={7}
-                  maxToRenderPerBatch={10}
-                  updateCellsBatchingPeriod={50}
-                  extraData={moods}
-                />
-              )}
             </View>
           </View>
         </SafeAreaView>
@@ -248,6 +310,7 @@ export default function HomeScreen() {
           onSave={handleAddNote}
         />
       )}
+      <ToastManager config={toastConfig} />
     </>
   );
 }

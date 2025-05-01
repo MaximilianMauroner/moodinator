@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef } from "react";
 import { View, Text } from "react-native";
 import Animated, {
   FadeInRight,
@@ -44,11 +44,25 @@ const renderLeftActions = () => (
 
 export const DisplayMoodItem = React.memo(
   ({ mood, onSwipeableWillOpen, swipeThreshold }: Props) => {
+    const swipeableRef = useRef<any>(null);
     const moodColor =
       moodScale.find((m) => m.value === mood.mood)?.color ?? "text-blue-800";
 
+    const handleSwipeableOpen = (direction: string) => {
+      // Trigger the action in the parent component
+      runOnJS(onSwipeableWillOpen)(direction as SwipeDirection, mood);
+
+      // Close the swipeable after a small delay
+      setTimeout(() => {
+        if (swipeableRef.current) {
+          swipeableRef.current.close();
+        }
+      }, 300); // Small delay to let the animation complete
+    };
+
     return (
       <Swipeable
+        ref={swipeableRef}
         key={mood.id}
         renderRightActions={renderRightActions}
         renderLeftActions={renderLeftActions}
@@ -58,9 +72,7 @@ export const DisplayMoodItem = React.memo(
         containerStyle={{ borderRadius: 12 }}
         rightThreshold={swipeThreshold}
         leftThreshold={swipeThreshold}
-        onSwipeableOpen={(direction) =>
-          runOnJS(onSwipeableWillOpen)(direction as SwipeDirection, mood)
-        }
+        onSwipeableOpen={handleSwipeableOpen}
       >
         <Animated.View className="p-4 rounded-xl bg-white flex-row justify-between items-center">
           <View>
