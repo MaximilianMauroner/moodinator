@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   View,
   Text,
@@ -6,7 +6,10 @@ import {
   RefreshControl,
   FlatList,
 } from "react-native";
-import { GestureHandlerRootView } from "react-native-gesture-handler";
+import {
+  Directions,
+  GestureHandlerRootView,
+} from "react-native-gesture-handler";
 import {
   insertMood,
   getAllMoods,
@@ -26,6 +29,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import ToastManager, { Toast } from "toastify-react-native";
 import { IconSymbol } from "@/components/ui/IconSymbol";
 import { HapticTab } from "@/components/HapticTab";
+import { set } from "date-fns";
 
 const SHOW_LABELS_KEY = "showLabelsPreference";
 
@@ -99,10 +103,11 @@ export default function HomeScreen() {
       setRefreshing(false); // <-- ensure refreshing is reset
     }
   };
-  const onRefresh = useCallback(() => {
+
+  const onRefresh = () => {
     setRefreshing(true);
     fetchMoods();
-  }, []);
+  };
 
   useEffect(() => {
     fetchMoods();
@@ -142,24 +147,20 @@ export default function HomeScreen() {
     setSelectedMoodId(null);
   };
 
-  const onSwipeableWillOpen = useCallback(
-    (direction: SwipeDirection, mood: MoodEntry) => {
-      if (direction === "right") {
-        handleDeleteMood(mood.id);
-      } else if (direction === "left") {
-        setSelectedMoodId(mood.id);
-        setNoteText(mood.note || "");
-        setModalVisible(true);
-      }
-    },
-    []
-  );
+  const onSwipeableWillOpen = (direction: SwipeDirection, mood: MoodEntry) => {
+    if (direction === "right") {
+      handleDeleteMood(mood);
+    } else if (direction === "left") {
+      setSelectedMoodId(mood.id);
+      setNoteText(mood.note || "");
+      setModalVisible(true);
+    }
+  };
 
-  const handleDeleteMood = async (id: number) => {
-    const index = moods.findIndex((mood) => mood.id === id);
-    const moodToDelete = moods.find((mood) => mood.id === id);
-    deleteMood(id);
-    setMoods((prev) => [...prev.filter((mood) => mood.id !== id)]);
+  const handleDeleteMood = async (mood: MoodEntry) => {
+    console.log(mood);
+    await deleteMood(mood.id);
+    setMoods((prev) => prev.filter((mood) => mood.id !== mood.id));
     Toast.show({
       type: "success",
       text1: "Mood deleted",
@@ -168,28 +169,39 @@ export default function HomeScreen() {
       visibilityTime: 3000,
       progressBarColor: "#3b82f6",
       onPress: async () => {
-        if (moodToDelete && index !== -1) {
-          const crmood = await insertMoodEntry(moodToDelete);
+        if (mood) {
+          const crmood = await insertMoodEntry(mood);
+
+          // Re-insert the restored mood and keep the list sorted by newest first
           setMoods((prev) => {
-            const newMoods = [...prev];
-            newMoods.splice(index, 0, crmood);
-            return newMoods;
+            const updated = [...prev, crmood].sort(
+              (a, b) =>
+                new Date(b.timestamp).getTime() -
+                new Date(a.timestamp).getTime()
+            );
+            return updated;
           });
+
+          // If this restored entry is now the most recent, update lastTracked
+          if (!lastTracked || new Date(crmood.timestamp) > lastTracked) {
+            setLastTracked(new Date(crmood.timestamp));
+          }
+          // Update lastTracked if the restored mood is the most recent
+          Toast.hide();
+        } else {
+          console.log(recentlyDeletedMood);
+          Toast.error("Failed to restore mood");
         }
-        Toast.hide();
       },
     });
   };
 
-  const renderMoodItem = useCallback(
-    ({ item }: { item: MoodEntry }) => (
-      <DisplayMoodItem
-        mood={item}
-        onSwipeableWillOpen={onSwipeableWillOpen}
-        swipeThreshold={SWIPE_THRESHOLD}
-      />
-    ),
-    [onSwipeableWillOpen]
+  const renderMoodItem = ({ item }: { item: MoodEntry }) => (
+    <DisplayMoodItem
+      mood={item}
+      onSwipeableWillOpen={onSwipeableWillOpen}
+      swipeThreshold={SWIPE_THRESHOLD}
+    />
   );
 
   // Toggle labels preference
@@ -209,11 +221,9 @@ export default function HomeScreen() {
   }, []);
 
   // Also check for label preference changes when screen comes into focus
-  useFocusEffect(
-    useCallback(() => {
-      loadShowLabelsPreference();
-    }, [])
-  );
+  useFocusEffect(() => {
+    loadShowLabelsPreference();
+  });
 
   const loadShowLabelsPreference = async () => {
     try {

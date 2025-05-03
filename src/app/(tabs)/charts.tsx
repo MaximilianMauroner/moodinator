@@ -128,17 +128,18 @@ const DisplayMoodChart = ({ refreshTrigger }: { refreshTrigger: boolean }) => {
   // Add helper function to get color from Tailwind class
   const getColorFromTailwind = (colorClass: string) => {
     const colorMap: Record<string, string> = {
-      "text-emerald-500": "#10B981",
-      "text-green-500": "#22C55E",
-      "text-lime-500": "#84CC16",
-      "text-yellow-500": "#EAB308",
-      "text-amber-500": "#F59E0B",
-      "text-blue-500": "#3B82F6",
-      "text-indigo-500": "#6366F1",
-      "text-violet-500": "#8B5CF6",
-      "text-purple-500": "#A855F7",
-      "text-pink-500": "#EC4899",
-      "text-red-500": "#EF4444",
+      "text-sky-500": "#03a9f4", // light-blue-500
+      "text-cyan-500": "#00bcd4", // cyan-500
+      "text-teal-500": "#009688", // teal-500
+      "text-emerald-500": "#4caf50", // green-500
+      "text-green-500": "#4caf50", // green-500
+      "text-gray-500": "#9e9e9e", // grey-500
+      "text-lime-500": "#cddc39", // lime-500
+      "text-yellow-500": "#ffeb3b", // yellow-500
+      "text-amber-500": "#ffc107", // amber-500
+      "text-orange-600": "#fb8c00", // orange-600
+      "text-red-500": "#f44336", // red-500
+      "text-red-700": "#d32f2f", // red-700
     };
     return colorMap[colorClass] || "#FFD700";
   };
