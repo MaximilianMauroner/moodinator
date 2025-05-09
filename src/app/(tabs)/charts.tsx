@@ -11,9 +11,9 @@ import {
 import { LineChart } from "react-native-chart-kit";
 import { seedMoods, clearMoods, getAllMoods } from "@db/db";
 import type { MoodEntry } from "@db/types";
-import { format, min } from "date-fns";
+import { format, startOfDay, addDays, isBefore, isEqual } from "date-fns";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Circle } from "react-native-svg";
+import { Circle, Line } from "react-native-svg";
 import { moodScale } from "@/constants/moodScale";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
@@ -104,6 +104,9 @@ export default function ChartsScreen() {
             )}
           </View>
           {moodCount > 0 && <DisplayMoodChart refreshTrigger={refreshing} />}
+          {moodCount > 0 && (
+            <DisplayDailyMoodChart refreshTrigger={refreshing} />
+          )}
         </ScrollView>
       </SafeAreaView>
     </GestureHandlerRootView>
@@ -125,7 +128,6 @@ const DisplayMoodChart = ({ refreshTrigger }: { refreshTrigger: boolean }) => {
     fetchMoods();
   }, [refreshTrigger]); // Re-fetch when refreshTrigger changes
 
-  // Add helper function to get color from Tailwind class
   const getColorFromTailwind = (colorClass: string) => {
     const colorMap: Record<string, string> = {
       "text-sky-500": "#03a9f4", // light-blue-500
@@ -236,5 +238,331 @@ const DisplayMoodChart = ({ refreshTrigger }: { refreshTrigger: boolean }) => {
         }
       />
     </ScrollView>
+  );
+};
+
+const getDaysInRange = (start: Date, end: Date): Date[] => {
+  const days: Date[] = [];
+  let currentDate = startOfDay(start);
+  const finalDate = startOfDay(end);
+
+  while (isBefore(currentDate, finalDate) || isEqual(currentDate, finalDate)) {
+    days.push(new Date(currentDate)); // Store a new Date object
+    currentDate = addDays(currentDate, 1);
+  }
+  return days;
+};
+
+const processMoodDataForDailyChart = (allMoods: MoodEntry[]) => {
+  if (!allMoods || allMoods.length === 0) {
+    return { labels: [], dailyAggregates: [] };
+  }
+
+  const sortedMoods = [...allMoods].sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  );
+
+  const minDate = new Date(sortedMoods[0].timestamp);
+  const maxDate = new Date(sortedMoods[sortedMoods.length - 1].timestamp);
+
+  const allDatesInRange = getDaysInRange(minDate, maxDate);
+
+  const moodsByDay: Record<string, number[]> = {};
+  sortedMoods.forEach((mood) => {
+    const dayKey = format(startOfDay(new Date(mood.timestamp)), "yyyy-MM-dd");
+    if (!moodsByDay[dayKey]) {
+      moodsByDay[dayKey] = [];
+    }
+    moodsByDay[dayKey].push(mood.mood);
+  });
+
+  type DailyMoodAggregateWorking = {
+    date: Date;
+    moods: number[] | null;
+    avg?: number;
+    min?: number;
+    max?: number;
+  };
+
+  const initialAggregates: DailyMoodAggregateWorking[] = allDatesInRange.map(
+    (date) => {
+      const dateKey = format(date, "yyyy-MM-dd");
+      const dayMoods = moodsByDay[dateKey] || null;
+      let avg, min, max;
+
+      if (dayMoods && dayMoods.length > 0) {
+        avg = dayMoods.reduce((sum, val) => sum + val, 0) / dayMoods.length;
+        min = Math.min(...dayMoods);
+        max = Math.max(...dayMoods);
+        return { date, moods: dayMoods, avg, min, max };
+      } else {
+        return { date, moods: null };
+      }
+    }
+  );
+
+  const finalAggregates = initialAggregates.map((aggregate, index) => {
+    if (aggregate.avg !== undefined) {
+      return { ...aggregate, finalAvg: aggregate.avg, isInterpolated: false };
+    }
+
+    let prevIndex = -1;
+    for (let i = index - 1; i >= 0; i--) {
+      if (initialAggregates[i].avg !== undefined) {
+        prevIndex = i;
+        break;
+      }
+    }
+
+    let nextIndex = -1;
+    for (let i = index + 1; i < initialAggregates.length; i++) {
+      if (initialAggregates[i].avg !== undefined) {
+        nextIndex = i;
+        break;
+      }
+    }
+
+    const prevAgg = prevIndex !== -1 ? initialAggregates[prevIndex] : null;
+    const nextAgg = nextIndex !== -1 ? initialAggregates[nextIndex] : null;
+
+    let interpolatedAvg: number;
+    if (
+      prevAgg &&
+      nextAgg &&
+      prevAgg.avg !== undefined &&
+      nextAgg.avg !== undefined
+    ) {
+      const x0 = prevAgg.date.getTime();
+      const y0 = prevAgg.avg;
+      const x1 = nextAgg.date.getTime();
+      const y1 = nextAgg.avg;
+      const x = aggregate.date.getTime();
+      if (x1 === x0) {
+        interpolatedAvg = y0;
+      } else {
+        interpolatedAvg = y0 + ((y1 - y0) * (x - x0)) / (x1 - x0);
+      }
+    } else if (prevAgg && prevAgg.avg !== undefined) {
+      interpolatedAvg = prevAgg.avg;
+    } else if (nextAgg && nextAgg.avg !== undefined) {
+      interpolatedAvg = nextAgg.avg;
+    } else {
+      const neutralMood = moodScale.find((s) => s.label === "Neutral");
+      interpolatedAvg = neutralMood ? neutralMood.value : 3;
+    }
+    return { ...aggregate, finalAvg: interpolatedAvg, isInterpolated: true };
+  });
+
+  return {
+    labels: finalAggregates.map((agg) => format(agg.date, "d/M")),
+    dailyAggregates: finalAggregates,
+  };
+};
+
+const DisplayDailyMoodChart = ({
+  refreshTrigger,
+}: {
+  refreshTrigger: boolean;
+}) => {
+  const [processedData, setProcessedData] = useState<{
+    labels: string[];
+    dailyAggregates: Array<{
+      date: Date;
+      moods: number[] | null;
+      avg?: number;
+      min?: number;
+      max?: number;
+      finalAvg: number;
+      isInterpolated: boolean;
+    }>;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const chartHeight = 300;
+
+  const fetchAndProcessMoods = useCallback(async () => {
+    setLoading(true);
+    const allMoods = await getAllMoods();
+    if (allMoods.length === 0) {
+      setProcessedData(null);
+      setLoading(false);
+      return;
+    }
+    const data = processMoodDataForDailyChart(allMoods);
+    setProcessedData(data);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    fetchAndProcessMoods();
+  }, [refreshTrigger, fetchAndProcessMoods]);
+
+  if (loading) {
+    return (
+      <View className="flex-1 justify-center items-center py-10">
+        <ActivityIndicator size="large" color="#7DCEA0" />
+      </View>
+    );
+  }
+
+  if (!processedData || processedData.dailyAggregates.length === 0) {
+    return (
+      <View className="my-4 py-10">
+        <Text style={{ color: "#7DCEA0", textAlign: "center" }}>
+          No daily mood data available for summary chart.
+        </Text>
+      </View>
+    );
+  }
+
+  // reverse daily data so most recent days appear on the left
+  const reversedLabels = processedData.labels.slice().reverse();
+  const reversedAggregates = processedData.dailyAggregates.slice().reverse();
+
+  // helper to map Tailwind color classes to hex, same as DisplayMoodChart
+  const getColorFromTailwind = (colorClass: string) => {
+    const colorMap: Record<string, string> = {
+      "text-sky-500": "#03a9f4",
+      "text-cyan-500": "#00bcd4",
+      "text-teal-500": "#009688",
+      "text-emerald-500": "#4caf50",
+      "text-green-500": "#4caf50",
+      "text-gray-500": "#9e9e9e",
+      "text-lime-500": "#cddc39",
+      "text-yellow-500": "#ffeb3b",
+      "text-amber-500": "#ffc107",
+      "text-orange-600": "#fb8c00",
+      "text-red-500": "#f44336",
+      "text-red-700": "#d32f2f",
+    };
+    return colorMap[colorClass] || "#FFD700";
+  };
+
+  // compute dot colors based on rounded average mood
+  const dotColors = reversedAggregates.map((agg) => {
+    const idx = Math.round(agg.finalAvg);
+    const colorClass = moodScale[idx]?.color;
+    return getColorFromTailwind(colorClass);
+  });
+
+  const chartData = {
+    labels: reversedLabels,
+    datasets: [
+      {
+        data: reversedAggregates.map((agg) => agg.finalAvg),
+        dotColor: dotColors,
+        strokeWidth: 2,
+        color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+      },
+      {
+        data: reversedAggregates.map(() => moodScale[0].value),
+        withDots: false,
+      },
+      {
+        data: reversedAggregates.map(
+          () => moodScale[moodScale.length - 1].value
+        ),
+        withDots: false,
+      },
+    ],
+  };
+
+  return (
+    <View className="my-8">
+      <Text
+        className="text-xl font-semibold text-center mb-3"
+        style={{ color: "#27AE60" }}
+      >
+        Daily Mood Summary
+      </Text>
+      <ScrollView
+        horizontal={true}
+        showsHorizontalScrollIndicator={true}
+        scrollEventThrottle={16}
+        className="mx-4"
+      >
+        <LineChart
+          data={chartData}
+          width={Math.max(
+            Dimensions.get("window").width - 32,
+            processedData.labels.length * 60
+          )}
+          height={chartHeight}
+          chartConfig={{
+            backgroundColor: "#E8F8F5",
+            backgroundGradientFrom: "#A9DFBF",
+            backgroundGradientTo: "#A9DFBF",
+            decimalPlaces: 1,
+            color: (opacity = 1) => `rgba(39, 174, 96, ${opacity})`,
+            labelColor: (opacity = 1) => `rgba(25, 111, 61, ${opacity})`,
+            style: {
+              borderRadius: 16,
+            },
+            propsForDots: {
+              r: "3",
+              strokeWidth: "1",
+            },
+            propsForLabels: {
+              fontSize: 10,
+            },
+            fillShadowGradientFrom: "rgba(39, 174, 96, 0.5)",
+            fillShadowGradientTo: "rgba(169, 223, 191, 0.1)",
+          }}
+          style={{ borderRadius: 16 }}
+          bezier
+          segments={Math.min(10, moodScale.length - 1)}
+          renderDotContent={({ x, y, index }) => {
+            const aggregate = reversedAggregates[index];
+            if (!aggregate) return null;
+
+            const dotColor =
+              aggregate.isInterpolated && !aggregate.moods
+                ? "rgba(25, 111, 61, 0.4)"
+                : "rgba(39, 174, 96, 0.9)";
+            const lineColor =
+              aggregate.isInterpolated && !aggregate.moods
+                ? "rgba(25, 111, 61, 0.3)"
+                : "rgba(39, 174, 96, 0.7)";
+
+            let visualLineHeight = 0;
+            if (
+              aggregate.moods &&
+              aggregate.moods.length > 1 &&
+              aggregate.min !== undefined &&
+              aggregate.max !== undefined
+            ) {
+              const rangeFactor = 6;
+              const minPixelHeight = 6;
+              visualLineHeight = Math.max(
+                minPixelHeight,
+                (aggregate.max - aggregate.min) * rangeFactor
+              );
+            }
+
+            return (
+              <React.Fragment key={index}>
+                {visualLineHeight > 0 && (
+                  <Line
+                    x1={x}
+                    y1={y - visualLineHeight / 2}
+                    x2={x}
+                    y2={y + visualLineHeight / 2}
+                    stroke={lineColor}
+                    strokeWidth="3"
+                  />
+                )}
+                <Circle
+                  cx={x}
+                  cy={y}
+                  r="5"
+                  fill={dotColors[index]}
+                  stroke={dotColors[index]}
+                  strokeWidth="1"
+                />
+              </React.Fragment>
+            );
+          }}
+        />
+      </ScrollView>
+    </View>
   );
 };
