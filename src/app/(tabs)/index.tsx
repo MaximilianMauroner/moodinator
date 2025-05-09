@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -6,10 +6,7 @@ import {
   RefreshControl,
   FlatList,
 } from "react-native";
-import {
-  Directions,
-  GestureHandlerRootView,
-} from "react-native-gesture-handler";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import {
   insertMood,
   getAllMoods,
@@ -17,7 +14,6 @@ import {
   updateMoodNote,
   insertMoodEntry,
 } from "@db/db";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DisplayMoodItem } from "@/components/DisplayMoodItem";
 import { NoteModal } from "@/components/NoteModal";
 import { MoodButtonsDetailed } from "@/components/MoodButtonsDetailed";
@@ -84,13 +80,11 @@ export default function HomeScreen() {
   const [currentMoodPressed, setCurrentMoodPressed] = useState<number | null>(
     null
   );
-  const [recentlyDeletedMood, setRecentlyDeletedMood] =
-    useState<MoodEntry | null>(null);
   const [showDetailedLabels, setShowDetailedLabels] = useState(false);
 
   const SWIPE_THRESHOLD = 100; // pixels to trigger action
 
-  const fetchMoods = async () => {
+  const fetchMoods = useCallback(async () => {
     setLoading(true);
     try {
       const data = await getAllMoods();
@@ -102,31 +96,31 @@ export default function HomeScreen() {
       setLoading(false);
       setRefreshing(false); // <-- ensure refreshing is reset
     }
-  };
+  }, []);
 
-  const onRefresh = () => {
+  const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchMoods();
-  };
+  }, [fetchMoods]);
 
   useEffect(() => {
     fetchMoods();
-  }, []);
+  }, [fetchMoods]);
 
-  const handleMoodPress = async (mood: number) => {
+  const handleMoodPress = useCallback(async (mood: number) => {
     const newMood = await insertMood(mood);
     setMoods((prev) => [newMood, ...prev]);
     setLastTracked(new Date());
-  };
+  }, []);
 
-  const handleLongPress = (mood: number) => {
+  const handleLongPress = useCallback((mood: number) => {
     setCurrentMoodPressed(mood);
     setSelectedMoodId(null);
     setNoteText("");
     setModalVisible(true);
-  };
+  }, []);
 
-  const handleAddNote = async () => {
+  const handleAddNote = useCallback(async () => {
     if (selectedMoodId !== null) {
       const updatedMood = await updateMoodNote(selectedMoodId, noteText);
       if (updatedMood) {
@@ -145,22 +139,12 @@ export default function HomeScreen() {
     setModalVisible(false);
     setNoteText("");
     setSelectedMoodId(null);
-  };
+  }, [selectedMoodId, noteText, currentMoodPressed]);
 
-  const onSwipeableWillOpen = (direction: SwipeDirection, mood: MoodEntry) => {
-    if (direction === "right") {
-      handleDeleteMood(mood);
-    } else if (direction === "left") {
-      setSelectedMoodId(mood.id);
-      setNoteText(mood.note || "");
-      setModalVisible(true);
-    }
-  };
-
-  const handleDeleteMood = async (mood: MoodEntry) => {
+  const handleDeleteMood = useCallback(async (mood: MoodEntry) => {
     console.log(mood);
     await deleteMood(mood.id);
-    setMoods((prev) => prev.filter((mood) => mood.id !== mood.id));
+    setMoods((prev) => prev.filter((m) => m.id !== mood.id));
     Toast.show({
       type: "success",
       text1: "Mood deleted",
@@ -172,7 +156,6 @@ export default function HomeScreen() {
         if (mood) {
           const crmood = await insertMoodEntry(mood);
 
-          // Re-insert the restored mood and keep the list sorted by newest first
           setMoods((prev) => {
             const updated = [...prev, crmood].sort(
               (a, b) =>
@@ -182,30 +165,48 @@ export default function HomeScreen() {
             return updated;
           });
 
-          // If this restored entry is now the most recent, update lastTracked
-          if (!lastTracked || new Date(crmood.timestamp) > lastTracked) {
-            setLastTracked(new Date(crmood.timestamp));
-          }
-          // Update lastTracked if the restored mood is the most recent
+          setLastTracked((prevLastTracked) => {
+            if (
+              !prevLastTracked ||
+              new Date(crmood.timestamp) > prevLastTracked
+            ) {
+              return new Date(crmood.timestamp);
+            }
+            return prevLastTracked;
+          });
           Toast.hide();
         } else {
-          console.log(recentlyDeletedMood);
           Toast.error("Failed to restore mood");
         }
       },
     });
-  };
+  }, []);
 
-  const renderMoodItem = ({ item }: { item: MoodEntry }) => (
-    <DisplayMoodItem
-      mood={item}
-      onSwipeableWillOpen={onSwipeableWillOpen}
-      swipeThreshold={SWIPE_THRESHOLD}
-    />
+  const onSwipeableWillOpen = useCallback(
+    (direction: SwipeDirection, mood: MoodEntry) => {
+      if (direction === "right") {
+        handleDeleteMood(mood);
+      } else if (direction === "left") {
+        setSelectedMoodId(mood.id);
+        setNoteText(mood.note || "");
+        setModalVisible(true);
+      }
+    },
+    [handleDeleteMood]
   );
 
-  // Toggle labels preference
-  const toggleLabelsPreference = async () => {
+  const renderMoodItem = useCallback(
+    ({ item }: { item: MoodEntry }) => (
+      <DisplayMoodItem
+        mood={item}
+        onSwipeableWillOpen={onSwipeableWillOpen}
+        swipeThreshold={SWIPE_THRESHOLD}
+      />
+    ),
+    [onSwipeableWillOpen]
+  );
+
+  const toggleLabelsPreference = useCallback(async () => {
     const newValue = !showDetailedLabels;
     setShowDetailedLabels(newValue);
     try {
@@ -213,19 +214,9 @@ export default function HomeScreen() {
     } catch (error) {
       console.error("Failed to save label preference:", error);
     }
-  };
+  }, [showDetailedLabels]);
 
-  // Load show labels preference from AsyncStorage
-  useEffect(() => {
-    loadShowLabelsPreference();
-  }, []);
-
-  // Also check for label preference changes when screen comes into focus
-  useFocusEffect(() => {
-    loadShowLabelsPreference();
-  });
-
-  const loadShowLabelsPreference = async () => {
+  const loadShowLabelsPreference = useCallback(async () => {
     try {
       const value = await AsyncStorage.getItem(SHOW_LABELS_KEY);
       if (value !== null) {
@@ -234,7 +225,23 @@ export default function HomeScreen() {
     } catch (error) {
       console.error("Failed to load label preference:", error);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadShowLabelsPreference();
+  }, [loadShowLabelsPreference]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadShowLabelsPreference();
+    }, [loadShowLabelsPreference])
+  );
+
+  const handleCloseModal = useCallback(() => {
+    setModalVisible(false);
+    setCurrentMoodPressed(null);
+    setSelectedMoodId(null);
+  }, []);
 
   return (
     <>
@@ -315,7 +322,7 @@ export default function HomeScreen() {
           visible={modalVisible}
           noteText={noteText}
           setNoteText={setNoteText}
-          onCancel={() => setModalVisible(false)}
+          onCancel={handleCloseModal}
           onSave={handleAddNote}
         />
       )}
