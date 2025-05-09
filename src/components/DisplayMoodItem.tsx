@@ -19,11 +19,7 @@ interface Props {
 }
 
 const renderRightActions = () => (
-  <Animated.View
-    entering={FadeInRight}
-    exiting={SlideOutRight}
-    className="flex justify-center items-end h-full"
-  >
+  <Animated.View className="flex justify-center items-end h-full">
     <View className="h-full px-6 justify-center bg-red-50 rounded-xl">
       <Text className="text-red-500 font-bold">Delete</Text>
     </View>
@@ -31,11 +27,7 @@ const renderRightActions = () => (
 );
 
 const renderLeftActions = () => (
-  <Animated.View
-    entering={FadeInLeft}
-    exiting={SlideOutLeft}
-    className="flex justify-center items-start h-full"
-  >
+  <Animated.View className="flex justify-center items-start h-full">
     <View className="h-full px-6 justify-center bg-blue-50 rounded-xl">
       <Text className="text-blue-500 font-bold">Add Note</Text>
     </View>
