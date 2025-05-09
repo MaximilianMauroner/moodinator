@@ -513,43 +513,30 @@ const DisplayDailyMoodChart = ({
           renderDotContent={({ x, y, index }) => {
             const aggregate = reversedAggregates[index];
             if (!aggregate) return null;
-
-            const dotColor =
-              aggregate.isInterpolated && !aggregate.moods
-                ? "rgba(25, 111, 61, 0.4)"
-                : "rgba(39, 174, 96, 0.9)";
-            const lineColor =
-              aggregate.isInterpolated && !aggregate.moods
-                ? "rgba(25, 111, 61, 0.3)"
-                : "rgba(39, 174, 96, 0.7)";
-
-            let visualLineHeight = 0;
-            if (
-              aggregate.moods &&
-              aggregate.moods.length > 1 &&
-              aggregate.min !== undefined &&
-              aggregate.max !== undefined
-            ) {
-              const rangeFactor = 6;
-              const minPixelHeight = 6;
-              visualLineHeight = Math.max(
-                minPixelHeight,
-                (aggregate.max - aggregate.min) * rangeFactor
-              );
-            }
-
-            return (
-              <React.Fragment key={index}>
-                {visualLineHeight > 0 && (
+            let lineElement = null;
+            {
+              // only draw if we have both min and max for this day
+              const startY = 240;
+              const endY = 15;
+              const split = Math.abs(startY - endY) / 10;
+              const y1 = startY - split * (aggregate.min ?? aggregate.finalAvg);
+              const y2 = startY - split * (aggregate.max ?? aggregate.finalAvg);
+              if (aggregate.min !== undefined && aggregate.max !== undefined) {
+                lineElement = (
                   <Line
                     x1={x}
-                    y1={y - visualLineHeight / 2}
                     x2={x}
-                    y2={y + visualLineHeight / 2}
-                    stroke={lineColor}
+                    y1={y1}
+                    y2={y2}
+                    stroke={dotColors[index]}
                     strokeWidth="3"
                   />
-                )}
+                );
+              }
+            }
+            return (
+              <React.Fragment key={index}>
+                {lineElement}
                 <Circle
                   cx={x}
                   cy={y}
