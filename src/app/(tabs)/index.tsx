@@ -142,7 +142,6 @@ export default function HomeScreen() {
   }, [selectedMoodId, noteText, currentMoodPressed]);
 
   const handleDeleteMood = useCallback(async (mood: MoodEntry) => {
-    console.log(mood);
     await deleteMood(mood.id);
     setMoods((prev) => prev.filter((m) => m.id !== mood.id));
     Toast.show({
@@ -245,10 +244,10 @@ export default function HomeScreen() {
 
   return (
     <>
-      <GestureHandlerRootView>
+      <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaView className="flex-1 bg-gradient-to-b from-blue-50 to-white">
-          <View className="grid grid-rows-3 p-4 space-y-4">
-            <View className="row-span-1">
+          <View className="flex-1 p-4 space-y-4">
+            <View>
               <Text className="text-3xl font-extrabold text-center mb-2 text-blue-700">
                 Moodinator
               </Text>
@@ -273,8 +272,8 @@ export default function HomeScreen() {
               </View>
             </View>
 
-            <View className="row-span-2 bg-white rounded-2xl shadow-lg overflow-hidden">
-              <View className="h-full">
+            <View className="flex-1 bg-white rounded-2xl shadow-lg overflow-hidden">
+              <View className="flex-1 flex flex-col">
                 <View className="p-4 flex-row justify-between items-center">
                   <Text className="font-bold text-xl text-blue-800">
                     Mood History {moods.length > 0 ? `(${moods.length})` : ""}
@@ -310,6 +309,7 @@ export default function HomeScreen() {
                     maxToRenderPerBatch={10}
                     updateCellsBatchingPeriod={50}
                     extraData={moods}
+                    style={{ flex: 1 }}
                   />
                 )}
               </View>
