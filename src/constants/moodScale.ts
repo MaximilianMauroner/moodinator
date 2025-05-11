@@ -3,37 +3,37 @@ import { MoodScale } from "@/types/mood";
 export const moodScale: MoodScale[] = [
     {
         value: 0,
-        label: "Motivated to live",
+        label: "Happy to be alive",
         color: "text-sky-500",
         bg: "bg-sky-100",
     },
     {
         value: 1,
-        label: "Happy to be alive",
+        label: "Motivated to live",
         color: "text-cyan-500",
         bg: "bg-cyan-100",
     },
     {
         value: 2,
-        label: "Calm and content",
+        label: "Satisfied with life",
         color: "text-teal-500",
         bg: "bg-teal-100",
     },
     {
         value: 3,
-        label: "Neutral (neither good nor bad)",
+        label: "Calm and content",
         color: "text-emerald-500",
         bg: "bg-emerald-100",
     },
     {
         value: 4,
-        label: "Mildly anxious or down",
+        label: "Neutral (neither good nor bad)",
         color: "text-green-500",
         bg: "bg-green-100",
     },
     {
         value: 5,
-        label: "Moderate distress",
+        label: "Background Depression",
         color: "text-gray-500",
         bg: "bg-gray-100",
     },
@@ -45,7 +45,7 @@ export const moodScale: MoodScale[] = [
     },
     {
         value: 7,
-        label: "Severe distress, hard to communicate",
+        label: "Severe distress, communication difficulties",
         color: "text-amber-500",
         bg: "bg-amber-100",
     },
@@ -57,13 +57,13 @@ export const moodScale: MoodScale[] = [
     },
     {
         value: 9,
-        label: "Experiencing suicidal thoughts",
+        label: "Feeling intent to act on suicidal thoughts",
         color: "text-red-500",
         bg: "bg-red-200",
     },
     {
         value: 10,
-        label: "Feeling intent to act on suicidal thoughts",
+        label: "Acting on suicidal thoughts",
         color: "text-red-700",
         bg: "bg-red-300",
     },
