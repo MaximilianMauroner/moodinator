@@ -29,7 +29,7 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
           className={`text-xs font-medium ${moodScale[0].color} text-center px-1 mt-1`}
           numberOfLines={2}
         >
-          {moodScale[0].label}
+          {moodScale[0].description}
         </Text>
       </HapticTab>
 
@@ -50,7 +50,7 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
             className={`text-xs font-medium ${mood.color} text-center px-1 mt-1`}
             numberOfLines={2}
           >
-            {mood.label}
+            {mood.description}
           </Text>
         </HapticTab>
       ))}
@@ -71,7 +71,7 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
             className={`text-xs font-medium ${mood.color} text-center px-1 mt-1`}
             numberOfLines={2}
           >
-            {mood.label}
+            {mood.description}
           </Text>
         </HapticTab>
       ))}
