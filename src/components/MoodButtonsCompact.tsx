@@ -27,6 +27,9 @@ export const MoodButtonsCompact: React.FC<MoodButtonsCompactProps> = ({
           <Text className={`text-lg font-bold ${moodScale[0].color}`}>
             {moodScale[0].value}
           </Text>
+          <Text className={`text-xs ${moodScale[0].color}`}>
+            {moodScale[0].label}
+          </Text>
         </HapticTab>
 
         {moodScale.slice(1, 4).map((mood) => (
@@ -41,6 +44,7 @@ export const MoodButtonsCompact: React.FC<MoodButtonsCompactProps> = ({
             <Text className={`text-lg font-bold ${mood.color}`}>
               {mood.value}
             </Text>
+            <Text className={`text-xs ${mood.color}`}>{mood.label}</Text>
           </HapticTab>
         ))}
       </View>
@@ -58,6 +62,7 @@ export const MoodButtonsCompact: React.FC<MoodButtonsCompactProps> = ({
             <Text className={`text-lg font-bold ${mood.color}`}>
               {mood.value}
             </Text>
+            <Text className={`text-xs ${mood.color}`}>{mood.label}</Text>
           </HapticTab>
         ))}
       </View>
@@ -75,6 +80,7 @@ export const MoodButtonsCompact: React.FC<MoodButtonsCompactProps> = ({
             <Text className={`text-lg font-bold ${mood.color}`}>
               {mood.value}
             </Text>
+            <Text className={`text-xs ${mood.color}`}>{mood.label}</Text>
           </HapticTab>
         ))}
       </View>
