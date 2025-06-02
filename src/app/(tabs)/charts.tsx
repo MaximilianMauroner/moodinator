@@ -17,6 +17,23 @@ import { Circle, Line } from "react-native-svg";
 import { moodScale } from "@/constants/moodScale";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
+// shared Tailwind->hex color map
+const colorMap: Record<string, string> = {
+  "text-sky-500": "#03a9f4",
+  "text-cyan-500": "#00bcd4",
+  "text-teal-500": "#009688",
+  "text-emerald-500": "#4caf50",
+  "text-green-500": "#4caf50",
+  "text-gray-500": "#9e9e9e",
+  "text-lime-500": "#cddc39",
+  "text-yellow-500": "#ffeb3b",
+  "text-amber-500": "#ffc107",
+  "text-orange-600": "#fb8c00",
+  "text-red-500": "#f44336",
+  "text-red-700": "#d32f2f",
+};
+const getColorFromTailwind = (cls: string) => colorMap[cls] || "#FFD700";
+
 export default function ChartsScreen() {
   const [loading, setLoading] = useState<"seed" | "clear" | null>(null);
   const [moods, setMoods] = useState<MoodEntry[]>([]);
@@ -103,143 +120,13 @@ export default function ChartsScreen() {
               </Pressable>
             )}
           </View>
-          {moodCount > 0 && <DisplayMoodChart refreshTrigger={refreshing} />}
-          {moodCount > 0 && (
-            <DisplayDailyMoodChart refreshTrigger={refreshing} />
-          )}
+          {moodCount > 0 && <DisplayMoodChart moods={moods} />}
+          {moodCount > 0 && <DisplayDailyMoodChart moods={moods} />}
         </ScrollView>
       </SafeAreaView>
     </GestureHandlerRootView>
   );
 }
-
-const DisplayMoodChart = ({ refreshTrigger }: { refreshTrigger: boolean }) => {
-  const [moods, setMoods] = useState<MoodEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const fetchMoods = async () => {
-    const allMoods = await getAllMoods();
-    setMoods(allMoods);
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    setLoading(true);
-    fetchMoods();
-  }, [refreshTrigger]); // Re-fetch when refreshTrigger changes
-
-  const getColorFromTailwind = (colorClass: string) => {
-    const colorMap: Record<string, string> = {
-      "text-sky-500": "#03a9f4", // light-blue-500
-      "text-cyan-500": "#00bcd4", // cyan-500
-      "text-teal-500": "#009688", // teal-500
-      "text-emerald-500": "#4caf50", // green-500
-      "text-green-500": "#4caf50", // green-500
-      "text-gray-500": "#9e9e9e", // grey-500
-      "text-lime-500": "#cddc39", // lime-500
-      "text-yellow-500": "#ffeb3b", // yellow-500
-      "text-amber-500": "#ffc107", // amber-500
-      "text-orange-600": "#fb8c00", // orange-600
-      "text-red-500": "#f44336", // red-500
-      "text-red-700": "#d32f2f", // red-700
-    };
-    return colorMap[colorClass] || "#FFD700";
-  };
-
-  const chartData = useMemo(() => {
-    return {
-      labels: moods.map((m) => format(new Date(m.timestamp), "HH:MM d/M")),
-      datasets: [
-        {
-          data: moods.map((m) => m.mood),
-          strokeWidth: 3,
-          dotColor: moods.map((m) =>
-            getColorFromTailwind(moodScale[m.mood].color)
-          ),
-        },
-        {
-          data: [moodScale[0].value], // min
-          withDots: false,
-        },
-        {
-          data: [moodScale[moodScale.length - 1].value], // max
-          withDots: false,
-        },
-      ],
-    };
-  }, [moods]);
-
-  if (loading) {
-    return (
-      <View className="flex-1 justify-center items-center">
-        <ActivityIndicator size="large" color="#5DADE2" />
-      </View>
-    );
-  }
-
-  if (!moods.length) {
-    return (
-      <View className="flex-1 justify-center items-center">
-        <Text style={{ color: "#9B59B6" }}>No mood data available.</Text>
-      </View>
-    );
-  }
-
-  return (
-    <ScrollView
-      className="mx-4"
-      horizontal={true}
-      showsHorizontalScrollIndicator={true}
-      scrollEventThrottle={16}
-    >
-      <LineChart
-        data={chartData}
-        width={Math.max(Dimensions.get("window").width, moods.length * 60)}
-        height={300}
-        chartConfig={{
-          backgroundColor: "#F5F5DC",
-          backgroundGradientFrom: "#9B59B6",
-          backgroundGradientTo: "#9B59B6",
-          decimalPlaces: 0,
-          color: (opacity = 1) => `rgba(245, 245, 220, ${opacity})`,
-          labelColor: (opacity = 1) => `rgba(245, 245, 220, ${opacity})`,
-          style: {
-            borderRadius: 16,
-          },
-          propsForDots: {
-            r: "4", // Slightly smaller dots
-            strokeWidth: "1",
-          },
-          propsForLabels: {
-            fontSize: 10, // Smaller font size for labels
-          },
-          fillShadowGradientFrom: "#9B59B6",
-          fillShadowGradientTo: "transparent",
-        }}
-        style={{
-          borderRadius: 16,
-        }}
-        withVerticalLines={true}
-        segments={10}
-        bezier
-        renderDotContent={({ x, y, index }) =>
-          chartData.datasets[0] &&
-          Array.isArray(chartData.datasets[0].dotColor) &&
-          chartData.datasets[0].dotColor[index] && (
-            <Circle
-              key={index}
-              cx={x}
-              cy={y}
-              r="5"
-              fill={chartData.datasets[0].dotColor[index]}
-              stroke={chartData.datasets[0].dotColor[index]}
-            />
-          )
-        }
-      />
-    </ScrollView>
-  );
-};
 
 const getDaysInRange = (start: Date, end: Date): Date[] => {
   const days: Date[] = [];
@@ -359,52 +246,98 @@ const processMoodDataForDailyChart = (allMoods: MoodEntry[]) => {
   };
 };
 
-const DisplayDailyMoodChart = ({
-  refreshTrigger,
-}: {
-  refreshTrigger: boolean;
-}) => {
-  const [processedData, setProcessedData] = useState<{
-    labels: string[];
-    dailyAggregates: Array<{
-      date: Date;
-      moods: number[] | null;
-      avg?: number;
-      min?: number;
-      max?: number;
-      finalAvg: number;
-      isInterpolated: boolean;
-    }>;
-  } | null>(null);
-  const [loading, setLoading] = useState(true);
-  const chartHeight = 300;
-
-  const fetchAndProcessMoods = useCallback(async () => {
-    setLoading(true);
-    const allMoods = await getAllMoods();
-    if (allMoods.length === 0) {
-      setProcessedData(null);
-      setLoading(false);
-      return;
-    }
-    const data = processMoodDataForDailyChart(allMoods);
-    setProcessedData(data);
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    fetchAndProcessMoods();
-  }, [refreshTrigger, fetchAndProcessMoods]);
-
-  if (loading) {
+const DisplayMoodChart = ({ moods }: { moods: MoodEntry[] }) => {
+  if (!moods.length) {
     return (
-      <View className="flex-1 justify-center items-center py-10">
-        <ActivityIndicator size="large" color="#7DCEA0" />
+      <View className="flex-1 justify-center items-center">
+        <Text style={{ color: "#9B59B6" }}>No mood data available.</Text>
       </View>
     );
   }
 
-  if (!processedData || processedData.dailyAggregates.length === 0) {
+  const chartData = useMemo(
+    () => ({
+      labels: moods.map((m) => format(new Date(m.timestamp), "HH:MM d/M")),
+      datasets: [
+        {
+          data: moods.map((m) => m.mood),
+          strokeWidth: 3,
+          dotColor: moods.map((m) =>
+            getColorFromTailwind(moodScale[m.mood].color)
+          ),
+        },
+        {
+          data: [moodScale[0].value], // min
+          withDots: false,
+        },
+        {
+          data: [moodScale[moodScale.length - 1].value], // max
+          withDots: false,
+        },
+      ],
+    }),
+    [moods]
+  );
+
+  return (
+    <ScrollView
+      className="mx-4"
+      horizontal
+      showsHorizontalScrollIndicator
+      scrollEventThrottle={16}
+    >
+      <LineChart
+        data={chartData}
+        width={Math.max(Dimensions.get("window").width, moods.length * 60)}
+        height={300}
+        chartConfig={{
+          backgroundColor: "#F5F5DC",
+          backgroundGradientFrom: "#9B59B6",
+          backgroundGradientTo: "#9B59B6",
+          decimalPlaces: 0,
+          color: (opacity = 1) => `rgba(245, 245, 220, ${opacity})`,
+          labelColor: (opacity = 1) => `rgba(245, 245, 220, ${opacity})`,
+          style: {
+            borderRadius: 16,
+          },
+          propsForDots: {
+            r: "4", // Slightly smaller dots
+            strokeWidth: "1",
+          },
+          propsForLabels: {
+            fontSize: 10, // Smaller font size for labels
+          },
+          fillShadowGradientFrom: "#9B59B6",
+          fillShadowGradientTo: "transparent",
+        }}
+        style={{
+          borderRadius: 16,
+        }}
+        withVerticalLines={true}
+        segments={10}
+        bezier
+        renderDotContent={({ x, y, index }) =>
+          chartData.datasets[0] &&
+          Array.isArray(chartData.datasets[0].dotColor) &&
+          chartData.datasets[0].dotColor[index] && (
+            <Circle
+              key={index}
+              cx={x}
+              cy={y}
+              r="5"
+              fill={chartData.datasets[0].dotColor[index]}
+              stroke={chartData.datasets[0].dotColor[index]}
+            />
+          )
+        }
+      />
+    </ScrollView>
+  );
+};
+
+const DisplayDailyMoodChart = ({ moods }: { moods: MoodEntry[] }) => {
+  const processedData = processMoodDataForDailyChart(moods);
+  if (!processedData?.dailyAggregates.length) {
     return (
       <View className="my-4 py-10">
         <Text style={{ color: "#7DCEA0", textAlign: "center" }}>
@@ -414,34 +347,13 @@ const DisplayDailyMoodChart = ({
     );
   }
 
-  // reverse daily data so most recent days appear on the left
   const reversedLabels = processedData.labels.slice().reverse();
   const reversedAggregates = processedData.dailyAggregates.slice().reverse();
-
-  // helper to map Tailwind color classes to hex, same as DisplayMoodChart
-  const getColorFromTailwind = (colorClass: string) => {
-    const colorMap: Record<string, string> = {
-      "text-sky-500": "#03a9f4",
-      "text-cyan-500": "#00bcd4",
-      "text-teal-500": "#009688",
-      "text-emerald-500": "#4caf50",
-      "text-green-500": "#4caf50",
-      "text-gray-500": "#9e9e9e",
-      "text-lime-500": "#cddc39",
-      "text-yellow-500": "#ffeb3b",
-      "text-amber-500": "#ffc107",
-      "text-orange-600": "#fb8c00",
-      "text-red-500": "#f44336",
-      "text-red-700": "#d32f2f",
-    };
-    return colorMap[colorClass] || "#FFD700";
-  };
 
   // compute dot colors based on rounded average mood
   const dotColors = reversedAggregates.map((agg) => {
     const idx = Math.round(agg.finalAvg);
-    const colorClass = moodScale[idx]?.color;
-    return getColorFromTailwind(colorClass);
+    return getColorFromTailwind(moodScale[idx]?.color);
   });
 
   const chartData = {
@@ -451,7 +363,7 @@ const DisplayDailyMoodChart = ({
         data: reversedAggregates.map((agg) => agg.finalAvg),
         dotColor: dotColors,
         strokeWidth: 2,
-        color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+        color: (o = 1) => `rgba(255,255,255,${o})`,
       },
       {
         data: reversedAggregates.map(() => moodScale[0].value),
@@ -475,8 +387,8 @@ const DisplayDailyMoodChart = ({
         Daily Mood Summary
       </Text>
       <ScrollView
-        horizontal={true}
-        showsHorizontalScrollIndicator={true}
+        horizontal
+        showsHorizontalScrollIndicator
         scrollEventThrottle={16}
         className="mx-4"
       >
@@ -486,7 +398,7 @@ const DisplayDailyMoodChart = ({
             Dimensions.get("window").width - 32,
             processedData.labels.length * 60
           )}
-          height={chartHeight}
+          height={300}
           chartConfig={{
             backgroundColor: "#E8F8F5",
             backgroundGradientFrom: "#A9DFBF",
@@ -511,32 +423,38 @@ const DisplayDailyMoodChart = ({
           bezier
           segments={Math.min(10, moodScale.length - 1)}
           renderDotContent={({ x, y, index }) => {
-            const aggregate = reversedAggregates[index];
-            if (!aggregate) return null;
-            let lineElement = null;
-            {
-              // only draw if we have both min and max for this day
-              const startY = 240;
-              const endY = 15;
-              const split = Math.abs(startY - endY) / 10;
-              const y1 = startY - split * (aggregate.min ?? aggregate.finalAvg);
-              const y2 = startY - split * (aggregate.max ?? aggregate.finalAvg);
-              if (aggregate.min !== undefined && aggregate.max !== undefined) {
-                lineElement = (
-                  <Line
-                    x1={x}
-                    x2={x}
-                    y1={y1}
-                    y2={y2}
-                    stroke={dotColors[index]}
-                    strokeWidth="3"
-                  />
-                );
-              }
-            }
+            const agg = reversedAggregates[index];
+            const startY = 240,
+              endY = 15,
+              split = Math.abs(startY - endY) / 10;
+            const uniqueMoods = Array.from(new Set(agg.moods ?? []));
+            const moodCircles = uniqueMoods.map((val) => (
+              <Circle
+                key={`m-${index}-${val}`}
+                cx={x}
+                cy={startY - split * val}
+                r="3"
+                fill={getColorFromTailwind(moodScale[val].color)}
+                stroke={getColorFromTailwind(moodScale[val].color)}
+              />
+            ));
+            const y1 = startY - split * (agg.min ?? agg.finalAvg);
+            const y2 = startY - split * (agg.max ?? agg.finalAvg);
+            const lineEl =
+              agg.min !== undefined && agg.max !== undefined ? (
+                <Line
+                  x1={x}
+                  x2={x}
+                  y1={y1}
+                  y2={y2}
+                  stroke={dotColors[index]}
+                  strokeWidth="3"
+                />
+              ) : null;
             return (
               <React.Fragment key={index}>
-                {lineElement}
+                {lineEl}
+                {moodCircles}
                 <Circle
                   cx={x}
                   cy={y}
