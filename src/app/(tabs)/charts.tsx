@@ -293,7 +293,7 @@ const DisplayMoodChart = ({ moods }: { moods: MoodEntry[] }) => {
         chartConfig={{
           backgroundColor: "#F5F5DC",
           backgroundGradientFrom: "#9B59B6",
-          backgroundGradientTo: "#9B59B6",
+          backgroundGradientTo: "#8E44AD",
           decimalPlaces: 0,
           color: (opacity = 1) => `rgba(245, 245, 220, ${opacity})`,
           labelColor: (opacity = 1) => `rgba(245, 245, 220, ${opacity})`,
@@ -301,14 +301,14 @@ const DisplayMoodChart = ({ moods }: { moods: MoodEntry[] }) => {
             borderRadius: 16,
           },
           propsForDots: {
-            r: "4", // Slightly smaller dots
+            r: "4",
             strokeWidth: "1",
           },
           propsForLabels: {
-            fontSize: 10, // Smaller font size for labels
+            fontSize: 10,
           },
           fillShadowGradientFrom: "#9B59B6",
-          fillShadowGradientTo: "transparent",
+          fillShadowGradientTo: "rgba(142, 68, 173, 0.2)",
         }}
         style={{
           borderRadius: 16,
@@ -382,7 +382,7 @@ const DisplayDailyMoodChart = ({ moods }: { moods: MoodEntry[] }) => {
     <View className="my-8">
       <Text
         className="text-xl font-semibold text-center mb-3"
-        style={{ color: "#27AE60" }}
+        style={{ color: "#7986CB" }}
       >
         Daily Mood Summary
       </Text>
@@ -400,12 +400,12 @@ const DisplayDailyMoodChart = ({ moods }: { moods: MoodEntry[] }) => {
           )}
           height={300}
           chartConfig={{
-            backgroundColor: "#E8F8F5",
-            backgroundGradientFrom: "#A9DFBF",
-            backgroundGradientTo: "#A9DFBF",
+            backgroundColor: "#F5F5DC",
+            backgroundGradientFrom: "#7986CB",
+            backgroundGradientTo: "#5C6BC0",
             decimalPlaces: 1,
-            color: (opacity = 1) => `rgba(39, 174, 96, ${opacity})`,
-            labelColor: (opacity = 1) => `rgba(25, 111, 61, ${opacity})`,
+            color: (opacity = 1) => `rgba(245, 245, 220, ${opacity})`,
+            labelColor: (opacity = 1) => `rgba(245, 245, 220, ${opacity})`,
             style: {
               borderRadius: 16,
             },
@@ -416,8 +416,8 @@ const DisplayDailyMoodChart = ({ moods }: { moods: MoodEntry[] }) => {
             propsForLabels: {
               fontSize: 10,
             },
-            fillShadowGradientFrom: "rgba(39, 174, 96, 0.5)",
-            fillShadowGradientTo: "rgba(169, 223, 191, 0.1)",
+            fillShadowGradientFrom: "#7986CB",
+            fillShadowGradientTo: "rgba(92, 107, 192, 0.2)",
           }}
           style={{ borderRadius: 16 }}
           bezier
