@@ -13,9 +13,11 @@ import {
   deleteMood,
   updateMoodNote,
   insertMoodEntry,
+  updateMoodTimestamp,
 } from "@db/db";
 import { DisplayMoodItem } from "@/components/DisplayMoodItem";
 import { NoteModal } from "@/components/NoteModal";
+import { DateTimePickerModal } from "@/components/DateTimePickerModal";
 import { MoodButtonsDetailed } from "@/components/MoodButtonsDetailed";
 import { MoodButtonsCompact } from "@/components/MoodButtonsCompact";
 import { SwipeDirection } from "@/types/mood";
@@ -25,7 +27,6 @@ import { useFocusEffect } from "@react-navigation/native";
 import ToastManager, { Toast } from "toastify-react-native";
 import { IconSymbol } from "@/components/ui/IconSymbol";
 import { HapticTab } from "@/components/HapticTab";
-import { set } from "date-fns";
 
 const SHOW_LABELS_KEY = "showLabelsPreference";
 
@@ -81,6 +82,8 @@ export default function HomeScreen() {
     null
   );
   const [showDetailedLabels, setShowDetailedLabels] = useState(false);
+  const [showDateModal, setShowDateModal] = useState(false);
+  const [selectedMood, setSelectedMood] = useState<MoodEntry | null>(null);
 
   const SWIPE_THRESHOLD = 100; // pixels to trigger action
 
@@ -194,15 +197,30 @@ export default function HomeScreen() {
     [handleDeleteMood]
   );
 
+  const handleMoodItemLongPress = useCallback((mood: MoodEntry) => {
+    setSelectedMood(mood);
+    setShowDateModal(true);
+  }, []);
+
+  const handleDateTimeSave = useCallback(
+    async (moodId: number, newTimestamp: number) => {
+      await updateMoodTimestamp(moodId, newTimestamp);
+      await fetchMoods(); // Refresh the moods list
+      setShowDateModal(false);
+    },
+    [fetchMoods]
+  );
+
   const renderMoodItem = useCallback(
     ({ item }: { item: MoodEntry }) => (
       <DisplayMoodItem
         mood={item}
         onSwipeableWillOpen={onSwipeableWillOpen}
+        onLongPress={handleMoodItemLongPress}
         swipeThreshold={SWIPE_THRESHOLD}
       />
     ),
-    [onSwipeableWillOpen]
+    [onSwipeableWillOpen, handleMoodItemLongPress]
   );
 
   const toggleLabelsPreference = useCallback(async () => {
@@ -324,6 +342,14 @@ export default function HomeScreen() {
           setNoteText={setNoteText}
           onCancel={handleCloseModal}
           onSave={handleAddNote}
+        />
+      )}
+      {showDateModal && (
+        <DateTimePickerModal
+          visible={showDateModal}
+          mood={selectedMood}
+          onClose={() => setShowDateModal(false)}
+          onSave={handleDateTimeSave}
         />
       )}
       <ToastManager config={toastConfig} />

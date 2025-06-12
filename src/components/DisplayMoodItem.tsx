@@ -1,5 +1,5 @@
 import React, { useRef } from "react";
-import { View, Text } from "react-native";
+import { View, Text, Pressable } from "react-native";
 import Animated, {
   FadeInRight,
   FadeInLeft,
@@ -15,6 +15,7 @@ import { moodScale } from "@/constants/moodScale";
 interface Props {
   mood: MoodEntry;
   onSwipeableWillOpen: (direction: SwipeDirection, mood: MoodEntry) => void;
+  onLongPress?: (mood: MoodEntry) => void;
   swipeThreshold: number;
 }
 
@@ -35,7 +36,7 @@ const renderLeftActions = () => (
 );
 
 export const DisplayMoodItem = React.memo(
-  ({ mood, onSwipeableWillOpen, swipeThreshold }: Props) => {
+  ({ mood, onSwipeableWillOpen, onLongPress, swipeThreshold }: Props) => {
     const swipeableRef = useRef<any>(null);
     const moodColor =
       moodScale.find((m) => m.value === mood.mood)?.color ?? "text-blue-800";
@@ -66,17 +67,19 @@ export const DisplayMoodItem = React.memo(
         leftThreshold={swipeThreshold}
         onSwipeableOpen={handleSwipeableOpen}
       >
-        <Animated.View className="p-4 rounded-xl bg-white flex-row justify-between items-center">
-          <View>
-            <Text className={`text-lg font-bold ${moodColor}`}>
-              Mood: {mood.mood}
-              {mood.note ? ` • ${mood.note}` : ""}
-            </Text>
-            <Text className="text-xs text-gray-500 mt-1">
-              {new Date(mood.timestamp).toLocaleString()}
-            </Text>
-          </View>
-        </Animated.View>
+        <Pressable onLongPress={() => onLongPress?.(mood)}>
+          <Animated.View className="p-4 rounded-xl bg-white flex-row justify-between items-center">
+            <View>
+              <Text className={`text-lg font-bold ${moodColor}`}>
+                Mood: {mood.mood}
+                {mood.note ? ` • ${mood.note}` : ""}
+              </Text>
+              <Text className="text-xs text-gray-500 mt-1">
+                {new Date(mood.timestamp).toLocaleString()}
+              </Text>
+            </View>
+          </Animated.View>
+        </Pressable>
       </Swipeable>
     );
   }

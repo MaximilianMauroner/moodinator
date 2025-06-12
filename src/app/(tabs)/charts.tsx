@@ -34,6 +34,8 @@ const colorMap: Record<string, string> = {
 };
 const getColorFromTailwind = (cls: string) => colorMap[cls] || "#FFD700";
 
+const SECTION_SPACING = 12; // 48px between sections
+
 export default function ChartsScreen() {
   const [loading, setLoading] = useState<"seed" | "clear" | null>(null);
   const [moods, setMoods] = useState<MoodEntry[]>([]);
@@ -122,6 +124,7 @@ export default function ChartsScreen() {
           </View>
           {moodCount > 0 && <DisplayMoodChart moods={moods} />}
           {moodCount > 0 && <DisplayDailyMoodChart moods={moods} />}
+          {moodCount > 0 && <DisplayWeeklyMoodChart moods={moods} />}
         </ScrollView>
       </SafeAreaView>
     </GestureHandlerRootView>
@@ -246,6 +249,69 @@ const processMoodDataForDailyChart = (allMoods: MoodEntry[]) => {
   };
 };
 
+const processWeeklyMoodData = (allMoods: MoodEntry[]) => {
+  if (!allMoods || allMoods.length === 0) {
+    return { labels: [], weeklyAggregates: [] };
+  }
+
+  const sortedMoods = [...allMoods].sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  );
+
+  const moodsByWeek: Record<string, number[]> = {};
+  sortedMoods.forEach((mood) => {
+    const date = new Date(mood.timestamp);
+    const weekStart = startOfDay(
+      new Date(date.setDate(date.getDate() - date.getDay()))
+    );
+    const weekKey = format(weekStart, "yyyy-MM-dd");
+    if (!moodsByWeek[weekKey]) {
+      moodsByWeek[weekKey] = [];
+    }
+    moodsByWeek[weekKey].push(mood.mood);
+  });
+
+  const getQuartiles = (arr: number[]) => {
+    const sorted = [...arr].sort((a, b) => a - b);
+    const q1Idx = Math.floor(sorted.length * 0.25);
+    const q2Idx = Math.floor(sorted.length * 0.5);
+    const q3Idx = Math.floor(sorted.length * 0.75);
+    return {
+      q1: sorted[q1Idx],
+      q2: sorted[q2Idx], // median
+      q3: sorted[q3Idx],
+      min: sorted[0],
+      max: sorted[sorted.length - 1],
+      outliers: sorted.filter(
+        (v) =>
+          v < sorted[q1Idx] - 1.5 * (sorted[q3Idx] - sorted[q1Idx]) ||
+          v > sorted[q3Idx] + 1.5 * (sorted[q3Idx] - sorted[q1Idx])
+      ),
+    };
+  };
+
+  const weekKeys = Object.keys(moodsByWeek).sort().reverse(); // Reverse the order
+  const weeklyAggregates = weekKeys.map((weekKey) => {
+    const weekMoods = moodsByWeek[weekKey];
+    const stats = getQuartiles(weekMoods);
+    const avg = weekMoods.reduce((sum, val) => sum + val, 0) / weekMoods.length;
+
+    return {
+      weekStart: new Date(weekKey),
+      moods: weekMoods,
+      ...stats,
+      avg,
+      finalAvg: stats.q2, // use median instead of mean
+      isInterpolated: false,
+    };
+  });
+
+  return {
+    labels: weeklyAggregates.map((week) => format(week.weekStart, "'W'w MMM")),
+    weeklyAggregates,
+  };
+};
+
 const DisplayMoodChart = ({ moods }: { moods: MoodEntry[] }) => {
   if (!moods.length) {
     return (
@@ -280,58 +346,67 @@ const DisplayMoodChart = ({ moods }: { moods: MoodEntry[] }) => {
   );
 
   return (
-    <ScrollView
-      className="mx-4"
-      horizontal
-      showsHorizontalScrollIndicator
-      scrollEventThrottle={16}
-    >
-      <LineChart
-        data={chartData}
-        width={Math.max(Dimensions.get("window").width, moods.length * 60)}
-        height={300}
-        chartConfig={{
-          backgroundColor: "#F5F5DC",
-          backgroundGradientFrom: "#9B59B6",
-          backgroundGradientTo: "#8E44AD",
-          decimalPlaces: 0,
-          color: (opacity = 1) => `rgba(245, 245, 220, ${opacity})`,
-          labelColor: (opacity = 1) => `rgba(245, 245, 220, ${opacity})`,
-          style: {
+    <View className={`mt-${SECTION_SPACING / 2} mb-${SECTION_SPACING}`}>
+      <Text
+        className="text-xl font-semibold text-center mb-3"
+        style={{ color: "#9B59B6" }}
+      >
+        Raw Mood Data
+      </Text>
+      <View className="mx-4 h-0.5 bg-gray-100 mb-4" />
+      <ScrollView
+        className="mx-4"
+        horizontal
+        showsHorizontalScrollIndicator
+        scrollEventThrottle={16}
+      >
+        <LineChart
+          data={chartData}
+          width={Math.max(Dimensions.get("window").width, moods.length * 60)}
+          height={300}
+          chartConfig={{
+            backgroundColor: "#F5F5DC",
+            backgroundGradientFrom: "#9B59B6",
+            backgroundGradientTo: "#8E44AD",
+            decimalPlaces: 0,
+            color: (opacity = 1) => `rgba(245, 245, 220, ${opacity})`,
+            labelColor: (opacity = 1) => `rgba(245, 245, 220, ${opacity})`,
+            style: {
+              borderRadius: 16,
+            },
+            propsForDots: {
+              r: "4",
+              strokeWidth: "1",
+            },
+            propsForLabels: {
+              fontSize: 10,
+            },
+            fillShadowGradientFrom: "#9B59B6",
+            fillShadowGradientTo: "rgba(142, 68, 173, 0.2)",
+          }}
+          style={{
             borderRadius: 16,
-          },
-          propsForDots: {
-            r: "4",
-            strokeWidth: "1",
-          },
-          propsForLabels: {
-            fontSize: 10,
-          },
-          fillShadowGradientFrom: "#9B59B6",
-          fillShadowGradientTo: "rgba(142, 68, 173, 0.2)",
-        }}
-        style={{
-          borderRadius: 16,
-        }}
-        withVerticalLines={true}
-        segments={10}
-        bezier
-        renderDotContent={({ x, y, index }) =>
-          chartData.datasets[0] &&
-          Array.isArray(chartData.datasets[0].dotColor) &&
-          chartData.datasets[0].dotColor[index] && (
-            <Circle
-              key={index}
-              cx={x}
-              cy={y}
-              r="5"
-              fill={chartData.datasets[0].dotColor[index]}
-              stroke={chartData.datasets[0].dotColor[index]}
-            />
-          )
-        }
-      />
-    </ScrollView>
+          }}
+          withVerticalLines={true}
+          segments={10}
+          bezier
+          renderDotContent={({ x, y, index }) =>
+            chartData.datasets[0] &&
+            Array.isArray(chartData.datasets[0].dotColor) &&
+            chartData.datasets[0].dotColor[index] && (
+              <Circle
+                key={index}
+                cx={x}
+                cy={y}
+                r="5"
+                fill={chartData.datasets[0].dotColor[index]}
+                stroke={chartData.datasets[0].dotColor[index]}
+              />
+            )
+          }
+        />
+      </ScrollView>
+    </View>
   );
 };
 
@@ -339,7 +414,7 @@ const DisplayDailyMoodChart = ({ moods }: { moods: MoodEntry[] }) => {
   const processedData = processMoodDataForDailyChart(moods);
   if (!processedData?.dailyAggregates.length) {
     return (
-      <View className="my-4 py-10">
+      <View className="mb-8">
         <Text style={{ color: "#7DCEA0", textAlign: "center" }}>
           No daily mood data available for summary chart.
         </Text>
@@ -379,7 +454,8 @@ const DisplayDailyMoodChart = ({ moods }: { moods: MoodEntry[] }) => {
   };
 
   return (
-    <View className="my-8">
+    <View className={`mb-${SECTION_SPACING}`}>
+      <View className="mx-4 h-0.5 bg-gray-100 mb-4" />
       <Text
         className="text-xl font-semibold text-center mb-3"
         style={{ color: "#7986CB" }}
@@ -463,6 +539,212 @@ const DisplayDailyMoodChart = ({ moods }: { moods: MoodEntry[] }) => {
                   stroke={dotColors[index]}
                   strokeWidth="1"
                 />
+              </React.Fragment>
+            );
+          }}
+        />
+      </ScrollView>
+    </View>
+  );
+};
+
+const DisplayWeeklyMoodChart = ({ moods }: { moods: MoodEntry[] }) => {
+  const processedData = processWeeklyMoodData(moods);
+
+  if (!processedData?.weeklyAggregates.length) {
+    return (
+      <View className="my-4 py-10">
+        <Text style={{ color: "#7DCEA0", textAlign: "center" }}>
+          No weekly mood data available for summary chart.
+        </Text>
+      </View>
+    );
+  }
+
+  const chartData = {
+    labels: processedData.labels,
+    datasets: [
+      {
+        data: processedData.weeklyAggregates.map((agg) => agg.q2),
+        strokeWidth: 2,
+        color: (o = 1) => `rgba(255,255,255,${o})`,
+      },
+      {
+        data: processedData.weeklyAggregates.map(() => moodScale[0].value),
+        withDots: false,
+      },
+      {
+        data: processedData.weeklyAggregates.map(
+          () => moodScale[moodScale.length - 1].value
+        ),
+        withDots: false,
+      },
+    ],
+  };
+
+  return (
+    <View className={`mb-${SECTION_SPACING * 1.5}`}>
+      <View className="mx-4 h-0.5 bg-gray-100 mb-4" />
+      <Text
+        className="text-xl font-semibold text-center mb-3"
+        style={{ color: "#673AB7" }}
+      >
+        Weekly Mood Distribution
+      </Text>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator
+        scrollEventThrottle={16}
+        className="mx-4"
+      >
+        <LineChart
+          data={chartData}
+          width={Math.max(
+            Dimensions.get("window").width - 32,
+            processedData.labels.length * 80 + 40
+          )}
+          height={340} // Increased height further
+          chartConfig={{
+            backgroundColor: "#673AB7",
+            backgroundGradientFrom: "#673AB7",
+            backgroundGradientTo: "#4527A0",
+            fillShadowGradientFrom: "#673AB7",
+            fillShadowGradientTo: "rgba(69, 39, 160, 0.2)",
+            decimalPlaces: 1,
+            color: (opacity = 1) => `rgba(245, 245, 220, ${opacity})`,
+            labelColor: (opacity = 1) => `rgba(245, 245, 220, ${opacity})`,
+            style: {
+              borderRadius: 16,
+              paddingLeft: 15,
+              paddingRight: 15,
+              paddingTop: 20, // Increased top padding
+              paddingBottom: 20, // Increased bottom padding
+            },
+            propsForDots: { r: "3", strokeWidth: "1" },
+            propsForLabels: { fontSize: 10 },
+          }}
+          fromZero={true} // Ensure chart starts from 0
+          style={{
+            borderRadius: 16,
+            paddingBottom: 10, // Extra padding for container
+          }}
+          bezier
+          segments={Math.min(10, moodScale.length - 1)}
+          renderDotContent={({ x, y, index }) => {
+            const agg = processedData.weeklyAggregates[index];
+            const startY = 280, // Increased start Y
+              endY = 30; // Increased end Y
+            const split = Math.abs(startY - endY) / 10;
+            const boxWidth = 20; // Controls overall width of the boxplot
+            const whiskerWidth = boxWidth * 0.6; // Whiskers are slightly narrower than the box
+
+            const getColorForValue = (value: number) => {
+              const roundedValue = Math.round(value);
+              return getColorFromTailwind(moodScale[roundedValue]?.color);
+            };
+
+            // Calculate vertical positions
+            const minY = startY - split * agg.min;
+            const maxY = startY - split * agg.max;
+            const q1Y = startY - split * agg.q1;
+            const q2Y = startY - split * agg.q2;
+            const q3Y = startY - split * agg.q3;
+
+            // Get colors based on mood values
+            const minColor = getColorForValue(agg.min);
+            const maxColor = getColorForValue(agg.max);
+            const q1Color = getColorForValue(agg.q1);
+            const q2Color = getColorForValue(agg.q2);
+            const q3Color = getColorForValue(agg.q3);
+
+            return (
+              <React.Fragment key={index}>
+                {/* Whiskers */}
+                <Line
+                  x1={x}
+                  x2={x}
+                  y1={minY}
+                  y2={q1Y}
+                  stroke={q1Color}
+                  strokeWidth="1"
+                  strokeDasharray="4,4"
+                />
+                <Line
+                  x1={x}
+                  x2={x}
+                  y1={q3Y}
+                  y2={maxY}
+                  stroke={q3Color}
+                  strokeWidth="1"
+                  strokeDasharray="4,4"
+                />
+
+                {/* Min/Max caps */}
+                <Line
+                  x1={x - whiskerWidth / 2}
+                  x2={x + whiskerWidth / 2}
+                  y1={minY}
+                  y2={minY}
+                  stroke={minColor}
+                  strokeWidth="2"
+                />
+                <Line
+                  x1={x - whiskerWidth / 2}
+                  x2={x + whiskerWidth / 2}
+                  y1={maxY}
+                  y2={maxY}
+                  stroke={maxColor}
+                  strokeWidth="2"
+                />
+
+                {/* Box edges */}
+                <Line
+                  x1={x - boxWidth / 2}
+                  x2={x + boxWidth / 2}
+                  y1={q1Y}
+                  y2={q1Y}
+                  stroke={q1Color}
+                  strokeWidth="2"
+                />
+                <Line
+                  x1={x - boxWidth / 2}
+                  x2={x + boxWidth / 2}
+                  y1={q3Y}
+                  y2={q3Y}
+                  stroke={q3Color}
+                  strokeWidth="2"
+                />
+
+                {/* Box sides */}
+                <Line
+                  x1={x - boxWidth / 2}
+                  x2={x - boxWidth / 2}
+                  y1={q1Y}
+                  y2={q3Y}
+                  stroke={q2Color}
+                  strokeWidth="2"
+                />
+                <Line
+                  x1={x + boxWidth / 2}
+                  x2={x + boxWidth / 2}
+                  y1={q1Y}
+                  y2={q3Y}
+                  stroke={q2Color}
+                  strokeWidth="2"
+                />
+
+                {/* Outliers */}
+                {agg.outliers.map((val, i) => (
+                  <Circle
+                    key={`outlier-${index}-${i}`}
+                    cx={x}
+                    cy={startY - split * val}
+                    r="3"
+                    fill={getColorForValue(val)}
+                    stroke="rgba(255,255,255,0.3)"
+                    strokeWidth="1"
+                  />
+                ))}
               </React.Fragment>
             );
           }}

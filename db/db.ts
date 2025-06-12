@@ -81,6 +81,23 @@ export async function updateMoodNote(id: number, note: string): Promise<MoodEntr
 }
 
 /**
+ * Updates the timestamp of a mood entry by its ID and returns the updated mood entry.
+ * @param id - The ID of the mood entry to update
+ * @param timestamp - The new timestamp
+ * @returns Promise resolving to the updated MoodEntry
+ */
+export async function updateMoodTimestamp(id: number, timestamp: number): Promise<MoodEntry | undefined> {
+    const db = await getDb();
+    await db.runAsync(
+        'UPDATE moods SET timestamp = ? WHERE id = ?;',
+        timestamp,
+        id
+    );
+    const updated = await db.getFirstAsync('SELECT * FROM moods WHERE id = ?;', id);
+    return updated as MoodEntry | undefined;
+}
+
+/**
  * Retrieves all mood entries, ordered by timestamp descending.
  * @returns Promise resolving to an array of MoodEntry
  */
@@ -106,10 +123,9 @@ export async function seedMoods() {
     if (!__DEV__) return;
 
     const db = await getDb();
-    const days = 30;
+    const days = 60;
     const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days); // Go back 365 days
-
+    startDate.setDate(startDate.getDate() - days);
     for (let i = 0; i < days; i++) {
         // Random number of entries per day (0-9)
         const entriesCount = Math.floor(Math.random() * 10);
@@ -122,8 +138,8 @@ export async function seedMoods() {
             currentDate.setHours(Math.floor(Math.random() * 24));
             currentDate.setMinutes(Math.floor(Math.random() * 60));
 
-            // Random mood between 1 and 10
-            const mood = Math.floor(Math.random() * 10) + 1;
+            // Random mood between 0 and 10
+            const mood = Math.floor(Math.random() * 11);
 
             await db.runAsync(
                 'INSERT INTO moods (mood, timestamp) VALUES (?, ?);',
