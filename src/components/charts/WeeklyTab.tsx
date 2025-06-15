@@ -344,13 +344,6 @@ export const WeeklyTab = ({ moods }: { moods: MoodEntry[] }) => {
                       {Math.abs(trend).toFixed(1)}
                     </Text>
                   )}
-                  <Text
-                    className={`text-lg mt-2 ${
-                      isExpanded ? "text-blue-600" : "text-gray-400"
-                    }`}
-                  >
-                    {isExpanded ? "⌄" : "⌃"}
-                  </Text>
                 </View>
               </TouchableOpacity>
 

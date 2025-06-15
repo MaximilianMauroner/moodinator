@@ -38,8 +38,17 @@ const renderLeftActions = () => (
 export const DisplayMoodItem = React.memo(
   ({ mood, onSwipeableWillOpen, onLongPress, swipeThreshold }: Props) => {
     const swipeableRef = useRef<any>(null);
-    const moodColor =
-      moodScale.find((m) => m.value === mood.mood)?.color ?? "text-blue-800";
+
+    // Pre-compute mood data to avoid accessing .value during render
+    const moodData = React.useMemo(() => {
+      const moodInfo = moodScale.find((m) => m.value === mood.mood);
+      return {
+        color: moodInfo?.color ?? "text-blue-800",
+        label: moodInfo?.label ?? `Mood ${mood.mood}`,
+      };
+    }, [mood.mood]);
+
+    const moodColor = moodData.color;
 
     const handleSwipeableOpen = (direction: string) => {
       // Trigger the action in the parent component

@@ -3,11 +3,10 @@ import {
   View,
   Text,
   TouchableOpacity,
-  ActivityIndicator,
   ScrollView,
   RefreshControl,
 } from "react-native";
-import { clearMoods, getAllMoods, seedMoodsFromFile } from "@db/db";
+import { getAllMoods } from "@db/db";
 import type { MoodEntry } from "@db/types";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -28,15 +27,10 @@ const tabs: { id: TabType; label: string; icon: string }[] = [
 ];
 
 export default function ChartsScreen() {
-  const [loading, setLoading] = useState<"seed" | "clear" | null>(null);
   const [moods, setMoods] = useState<MoodEntry[]>([]);
   const [moodCount, setMoodCount] = useState<number>(0);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>("overview");
-  const [lastSeedResult, setLastSeedResult] = useState<{
-    count: number;
-    source: "file" | "random";
-  } | null>(null);
 
   const getMoodCount = useCallback(async () => {
     const allMoods = await getAllMoods();
@@ -52,28 +46,7 @@ export default function ChartsScreen() {
 
   useEffect(() => {
     getMoodCount();
-  }, [loading, getMoodCount]);
-
-  const handleSeedMoods = useCallback(async () => {
-    setLoading("seed");
-    try {
-      const result = await seedMoodsFromFile();
-      setLastSeedResult(result);
-      console.log(`Seeded ${result.count} moods from ${result.source}`);
-    } finally {
-      setLoading(null);
-    }
-  }, []);
-
-  const handleClearMoods = useCallback(async () => {
-    setLoading("clear");
-    try {
-      await clearMoods();
-      setLastSeedResult(null);
-    } finally {
-      setLoading(null);
-    }
-  }, []);
+  }, [getMoodCount]);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -85,64 +58,16 @@ export default function ChartsScreen() {
           }
         >
           {/* Header */}
-          <View className="mt-1 flex gap-2 flex-row justify-center items-center p-4">
-            {__DEV__ && (
-              <TouchableOpacity
-                onPress={handleSeedMoods}
-                style={{
-                  backgroundColor: "#2563EB",
-                  paddingHorizontal: 16,
-                  paddingVertical: 8,
-                  borderRadius: 6,
-                }}
-              >
-                {loading === "seed" ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={{ color: "#FFFFFF", fontWeight: "600" }}>
-                    Seed Moods
-                  </Text>
-                )}
-              </TouchableOpacity>
-            )}
-            <View className="flex flex-row justify-center items-center">
-              <Text className="text-3xl font-extrabold text-center text-sky-400">
-                Insights
-              </Text>
+          <View className="mt-1 flex flex-row justify-center items-center p-4">
+            <Text className="text-3xl font-extrabold text-center text-sky-400">
+              Insights
+            </Text>
+            <View className="justify-center">
               <Text className="font-semibold pl-2 text-purple-600">
                 ({moodCount})
               </Text>
             </View>
-            {__DEV__ && (
-              <TouchableOpacity
-                onPress={handleClearMoods}
-                style={{
-                  backgroundColor: "#EF4444",
-                  paddingHorizontal: 16,
-                  paddingVertical: 8,
-                  borderRadius: 6,
-                }}
-              >
-                {loading === "clear" ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={{ color: "#FFFFFF", fontWeight: "600" }}>
-                    Clear Moods
-                  </Text>
-                )}
-              </TouchableOpacity>
-            )}
           </View>
-
-          {/* Seed Result Feedback */}
-          {__DEV__ && lastSeedResult && (
-            <View className="mx-4 mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-              <Text className="text-green-800 text-center font-medium">
-                ✅ Loaded {lastSeedResult.count} moods from{" "}
-                {lastSeedResult.source === "file" ? "JSON file" : "random data"}
-              </Text>
-            </View>
-          )}
 
           {/* Tab Navigation */}
           {moodCount > 0 && (
@@ -212,11 +137,6 @@ export default function ChartsScreen() {
                 <Text className="text-gray-400 text-center mt-2">
                   Start tracking your moods to see beautiful insights here!
                 </Text>
-                {__DEV__ && (
-                  <Text className="text-blue-500 text-center mt-4 text-sm">
-                    💡 Use "Seed Moods" button above to add sample data
-                  </Text>
-                )}
               </View>
             )}
           </View>
