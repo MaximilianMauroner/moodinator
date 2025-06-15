@@ -11,15 +11,26 @@ import {
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { exportMoods, importMoods } from "@db/db";
+import {
+  exportMoods,
+  importMoods,
+  clearMoods,
+  seedMoodsFromFile,
+} from "@db/db";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Storage key for show labels preference
 const SHOW_LABELS_KEY = "showLabelsPreference";
 
 export default function SettingsScreen() {
-  const [loading, setLoading] = useState<"export" | "import" | null>(null);
+  const [loading, setLoading] = useState<
+    "export" | "import" | "seed" | "clear" | null
+  >(null);
   const [showDetailedLabels, setShowDetailedLabels] = useState(false);
+  const [lastSeedResult, setLastSeedResult] = useState<{
+    count: number;
+    source: "file" | "random";
+  } | null>(null);
 
   // Load saved preference on component mount
   useEffect(() => {
@@ -125,6 +136,53 @@ export default function SettingsScreen() {
     }
   };
 
+  const handleSeedMoods = async () => {
+    try {
+      setLoading("seed");
+      const result = await seedMoodsFromFile();
+      setLastSeedResult(result);
+      Alert.alert(
+        "Sample Data Added",
+        `Successfully added ${result.count} sample mood entries.`
+      );
+    } catch (error) {
+      Alert.alert("Error", "Failed to add sample data");
+      console.error(error);
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleClearMoods = async () => {
+    Alert.alert(
+      "Clear All Data",
+      "Are you sure you want to delete all mood data? This action cannot be undone.",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Delete All",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setLoading("clear");
+              await clearMoods();
+              setLastSeedResult(null);
+              Alert.alert("Success", "All mood data has been cleared.");
+            } catch (error) {
+              Alert.alert("Error", "Failed to clear mood data");
+              console.error(error);
+            } finally {
+              setLoading(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <SafeAreaView className="flex-1 bg-gradient-to-b from-blue-50 to-white">
       <ScrollView className="flex-1">
@@ -187,10 +245,65 @@ export default function SettingsScreen() {
                     )}
                   </Pressable>
                 </View>
+
+                <>
+                  <View className="border-t border-gray-200 my-4" />
+
+                  <View>
+                    <Text className="text-base font-medium text-gray-800 mb-1">
+                      Add Sample Data
+                    </Text>
+                    <Text className="text-sm text-gray-600 mb-2">
+                      Add sample mood entries for testing and demonstration
+                    </Text>
+                    <Pressable
+                      onPress={handleSeedMoods}
+                      className="bg-purple-500 py-3 px-4 rounded-lg"
+                    >
+                      {loading === "seed" ? (
+                        <ActivityIndicator color="#fff" />
+                      ) : (
+                        <Text className="text-white font-medium text-center">
+                          Add Sample Data
+                        </Text>
+                      )}
+                    </Pressable>
+                  </View>
+
+                  <View className="border-t border-gray-200 my-4" />
+
+                  <View>
+                    <Text className="text-base font-medium text-gray-800 mb-1">
+                      Clear All Data
+                    </Text>
+                    <Text className="text-sm text-gray-600 mb-2">
+                      Remove all mood entries from the database
+                    </Text>
+                    <Pressable
+                      onPress={handleClearMoods}
+                      className="bg-red-500 py-3 px-4 rounded-lg"
+                    >
+                      {loading === "clear" ? (
+                        <ActivityIndicator color="#fff" />
+                      ) : (
+                        <Text className="text-white font-medium text-center">
+                          Clear All Data
+                        </Text>
+                      )}
+                    </Pressable>
+                  </View>
+                </>
+                {lastSeedResult && (
+                  <View className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <Text className="text-green-800 text-center font-medium">
+                      ✅ Added {lastSeedResult.count} sample mood entries
+                    </Text>
+                  </View>
+                )}
               </View>
             </View>
 
-            <View className="space-y-4">
+            <View className="space-y-4 pb-8">
               <Text className="text-lg font-semibold mb-2 text-gray-700">
                 Preferences
               </Text>

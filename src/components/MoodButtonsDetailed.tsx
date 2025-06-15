@@ -12,29 +12,44 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
   onMoodPress,
   onLongPress,
 }) => {
+  // Pre-compute mood data to avoid accessing .value during render
+  const moodData = React.useMemo(() => {
+    return moodScale.map((mood) => ({
+      value: mood.value,
+      label: mood.label,
+      description: mood.description,
+      color: mood.color,
+      bg: mood.bg,
+    }));
+  }, []);
+
+  const firstMood = moodData[0];
+  const middleMoods = moodData.slice(1, 6);
+  const lastMoods = moodData.slice(6);
+
   return (
     <View className="flex-row flex-wrap justify-between mb-2">
       {/* Zero button (full width) */}
       <HapticTab
-        key={moodScale[0].value}
-        className={`items-center justify-center h-20 rounded-lg shadow-sm ${moodScale[0].bg} mb-2 w-full`}
-        onPress={() => onMoodPress(moodScale[0].value)}
-        onLongPress={() => onLongPress(moodScale[0].value)}
+        key={firstMood.value}
+        className={`items-center justify-center h-20 rounded-lg shadow-sm ${firstMood.bg} mb-2 w-full`}
+        onPress={() => onMoodPress(firstMood.value)}
+        onLongPress={() => onLongPress(firstMood.value)}
         delayLongPress={500}
       >
-        <Text className={`text-lg font-bold ${moodScale[0].color}`}>
-          {moodScale[0].value}
+        <Text className={`text-lg font-bold ${firstMood.color}`}>
+          {firstMood.value}
         </Text>
         <Text
-          className={`text-xs font-medium ${moodScale[0].color} text-center px-1 mt-1`}
+          className={`text-xs font-medium ${firstMood.color} text-center px-1 mt-1`}
           numberOfLines={2}
         >
-          {moodScale[0].description}
+          {firstMood.description}
         </Text>
       </HapticTab>
 
       {/* Remaining buttons (two columns) */}
-      {moodScale.slice(1, 6).map((mood) => (
+      {middleMoods.map((mood) => (
         <HapticTab
           key={mood.value}
           className={`items-center justify-center h-24 rounded-lg shadow-sm ${mood.bg} mb-2`}
@@ -55,7 +70,7 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
         </HapticTab>
       ))}
 
-      {moodScale.slice(6).map((mood) => (
+      {lastMoods.map((mood) => (
         <HapticTab
           key={mood.value}
           className={`items-center justify-center h-24 rounded-lg shadow-sm ${mood.bg} mb-2`}

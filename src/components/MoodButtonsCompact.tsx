@@ -12,27 +12,42 @@ export const MoodButtonsCompact: React.FC<MoodButtonsCompactProps> = ({
   onMoodPress,
   onLongPress,
 }) => {
+  // Pre-compute mood data to avoid accessing .value during render
+  const moodData = React.useMemo(() => {
+    return moodScale.map((mood) => ({
+      value: mood.value,
+      label: mood.label,
+      color: mood.color,
+      bg: mood.bg,
+    }));
+  }, []);
+
+  const firstMood = moodData[0];
+  const secondRowMoods = moodData.slice(1, 4);
+  const thirdRowMoods = moodData.slice(4, 8);
+  const fourthRowMoods = moodData.slice(8);
+
   return (
     <View className="flex-row flex-wrap justify-between mb-2">
       <View className="w-full flex-row justify-between mb-2">
         {/* Include 0 button with the first row in compact mode */}
         <HapticTab
-          key={moodScale[0].value}
-          className={`items-center justify-center h-16 rounded-lg shadow-sm ${moodScale[0].bg}`}
+          key={firstMood.value}
+          className={`items-center justify-center h-16 rounded-lg shadow-sm ${firstMood.bg}`}
           style={{ width: "23%" }}
-          onPress={() => onMoodPress(moodScale[0].value)}
-          onLongPress={() => onLongPress(moodScale[0].value)}
+          onPress={() => onMoodPress(firstMood.value)}
+          onLongPress={() => onLongPress(firstMood.value)}
           delayLongPress={500}
         >
-          <Text className={`text-lg font-bold ${moodScale[0].color}`}>
-            {moodScale[0].value}
+          <Text className={`text-lg font-bold ${firstMood.color}`}>
+            {firstMood.value}
           </Text>
-          <Text className={`text-xs ${moodScale[0].color}`}>
-            {moodScale[0].label}
+          <Text className={`text-xs ${firstMood.color}`}>
+            {firstMood.label}
           </Text>
         </HapticTab>
 
-        {moodScale.slice(1, 4).map((mood) => (
+        {secondRowMoods.map((mood) => (
           <HapticTab
             key={mood.value}
             className={`items-center justify-center h-16 rounded-lg shadow-sm ${mood.bg}`}
@@ -50,7 +65,7 @@ export const MoodButtonsCompact: React.FC<MoodButtonsCompactProps> = ({
       </View>
 
       <View className="w-full flex-row justify-between mb-2">
-        {moodScale.slice(4, 8).map((mood) => (
+        {thirdRowMoods.map((mood) => (
           <HapticTab
             key={mood.value}
             className={`items-center justify-center h-16 rounded-lg shadow-sm ${mood.bg}`}
@@ -68,7 +83,7 @@ export const MoodButtonsCompact: React.FC<MoodButtonsCompactProps> = ({
       </View>
 
       <View className="w-full flex-row justify-between">
-        {moodScale.slice(8).map((mood) => (
+        {fourthRowMoods.map((mood) => (
           <HapticTab
             key={mood.value}
             className={`items-center justify-center h-16 rounded-lg shadow-sm ${mood.bg}`}
