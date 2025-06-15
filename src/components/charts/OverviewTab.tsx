@@ -37,17 +37,7 @@ export const OverviewTab = ({ moods }: { moods: MoodEntry[] }) => {
           <View className="flex-1 items-center">
             <Text className="text-sm text-gray-500 mb-1">This Week</Text>
             <Text
-              className={`text-3xl font-bold ${
-                currentInterpretation.color === "green"
-                  ? "text-green-600"
-                  : currentInterpretation.color === "blue"
-                  ? "text-blue-600"
-                  : currentInterpretation.color === "yellow"
-                  ? "text-yellow-600"
-                  : currentInterpretation.color === "orange"
-                  ? "text-orange-600"
-                  : "text-red-600"
-              }`}
+              className={`text-3xl font-bold ${currentInterpretation.textClass}`}
             >
               {currentWeekAvg.toFixed(1)}
             </Text>
@@ -58,32 +48,12 @@ export const OverviewTab = ({ moods }: { moods: MoodEntry[] }) => {
 
           <View className="items-center px-4">
             <Text
-              className={`text-2xl font-bold ${
-                trendInterpretation.color === "green"
-                  ? "text-green-500"
-                  : trendInterpretation.color === "blue"
-                  ? "text-blue-500"
-                  : trendInterpretation.color === "red"
-                  ? "text-red-500"
-                  : trendInterpretation.color === "orange"
-                  ? "text-orange-500"
-                  : "text-gray-400"
-              }`}
+              className={`text-2xl font-bold ${trendInterpretation.textClass}`}
             >
               {weeklyTrend < 0 ? "↗️" : weeklyTrend > 0 ? "↘️" : "➡️"}
             </Text>
             <Text
-              className={`text-sm font-semibold ${
-                trendInterpretation.color === "green"
-                  ? "text-green-500"
-                  : trendInterpretation.color === "blue"
-                  ? "text-blue-500"
-                  : trendInterpretation.color === "red"
-                  ? "text-red-500"
-                  : trendInterpretation.color === "orange"
-                  ? "text-orange-500"
-                  : "text-gray-400"
-              }`}
+              className={`text-sm font-semibold ${trendInterpretation.textClass}`}
             >
               {weeklyTrend > 0 ? "+" : ""}
               {weeklyTrend.toFixed(1)}
@@ -93,17 +63,7 @@ export const OverviewTab = ({ moods }: { moods: MoodEntry[] }) => {
           <View className="flex-1 items-center">
             <Text className="text-sm text-gray-500 mb-1">Last Week</Text>
             <Text
-              className={`text-3xl font-bold ${
-                lastInterpretation.color === "green"
-                  ? "text-green-600"
-                  : lastInterpretation.color === "blue"
-                  ? "text-blue-600"
-                  : lastInterpretation.color === "yellow"
-                  ? "text-yellow-600"
-                  : lastInterpretation.color === "orange"
-                  ? "text-orange-600"
-                  : "text-red-600"
-              }`}
+              className={`text-3xl font-bold ${lastInterpretation.textClass}`}
             >
               {lastWeekAvg.toFixed(1)}
             </Text>
@@ -113,31 +73,12 @@ export const OverviewTab = ({ moods }: { moods: MoodEntry[] }) => {
           </View>
         </View>
 
-        <View
-          className={`p-3 rounded-xl ${
-            trendInterpretation.color === "green"
-              ? "bg-green-50"
-              : trendInterpretation.color === "blue"
-              ? "bg-blue-50"
-              : trendInterpretation.color === "red"
-              ? "bg-red-50"
-              : trendInterpretation.color === "orange"
-              ? "bg-orange-50"
-              : "bg-gray-50"
-          }`}
-        >
+        <View className={`p-3 rounded-xl ${trendInterpretation.bgClass}`}>
           <Text
-            className={`text-center font-medium ${
-              trendInterpretation.color === "green"
-                ? "text-green-700"
-                : trendInterpretation.color === "blue"
-                ? "text-blue-700"
-                : trendInterpretation.color === "red"
-                ? "text-red-700"
-                : trendInterpretation.color === "orange"
-                ? "text-orange-700"
-                : "text-gray-700"
-            }`}
+            className={`text-center font-medium ${trendInterpretation.textClass.replace(
+              "500",
+              "700"
+            )}`}
           >
             {trendInterpretation.emoji} {trendInterpretation.text}
           </Text>
@@ -150,15 +91,7 @@ export const OverviewTab = ({ moods }: { moods: MoodEntry[] }) => {
           <View className="flex-1 bg-white p-4 rounded-xl mr-2 shadow-sm">
             <Text
               className={`text-center text-2xl font-bold ${
-                getMoodInterpretation(overallAvg).color === "green"
-                  ? "text-green-600"
-                  : getMoodInterpretation(overallAvg).color === "blue"
-                  ? "text-blue-600"
-                  : getMoodInterpretation(overallAvg).color === "yellow"
-                  ? "text-yellow-600"
-                  : getMoodInterpretation(overallAvg).color === "orange"
-                  ? "text-orange-600"
-                  : "text-red-600"
+                getMoodInterpretation(overallAvg).textClass
               }`}
             >
               {overallAvg.toFixed(1)}
@@ -211,30 +144,12 @@ export const OverviewTab = ({ moods }: { moods: MoodEntry[] }) => {
                 </View>
                 <View className="items-end">
                   <View
-                    className={`px-3 py-1 rounded-full ${
-                      interpretation.color === "green"
-                        ? "bg-green-100"
-                        : interpretation.color === "blue"
-                        ? "bg-blue-100"
-                        : interpretation.color === "yellow"
-                        ? "bg-yellow-100"
-                        : interpretation.color === "orange"
-                        ? "bg-orange-100"
-                        : "bg-red-100"
-                    }`}
+                    className={`px-3 py-1 rounded-full ${interpretation.bgClass}`}
                   >
                     <Text
-                      className={`text-sm font-medium ${
-                        interpretation.color === "green"
-                          ? "text-green-700"
-                          : interpretation.color === "blue"
-                          ? "text-blue-700"
-                          : interpretation.color === "yellow"
-                          ? "text-yellow-700"
-                          : interpretation.color === "orange"
-                          ? "text-orange-700"
-                          : "text-red-700"
-                      }`}
+                      className={`text-sm font-medium ${interpretation.textClass
+                        .replace("500", "700")
+                        .replace("600", "700")}`}
                     >
                       {interpretation.text}
                     </Text>
