@@ -1,46 +1,38 @@
-import React, { useEffect, useState, useMemo, useCallback } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   View,
   Text,
-  Dimensions,
-  Pressable,
+  TouchableOpacity,
   ActivityIndicator,
   ScrollView,
   RefreshControl,
 } from "react-native";
-import { LineChart } from "react-native-chart-kit";
-import { seedMoods, clearMoods, getAllMoods, seedMoodsFromFile } from "@db/db";
+import { clearMoods, getAllMoods, seedMoodsFromFile } from "@db/db";
 import type { MoodEntry } from "@db/types";
-import { format, startOfDay, addDays, isBefore, isEqual } from "date-fns";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Circle, Line } from "react-native-svg";
-import { moodScale } from "@/constants/moodScale";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import {
+  OverviewTab,
+  WeeklyTab,
+  DailyTab,
+  RawDataTab,
+} from "@/components/charts";
 
-// shared Tailwind->hex color map
-const colorMap: Record<string, string> = {
-  "text-sky-500": "#03a9f4",
-  "text-cyan-500": "#00bcd4",
-  "text-teal-500": "#009688",
-  "text-emerald-500": "#4caf50",
-  "text-green-500": "#4caf50",
-  "text-gray-500": "#9e9e9e",
-  "text-lime-500": "#cddc39",
-  "text-yellow-500": "#ffeb3b",
-  "text-amber-500": "#ffc107",
-  "text-orange-600": "#fb8c00",
-  "text-red-500": "#f44336",
-  "text-red-700": "#d32f2f",
-};
-const getColorFromTailwind = (cls: string) => colorMap[cls] || "#FFD700";
+type TabType = "overview" | "weekly" | "daily" | "raw";
 
-const SECTION_SPACING = 12; // 48px between sections
+const tabs: { id: TabType; label: string; icon: string }[] = [
+  { id: "overview", label: "Overview", icon: "📊" },
+  { id: "weekly", label: "Weekly", icon: "📅" },
+  { id: "daily", label: "Daily", icon: "📈" },
+  { id: "raw", label: "Raw Data", icon: "🔬" },
+];
 
 export default function ChartsScreen() {
   const [loading, setLoading] = useState<"seed" | "clear" | null>(null);
   const [moods, setMoods] = useState<MoodEntry[]>([]);
   const [moodCount, setMoodCount] = useState<number>(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabType>("overview");
   const [lastSeedResult, setLastSeedResult] = useState<{
     count: number;
     source: "file" | "random";
@@ -95,16 +87,23 @@ export default function ChartsScreen() {
           {/* Header */}
           <View className="mt-1 flex gap-2 flex-row justify-center items-center p-4">
             {__DEV__ && (
-              <Pressable
+              <TouchableOpacity
                 onPress={handleSeedMoods}
-                className="bg-blue-600 px-4 py-2 rounded-md"
+                style={{
+                  backgroundColor: "#2563EB",
+                  paddingHorizontal: 16,
+                  paddingVertical: 8,
+                  borderRadius: 6,
+                }}
               >
                 {loading === "seed" ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text className="text-white font-semibold">Seed Moods</Text>
+                  <Text style={{ color: "#FFFFFF", fontWeight: "600" }}>
+                    Seed Moods
+                  </Text>
                 )}
-              </Pressable>
+              </TouchableOpacity>
             )}
             <View className="flex flex-row justify-center items-center">
               <Text className="text-3xl font-extrabold text-center text-sky-400">
@@ -115,16 +114,23 @@ export default function ChartsScreen() {
               </Text>
             </View>
             {__DEV__ && (
-              <Pressable
+              <TouchableOpacity
                 onPress={handleClearMoods}
-                className="bg-red-500 px-4 py-2 rounded-md"
+                style={{
+                  backgroundColor: "#EF4444",
+                  paddingHorizontal: 16,
+                  paddingVertical: 8,
+                  borderRadius: 6,
+                }}
               >
                 {loading === "clear" ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text className="text-white font-semibold">Clear Moods</Text>
+                  <Text style={{ color: "#FFFFFF", fontWeight: "600" }}>
+                    Clear Moods
+                  </Text>
                 )}
-              </Pressable>
+              </TouchableOpacity>
             )}
           </View>
 
@@ -138,10 +144,65 @@ export default function ChartsScreen() {
             </View>
           )}
 
+          {/* Tab Navigation */}
+          {moodCount > 0 && (
+            <View className="mx-4 mb-6">
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                className="flex-row"
+              >
+                {tabs.map((tab, index) => (
+                  <TouchableOpacity
+                    key={tab.id}
+                    onPress={() => setActiveTab(tab.id)}
+                    style={{
+                      paddingHorizontal: 24,
+                      paddingVertical: 12,
+                      borderRadius: 25,
+                      marginRight: 12,
+                      backgroundColor:
+                        activeTab === tab.id ? "#3B82F6" : "#F3F4F6",
+                      borderWidth: activeTab === tab.id ? 0 : 1,
+                      borderColor: "#E5E7EB",
+                      shadowColor:
+                        activeTab === tab.id ? "#3B82F6" : "transparent",
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.2,
+                      shadowRadius: 4,
+                      elevation: activeTab === tab.id ? 4 : 0,
+                    }}
+                  >
+                    <View
+                      style={{ flexDirection: "row", alignItems: "center" }}
+                    >
+                      <Text style={{ fontSize: 18, marginRight: 8 }}>
+                        {tab.icon}
+                      </Text>
+                      <Text
+                        style={{
+                          fontWeight: "600",
+                          color: activeTab === tab.id ? "#FFFFFF" : "#374151",
+                        }}
+                      >
+                        {tab.label}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
           {/* Content based on selected tab */}
           <View className="min-h-screen pb-20">
             {moodCount > 0 ? (
-              <></>
+              <>
+                {activeTab === "overview" && <OverviewTab moods={moods} />}
+                {activeTab === "weekly" && <WeeklyTab moods={moods} />}
+                {activeTab === "daily" && <DailyTab moods={moods} />}
+                {activeTab === "raw" && <RawDataTab moods={moods} />}
+              </>
             ) : (
               <View className="flex-1 justify-center items-center p-8 mt-20">
                 <Text className="text-6xl mb-4">📊</Text>
@@ -164,420 +225,3 @@ export default function ChartsScreen() {
     </GestureHandlerRootView>
   );
 }
-
-const getDaysInRange = (start: Date, end: Date): Date[] => {
-  const days: Date[] = [];
-  let currentDate = startOfDay(start);
-  const finalDate = startOfDay(end);
-
-  while (isBefore(currentDate, finalDate) || isEqual(currentDate, finalDate)) {
-    days.push(new Date(currentDate)); // Store a new Date object
-    currentDate = addDays(currentDate, 1);
-  }
-  return days;
-};
-
-const processMoodDataForDailyChart = (allMoods: MoodEntry[]) => {
-  if (!allMoods || allMoods.length === 0) {
-    return { labels: [], dailyAggregates: [] };
-  }
-
-  const sortedMoods = [...allMoods].sort(
-    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-  );
-
-  const minDate = new Date(sortedMoods[0].timestamp);
-  const maxDate = new Date(sortedMoods[sortedMoods.length - 1].timestamp);
-
-  const allDatesInRange = getDaysInRange(minDate, maxDate);
-
-  const moodsByDay: Record<string, number[]> = {};
-  sortedMoods.forEach((mood) => {
-    const dayKey = format(startOfDay(new Date(mood.timestamp)), "yyyy-MM-dd");
-    if (!moodsByDay[dayKey]) {
-      moodsByDay[dayKey] = [];
-    }
-    moodsByDay[dayKey].push(mood.mood);
-  });
-
-  type DailyMoodAggregateWorking = {
-    date: Date;
-    moods: number[] | null;
-    avg?: number;
-    min?: number;
-    max?: number;
-  };
-
-  const initialAggregates: DailyMoodAggregateWorking[] = allDatesInRange.map(
-    (date) => {
-      const dateKey = format(date, "yyyy-MM-dd");
-      const dayMoods = moodsByDay[dateKey] || null;
-      let avg, min, max;
-
-      if (dayMoods && dayMoods.length > 0) {
-        avg = dayMoods.reduce((sum, val) => sum + val, 0) / dayMoods.length;
-        min = Math.min(...dayMoods);
-        max = Math.max(...dayMoods);
-        return { date, moods: dayMoods, avg, min, max };
-      } else {
-        return { date, moods: null };
-      }
-    }
-  );
-
-  const finalAggregates = initialAggregates.map((aggregate, index) => {
-    if (aggregate.avg !== undefined) {
-      return { ...aggregate, finalAvg: aggregate.avg, isInterpolated: false };
-    }
-
-    let prevIndex = -1;
-    for (let i = index - 1; i >= 0; i--) {
-      if (initialAggregates[i].avg !== undefined) {
-        prevIndex = i;
-        break;
-      }
-    }
-
-    let nextIndex = -1;
-    for (let i = index + 1; i < initialAggregates.length; i++) {
-      if (initialAggregates[i].avg !== undefined) {
-        nextIndex = i;
-        break;
-      }
-    }
-
-    const prevAgg = prevIndex !== -1 ? initialAggregates[prevIndex] : null;
-    const nextAgg = nextIndex !== -1 ? initialAggregates[nextIndex] : null;
-
-    let interpolatedAvg: number;
-    if (
-      prevAgg &&
-      nextAgg &&
-      prevAgg.avg !== undefined &&
-      nextAgg.avg !== undefined
-    ) {
-      const x0 = prevAgg.date.getTime();
-      const y0 = prevAgg.avg;
-      const x1 = nextAgg.date.getTime();
-      const y1 = nextAgg.avg;
-      const x = aggregate.date.getTime();
-      if (x1 === x0) {
-        interpolatedAvg = y0;
-      } else {
-        interpolatedAvg = y0 + ((y1 - y0) * (x - x0)) / (x1 - x0);
-      }
-    } else if (prevAgg && prevAgg.avg !== undefined) {
-      interpolatedAvg = prevAgg.avg;
-    } else if (nextAgg && nextAgg.avg !== undefined) {
-      interpolatedAvg = nextAgg.avg;
-    } else {
-      const neutralMood = moodScale.find((s) => s.label === "Neutral");
-      interpolatedAvg = neutralMood ? neutralMood.value : 3;
-    }
-    return { ...aggregate, finalAvg: interpolatedAvg, isInterpolated: true };
-  });
-
-  return {
-    labels: finalAggregates.map((agg) => format(agg.date, "d/M")),
-    dailyAggregates: finalAggregates,
-  };
-};
-
-const processWeeklyMoodData = (allMoods: MoodEntry[]) => {
-  if (!allMoods || allMoods.length === 0) {
-    return { labels: [], weeklyAggregates: [] };
-  }
-
-  const sortedMoods = [...allMoods].sort(
-    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-  );
-
-  const moodsByWeek: Record<string, number[]> = {};
-  sortedMoods.forEach((mood) => {
-    const date = new Date(mood.timestamp);
-    const weekStart = startOfDay(
-      new Date(date.setDate(date.getDate() - date.getDay()))
-    );
-    const weekKey = format(weekStart, "yyyy-MM-dd");
-    if (!moodsByWeek[weekKey]) {
-      moodsByWeek[weekKey] = [];
-    }
-    moodsByWeek[weekKey].push(mood.mood);
-  });
-
-  const getQuartiles = (arr: number[]) => {
-    const sorted = [...arr].sort((a, b) => a - b);
-    const q1Idx = Math.floor(sorted.length * 0.25);
-    const q2Idx = Math.floor(sorted.length * 0.5);
-    const q3Idx = Math.floor(sorted.length * 0.75);
-    return {
-      q1: sorted[q1Idx],
-      q2: sorted[q2Idx], // median
-      q3: sorted[q3Idx],
-      min: sorted[0],
-      max: sorted[sorted.length - 1],
-      outliers: sorted.filter(
-        (v) =>
-          v < sorted[q1Idx] - 1.5 * (sorted[q3Idx] - sorted[q1Idx]) ||
-          v > sorted[q3Idx] + 1.5 * (sorted[q3Idx] - sorted[q1Idx])
-      ),
-    };
-  };
-
-  const weekKeys = Object.keys(moodsByWeek).sort().reverse(); // Reverse the order
-  const weeklyAggregates = weekKeys.map((weekKey) => {
-    const weekMoods = moodsByWeek[weekKey];
-    const stats = getQuartiles(weekMoods);
-    const avg = weekMoods.reduce((sum, val) => sum + val, 0) / weekMoods.length;
-
-    return {
-      weekStart: new Date(weekKey),
-      moods: weekMoods,
-      ...stats,
-      avg,
-      finalAvg: stats.q2, // use median instead of mean
-      isInterpolated: false,
-    };
-  });
-
-  return {
-    labels: weeklyAggregates.map((week) => format(week.weekStart, "'W'w MMM")),
-    weeklyAggregates,
-  };
-};
-
-const DisplayMoodChart = ({ moods }: { moods: MoodEntry[] }) => {
-  if (!moods.length) {
-    return (
-      <View className="flex-1 justify-center items-center">
-        <Text className="text-purple-600">No mood data available.</Text>
-      </View>
-    );
-  }
-
-  const chartData = useMemo(
-    () => ({
-      labels: moods.map((m) => format(new Date(m.timestamp), "HH:MM d/M")),
-      datasets: [
-        {
-          data: moods.map((m) => m.mood),
-          strokeWidth: 3,
-          dotColor: moods.map((m) =>
-            getColorFromTailwind(moodScale[m.mood].color)
-          ),
-        },
-        {
-          data: [moodScale[0].value], // min
-          withDots: false,
-        },
-        {
-          data: [moodScale[moodScale.length - 1].value], // max
-          withDots: false,
-        },
-      ],
-    }),
-    [moods]
-  );
-
-  return (
-    <View className={`mt-${SECTION_SPACING / 2} mb-${SECTION_SPACING}`}>
-      <Text
-        className="text-xl font-semibold text-center mb-3"
-        style={{ color: "#9B59B6" }}
-      >
-        Raw Mood Data
-      </Text>
-      <View className="mx-4 h-0.5 bg-gray-100 mb-4" />
-      <ScrollView
-        className="mx-4"
-        horizontal
-        showsHorizontalScrollIndicator
-        scrollEventThrottle={16}
-      >
-        <LineChart
-          data={chartData}
-          width={Math.max(Dimensions.get("window").width, moods.length * 60)}
-          height={300}
-          chartConfig={{
-            backgroundColor: "#F5F5DC",
-            backgroundGradientFrom: "#9B59B6",
-            backgroundGradientTo: "#8E44AD",
-            decimalPlaces: 0,
-            color: (opacity = 1) => `rgba(245, 245, 220, ${opacity})`,
-            labelColor: (opacity = 1) => `rgba(245, 245, 220, ${opacity})`,
-            style: {
-              borderRadius: 16,
-            },
-            propsForDots: {
-              r: "4",
-              strokeWidth: "1",
-            },
-            propsForLabels: {
-              fontSize: 10,
-            },
-            fillShadowGradientFrom: "#9B59B6",
-            fillShadowGradientTo: "rgba(142, 68, 173, 0.2)",
-          }}
-          style={{
-            borderRadius: 16,
-          }}
-          withVerticalLines={true}
-          segments={10}
-          bezier
-          renderDotContent={({ x, y, index }) =>
-            chartData.datasets[0] &&
-            Array.isArray(chartData.datasets[0].dotColor) &&
-            chartData.datasets[0].dotColor[index] && (
-              <Circle
-                key={index}
-                cx={x}
-                cy={y}
-                r="5"
-                fill={chartData.datasets[0].dotColor[index]}
-                stroke={chartData.datasets[0].dotColor[index]}
-              />
-            )
-          }
-        />
-      </ScrollView>
-    </View>
-  );
-};
-
-const DisplayDailyMoodChart = ({ moods }: { moods: MoodEntry[] }) => {
-  const processedData = processMoodDataForDailyChart(moods);
-  if (!processedData?.dailyAggregates.length) {
-    return (
-      <View className="mb-8">
-        <Text style={{ color: "#7DCEA0", textAlign: "center" }}>
-          No daily mood data available for summary chart.
-        </Text>
-      </View>
-    );
-  }
-
-  const reversedLabels = processedData.labels.slice().reverse();
-  const reversedAggregates = processedData.dailyAggregates.slice().reverse();
-
-  // compute dot colors based on rounded average mood
-  const dotColors = reversedAggregates.map((agg) => {
-    const idx = Math.round(agg.finalAvg);
-    return getColorFromTailwind(moodScale[idx]?.color);
-  });
-
-  const chartData = {
-    labels: reversedLabels,
-    datasets: [
-      {
-        data: reversedAggregates.map((agg) => agg.finalAvg),
-        dotColor: dotColors,
-        strokeWidth: 2,
-        color: (o = 1) => `rgba(255,255,255,${o})`,
-      },
-      {
-        data: reversedAggregates.map(() => moodScale[0].value),
-        withDots: false,
-      },
-      {
-        data: reversedAggregates.map(
-          () => moodScale[moodScale.length - 1].value
-        ),
-        withDots: false,
-      },
-    ],
-  };
-
-  return (
-    <View className={`mb-${SECTION_SPACING}`}>
-      <View className="mx-4 h-0.5 bg-gray-100 mb-4" />
-      <Text
-        className="text-xl font-semibold text-center mb-3"
-        style={{ color: "#7986CB" }}
-      >
-        Daily Mood Summary
-      </Text>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator
-        scrollEventThrottle={16}
-        className="mx-4"
-      >
-        <LineChart
-          data={chartData}
-          width={Math.max(
-            Dimensions.get("window").width - 32,
-            processedData.labels.length * 60
-          )}
-          height={300}
-          chartConfig={{
-            backgroundColor: "#F5F5DC",
-            backgroundGradientFrom: "#7986CB",
-            backgroundGradientTo: "#5C6BC0",
-            decimalPlaces: 1,
-            color: (opacity = 1) => `rgba(245, 245, 220, ${opacity})`,
-            labelColor: (opacity = 1) => `rgba(245, 245, 220, ${opacity})`,
-            style: {
-              borderRadius: 16,
-            },
-            propsForDots: {
-              r: "3",
-              strokeWidth: "1",
-            },
-            propsForLabels: {
-              fontSize: 10,
-            },
-            fillShadowGradientFrom: "#7986CB",
-            fillShadowGradientTo: "rgba(92, 107, 192, 0.2)",
-          }}
-          style={{ borderRadius: 16 }}
-          bezier
-          segments={Math.min(10, moodScale.length - 1)}
-          renderDotContent={({ x, y, index }) => {
-            const agg = reversedAggregates[index];
-            const startY = 240,
-              endY = 15,
-              split = Math.abs(startY - endY) / 10;
-            const uniqueMoods = Array.from(new Set(agg.moods ?? []));
-            const moodCircles = uniqueMoods.map((val) => (
-              <Circle
-                key={`m-${index}-${val}`}
-                cx={x}
-                cy={startY - split * val}
-                r="3"
-                fill={getColorFromTailwind(moodScale[val].color)}
-                stroke={getColorFromTailwind(moodScale[val].color)}
-              />
-            ));
-            const y1 = startY - split * (agg.min ?? agg.finalAvg);
-            const y2 = startY - split * (agg.max ?? agg.finalAvg);
-            const lineEl =
-              agg.min !== undefined && agg.max !== undefined ? (
-                <Line
-                  x1={x}
-                  x2={x}
-                  y1={y1}
-                  y2={y2}
-                  stroke={dotColors[index]}
-                  strokeWidth="3"
-                />
-              ) : null;
-            return (
-              <React.Fragment key={index}>
-                {lineEl}
-                {moodCircles}
-                <Circle
-                  cx={x}
-                  cy={y}
-                  r="5"
-                  fill={dotColors[index]}
-                  stroke={dotColors[index]}
-                  strokeWidth="1"
-                />
-              </React.Fragment>
-            );
-          }}
-        />
-      </ScrollView>
-    </View>
-  );
-};
