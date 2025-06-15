@@ -52,7 +52,7 @@ export const moodScale: MoodScale[] = [
     },
     {
         value: 7,
-        label: "Severe distress",
+        label: "Barely Coping",
         description: "Intense distress; trouble reaching out",
         color: "text-amber-500",
         bg: "bg-amber-100",
