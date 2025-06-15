@@ -9,7 +9,7 @@ import {
   RefreshControl,
 } from "react-native";
 import { LineChart } from "react-native-chart-kit";
-import { seedMoods, clearMoods, getAllMoods } from "@db/db";
+import { seedMoods, clearMoods, getAllMoods, seedMoodsFromFile } from "@db/db";
 import type { MoodEntry } from "@db/types";
 import { format, startOfDay, addDays, isBefore, isEqual } from "date-fns";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -41,6 +41,10 @@ export default function ChartsScreen() {
   const [moods, setMoods] = useState<MoodEntry[]>([]);
   const [moodCount, setMoodCount] = useState<number>(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [lastSeedResult, setLastSeedResult] = useState<{
+    count: number;
+    source: "file" | "random";
+  } | null>(null);
 
   const getMoodCount = useCallback(async () => {
     const allMoods = await getAllMoods();
@@ -134,47 +138,10 @@ export default function ChartsScreen() {
             </View>
           )}
 
-          {/* Tab Pills */}
-          <View className="px-4 mb-6">
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: 4 }}
-            >
-              <View className="flex-row space-x-2 bg-gray-100 rounded-full p-1">
-                {tabs.map((tab) => (
-                  <Pressable
-                    key={tab.id}
-                    onPress={() => setSelectedTab(tab.id)}
-                    className={`flex-row items-center px-5 py-3 rounded-full ${
-                      selectedTab === tab.id ? "bg-white" : "bg-transparent"
-                    }`}
-                  >
-                    <Text className="mr-2 text-base">{tab.icon}</Text>
-                    <Text
-                      className={`font-semibold text-sm ${
-                        selectedTab === tab.id ? "text-blue-600" : "text-gray-500"
-                      }`}
-                    >
-                      {tab.label}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            </ScrollView>
-          </View>
-
           {/* Content based on selected tab */}
           <View className="min-h-screen pb-20">
             {moodCount > 0 ? (
-              <>
-                {selectedTab === "overview" && (
-                  <OverviewContent moods={moods} />
-                )}
-                {selectedTab === "weekly" && <WeeklyContent moods={moods} />}
-                {selectedTab === "daily" && <DailyContent moods={moods} />}
-                {selectedTab === "trends" && <TrendsContent moods={moods} />}
-              </>
+              <></>
             ) : (
               <View className="flex-1 justify-center items-center p-8 mt-20">
                 <Text className="text-6xl mb-4">📊</Text>
@@ -606,212 +573,6 @@ const DisplayDailyMoodChart = ({ moods }: { moods: MoodEntry[] }) => {
                   stroke={dotColors[index]}
                   strokeWidth="1"
                 />
-              </React.Fragment>
-            );
-          }}
-        />
-      </ScrollView>
-    </View>
-  );
-};
-
-const DisplayWeeklyMoodChart = ({ moods }: { moods: MoodEntry[] }) => {
-  const processedData = processWeeklyMoodData(moods);
-
-  if (!processedData?.weeklyAggregates.length) {
-    return (
-      <View className="my-4 py-10">
-        <Text style={{ color: "#7DCEA0", textAlign: "center" }}>
-          No weekly mood data available for summary chart.
-        </Text>
-      </View>
-    );
-  }
-
-  const chartData = {
-    labels: processedData.labels,
-    datasets: [
-      {
-        data: processedData.weeklyAggregates.map((agg) => agg.q2),
-        strokeWidth: 2,
-        color: (o = 1) => `rgba(255,255,255,${o})`,
-      },
-      {
-        data: processedData.weeklyAggregates.map(() => moodScale[0].value),
-        withDots: false,
-      },
-      {
-        data: processedData.weeklyAggregates.map(
-          () => moodScale[moodScale.length - 1].value
-        ),
-        withDots: false,
-      },
-    ],
-  };
-
-  return (
-    <View className={`mb-${SECTION_SPACING * 1.5}`}>
-      <View className="mx-4 h-0.5 bg-gray-100 mb-4" />
-      <Text
-        className="text-xl font-semibold text-center mb-3"
-        style={{ color: "#673AB7" }}
-      >
-        Weekly Mood Distribution
-      </Text>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator
-        scrollEventThrottle={16}
-        className="mx-4"
-      >
-        <LineChart
-          data={chartData}
-          width={Math.max(
-            Dimensions.get("window").width - 32,
-            processedData.labels.length * 80 + 40
-          )}
-          height={340} // Increased height further
-          chartConfig={{
-            backgroundColor: "#673AB7",
-            backgroundGradientFrom: "#673AB7",
-            backgroundGradientTo: "#4527A0",
-            fillShadowGradientFrom: "#673AB7",
-            fillShadowGradientTo: "rgba(69, 39, 160, 0.2)",
-            decimalPlaces: 1,
-            color: (opacity = 1) => `rgba(245, 245, 220, ${opacity})`,
-            labelColor: (opacity = 1) => `rgba(245, 245, 220, ${opacity})`,
-            style: {
-              borderRadius: 16,
-              paddingLeft: 15,
-              paddingRight: 15,
-              paddingTop: 20, // Increased top padding
-              paddingBottom: 20, // Increased bottom padding
-            },
-            propsForDots: { r: "3", strokeWidth: "1" },
-            propsForLabels: { fontSize: 10 },
-          }}
-          fromZero={true} // Ensure chart starts from 0
-          style={{
-            borderRadius: 16,
-            paddingBottom: 10, // Extra padding for container
-          }}
-          bezier
-          segments={Math.min(10, moodScale.length - 1)}
-          renderDotContent={({ x, y, index }) => {
-            const agg = processedData.weeklyAggregates[index];
-            const startY = 280, // Increased start Y
-              endY = 30; // Increased end Y
-            const split = Math.abs(startY - endY) / 10;
-            const boxWidth = 20; // Controls overall width of the boxplot
-            const whiskerWidth = boxWidth * 0.6; // Whiskers are slightly narrower than the box
-
-            const getColorForValue = (value: number) => {
-              const roundedValue = Math.round(value);
-              return getColorFromTailwind(moodScale[roundedValue]?.color);
-            };
-
-            // Calculate vertical positions
-            const minY = startY - split * agg.min;
-            const maxY = startY - split * agg.max;
-            const q1Y = startY - split * agg.q1;
-            const q2Y = startY - split * agg.q2;
-            const q3Y = startY - split * agg.q3;
-
-            // Get colors based on mood values
-            const minColor = getColorForValue(agg.min);
-            const maxColor = getColorForValue(agg.max);
-            const q1Color = getColorForValue(agg.q1);
-            const q2Color = getColorForValue(agg.q2);
-            const q3Color = getColorForValue(agg.q3);
-
-            return (
-              <React.Fragment key={index}>
-                {/* Whiskers */}
-                <Line
-                  x1={x}
-                  x2={x}
-                  y1={minY}
-                  y2={q1Y}
-                  stroke={q1Color}
-                  strokeWidth="1"
-                  strokeDasharray="4,4"
-                />
-                <Line
-                  x1={x}
-                  x2={x}
-                  y1={q3Y}
-                  y2={maxY}
-                  stroke={q3Color}
-                  strokeWidth="1"
-                  strokeDasharray="4,4"
-                />
-
-                {/* Min/Max caps */}
-                <Line
-                  x1={x - whiskerWidth / 2}
-                  x2={x + whiskerWidth / 2}
-                  y1={minY}
-                  y2={minY}
-                  stroke={minColor}
-                  strokeWidth="2"
-                />
-                <Line
-                  x1={x - whiskerWidth / 2}
-                  x2={x + whiskerWidth / 2}
-                  y1={maxY}
-                  y2={maxY}
-                  stroke={maxColor}
-                  strokeWidth="2"
-                />
-
-                {/* Box edges */}
-                <Line
-                  x1={x - boxWidth / 2}
-                  x2={x + boxWidth / 2}
-                  y1={q1Y}
-                  y2={q1Y}
-                  stroke={q1Color}
-                  strokeWidth="2"
-                />
-                <Line
-                  x1={x - boxWidth / 2}
-                  x2={x + boxWidth / 2}
-                  y1={q3Y}
-                  y2={q3Y}
-                  stroke={q3Color}
-                  strokeWidth="2"
-                />
-
-                {/* Box sides */}
-                <Line
-                  x1={x - boxWidth / 2}
-                  x2={x - boxWidth / 2}
-                  y1={q1Y}
-                  y2={q3Y}
-                  stroke={q2Color}
-                  strokeWidth="2"
-                />
-                <Line
-                  x1={x + boxWidth / 2}
-                  x2={x + boxWidth / 2}
-                  y1={q1Y}
-                  y2={q3Y}
-                  stroke={q2Color}
-                  strokeWidth="2"
-                />
-
-                {/* Outliers */}
-                {agg.outliers.map((val, i) => (
-                  <Circle
-                    key={`outlier-${index}-${i}`}
-                    cx={x}
-                    cy={startY - split * val}
-                    r="3"
-                    fill={getColorForValue(val)}
-                    stroke="rgba(255,255,255,0.3)"
-                    strokeWidth="1"
-                  />
-                ))}
               </React.Fragment>
             );
           }}
