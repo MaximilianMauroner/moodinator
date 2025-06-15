@@ -1,7 +1,19 @@
-import React from "react";
-import { View, Text, ScrollView, Dimensions } from "react-native";
+import React, { useState } from "react";
+import {
+  View,
+  Text,
+  ScrollView,
+  Dimensions,
+  TouchableOpacity,
+} from "react-native";
 import { LineChart } from "react-native-chart-kit";
-import { format, endOfWeek } from "date-fns";
+import {
+  format,
+  endOfWeek,
+  startOfWeek,
+  endOfWeek as getEndOfWeek,
+  isWithinInterval,
+} from "date-fns";
 import type { MoodEntry } from "@db/types";
 import { moodScale } from "@/constants/moodScale";
 import type { MoodScale } from "@/types/mood";
@@ -14,6 +26,31 @@ import {
 
 export const WeeklyTab = ({ moods }: { moods: MoodEntry[] }) => {
   const weeklyData = processWeeklyMoodData(moods);
+  const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set());
+
+  // Helper function to get mood entries for a specific week
+  const getMoodEntriesForWeek = (weekStart: Date): MoodEntry[] => {
+    const weekEnd = getEndOfWeek(weekStart, { weekStartsOn: 1 });
+    return moods
+      .filter((mood) => {
+        const moodDate = new Date(mood.timestamp);
+        return isWithinInterval(moodDate, { start: weekStart, end: weekEnd });
+      })
+      .sort(
+        (a, b) =>
+          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      );
+  };
+
+  const toggleWeekExpansion = (weekKey: string) => {
+    const newExpandedWeeks = new Set(expandedWeeks);
+    if (newExpandedWeeks.has(weekKey)) {
+      newExpandedWeeks.delete(weekKey);
+    } else {
+      newExpandedWeeks.add(weekKey);
+    }
+    setExpandedWeeks(newExpandedWeeks);
+  };
 
   if (!weeklyData.weeklyAggregates.length) {
     return (
@@ -244,7 +281,7 @@ export const WeeklyTab = ({ moods }: { moods: MoodEntry[] }) => {
           🗓️ Week-by-Week Details
         </Text>
         <Text className="text-sm text-gray-500 mb-4">
-          Explore each week's mood patterns, distribution, and insights
+          Tap any week to view detailed mood entries and notes
         </Text>
       </View>
 
@@ -254,13 +291,20 @@ export const WeeklyTab = ({ moods }: { moods: MoodEntry[] }) => {
           const trend = prevWeek ? week.avg - prevWeek.avg : 0;
           const interpretation = getMoodInterpretation(week.avg);
           const trendInterpretation = getTrendInterpretation(trend);
+          const weekKey = week.weekStart.toString();
+          const isExpanded = expandedWeeks.has(weekKey);
+          const weekMoodEntries = getMoodEntriesForWeek(week.weekStart);
 
           return (
             <View
-              key={week.weekStart.toString()}
+              key={weekKey}
               className="bg-white mx-4 p-4 rounded-xl mb-3 shadow-sm"
             >
-              <View className="flex-row justify-between items-center">
+              <TouchableOpacity
+                onPress={() => toggleWeekExpansion(weekKey)}
+                className="flex-row justify-between items-center"
+                activeOpacity={0.7}
+              >
                 <View className="flex-1">
                   <Text className="font-semibold text-gray-800">
                     {format(week.weekStart, "MMM dd")} -{" "}
@@ -296,12 +340,98 @@ export const WeeklyTab = ({ moods }: { moods: MoodEntry[] }) => {
                     <Text
                       className={`text-xs mt-1 ${trendInterpretation.textClass}`}
                     >
-                      {trend < 0 ? "↗️ " : trend > 0 ? "↘️ " : "➡️ "}
+                      {trend < 0 ? "- " : trend > 0 ? "+ " : "➡️ "}
                       {Math.abs(trend).toFixed(1)}
                     </Text>
                   )}
+                  <Text
+                    className={`text-lg mt-2 ${
+                      isExpanded ? "text-blue-600" : "text-gray-400"
+                    }`}
+                  >
+                    {isExpanded ? "⌄" : "⌃"}
+                  </Text>
                 </View>
-              </View>
+              </TouchableOpacity>
+
+              {/* Accordion Content - Mood Entries */}
+              {isExpanded && (
+                <View className="mt-4 pt-4 border-t border-gray-100">
+                  <Text className="text-sm font-semibold text-gray-800 mb-3">
+                    📝 Mood Entries for this Week:
+                  </Text>
+                  {weekMoodEntries.length > 0 ? (
+                    <View className="space-y-2">
+                      {[...weekMoodEntries]
+                        .sort(
+                          (a, b) =>
+                            new Date(b.timestamp).getTime() -
+                            new Date(a.timestamp).getTime()
+                        )
+                        .map((entry) => {
+                          const entryMoodInfo = moodScale.find(
+                            (m: MoodScale) => m.value === entry.mood
+                          );
+                          return (
+                            <View
+                              key={entry.id}
+                              className="bg-gray-50 p-3 rounded-lg mb-2"
+                            >
+                              <View className="flex-row justify-between items-start">
+                                <View className="flex-1">
+                                  <View className="flex flex-row justify-between items-center">
+                                    <View className="flex flex-row items-center space-x-1">
+                                      <Text
+                                        className={`text-lg font-bold ${
+                                          entryMoodInfo?.color ||
+                                          "text-gray-600"
+                                        }`}
+                                      >
+                                        {entry.mood}
+                                      </Text>
+                                      <View
+                                        className={`px-2 py-1 rounded-full ml-2 ${
+                                          entryMoodInfo?.bg || "bg-gray-200"
+                                        }`}
+                                      >
+                                        <Text
+                                          className={`text-xs font-medium ${
+                                            entryMoodInfo?.color ||
+                                            "text-gray-600"
+                                          }`}
+                                        >
+                                          {entryMoodInfo?.label ||
+                                            `Mood ${entry.mood}`}
+                                        </Text>
+                                      </View>
+                                    </View>
+                                    <View>
+                                      {entry.note && (
+                                        <Text className="text-sm text-gray-600 italic">
+                                          "{entry.note}"
+                                        </Text>
+                                      )}
+                                      <Text className="text-xs text-gray-500">
+                                        {format(
+                                          new Date(entry.timestamp),
+                                          "dd/MM HH:mm"
+                                        )}
+                                      </Text>
+                                    </View>
+                                  </View>
+                                </View>
+                              </View>
+                            </View>
+                          );
+                        })}
+                    </View>
+                  ) : (
+                    <Text className="text-sm text-gray-500 italic">
+                      No detailed entries available for this week.
+                    </Text>
+                  )}
+                </View>
+              )}
 
               {/* Enhanced Mood distribution for this week */}
               <View className="mt-3 pt-3 border-t border-gray-100">

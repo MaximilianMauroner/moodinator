@@ -175,7 +175,7 @@ export const processMoodDataForDailyChart = (allMoods: MoodEntry[]) => {
   });
 
   return {
-    labels: finalAggregates.map((agg) => format(agg.date, "d/M")),
+    labels: finalAggregates.map((agg) => format(agg.date, "dd/MM")),
     dailyAggregates: finalAggregates,
   };
 };
@@ -379,16 +379,16 @@ export const getTrendInterpretation = (trend: number) => {
       color: "green",
       text: "Great improvement!",
       emoji: "🎉",
-      textClass: "text-green-500",
-      bgClass: "bg-green-50",
+      textClass: "text-cyan-500",
+      bgClass: "bg-cyan-50",
     };
   if (trend < 0)
     return {
       color: "blue",
       text: "Slight improvement",
       emoji: "📈",
-      textClass: "text-blue-500",
-      bgClass: "bg-blue-50",
+      textClass: "text-green-500",
+      bgClass: "bg-green-50",
     };
   if (trend > 0.5)
     return {
