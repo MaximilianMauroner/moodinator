@@ -73,7 +73,7 @@ export const moodScale: MoodScale[] = [
     },
     {
         value: 10,
-        label: "Attempting self-harm",
+        label: "Attempting",
         description: "Taking steps toward self-harm",
         color: "text-red-700",
         bg: "bg-red-300",
