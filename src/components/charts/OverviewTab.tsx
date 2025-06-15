@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Text, ScrollView } from "react-native";
-import { format } from "date-fns";
+import { endOfWeek, format } from "date-fns";
 import type { MoodEntry } from "@db/types";
 import { moodScale } from "@/constants/moodScale";
 import {
@@ -199,7 +199,11 @@ export const OverviewTab = ({ moods }: { moods: MoodEntry[] }) => {
               <View className="flex-row justify-between items-center">
                 <View>
                   <Text className="font-semibold text-gray-800">
-                    Week of {format(week.weekStart, "MMM dd")}
+                    Week of {format(week.weekStart, "MMM dd")} -{" "}
+                    {format(
+                      endOfWeek(week.weekStart, { weekStartsOn: 1 }),
+                      "MMM dd"
+                    )}
                   </Text>
                   <Text className="text-sm text-gray-500">
                     {week.moods.length} entries • Avg: {week.avg.toFixed(1)}
