@@ -1,0 +1,298 @@
+import React from "react";
+import { View, Text, ScrollView, Dimensions } from "react-native";
+import { LineChart } from "react-native-chart-kit";
+import { Circle, Line } from "react-native-svg";
+import {
+  format,
+  startOfDay,
+  addDays,
+  isBefore,
+  isEqual,
+  startOfWeek,
+} from "date-fns";
+import type { MoodEntry } from "@db/types";
+import { moodScale } from "@/constants/moodScale";
+
+// Shared Tailwind->hex color map
+export const colorMap: Record<string, string> = {
+  "text-sky-500": "#03a9f4",
+  "text-cyan-500": "#00bcd4",
+  "text-teal-500": "#009688",
+  "text-emerald-500": "#4caf50",
+  "text-green-500": "#4caf50",
+  "text-gray-500": "#9e9e9e",
+  "text-lime-500": "#cddc39",
+  "text-yellow-500": "#ffeb3b",
+  "text-amber-500": "#ffc107",
+  "text-orange-600": "#fb8c00",
+  "text-red-500": "#f44336",
+  "text-red-700": "#d32f2f",
+};
+
+export const getColorFromTailwind = (cls: string) => colorMap[cls] || "#FFD700";
+
+// Shared chart configuration with proper y-axis range (0-10)
+export const getBaseChartConfig = (
+  gradientFrom: string,
+  gradientTo: string
+) => ({
+  backgroundColor: "#ffffff",
+  backgroundGradientFrom: gradientFrom,
+  backgroundGradientTo: gradientTo,
+  decimalPlaces: 1,
+  color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+  labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+  style: { borderRadius: 16 },
+  propsForDots: { r: "6", strokeWidth: "2" },
+  yAxisMin: 0,
+  yAxisMax: 10,
+  yAxisInterval: 1,
+});
+
+// Helper function to get days in range
+export const getDaysInRange = (start: Date, end: Date): Date[] => {
+  const days: Date[] = [];
+  let currentDate = startOfDay(start);
+  const finalDate = startOfDay(end);
+
+  while (isBefore(currentDate, finalDate) || isEqual(currentDate, finalDate)) {
+    days.push(new Date(currentDate));
+    currentDate = addDays(currentDate, 1);
+  }
+  return days;
+};
+
+// Process daily mood data
+export const processMoodDataForDailyChart = (allMoods: MoodEntry[]) => {
+  if (!allMoods || allMoods.length === 0) {
+    return { labels: [], dailyAggregates: [] };
+  }
+
+  const sortedMoods = [...allMoods].sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  );
+
+  const minDate = new Date(sortedMoods[0].timestamp);
+  const maxDate = new Date(sortedMoods[sortedMoods.length - 1].timestamp);
+  const allDatesInRange = getDaysInRange(minDate, maxDate);
+
+  const moodsByDay: Record<string, number[]> = {};
+  sortedMoods.forEach((mood) => {
+    const dayKey = format(startOfDay(new Date(mood.timestamp)), "yyyy-MM-dd");
+    if (!moodsByDay[dayKey]) {
+      moodsByDay[dayKey] = [];
+    }
+    moodsByDay[dayKey].push(mood.mood);
+  });
+
+  type DailyMoodAggregateWorking = {
+    date: Date;
+    moods: number[] | null;
+    avg?: number;
+    min?: number;
+    max?: number;
+  };
+
+  const initialAggregates: DailyMoodAggregateWorking[] = allDatesInRange.map(
+    (date) => {
+      const dateKey = format(date, "yyyy-MM-dd");
+      const dayMoods = moodsByDay[dateKey] || null;
+      let avg, min, max;
+
+      if (dayMoods && dayMoods.length > 0) {
+        avg = dayMoods.reduce((sum, val) => sum + val, 0) / dayMoods.length;
+        min = Math.min(...dayMoods);
+        max = Math.max(...dayMoods);
+        return { date, moods: dayMoods, avg, min, max };
+      } else {
+        return { date, moods: null };
+      }
+    }
+  );
+
+  const finalAggregates = initialAggregates.map((aggregate, index) => {
+    if (aggregate.avg !== undefined) {
+      return { ...aggregate, finalAvg: aggregate.avg, isInterpolated: false };
+    }
+
+    let prevIndex = -1;
+    for (let i = index - 1; i >= 0; i--) {
+      if (initialAggregates[i].avg !== undefined) {
+        prevIndex = i;
+        break;
+      }
+    }
+
+    let nextIndex = -1;
+    for (let i = index + 1; i < initialAggregates.length; i++) {
+      if (initialAggregates[i].avg !== undefined) {
+        nextIndex = i;
+        break;
+      }
+    }
+
+    const prevAgg = prevIndex !== -1 ? initialAggregates[prevIndex] : null;
+    const nextAgg = nextIndex !== -1 ? initialAggregates[nextIndex] : null;
+
+    let interpolatedAvg: number;
+    if (
+      prevAgg &&
+      nextAgg &&
+      prevAgg.avg !== undefined &&
+      nextAgg.avg !== undefined
+    ) {
+      const x0 = prevAgg.date.getTime();
+      const y0 = prevAgg.avg;
+      const x1 = nextAgg.date.getTime();
+      const y1 = nextAgg.avg;
+      const x = aggregate.date.getTime();
+      if (x1 === x0) {
+        interpolatedAvg = y0;
+      } else {
+        interpolatedAvg = y0 + ((y1 - y0) * (x - x0)) / (x1 - x0);
+      }
+    } else if (prevAgg && prevAgg.avg !== undefined) {
+      interpolatedAvg = prevAgg.avg;
+    } else if (nextAgg && nextAgg.avg !== undefined) {
+      interpolatedAvg = nextAgg.avg;
+    } else {
+      const neutralMood = moodScale.find((s) => s.label === "Neutral");
+      interpolatedAvg = neutralMood ? neutralMood.value : 5;
+    }
+    return { ...aggregate, finalAvg: interpolatedAvg, isInterpolated: true };
+  });
+
+  return {
+    labels: finalAggregates.map((agg) => format(agg.date, "d/M")),
+    dailyAggregates: finalAggregates,
+  };
+};
+
+// Process weekly mood data
+export const processWeeklyMoodData = (allMoods: MoodEntry[]) => {
+  if (!allMoods || allMoods.length === 0) {
+    return { labels: [], weeklyAggregates: [] };
+  }
+
+  const sortedMoods = [...allMoods].sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  );
+
+  const moodsByWeek: Record<string, number[]> = {};
+  sortedMoods.forEach((mood) => {
+    const date = new Date(mood.timestamp);
+    const weekStart = startOfDay(
+      new Date(date.setDate(date.getDate() - date.getDay()))
+    );
+    const weekKey = format(weekStart, "yyyy-MM-dd");
+    if (!moodsByWeek[weekKey]) {
+      moodsByWeek[weekKey] = [];
+    }
+    moodsByWeek[weekKey].push(mood.mood);
+  });
+
+  const getQuartiles = (arr: number[]) => {
+    const sorted = [...arr].sort((a, b) => a - b);
+    const q1Idx = Math.floor(sorted.length * 0.25);
+    const q2Idx = Math.floor(sorted.length * 0.5);
+    const q3Idx = Math.floor(sorted.length * 0.75);
+    return {
+      q1: sorted[q1Idx],
+      q2: sorted[q2Idx], // median
+      q3: sorted[q3Idx],
+      min: sorted[0],
+      max: sorted[sorted.length - 1],
+      outliers: sorted.filter(
+        (v) =>
+          v < sorted[q1Idx] - 1.5 * (sorted[q3Idx] - sorted[q1Idx]) ||
+          v > sorted[q3Idx] + 1.5 * (sorted[q3Idx] - sorted[q1Idx])
+      ),
+    };
+  };
+
+  const weekKeys = Object.keys(moodsByWeek).sort().reverse();
+  const weeklyAggregates = weekKeys.map((weekKey) => {
+    const weekMoods = moodsByWeek[weekKey];
+    const stats = getQuartiles(weekMoods);
+    const avg = weekMoods.reduce((sum, val) => sum + val, 0) / weekMoods.length;
+
+    return {
+      weekStart: new Date(weekKey),
+      moods: weekMoods,
+      ...stats,
+      avg,
+      finalAvg: stats.q2, // use median instead of mean
+      isInterpolated: false,
+    };
+  });
+
+  return {
+    labels: weeklyAggregates.map((week) => format(week.weekStart, "'W'w MMM")),
+    weeklyAggregates,
+  };
+};
+
+// Mini Weekly Chart Component for Overview
+export const MiniWeeklyChart = ({ weeklyData }: { weeklyData: any[] }) => {
+  if (!weeklyData.length) return null;
+
+  const chartData = {
+    labels: weeklyData
+      .map((week) => format(week.weekStart, "MMM dd"))
+      .reverse(),
+    datasets: [
+      {
+        data: weeklyData.map((week) => week.avg).reverse(),
+        strokeWidth: 3,
+        color: (opacity = 1) => `rgba(59, 130, 246, ${opacity})`,
+      },
+      {
+        data: [0], // Min value for y-axis
+        withDots: false,
+      },
+      {
+        data: [10], // Max value for y-axis
+        withDots: false,
+      },
+    ],
+  };
+
+  return (
+    <View className="mx-4 mb-6 bg-white p-4 rounded-2xl shadow-lg">
+      <Text className="text-lg font-semibold text-center mb-3 text-gray-800">
+        📅 Last 4 Weeks Trend
+      </Text>
+      <LineChart
+        data={chartData}
+        width={Dimensions.get("window").width - 64}
+        height={200}
+        chartConfig={getBaseChartConfig("#f8fafc", "#e2e8f0")}
+        style={{ borderRadius: 16 }}
+        bezier
+        segments={10}
+      />
+    </View>
+  );
+};
+
+// Mood interpretation helper (remember: higher number = worse mood)
+export const getMoodInterpretation = (average: number) => {
+  if (average <= 2) return { color: "green", text: "Excellent" };
+  if (average <= 4) return { color: "blue", text: "Good" };
+  if (average <= 6) return { color: "yellow", text: "Fair" };
+  if (average <= 8) return { color: "orange", text: "Challenging" };
+  return { color: "red", text: "Difficult" };
+};
+
+// Trend interpretation helper (remember: lower number = improvement)
+export const getTrendInterpretation = (trend: number) => {
+  if (trend < -0.5)
+    return { color: "green", text: "Great improvement!", emoji: "🎉" };
+  if (trend < 0)
+    return { color: "blue", text: "Slight improvement", emoji: "📈" };
+  if (trend > 0.5)
+    return { color: "red", text: "Needs attention", emoji: "💙" };
+  if (trend > 0)
+    return { color: "orange", text: "Slight decline", emoji: "📊" };
+  return { color: "gray", text: "Steady as she goes", emoji: "📊" };
+};
