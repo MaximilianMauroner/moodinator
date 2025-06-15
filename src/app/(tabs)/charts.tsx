@@ -61,7 +61,9 @@ export default function ChartsScreen() {
   const handleSeedMoods = useCallback(async () => {
     setLoading("seed");
     try {
-      await seedMoods();
+      const result = await seedMoodsFromFile();
+      setLastSeedResult(result);
+      console.log(`Seeded ${result.count} moods from ${result.source}`);
     } finally {
       setLoading(null);
     }
@@ -71,6 +73,7 @@ export default function ChartsScreen() {
     setLoading("clear");
     try {
       await clearMoods();
+      setLastSeedResult(null);
     } finally {
       setLoading(null);
     }
@@ -85,11 +88,12 @@ export default function ChartsScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
         >
+          {/* Header */}
           <View className="mt-1 flex gap-2 flex-row justify-center items-center p-4">
             {__DEV__ && (
               <Pressable
                 onPress={handleSeedMoods}
-                className="bg-blue-500 px-4 py-2 rounded "
+                className="bg-blue-600 px-4 py-2 rounded-md"
               >
                 {loading === "seed" ? (
                   <ActivityIndicator color="#fff" />
@@ -99,20 +103,17 @@ export default function ChartsScreen() {
               </Pressable>
             )}
             <View className="flex flex-row justify-center items-center">
-              <Text
-                className="text-3xl font-extrabold text-center"
-                style={{ color: "#5DADE2" }}
-              >
-                Chart
+              <Text className="text-3xl font-extrabold text-center text-sky-400">
+                Insights
               </Text>
-              <Text className="font-semibold pl-2" style={{ color: "#9B59B6" }}>
+              <Text className="font-semibold pl-2 text-purple-600">
                 ({moodCount})
               </Text>
             </View>
             {__DEV__ && (
               <Pressable
                 onPress={handleClearMoods}
-                className="bg-red-500 px-4 py-2 rounded"
+                className="bg-red-500 px-4 py-2 rounded-md"
               >
                 {loading === "clear" ? (
                   <ActivityIndicator color="#fff" />
@@ -122,9 +123,75 @@ export default function ChartsScreen() {
               </Pressable>
             )}
           </View>
-          {moodCount > 0 && <DisplayMoodChart moods={moods} />}
-          {moodCount > 0 && <DisplayDailyMoodChart moods={moods} />}
-          {moodCount > 0 && <DisplayWeeklyMoodChart moods={moods} />}
+
+          {/* Seed Result Feedback */}
+          {__DEV__ && lastSeedResult && (
+            <View className="mx-4 mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+              <Text className="text-green-800 text-center font-medium">
+                ✅ Loaded {lastSeedResult.count} moods from{" "}
+                {lastSeedResult.source === "file" ? "JSON file" : "random data"}
+              </Text>
+            </View>
+          )}
+
+          {/* Tab Pills */}
+          <View className="px-4 mb-6">
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: 4 }}
+            >
+              <View className="flex-row space-x-2 bg-gray-100 rounded-full p-1">
+                {tabs.map((tab) => (
+                  <Pressable
+                    key={tab.id}
+                    onPress={() => setSelectedTab(tab.id)}
+                    className={`flex-row items-center px-5 py-3 rounded-full ${
+                      selectedTab === tab.id ? "bg-white" : "bg-transparent"
+                    }`}
+                  >
+                    <Text className="mr-2 text-base">{tab.icon}</Text>
+                    <Text
+                      className={`font-semibold text-sm ${
+                        selectedTab === tab.id ? "text-blue-600" : "text-gray-500"
+                      }`}
+                    >
+                      {tab.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </ScrollView>
+          </View>
+
+          {/* Content based on selected tab */}
+          <View className="min-h-screen pb-20">
+            {moodCount > 0 ? (
+              <>
+                {selectedTab === "overview" && (
+                  <OverviewContent moods={moods} />
+                )}
+                {selectedTab === "weekly" && <WeeklyContent moods={moods} />}
+                {selectedTab === "daily" && <DailyContent moods={moods} />}
+                {selectedTab === "trends" && <TrendsContent moods={moods} />}
+              </>
+            ) : (
+              <View className="flex-1 justify-center items-center p-8 mt-20">
+                <Text className="text-6xl mb-4">📊</Text>
+                <Text className="text-gray-500 text-center text-lg font-semibold">
+                  No mood data available yet
+                </Text>
+                <Text className="text-gray-400 text-center mt-2">
+                  Start tracking your moods to see beautiful insights here!
+                </Text>
+                {__DEV__ && (
+                  <Text className="text-blue-500 text-center mt-4 text-sm">
+                    💡 Use "Seed Moods" button above to add sample data
+                  </Text>
+                )}
+              </View>
+            )}
+          </View>
         </ScrollView>
       </SafeAreaView>
     </GestureHandlerRootView>
@@ -316,7 +383,7 @@ const DisplayMoodChart = ({ moods }: { moods: MoodEntry[] }) => {
   if (!moods.length) {
     return (
       <View className="flex-1 justify-center items-center">
-        <Text style={{ color: "#9B59B6" }}>No mood data available.</Text>
+        <Text className="text-purple-600">No mood data available.</Text>
       </View>
     );
   }

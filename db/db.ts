@@ -207,3 +207,86 @@ export async function importMoods(jsonData: string): Promise<number> {
     }
 }
 
+/**
+ * Seeds the database from a JSON file or with random data if file doesn't exist
+ */
+export async function seedMoodsFromFile(): Promise<{ source: 'file' | 'random'; count: number }> {
+    if (!__DEV__) return { source: 'random', count: 0 };
+
+    // First clear existing data
+    await clearMoods();
+
+    try {
+        // Try to load the JSON file
+        const jsonData = require('./export.json');
+
+        if (Array.isArray(jsonData) && jsonData.length > 0) {
+            const db = await getDb();
+
+            for (const mood of jsonData) {
+                await db.runAsync(
+                    'INSERT INTO moods (mood, note, timestamp) VALUES (?, ?, ?);',
+                    mood.mood,
+                    mood.note,
+                    mood.timestamp
+                );
+            }
+
+            return { source: 'file', count: jsonData.length };
+        }
+    } catch (error) {
+        console.log('JSON file not found or invalid, falling back to random seed');
+    }
+
+    // Fallback to random seeding if file doesn't exist or is invalid
+    const db = await getDb();
+    const days = 60;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    let totalEntries = 0;
+
+    for (let i = 0; i < days; i++) {
+        // Random number of entries per day (0-3, more realistic)
+        const entriesCount = Math.floor(Math.random() * 4);
+
+        for (let j = 0; j < entriesCount; j++) {
+            const currentDate = new Date(startDate);
+            currentDate.setDate(startDate.getDate() + i);
+
+            // Random time during the day
+            currentDate.setHours(Math.floor(Math.random() * 24));
+            currentDate.setMinutes(Math.floor(Math.random() * 60));
+
+            // More realistic mood distribution (3-8 most common, with occasional extremes)
+            let mood: number;
+            const rand = Math.random();
+            if (rand < 0.7) {
+                // 70% chance for moderate moods (4-6)
+                mood = Math.floor(Math.random() * 3) + 4;
+            } else if (rand < 0.9) {
+                // 20% chance for good moods (7-8)
+                mood = Math.floor(Math.random() * 2) + 7;
+            } else if (rand < 0.95) {
+                // 5% chance for low moods (2-3)
+                mood = Math.floor(Math.random() * 2) + 2;
+            } else {
+                // 5% chance for extreme moods (0-1, 9-10)
+                mood = Math.random() < 0.5 ? Math.floor(Math.random() * 2) : Math.floor(Math.random() * 2) + 9;
+            }
+
+            // Occasionally add notes (10% chance)
+            const note = Math.random() < 0.1 ? "Random seed entry" : null;
+
+            await db.runAsync(
+                'INSERT INTO moods (mood, note, timestamp) VALUES (?, ?, ?);',
+                mood,
+                note,
+                currentDate.getTime()
+            );
+            totalEntries++;
+        }
+    }
+
+    return { source: 'random', count: totalEntries };
+}
+
