@@ -48,12 +48,7 @@ export const OverviewTab = ({ moods }: { moods: MoodEntry[] }) => {
 
           <View className="items-center px-4">
             <Text
-              className={`text-2xl font-bold ${trendInterpretation.textClass}`}
-            >
-              {weeklyTrend < 0 ? "↗️" : weeklyTrend > 0 ? "↘️" : "➡️"}
-            </Text>
-            <Text
-              className={`text-sm font-semibold ${trendInterpretation.textClass}`}
+              className={`text-xl font-semibold ${trendInterpretation.textClass}`}
             >
               {weeklyTrend > 0 ? "+" : ""}
               {weeklyTrend.toFixed(1)}

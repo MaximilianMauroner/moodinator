@@ -224,9 +224,7 @@ export const RawDataTab = ({ moods }: { moods: MoodEntry[] }) => {
                       className={`px-2 py-1 rounded mt-1 ${interpretation.bgClass}`}
                     >
                       <Text
-                        className={`text-xs font-medium ${interpretation.textClass
-                          .replace("500", "700")
-                          .replace("600", "700")}`}
+                        className={`text-xs font-medium ${interpretation.textClass}`}
                       >
                         {moodScale[mood.mood]?.label}
                       </Text>
@@ -248,7 +246,7 @@ export const RawDataTab = ({ moods }: { moods: MoodEntry[] }) => {
             data={chartData}
             width={Math.max(
               Dimensions.get("window").width,
-              sortedMoods.length * 60
+              sortedMoods.length * 90
             )}
             height={300}
             chartConfig={getBaseChartConfig("#9B59B6", "#8E44AD")}
