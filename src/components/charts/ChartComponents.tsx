@@ -31,6 +31,18 @@ export const colorMap: Record<string, string> = {
 
 export const getColorFromTailwind = (cls: string) => colorMap[cls] || "#FFD700";
 
+// Helper function to get mood scale colors for a given mood value
+export const getMoodScaleColor = (moodValue: number) => {
+  const mood = moodScale.find((m) => m.value === Math.round(moodValue));
+  return mood ? mood.color : "text-gray-500";
+};
+
+// Helper function to get mood scale background color for a given mood value
+export const getMoodScaleBg = (moodValue: number) => {
+  const mood = moodScale.find((m) => m.value === Math.round(moodValue));
+  return mood ? mood.bg : "bg-gray-100";
+};
+
 // Shared chart configuration with proper y-axis range (0-10)
 export const getBaseChartConfig = (
   gradientFrom: string,
@@ -303,24 +315,102 @@ export const MiniWeeklyChart = ({ weeklyData }: { weeklyData: any[] }) => {
   );
 };
 
-// Mood interpretation helper (remember: higher number = worse mood)
+// Mood interpretation helper that uses actual mood scale colors and labels
 export const getMoodInterpretation = (average: number) => {
-  if (average <= 2) return { color: "green", text: "Excellent" };
-  if (average <= 4) return { color: "blue", text: "Good" };
-  if (average <= 6) return { color: "yellow", text: "Fair" };
-  if (average <= 8) return { color: "orange", text: "Challenging" };
-  return { color: "red", text: "Difficult" };
+  const roundedAverage = Math.round(average);
+  const moodInfo = moodScale.find((m) => m.value === roundedAverage);
+
+  if (moodInfo) {
+    return {
+      color: moodInfo.color.replace("text-", ""),
+      text: moodInfo.label,
+      bg: moodInfo.bg,
+      textClass: moodInfo.color,
+      bgClass: moodInfo.bg,
+    };
+  }
+
+  // Fallback for values not in mood scale
+  if (average <= 2)
+    return {
+      color: "sky-500",
+      text: "Excellent",
+      bg: "bg-sky-100",
+      textClass: "text-sky-500",
+      bgClass: "bg-sky-100",
+    };
+  if (average <= 4)
+    return {
+      color: "green-500",
+      text: "Good",
+      bg: "bg-green-100",
+      textClass: "text-green-500",
+      bgClass: "bg-green-100",
+    };
+  if (average <= 6)
+    return {
+      color: "yellow-500",
+      text: "Fair",
+      bg: "bg-yellow-100",
+      textClass: "text-yellow-500",
+      bgClass: "bg-yellow-100",
+    };
+  if (average <= 8)
+    return {
+      color: "orange-600",
+      text: "Challenging",
+      bg: "bg-orange-100",
+      textClass: "text-orange-600",
+      bgClass: "bg-orange-100",
+    };
+  return {
+    color: "red-500",
+    text: "Difficult",
+    bg: "bg-red-100",
+    textClass: "text-red-500",
+    bgClass: "bg-red-100",
+  };
 };
 
 // Trend interpretation helper (remember: lower number = improvement)
 export const getTrendInterpretation = (trend: number) => {
   if (trend < -0.5)
-    return { color: "green", text: "Great improvement!", emoji: "🎉" };
+    return {
+      color: "green",
+      text: "Great improvement!",
+      emoji: "🎉",
+      textClass: "text-green-500",
+      bgClass: "bg-green-50",
+    };
   if (trend < 0)
-    return { color: "blue", text: "Slight improvement", emoji: "📈" };
+    return {
+      color: "blue",
+      text: "Slight improvement",
+      emoji: "📈",
+      textClass: "text-blue-500",
+      bgClass: "bg-blue-50",
+    };
   if (trend > 0.5)
-    return { color: "red", text: "Needs attention", emoji: "💙" };
+    return {
+      color: "red",
+      text: "Needs attention",
+      emoji: "💙",
+      textClass: "text-red-500",
+      bgClass: "bg-red-50",
+    };
   if (trend > 0)
-    return { color: "orange", text: "Slight decline", emoji: "📊" };
-  return { color: "gray", text: "Steady as she goes", emoji: "📊" };
+    return {
+      color: "orange",
+      text: "Slight decline",
+      emoji: "📊",
+      textClass: "text-orange-500",
+      bgClass: "bg-orange-50",
+    };
+  return {
+    color: "gray",
+    text: "Steady as she goes",
+    emoji: "📊",
+    textClass: "text-gray-400",
+    bgClass: "bg-gray-50",
+  };
 };

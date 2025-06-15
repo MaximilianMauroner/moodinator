@@ -3,6 +3,7 @@ import { View, Text, Modal, Pressable, Platform } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { MoodEntry } from "@db/types";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { moodScale } from "@/constants/moodScale";
 
 interface Props {
   visible: boolean;
@@ -72,7 +73,10 @@ export const DateTimePickerModal: React.FC<Props> = ({
             </Text>
 
             <Text className="text-sm text-gray-600 mb-4">
-              Mood: {mood.mood}
+              Mood:{" "}
+              <Text className={moodScale[mood.mood]?.color || "text-gray-600"}>
+                {mood.mood}
+              </Text>
               {mood.note && ` • ${mood.note}`}
             </Text>
 

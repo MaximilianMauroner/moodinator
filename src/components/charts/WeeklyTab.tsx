@@ -64,12 +64,28 @@ export const WeeklyTab = ({ moods }: { moods: MoodEntry[] }) => {
         <View className="flex-row justify-between mb-4">
           <View className="flex-1">
             <Text className="text-sm text-gray-500">Best Week</Text>
-            <Text className="text-lg font-bold text-green-600">
+            <Text
+              className={`text-lg font-bold ${
+                getMoodInterpretation(
+                  Math.min(...weeklyData.weeklyAggregates.map((w) => w.avg))
+                ).textClass
+              }`}
+            >
               {Math.min(
                 ...weeklyData.weeklyAggregates.map((w) => w.avg)
               ).toFixed(1)}
             </Text>
-            <Text className="text-xs text-green-500">
+            <Text
+              className={`text-xs ${
+                moodScale.find(
+                  (m: MoodScale) =>
+                    m.value ===
+                    Math.round(
+                      Math.min(...weeklyData.weeklyAggregates.map((w) => w.avg))
+                    )
+                )?.color || "text-green-500"
+              }`}
+            >
               {moodScale.find(
                 (m: MoodScale) =>
                   m.value ===
@@ -81,12 +97,28 @@ export const WeeklyTab = ({ moods }: { moods: MoodEntry[] }) => {
           </View>
           <View className="flex-1">
             <Text className="text-sm text-gray-500">Most Challenging</Text>
-            <Text className="text-lg font-bold text-red-600">
+            <Text
+              className={`text-lg font-bold ${
+                getMoodInterpretation(
+                  Math.max(...weeklyData.weeklyAggregates.map((w) => w.avg))
+                ).textClass
+              }`}
+            >
               {Math.max(
                 ...weeklyData.weeklyAggregates.map((w) => w.avg)
               ).toFixed(1)}
             </Text>
-            <Text className="text-xs text-red-500">
+            <Text
+              className={`text-xs ${
+                moodScale.find(
+                  (m: MoodScale) =>
+                    m.value ===
+                    Math.round(
+                      Math.max(...weeklyData.weeklyAggregates.map((w) => w.avg))
+                    )
+                )?.color || "text-red-500"
+              }`}
+            >
               {moodScale.find(
                 (m: MoodScale) =>
                   m.value ===
@@ -98,13 +130,35 @@ export const WeeklyTab = ({ moods }: { moods: MoodEntry[] }) => {
           </View>
           <View className="flex-1">
             <Text className="text-sm text-gray-500">Overall Average</Text>
-            <Text className="text-lg font-bold text-blue-600">
+            <Text
+              className={`text-lg font-bold ${
+                getMoodInterpretation(
+                  weeklyData.weeklyAggregates.reduce(
+                    (sum, w) => sum + w.avg,
+                    0
+                  ) / weeklyData.weeklyAggregates.length
+                ).textClass
+              }`}
+            >
               {(
                 weeklyData.weeklyAggregates.reduce((sum, w) => sum + w.avg, 0) /
                 weeklyData.weeklyAggregates.length
               ).toFixed(1)}
             </Text>
-            <Text className="text-xs text-blue-500">
+            <Text
+              className={`text-xs ${
+                moodScale.find(
+                  (m: MoodScale) =>
+                    m.value ===
+                    Math.round(
+                      weeklyData.weeklyAggregates.reduce(
+                        (sum, w) => sum + w.avg,
+                        0
+                      ) / weeklyData.weeklyAggregates.length
+                    )
+                )?.color || "text-blue-500"
+              }`}
+            >
               {moodScale.find(
                 (m: MoodScale) =>
                   m.value ===
@@ -220,30 +274,12 @@ export const WeeklyTab = ({ moods }: { moods: MoodEntry[] }) => {
                   </Text>
                   <View className="flex-row">
                     <View
-                      className={`px-2 py-1 rounded mr-2 ${
-                        interpretation.color === "green"
-                          ? "bg-green-100"
-                          : interpretation.color === "blue"
-                          ? "bg-blue-100"
-                          : interpretation.color === "yellow"
-                          ? "bg-yellow-100"
-                          : interpretation.color === "orange"
-                          ? "bg-orange-100"
-                          : "bg-red-100"
-                      }`}
+                      className={`px-2 py-1 rounded mr-2 ${interpretation.bgClass}`}
                     >
                       <Text
-                        className={`text-xs font-medium ${
-                          interpretation.color === "green"
-                            ? "text-green-700"
-                            : interpretation.color === "blue"
-                            ? "text-blue-700"
-                            : interpretation.color === "yellow"
-                            ? "text-yellow-700"
-                            : interpretation.color === "orange"
-                            ? "text-orange-700"
-                            : "text-red-700"
-                        }`}
+                        className={`text-xs font-medium ${interpretation.textClass
+                          .replace("500", "700")
+                          .replace("600", "700")}`}
                       >
                         {interpretation.text}
                       </Text>
@@ -252,33 +288,13 @@ export const WeeklyTab = ({ moods }: { moods: MoodEntry[] }) => {
                 </View>
                 <View className="items-end">
                   <Text
-                    className={`text-2xl font-bold ${
-                      interpretation.color === "green"
-                        ? "text-green-600"
-                        : interpretation.color === "blue"
-                        ? "text-blue-600"
-                        : interpretation.color === "yellow"
-                        ? "text-yellow-600"
-                        : interpretation.color === "orange"
-                        ? "text-orange-600"
-                        : "text-red-600"
-                    }`}
+                    className={`text-2xl font-bold ${interpretation.textClass}`}
                   >
                     {week.avg.toFixed(1)}
                   </Text>
                   {prevWeek && (
                     <Text
-                      className={`text-xs mt-1 ${
-                        trendInterpretation.color === "green"
-                          ? "text-green-500"
-                          : trendInterpretation.color === "blue"
-                          ? "text-blue-500"
-                          : trendInterpretation.color === "red"
-                          ? "text-red-500"
-                          : trendInterpretation.color === "orange"
-                          ? "text-orange-500"
-                          : "text-gray-400"
-                      }`}
+                      className={`text-xs mt-1 ${trendInterpretation.textClass}`}
                     >
                       {trend < 0 ? "↗️ " : trend > 0 ? "↘️ " : "➡️ "}
                       {Math.abs(trend).toFixed(1)}

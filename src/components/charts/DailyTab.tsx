@@ -80,7 +80,11 @@ export const DailyTab = ({ moods }: { moods: MoodEntry[] }) => {
         <View className="flex-row justify-between mb-3">
           <View className="flex-1">
             <Text className="text-sm text-gray-500">Best Day</Text>
-            <Text className="text-lg font-bold text-green-600">
+            <Text
+              className={`text-lg font-bold ${
+                getMoodInterpretation(dailyStats.bestDay).textClass
+              }`}
+            >
               {dailyStats.bestDay.toFixed(1)}
             </Text>
             <Text className="text-xs text-gray-400">
@@ -89,7 +93,11 @@ export const DailyTab = ({ moods }: { moods: MoodEntry[] }) => {
           </View>
           <View className="flex-1">
             <Text className="text-sm text-gray-500">Challenging Day</Text>
-            <Text className="text-lg font-bold text-red-600">
+            <Text
+              className={`text-lg font-bold ${
+                getMoodInterpretation(dailyStats.worstDay).textClass
+              }`}
+            >
               {dailyStats.worstDay.toFixed(1)}
             </Text>
             <Text className="text-xs text-gray-400">
@@ -98,7 +106,11 @@ export const DailyTab = ({ moods }: { moods: MoodEntry[] }) => {
           </View>
           <View className="flex-1">
             <Text className="text-sm text-gray-500">Average</Text>
-            <Text className="text-lg font-bold text-blue-600">
+            <Text
+              className={`text-lg font-bold ${
+                getMoodInterpretation(dailyStats.averageDay).textClass
+              }`}
+            >
               {dailyStats.averageDay.toFixed(1)}
             </Text>
             <Text className="text-xs text-gray-400">
@@ -164,45 +176,17 @@ export const DailyTab = ({ moods }: { moods: MoodEntry[] }) => {
                 </View>
                 <View className="items-end">
                   <Text
-                    className={`text-2xl font-bold ${
-                      interpretation.color === "green"
-                        ? "text-green-600"
-                        : interpretation.color === "blue"
-                        ? "text-blue-600"
-                        : interpretation.color === "yellow"
-                        ? "text-yellow-600"
-                        : interpretation.color === "orange"
-                        ? "text-orange-600"
-                        : "text-red-600"
-                    }`}
+                    className={`text-2xl font-bold ${interpretation.textClass}`}
                   >
                     {day.finalAvg.toFixed(1)}
                   </Text>
                   <View
-                    className={`px-2 py-1 rounded mt-1 ${
-                      interpretation.color === "green"
-                        ? "bg-green-100"
-                        : interpretation.color === "blue"
-                        ? "bg-blue-100"
-                        : interpretation.color === "yellow"
-                        ? "bg-yellow-100"
-                        : interpretation.color === "orange"
-                        ? "bg-orange-100"
-                        : "bg-red-100"
-                    }`}
+                    className={`px-2 py-1 rounded mt-1 ${interpretation.bgClass}`}
                   >
                     <Text
-                      className={`text-xs font-medium ${
-                        interpretation.color === "green"
-                          ? "text-green-700"
-                          : interpretation.color === "blue"
-                          ? "text-blue-700"
-                          : interpretation.color === "yellow"
-                          ? "text-yellow-700"
-                          : interpretation.color === "orange"
-                          ? "text-orange-700"
-                          : "text-red-700"
-                      }`}
+                      className={`text-xs font-medium ${interpretation.textClass
+                        .replace("500", "700")
+                        .replace("600", "700")}`}
                     >
                       {interpretation.text}
                     </Text>
