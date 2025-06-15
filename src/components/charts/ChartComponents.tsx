@@ -181,9 +181,7 @@ export const processWeeklyMoodData = (allMoods: MoodEntry[]) => {
   const moodsByWeek: Record<string, number[]> = {};
   sortedMoods.forEach((mood) => {
     const date = new Date(mood.timestamp);
-    const weekStart = startOfDay(
-      new Date(date.setDate(date.getDate() - date.getDay()))
-    );
+    const weekStart = startOfWeek(date, { weekStartsOn: 1 }); // 1 = Monday
     const weekKey = format(weekStart, "yyyy-MM-dd");
     if (!moodsByWeek[weekKey]) {
       moodsByWeek[weekKey] = [];
@@ -236,25 +234,55 @@ export const processWeeklyMoodData = (allMoods: MoodEntry[]) => {
 export const MiniWeeklyChart = ({ weeklyData }: { weeklyData: any[] }) => {
   if (!weeklyData.length) return null;
 
+  const weeklyAverages = weeklyData.map((week) => week.avg);
+  const minValue = Math.min(...weeklyAverages);
+  const maxValue = Math.max(...weeklyAverages);
+
+  // Add some padding to the y-axis range
+  const padding = (maxValue - minValue) * 0.1 || 0.5; // 10% padding or 0.5 minimum
+  const yMin = Math.max(0, Math.floor(minValue - padding)); // Don't go below 0
+  const yMax = Math.min(10, Math.ceil(maxValue + padding)); // Don't go above 10
+
+  // Calculate appropriate interval based on range
+  const range = yMax - yMin;
+  let yInterval = 1;
+  if (range <= 2) yInterval = 0.5;
+  else if (range <= 4) yInterval = 1;
+  else if (range <= 8) yInterval = 2;
+  else yInterval = 2;
+
   const chartData = {
-    labels: weeklyData
-      .map((week) => format(week.weekStart, "MMM dd"))
-      .reverse(),
+    labels: weeklyData.map((week) => format(week.weekStart, "MMM dd")),
     datasets: [
       {
-        data: weeklyData.map((week) => week.avg).reverse(),
+        data: weeklyAverages,
         strokeWidth: 3,
         color: (opacity = 1) => `rgba(59, 130, 246, ${opacity})`,
       },
       {
-        data: [0], // Min value for y-axis
+        data: [yMin], // Dynamic min value for y-axis
         withDots: false,
       },
       {
-        data: [10], // Max value for y-axis
+        data: [yMax], // Dynamic max value for y-axis
         withDots: false,
       },
     ],
+  };
+
+  // Custom chart config with visible labels and dynamic y-axis
+  const chartConfig = {
+    backgroundColor: "#ffffff",
+    backgroundGradientFrom: "#f8fafc",
+    backgroundGradientTo: "#e2e8f0",
+    decimalPlaces: 1,
+    color: (opacity = 1) => `rgba(59, 130, 246, ${opacity})`,
+    labelColor: (opacity = 1) => `rgba(55, 65, 81, ${opacity})`, // Dark gray for visibility
+    style: { borderRadius: 16 },
+    propsForDots: { r: "6", strokeWidth: "2" },
+    yAxisMin: yMin,
+    yAxisMax: yMax,
+    yAxisInterval: yInterval,
   };
 
   return (
@@ -266,7 +294,7 @@ export const MiniWeeklyChart = ({ weeklyData }: { weeklyData: any[] }) => {
         data={chartData}
         width={Dimensions.get("window").width - 64}
         height={200}
-        chartConfig={getBaseChartConfig("#f8fafc", "#e2e8f0")}
+        chartConfig={chartConfig}
         style={{ borderRadius: 16 }}
         bezier
         segments={10}
