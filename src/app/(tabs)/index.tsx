@@ -1,10 +1,12 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
   View,
   Text,
   SafeAreaView,
   RefreshControl,
   FlatList,
+  ScrollView,
+  TouchableOpacity,
 } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import {
@@ -27,6 +29,17 @@ import { useFocusEffect } from "@react-navigation/native";
 import ToastManager, { Toast } from "toastify-react-native";
 import { IconSymbol } from "@/components/ui/IconSymbol";
 import { HapticTab } from "@/components/HapticTab";
+import { moodScale } from "@/constants/moodScale";
+import { getMoodInterpretation } from "@/components/charts";
+import {
+  format,
+  isToday,
+  isYesterday,
+  startOfDay,
+  endOfDay,
+  isWithinInterval,
+  subDays,
+} from "date-fns";
 
 const SHOW_LABELS_KEY = "showLabelsPreference";
 
@@ -260,79 +273,246 @@ export default function HomeScreen() {
     setSelectedMoodId(null);
   }, []);
 
+  // Calculate quick stats for today and recent activity
+  const quickStats = useMemo(() => {
+    if (!moods.length) return null;
+
+    const today = new Date();
+    const todayStart = startOfDay(today);
+    const todayEnd = endOfDay(today);
+
+    // Today's moods
+    const todayMoods = moods.filter((mood) =>
+      isWithinInterval(new Date(mood.timestamp), {
+        start: todayStart,
+        end: todayEnd,
+      })
+    );
+
+    // Yesterday's moods
+    const yesterday = subDays(today, 1);
+    const yesterdayStart = startOfDay(yesterday);
+    const yesterdayEnd = endOfDay(yesterday);
+    const yesterdayMoods = moods.filter((mood) =>
+      isWithinInterval(new Date(mood.timestamp), {
+        start: yesterdayStart,
+        end: yesterdayEnd,
+      })
+    );
+
+    // Recent week average
+    const recentWeek = moods.filter((mood) => {
+      const moodDate = new Date(mood.timestamp);
+      const daysDiff =
+        (today.getTime() - moodDate.getTime()) / (1000 * 3600 * 24);
+      return daysDiff <= 7;
+    });
+
+    const todayAvg =
+      todayMoods.length > 0
+        ? todayMoods.reduce((sum, mood) => sum + mood.mood, 0) /
+          todayMoods.length
+        : null;
+
+    const yesterdayAvg =
+      yesterdayMoods.length > 0
+        ? yesterdayMoods.reduce((sum, mood) => sum + mood.mood, 0) /
+          yesterdayMoods.length
+        : null;
+
+    const weekAvg =
+      recentWeek.length > 0
+        ? recentWeek.reduce((sum, mood) => sum + mood.mood, 0) /
+          recentWeek.length
+        : null;
+
+    return {
+      todayCount: todayMoods.length,
+      todayAvg,
+      yesterdayAvg,
+      weekAvg,
+      totalEntries: moods.length,
+      withNotes: moods.filter((m) => m.note && m.note.trim().length > 0).length,
+    };
+  }, [moods]);
+
+  const toggleLabelsView = useCallback(() => {
+    const newValue = !showDetailedLabels;
+    setShowDetailedLabels(newValue);
+    AsyncStorage.setItem(SHOW_LABELS_KEY, newValue.toString()).catch(
+      console.error
+    );
+  }, [showDetailedLabels]);
+
   return (
     <>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaView className="flex-1 bg-gradient-to-b from-blue-50 to-white">
-          <View className="flex-1 p-4 space-y-4">
-            <View>
-              <Text className="text-3xl font-extrabold text-center mb-2 text-blue-700">
+          <ScrollView
+            className="flex-1"
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            }
+          >
+            {/* Header */}
+            <View className="mt-1 flex flex-row justify-center items-center p-4">
+              <Text className="text-3xl font-extrabold text-center text-sky-400">
                 Moodinator
               </Text>
-              <View className="bg-white rounded-2xl shadow-lg p-4 mb-2">
-                {lastTracked && (
-                  <Text className="text-xs text-gray-400 text-center mb-2">
-                    Last tracked: {lastTracked.toLocaleTimeString()}
-                  </Text>
-                )}
-
-                {showDetailedLabels ? (
-                  <MoodButtonsDetailed
-                    onMoodPress={handleMoodPress}
-                    onLongPress={handleLongPress}
-                  />
-                ) : (
-                  <MoodButtonsCompact
-                    onMoodPress={handleMoodPress}
-                    onLongPress={handleLongPress}
-                  />
-                )}
-              </View>
-            </View>
-
-            <View className="flex-1 bg-white rounded-2xl shadow-lg overflow-hidden">
-              <View className="flex-1 flex flex-col">
-                <View className="p-4 flex-row justify-between items-center">
-                  <Text className="font-bold text-xl text-blue-800">
-                    Mood History {moods.length > 0 ? `(${moods.length})` : ""}
+              {quickStats && (
+                <View className="justify-center">
+                  <Text className="font-semibold pl-2 text-purple-600">
+                    ({quickStats.totalEntries})
                   </Text>
                 </View>
-                {loading ? (
-                  <Text className="text-center py-4 text-gray-500">
-                    Loading...
+              )}
+            </View>
+
+            {/* Quick Stats Cards */}
+            {quickStats && (
+              <View className="mx-4 mb-6">
+                <View className="flex-row">
+                  <View className="flex-1 bg-white p-4 rounded-xl mr-2 shadow-sm">
+                    <Text className="text-center text-xs text-gray-500 mb-1">
+                      Today's Entries
+                    </Text>
+                    <Text className="text-center text-2xl font-bold text-blue-600">
+                      {quickStats.todayCount}
+                    </Text>
+                    {quickStats.todayAvg && (
+                      <Text
+                        className={`text-center text-xs ${
+                          getMoodInterpretation(quickStats.todayAvg).textClass
+                        }`}
+                      >
+                        Avg: {quickStats.todayAvg.toFixed(1)}
+                      </Text>
+                    )}
+                  </View>
+                  <View className="flex-1 bg-white p-4 rounded-xl ml-2 shadow-sm">
+                    <Text className="text-center text-xs text-gray-500 mb-1">
+                      Week Average
+                    </Text>
+                    {quickStats.weekAvg ? (
+                      <>
+                        <Text
+                          className={`text-center text-2xl font-bold ${
+                            getMoodInterpretation(quickStats.weekAvg).textClass
+                          }`}
+                        >
+                          {quickStats.weekAvg.toFixed(1)}
+                        </Text>
+                        <Text className="text-center text-xs text-gray-400">
+                          {getMoodInterpretation(quickStats.weekAvg).text}
+                        </Text>
+                      </>
+                    ) : (
+                      <Text className="text-center text-2xl font-bold text-gray-400">
+                        --
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {/* Mood Input Section */}
+            <View className="mx-4 mb-6 bg-white rounded-2xl shadow-lg p-6">
+              <View className="flex-row justify-between items-center mb-4">
+                <Text className="text-xl font-bold text-gray-800">
+                  🎯 Track Your Mood
+                </Text>
+                <TouchableOpacity
+                  onPress={toggleLabelsView}
+                  className="bg-gray-100 px-3 py-1 rounded-full"
+                >
+                  <Text className="text-xs text-gray-600">
+                    {showDetailedLabels ? "Simple" : "Detailed"}
                   </Text>
-                ) : moods.length === 0 ? (
-                  <Text className="text-center py-4 text-gray-500">
-                    No moods tracked yet.
+                </TouchableOpacity>
+              </View>
+
+              {lastTracked && (
+                <Text className="text-xs text-gray-400 text-center mb-4">
+                  Last tracked: {format(lastTracked, "MMM dd 'at' HH:mm")}
+                </Text>
+              )}
+
+              {showDetailedLabels ? (
+                <MoodButtonsDetailed
+                  onMoodPress={handleMoodPress}
+                  onLongPress={handleLongPress}
+                />
+              ) : (
+                <MoodButtonsCompact
+                  onMoodPress={handleMoodPress}
+                  onLongPress={handleLongPress}
+                />
+              )}
+
+              <Text className="text-xs text-gray-400 text-center mt-4">
+                💡 Tip: Long press any mood to add a note
+              </Text>
+            </View>
+
+            {/* Mood History Section */}
+            <View className="mx-4 mb-6">
+              <View className="flex-row justify-between items-center mb-4">
+                <Text className="text-xl font-bold text-gray-800">
+                  📝 Recent Activity
+                </Text>
+                {quickStats && quickStats.withNotes > 0 && (
+                  <Text className="text-sm text-gray-500">
+                    {quickStats.withNotes} with notes
                   </Text>
-                ) : (
+                )}
+              </View>
+
+              {loading ? (
+                <View className="bg-white rounded-xl p-8 shadow-sm">
+                  <Text className="text-center text-gray-500">Loading...</Text>
+                </View>
+              ) : moods.length === 0 ? (
+                <View className="bg-white rounded-xl p-8 shadow-sm">
+                  <Text className="text-center text-6xl mb-4">🎯</Text>
+                  <Text className="text-center text-lg font-semibold text-gray-500">
+                    Ready to start tracking?
+                  </Text>
+                  <Text className="text-center text-gray-400 mt-2">
+                    Track your first mood above to begin your journey!
+                  </Text>
+                </View>
+              ) : (
+                <View className="bg-white rounded-xl shadow-sm overflow-hidden">
                   <FlatList
                     data={moods}
                     initialNumToRender={10}
-                    contentContainerStyle={{
-                      padding: 16,
-                    }}
+                    contentContainerStyle={{ padding: 16 }}
                     renderItem={renderMoodItem}
                     keyExtractor={(item) => item.id.toString()}
-                    refreshControl={
-                      <RefreshControl
-                        refreshing={refreshing}
-                        onRefresh={onRefresh}
-                        colors={["#3b82f6"]}
-                        tintColor="#3b82f6"
-                      />
-                    }
                     removeClippedSubviews={true}
                     windowSize={7}
                     maxToRenderPerBatch={10}
                     updateCellsBatchingPeriod={50}
                     extraData={moods}
-                    style={{ flex: 1 }}
+                    scrollEnabled={false}
+                    style={{ maxHeight: 400 }}
                   />
-                )}
-              </View>
+                  {moods.length > 5 && (
+                    <View className="p-4 border-t border-gray-100">
+                      <Text className="text-center text-sm text-gray-500">
+                        Showing recent entries • Swipe left to edit, right to
+                        delete
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              )}
             </View>
-          </View>
+
+            {/* Bottom padding for scroll */}
+            <View className="pb-20" />
+          </ScrollView>
         </SafeAreaView>
       </GestureHandlerRootView>
       {modalVisible && (

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   Alert,
   ScrollView,
   Switch,
+  TouchableOpacity,
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system";
@@ -16,8 +17,12 @@ import {
   importMoods,
   clearMoods,
   seedMoodsFromFile,
+  getAllMoods,
 } from "@db/db";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { MoodEntry } from "@db/types";
+import { getMoodInterpretation } from "@/components/charts";
+import { format } from "date-fns";
 
 // Storage key for show labels preference
 const SHOW_LABELS_KEY = "showLabelsPreference";
@@ -31,6 +36,57 @@ export default function SettingsScreen() {
     count: number;
     source: "file" | "random";
   } | null>(null);
+  const [moods, setMoods] = useState<MoodEntry[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Load saved preference and mood data on component mount
+  useEffect(() => {
+    loadShowLabelsPreference();
+    loadMoodData();
+  }, []);
+
+  // Load mood data for statistics
+  const loadMoodData = async () => {
+    try {
+      const data = await getAllMoods();
+      setMoods(data);
+    } catch (error) {
+      console.error("Failed to load mood data:", error);
+    }
+  };
+
+  // Calculate data statistics
+  const dataStats = useMemo(() => {
+    if (!moods.length) return null;
+
+    const totalEntries = moods.length;
+    const withNotes = moods.filter(
+      (m) => m.note && m.note.trim().length > 0
+    ).length;
+    const overallAvg =
+      moods.reduce((sum, mood) => sum + mood.mood, 0) / moods.length;
+    const oldestEntry = moods.reduce((oldest, mood) =>
+      new Date(mood.timestamp) < new Date(oldest.timestamp) ? mood : oldest
+    );
+    const newestEntry = moods.reduce((newest, mood) =>
+      new Date(mood.timestamp) > new Date(newest.timestamp) ? mood : newest
+    );
+
+    const daysSinceFirst = Math.floor(
+      (new Date().getTime() - new Date(oldestEntry.timestamp).getTime()) /
+        (1000 * 60 * 60 * 24)
+    );
+
+    return {
+      totalEntries,
+      withNotes,
+      overallAvg,
+      oldestEntry,
+      newestEntry,
+      daysSinceFirst: daysSinceFirst + 1, // +1 to include the first day
+      averagePerDay: totalEntries / (daysSinceFirst + 1),
+    };
+  }, [moods]);
 
   // Load saved preference on component mount
   useEffect(() => {
@@ -105,54 +161,6 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleImport = async () => {
-    try {
-      setLoading("import");
-      const result = await DocumentPicker.getDocumentAsync({
-        type: "application/json",
-      });
-
-      if (result.canceled) {
-        return;
-      }
-
-      const fileContent = await FileSystem.readAsStringAsync(
-        result.assets[0].uri
-      );
-      const importedCount = await importMoods(fileContent);
-
-      Alert.alert(
-        "Import Successful",
-        `Successfully imported ${importedCount} mood entries.`
-      );
-    } catch (error) {
-      Alert.alert(
-        "Import Error",
-        "Failed to import mood data. Please make sure the file is a valid JSON export."
-      );
-      console.error(error);
-    } finally {
-      setLoading(null);
-    }
-  };
-
-  const handleSeedMoods = async () => {
-    try {
-      setLoading("seed");
-      const result = await seedMoodsFromFile();
-      setLastSeedResult(result);
-      Alert.alert(
-        "Sample Data Added",
-        `Successfully added ${result.count} sample mood entries.`
-      );
-    } catch (error) {
-      Alert.alert("Error", "Failed to add sample data");
-      console.error(error);
-    } finally {
-      setLoading(null);
-    }
-  };
-
   const handleClearMoods = async () => {
     Alert.alert(
       "Clear All Data",
@@ -170,6 +178,7 @@ export default function SettingsScreen() {
               setLoading("clear");
               await clearMoods();
               setLastSeedResult(null);
+              setMoods([]);
               Alert.alert("Success", "All mood data has been cleared.");
             } catch (error) {
               Alert.alert("Error", "Failed to clear mood data");
@@ -183,150 +192,352 @@ export default function SettingsScreen() {
     );
   };
 
+  const handleSeedMoods = async () => {
+    try {
+      setLoading("seed");
+      const result = await seedMoodsFromFile();
+      setLastSeedResult(result);
+      await loadMoodData(); // Refresh mood data
+      Alert.alert(
+        "Sample Data Added",
+        `Successfully added ${result.count} sample mood entries.`
+      );
+    } catch (error) {
+      Alert.alert("Error", "Failed to add sample data");
+      console.error(error);
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleImport = async () => {
+    try {
+      setLoading("import");
+      const result = await DocumentPicker.getDocumentAsync({
+        type: "application/json",
+      });
+
+      if (result.canceled) {
+        return;
+      }
+
+      const fileContent = await FileSystem.readAsStringAsync(
+        result.assets[0].uri
+      );
+      const importedCount = await importMoods(fileContent);
+      await loadMoodData(); // Refresh mood data
+
+      Alert.alert(
+        "Import Successful",
+        `Successfully imported ${importedCount} mood entries.`
+      );
+    } catch (error) {
+      Alert.alert(
+        "Import Error",
+        "Failed to import mood data. Please make sure the file is a valid JSON export."
+      );
+      console.error(error);
+    } finally {
+      setLoading(null);
+    }
+  };
+
   return (
     <SafeAreaView className="flex-1 bg-gradient-to-b from-blue-50 to-white">
       <ScrollView className="flex-1">
-        <View className="p-4">
-          <Text
-            className="text-3xl font-extrabold text-center mb-6"
-            style={{ color: "#5DADE2" }}
-          >
+        {/* Header */}
+        <View className="mt-1 flex flex-row justify-center items-center p-4">
+          <Text className="text-3xl font-extrabold text-center text-sky-400">
             Settings
           </Text>
+          {dataStats && (
+            <View className="justify-center">
+              <Text className="font-semibold pl-2 text-purple-600">
+                ({dataStats.totalEntries})
+              </Text>
+            </View>
+          )}
+        </View>
 
-          <View className="space-y-4">
-            <Text className="text-lg font-semibold mb-2 text-gray-700">
-              Data Management
+        {/* Data Overview Card */}
+        {dataStats && (
+          <View className="mx-4 mb-6 bg-white p-6 rounded-2xl shadow-lg">
+            <Text className="text-xl font-bold text-gray-800 mb-4 text-center">
+              📊 Your Data Overview
             </Text>
 
-            <View className="bg-white rounded-xl p-4 shadow-sm">
-              <View className="space-y-4">
-                <View>
-                  <Text className="text-base font-medium text-gray-800 mb-1">
-                    Export Data
-                  </Text>
-                  <Text className="text-sm text-gray-600 mb-2">
-                    Export your mood data as a JSON file that you can save or
-                    share
-                  </Text>
-                  <Pressable
-                    onPress={handleExport}
-                    className="bg-blue-500 py-3 px-4 rounded-lg"
-                  >
-                    {loading === "export" ? (
-                      <ActivityIndicator color="#fff" />
-                    ) : (
-                      <Text className="text-white font-medium text-center">
-                        Export Mood Data
-                      </Text>
-                    )}
-                  </Pressable>
-                </View>
-
-                <View className="border-t border-gray-200 my-4" />
-
-                <View>
-                  <Text className="text-base font-medium text-gray-800 mb-1">
-                    Import Data
-                  </Text>
-                  <Text className="text-sm text-gray-600 mb-2">
-                    Import previously exported mood data from a JSON file
-                  </Text>
-                  <Pressable
-                    onPress={handleImport}
-                    className="bg-green-500 py-3 px-4 rounded-lg"
-                  >
-                    {loading === "import" ? (
-                      <ActivityIndicator color="#fff" />
-                    ) : (
-                      <Text className="text-white font-medium text-center">
-                        Import Mood Data
-                      </Text>
-                    )}
-                  </Pressable>
-                </View>
-
-                <>
-                  <View className="border-t border-gray-200 my-4" />
-
-                  <View>
-                    <Text className="text-base font-medium text-gray-800 mb-1">
-                      Add Sample Data
-                    </Text>
-                    <Text className="text-sm text-gray-600 mb-2">
-                      Add sample mood entries for testing and demonstration
-                    </Text>
-                    <Pressable
-                      onPress={handleSeedMoods}
-                      className="bg-purple-500 py-3 px-4 rounded-lg"
-                    >
-                      {loading === "seed" ? (
-                        <ActivityIndicator color="#fff" />
-                      ) : (
-                        <Text className="text-white font-medium text-center">
-                          Add Sample Data
-                        </Text>
-                      )}
-                    </Pressable>
-                  </View>
-
-                  <View className="border-t border-gray-200 my-4" />
-
-                  <View>
-                    <Text className="text-base font-medium text-gray-800 mb-1">
-                      Clear All Data
-                    </Text>
-                    <Text className="text-sm text-gray-600 mb-2">
-                      Remove all mood entries from the database
-                    </Text>
-                    <Pressable
-                      onPress={handleClearMoods}
-                      className="bg-red-500 py-3 px-4 rounded-lg"
-                    >
-                      {loading === "clear" ? (
-                        <ActivityIndicator color="#fff" />
-                      ) : (
-                        <Text className="text-white font-medium text-center">
-                          Clear All Data
-                        </Text>
-                      )}
-                    </Pressable>
-                  </View>
-                </>
-                {lastSeedResult && (
-                  <View className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                    <Text className="text-green-800 text-center font-medium">
-                      ✅ Added {lastSeedResult.count} sample mood entries
-                    </Text>
-                  </View>
-                )}
+            {/* Primary Stats */}
+            <View className="flex-row justify-between mb-4">
+              <View className="flex-1 items-center">
+                <Text className="text-2xl font-bold text-blue-600">
+                  {dataStats.totalEntries}
+                </Text>
+                <Text className="text-xs text-gray-500 text-center">
+                  Total Entries
+                </Text>
+              </View>
+              <View className="flex-1 items-center">
+                <Text
+                  className={`text-2xl font-bold ${
+                    getMoodInterpretation(dataStats.overallAvg).textClass
+                  }`}
+                >
+                  {dataStats.overallAvg.toFixed(1)}
+                </Text>
+                <Text className="text-xs text-gray-500 text-center">
+                  Average Mood
+                </Text>
+              </View>
+              <View className="flex-1 items-center">
+                <Text className="text-2xl font-bold text-green-600">
+                  {dataStats.daysSinceFirst}
+                </Text>
+                <Text className="text-xs text-gray-500 text-center">
+                  Days Tracked
+                </Text>
               </View>
             </View>
 
-            <View className="space-y-4 pb-8">
-              <Text className="text-lg font-semibold mb-2 text-gray-700">
-                Preferences
+            {/* Additional Stats */}
+            <View className="bg-gray-50 p-4 rounded-xl">
+              <View className="flex-row justify-between mb-2">
+                <Text className="text-sm text-gray-600">
+                  Entries with notes:
+                </Text>
+                <Text className="text-sm font-medium text-gray-800">
+                  {dataStats.withNotes} (
+                  {(
+                    (dataStats.withNotes / dataStats.totalEntries) *
+                    100
+                  ).toFixed(0)}
+                  %)
+                </Text>
+              </View>
+              <View className="flex-row justify-between mb-2">
+                <Text className="text-sm text-gray-600">Average per day:</Text>
+                <Text className="text-sm font-medium text-gray-800">
+                  {dataStats.averagePerDay.toFixed(1)} entries
+                </Text>
+              </View>
+              <View className="flex-row justify-between">
+                <Text className="text-sm text-gray-600">First entry:</Text>
+                <Text className="text-sm font-medium text-gray-800">
+                  {format(
+                    new Date(dataStats.oldestEntry.timestamp),
+                    "MMM dd, yyyy"
+                  )}
+                </Text>
+              </View>
+            </View>
+
+            <View className="mt-4 p-3 rounded-xl bg-gradient-to-r from-blue-50 to-purple-50">
+              <Text className="text-center text-sm text-gray-700">
+                <Text className="font-medium">
+                  {getMoodInterpretation(dataStats.overallAvg).text}
+                </Text>{" "}
+                overall mood
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* Preferences Section */}
+        <View className="mx-4 mb-6">
+          <Text className="text-lg font-semibold mb-3 text-gray-800">
+            ⚙️ Preferences
+          </Text>
+
+          <View className="bg-white rounded-xl p-4 shadow-sm">
+            <View className="flex-row justify-between items-center">
+              <View className="flex-1">
+                <Text className="text-base font-medium text-gray-800 mb-1">
+                  Show Detailed Labels
+                </Text>
+                <Text className="text-sm text-gray-600">
+                  Display detailed mood descriptions in the tracking interface
+                </Text>
+              </View>
+              <Switch
+                value={showDetailedLabels}
+                onValueChange={handleToggleLabels}
+                trackColor={{ false: "#f3f4f6", true: "#ddd6fe" }}
+                thumbColor={showDetailedLabels ? "#8b5cf6" : "#9ca3af"}
+              />
+            </View>
+          </View>
+        </View>
+
+        {/* Data Management Section */}
+        <View className="mx-4 mb-6">
+          <Text className="text-lg font-semibold mb-3 text-gray-800">
+            💾 Data Management
+          </Text>
+
+          <View className="bg-white rounded-xl p-4 shadow-sm space-y-4">
+            {/* Export */}
+            <View>
+              <Text className="text-base font-medium text-gray-800 mb-1">
+                Export Data
+              </Text>
+              <Text className="text-sm text-gray-600 mb-3">
+                Save your mood data as a JSON file for backup or sharing
+              </Text>
+              <TouchableOpacity
+                onPress={handleExport}
+                disabled={loading === "export"}
+                className="bg-blue-500 py-3 px-4 rounded-xl flex-row justify-center items-center"
+                style={{ opacity: loading === "export" ? 0.7 : 1 }}
+              >
+                {loading === "export" ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <>
+                    <Text className="text-white font-medium text-center mr-2">
+                      📤
+                    </Text>
+                    <Text className="text-white font-medium text-center">
+                      Export Mood Data
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            <View className="border-t border-gray-200 my-4" />
+
+            {/* Import */}
+            <View>
+              <Text className="text-base font-medium text-gray-800 mb-1">
+                Import Data
+              </Text>
+              <Text className="text-sm text-gray-600 mb-3">
+                Restore previously exported mood data from a JSON file
+              </Text>
+              <TouchableOpacity
+                onPress={handleImport}
+                disabled={loading === "import"}
+                className="bg-green-500 py-3 px-4 rounded-xl flex-row justify-center items-center"
+                style={{ opacity: loading === "import" ? 0.7 : 1 }}
+              >
+                {loading === "import" ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <>
+                    <Text className="text-white font-medium text-center mr-2">
+                      📥
+                    </Text>
+                    <Text className="text-white font-medium text-center">
+                      Import Mood Data
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            <View className="border-t border-gray-200 my-4" />
+
+            {/* Add Sample Data */}
+            <View>
+              <Text className="text-base font-medium text-gray-800 mb-1">
+                Add Sample Data
+              </Text>
+              <Text className="text-sm text-gray-600 mb-3">
+                Generate sample mood entries for testing and demonstration
+              </Text>
+              <TouchableOpacity
+                onPress={handleSeedMoods}
+                disabled={loading === "seed"}
+                className="bg-purple-500 py-3 px-4 rounded-xl flex-row justify-center items-center"
+                style={{ opacity: loading === "seed" ? 0.7 : 1 }}
+              >
+                {loading === "seed" ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <>
+                    <Text className="text-white font-medium text-center mr-2">
+                      🎲
+                    </Text>
+                    <Text className="text-white font-medium text-center">
+                      Add Sample Data
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            <View className="border-t border-gray-200 my-4" />
+
+            {/* Clear Data */}
+            <View>
+              <Text className="text-base font-medium text-gray-800 mb-1">
+                Clear All Data
+              </Text>
+              <Text className="text-sm text-gray-600 mb-3">
+                ⚠️ Permanently remove all mood entries from the database
+              </Text>
+              <TouchableOpacity
+                onPress={handleClearMoods}
+                disabled={loading === "clear"}
+                className="bg-red-500 py-3 px-4 rounded-xl flex-row justify-center items-center"
+                style={{ opacity: loading === "clear" ? 0.7 : 1 }}
+              >
+                {loading === "clear" ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <>
+                    <Text className="text-white font-medium text-center mr-2">
+                      🗑️
+                    </Text>
+                    <Text className="text-white font-medium text-center">
+                      Clear All Data
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {/* Success message for sample data */}
+            {lastSeedResult && (
+              <View className="mt-4 p-4 bg-green-50 border border-green-200 rounded-xl">
+                <Text className="text-green-800 text-center font-medium">
+                  ✅ Added {lastSeedResult.count} sample mood entries
+                  successfully
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* App Info Section */}
+        <View className="mx-4 mb-6">
+          <Text className="text-lg font-semibold mb-3 text-gray-800">
+            ℹ️ About
+          </Text>
+
+          <View className="bg-white rounded-xl p-4 shadow-sm">
+            <View className="items-center">
+              <Text className="text-4xl mb-2">🎯</Text>
+              <Text className="text-lg font-semibold text-gray-800 mb-1">
+                Moodinator
+              </Text>
+              <Text className="text-sm text-gray-600 text-center mb-4">
+                Track, analyze, and understand your emotional patterns with
+                detailed insights and beautiful visualizations.
               </Text>
 
-              <View className="bg-white rounded-xl p-4 shadow-sm">
-                <View className="space-y-4">
-                  <View>
-                    <Text className="text-base font-medium text-gray-800 mb-1">
-                      Show Detailed Labels
-                    </Text>
-                    <Text className="text-sm text-gray-600 mb-2">
-                      Toggle whether detailed labels are displayed in the app
-                    </Text>
-                    <Switch
-                      value={showDetailedLabels}
-                      onValueChange={handleToggleLabels}
-                    />
-                  </View>
-                </View>
+              <View className="bg-gradient-to-r from-blue-50 to-purple-50 p-3 rounded-lg w-full">
+                <Text className="text-center text-sm text-gray-700">
+                  💡 <Text className="font-medium">Tip:</Text> Use swipe
+                  gestures in the home screen - swipe left to edit notes, right
+                  to delete entries
+                </Text>
               </View>
             </View>
           </View>
         </View>
+
+        {/* Bottom padding */}
+        <View className="pb-20" />
       </ScrollView>
     </SafeAreaView>
   );
