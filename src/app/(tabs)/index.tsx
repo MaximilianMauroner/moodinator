@@ -4,7 +4,6 @@ import {
   Text,
   SafeAreaView,
   RefreshControl,
-  FlatList,
   ScrollView,
   TouchableOpacity,
 } from "react-native";
@@ -18,8 +17,7 @@ import {
   updateMoodTimestamp,
 } from "@db/db";
 import { DisplayMoodItem } from "@/components/DisplayMoodItem";
-import { NoteModal } from "@/components/NoteModal";
-import { DateTimePickerModal } from "@/components/DateTimePickerModal";
+import { EditMoodModal } from "@/components/EditMoodModal";
 import { MoodButtonsDetailed } from "@/components/MoodButtonsDetailed";
 import { MoodButtonsCompact } from "@/components/MoodButtonsCompact";
 import { SwipeDirection } from "@/types/mood";
@@ -55,28 +53,110 @@ const toastConfig = {
     hide: () => void;
     onPress: () => void;
   }) => (
-    <View className="flex-row items-center bg-blue-600 rounded-xl px-4 py-3 shadow-lg m-2">
-      <View className="flex-1 flex-row items-center" style={{ minHeight: 48 }}>
-        <View className="flex-1 ml-3">
-          <Text className="text-white font-bold text-base">{text1}</Text>
-          {text2 ? <Text className="text-white text-xs">{text2}</Text> : null}
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: "#10B981",
+        borderRadius: 16,
+        paddingHorizontal: 18,
+        paddingVertical: 14,
+        shadowColor: "#10B981",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 12,
+        elevation: 8,
+        marginHorizontal: 16,
+        marginVertical: 8,
+        borderWidth: 0,
+        maxWidth: "94%",
+        alignSelf: "center",
+      }}
+      pointerEvents="box-none"
+    >
+      <View
+        style={{
+          flex: 1,
+          flexDirection: "row",
+          alignItems: "center",
+          minHeight: 48,
+        }}
+      >
+        <View
+          style={{
+            backgroundColor: "rgba(255, 255, 255, 0.2)",
+            borderRadius: 20,
+            padding: 6,
+            marginRight: 12,
+          }}
+        >
+          <IconSymbol name="checkmark" size={16} color="#fff" />
         </View>
-        <HapticTab onPress={onPress}>
+        <View style={{ flex: 1 }}>
           <Text
-            className="text-blue-600 font-bold text-sm px-2 py-1 bg-white rounded-lg ml-2"
-            accessibilityRole="button"
+            style={{
+              color: "white",
+              fontWeight: "600",
+              fontSize: 15,
+              letterSpacing: 0.2,
+              lineHeight: 18,
+            }}
           >
-            Undo
+            {text1}
           </Text>
+          {text2 ? (
+            <Text
+              style={{
+                color: "rgba(255, 255, 255, 0.9)",
+                fontSize: 13,
+                marginTop: 2,
+                fontWeight: "400",
+                lineHeight: 16,
+              }}
+            >
+              {text2}
+            </Text>
+          ) : null}
+        </View>
+        <HapticTab onPress={onPress} style={{ pointerEvents: "auto" }}>
+          <View
+            style={{
+              backgroundColor: "white",
+              paddingHorizontal: 12,
+              paddingVertical: 6,
+              borderRadius: 12,
+              marginLeft: 8,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.1,
+              shadowRadius: 2,
+              elevation: 2,
+            }}
+          >
+            <Text
+              style={{
+                color: "#10B981",
+                fontWeight: "600",
+                fontSize: 13,
+                letterSpacing: 0.1,
+              }}
+            >
+              Undo
+            </Text>
+          </View>
         </HapticTab>
       </View>
-      <HapticTab onPress={hide}>
-        <IconSymbol
-          name="xmark"
-          size={20}
-          color="#fff"
-          style={{ marginLeft: 8 }}
-        />
+      <HapticTab onPress={hide} style={{ pointerEvents: "auto" }}>
+        <View
+          style={{
+            backgroundColor: "rgba(255, 255, 255, 0.2)",
+            borderRadius: 16,
+            padding: 6,
+            marginLeft: 8,
+          }}
+        >
+          <IconSymbol name="xmark" size={14} color="#fff" />
+        </View>
       </HapticTab>
     </View>
   ),
@@ -132,30 +212,42 @@ export default function HomeScreen() {
   const handleLongPress = useCallback((mood: number) => {
     setCurrentMoodPressed(mood);
     setSelectedMoodId(null);
+    // Create a temporary mood entry for the modal to display
+    setSelectedMood({
+      id: -1, // Temporary ID
+      mood: mood,
+      timestamp: new Date().toISOString(),
+      note: null,
+    });
     setNoteText("");
     setModalVisible(true);
   }, []);
 
   const handleAddNote = useCallback(async () => {
-    if (selectedMoodId !== null) {
-      const updatedMood = await updateMoodNote(selectedMoodId, noteText);
-      if (updatedMood) {
-        setMoods((prev) =>
-          prev.map((m) =>
-            m.id === updatedMood.id ? { ...m, note: noteText } : m
-          )
-        );
+    try {
+      if (selectedMoodId !== null) {
+        // Editing existing mood note
+        const updatedMood = await updateMoodNote(selectedMoodId, noteText);
+        if (updatedMood) {
+          // Refresh the entire mood list to ensure consistency
+          await fetchMoods();
+        }
+      } else if (currentMoodPressed !== null) {
+        // Creating new mood with note
+        const newMood = await insertMood(currentMoodPressed, noteText);
+        setMoods((prev) => [newMood, ...prev]);
+        setLastTracked(new Date());
       }
+    } catch (error) {
+      console.error("Error saving note:", error);
     }
-    if (currentMoodPressed !== null) {
-      const newMood = await insertMood(currentMoodPressed, noteText);
-      setMoods((prev) => [newMood, ...prev]);
-    }
+
+    // Reset states
     setCurrentMoodPressed(null);
-    setModalVisible(false);
-    setNoteText("");
     setSelectedMoodId(null);
-  }, [selectedMoodId, noteText, currentMoodPressed]);
+    setSelectedMood(null);
+    setNoteText("");
+  }, [selectedMoodId, noteText, currentMoodPressed, fetchMoods]);
 
   const handleDeleteMood = useCallback(async (mood: MoodEntry) => {
     await deleteMood(mood.id);
@@ -203,7 +295,9 @@ export default function HomeScreen() {
         handleDeleteMood(mood);
       } else if (direction === "left") {
         setSelectedMoodId(mood.id);
+        setSelectedMood(mood);
         setNoteText(mood.note || "");
+        setCurrentMoodPressed(null); // Clear this for editing existing mood
         setModalVisible(true);
       }
     },
@@ -212,28 +306,24 @@ export default function HomeScreen() {
 
   const handleMoodItemLongPress = useCallback((mood: MoodEntry) => {
     setSelectedMood(mood);
-    setShowDateModal(true);
+    setSelectedMoodId(mood.id);
+    setNoteText(mood.note || "");
+    setCurrentMoodPressed(null); // Clear this for editing existing mood
+    setShowDateModal(false); // Make sure we're not in date mode
+    setModalVisible(true);
   }, []);
 
   const handleDateTimeSave = useCallback(
     async (moodId: number, newTimestamp: number) => {
-      await updateMoodTimestamp(moodId, newTimestamp);
-      await fetchMoods(); // Refresh the moods list
-      setShowDateModal(false);
+      try {
+        await updateMoodTimestamp(moodId, newTimestamp);
+        await fetchMoods(); // Refresh the moods list to show updated time
+        setShowDateModal(false);
+      } catch (error) {
+        console.error("Error updating timestamp:", error);
+      }
     },
     [fetchMoods]
-  );
-
-  const renderMoodItem = useCallback(
-    ({ item }: { item: MoodEntry }) => (
-      <DisplayMoodItem
-        mood={item}
-        onSwipeableWillOpen={onSwipeableWillOpen}
-        onLongPress={handleMoodItemLongPress}
-        swipeThreshold={SWIPE_THRESHOLD}
-      />
-    ),
-    [onSwipeableWillOpen, handleMoodItemLongPress]
   );
 
   const toggleLabelsPreference = useCallback(async () => {
@@ -269,8 +359,11 @@ export default function HomeScreen() {
 
   const handleCloseModal = useCallback(() => {
     setModalVisible(false);
+    setShowDateModal(false);
     setCurrentMoodPressed(null);
     setSelectedMoodId(null);
+    setSelectedMood(null);
+    setNoteText("");
   }, []);
 
   // Calculate quick stats for today and recent activity
@@ -417,7 +510,7 @@ export default function HomeScreen() {
             )}
 
             {/* Mood Input Section */}
-            <View className="mx-4 mb-6 bg-white rounded-2xl shadow-lg p-6">
+            <View className="mx-4 mb-6">
               <View className="flex-row justify-between items-center mb-4">
                 <Text className="text-xl font-bold text-gray-800">
                   🎯 Track Your Mood
@@ -432,27 +525,29 @@ export default function HomeScreen() {
                 </TouchableOpacity>
               </View>
 
-              {lastTracked && (
-                <Text className="text-xs text-gray-400 text-center mb-4">
-                  Last tracked: {format(lastTracked, "MMM dd 'at' HH:mm")}
+              <View className="bg-white rounded-2xl shadow-lg p-6">
+                {lastTracked && (
+                  <Text className="text-xs text-gray-400 text-center mb-4">
+                    Last tracked: {format(lastTracked, "MMM dd 'at' HH:mm")}
+                  </Text>
+                )}
+
+                {showDetailedLabels ? (
+                  <MoodButtonsDetailed
+                    onMoodPress={handleMoodPress}
+                    onLongPress={handleLongPress}
+                  />
+                ) : (
+                  <MoodButtonsCompact
+                    onMoodPress={handleMoodPress}
+                    onLongPress={handleLongPress}
+                  />
+                )}
+
+                <Text className="text-xs text-gray-400 text-center mt-4">
+                  💡 Tip: Long press any mood to add a note
                 </Text>
-              )}
-
-              {showDetailedLabels ? (
-                <MoodButtonsDetailed
-                  onMoodPress={handleMoodPress}
-                  onLongPress={handleLongPress}
-                />
-              ) : (
-                <MoodButtonsCompact
-                  onMoodPress={handleMoodPress}
-                  onLongPress={handleLongPress}
-                />
-              )}
-
-              <Text className="text-xs text-gray-400 text-center mt-4">
-                💡 Tip: Long press any mood to add a note
-              </Text>
+              </View>
             </View>
 
             {/* Mood History Section */}
@@ -484,28 +579,37 @@ export default function HomeScreen() {
                 </View>
               ) : (
                 <View className="bg-white rounded-xl shadow-sm overflow-hidden">
-                  <FlatList
-                    data={moods}
-                    initialNumToRender={10}
+                  <ScrollView
+                    style={{
+                      maxHeight: Math.min(500, moods.length * 80 + 100),
+                    }}
                     contentContainerStyle={{ padding: 16 }}
-                    renderItem={renderMoodItem}
-                    keyExtractor={(item) => item.id.toString()}
-                    removeClippedSubviews={true}
-                    windowSize={7}
-                    maxToRenderPerBatch={10}
-                    updateCellsBatchingPeriod={50}
-                    extraData={moods}
-                    scrollEnabled={false}
-                    style={{ maxHeight: 400 }}
-                  />
-                  {moods.length > 5 && (
-                    <View className="p-4 border-t border-gray-100">
-                      <Text className="text-center text-sm text-gray-500">
-                        Showing recent entries • Swipe left to edit, right to
-                        delete
-                      </Text>
-                    </View>
-                  )}
+                    showsVerticalScrollIndicator={true}
+                    nestedScrollEnabled={true}
+                  >
+                    {moods.map((item) => (
+                      <DisplayMoodItem
+                        key={item.id}
+                        mood={item}
+                        onSwipeableWillOpen={onSwipeableWillOpen}
+                        onLongPress={handleMoodItemLongPress}
+                        swipeThreshold={SWIPE_THRESHOLD}
+                      />
+                    ))}
+                  </ScrollView>
+                  <View
+                    className="border-t border-gray-100 p-2"
+                    style={{
+                      backgroundColor: "#F9FAFB",
+                      borderTopWidth: 1,
+                      borderTopColor: "#F3F4F6",
+                    }}
+                  >
+                    <Text className="text-center text-xs text-gray-500">
+                      {moods.length} total entries • Swipe left to edit, right
+                      to delete
+                    </Text>
+                  </View>
                 </View>
               )}
             </View>
@@ -515,24 +619,33 @@ export default function HomeScreen() {
           </ScrollView>
         </SafeAreaView>
       </GestureHandlerRootView>
-      {modalVisible && (
-        <NoteModal
-          visible={modalVisible}
+      {(modalVisible || showDateModal) && (
+        <EditMoodModal
+          visible={modalVisible || showDateModal}
+          mood={selectedMood}
           noteText={noteText}
           setNoteText={setNoteText}
-          onCancel={handleCloseModal}
-          onSave={handleAddNote}
+          onClose={handleCloseModal}
+          onSaveNote={handleAddNote}
+          onSaveTime={handleDateTimeSave}
         />
       )}
-      {showDateModal && (
-        <DateTimePickerModal
-          visible={showDateModal}
-          mood={selectedMood}
-          onClose={() => setShowDateModal(false)}
-          onSave={handleDateTimeSave}
+      <View
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 9999,
+        }}
+        pointerEvents="box-none"
+      >
+        <ToastManager
+          config={toastConfig}
+          style={{ pointerEvents: "box-none" }}
         />
-      )}
-      <ToastManager config={toastConfig} />
+      </View>
     </>
   );
 }
