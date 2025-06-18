@@ -174,7 +174,6 @@ export async function seedMoods() {
  * Clears all mood entries from the database (DEV only)
  */
 export async function clearMoods() {
-    if (!__DEV__) return;
     const db = await getDb();
     await db.runAsync('DELETE FROM moods;');
 }
