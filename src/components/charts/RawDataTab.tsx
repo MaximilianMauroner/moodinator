@@ -24,7 +24,7 @@ export const RawDataTab = ({ moods }: { moods: MoodEntry[] }) => {
 
   // Sort moods by timestamp for chronological display
   const sortedMoods = [...moods].sort(
-    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
   );
 
   // Raw data statistics
