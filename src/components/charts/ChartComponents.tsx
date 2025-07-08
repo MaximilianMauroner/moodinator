@@ -9,6 +9,7 @@ import {
   isBefore,
   isEqual,
   startOfWeek,
+  subDays,
 } from "date-fns";
 import type { MoodEntry } from "@db/types";
 import { moodScale } from "@/constants/moodScale";
@@ -75,7 +76,10 @@ export const getDaysInRange = (start: Date, end: Date): Date[] => {
 };
 
 // Process daily mood data
-export const processMoodDataForDailyChart = (allMoods: MoodEntry[]) => {
+export const processMoodDataForDailyChart = (
+  allMoods: MoodEntry[],
+  numDays: number
+) => {
   if (!allMoods || allMoods.length === 0) {
     return { labels: [], dailyAggregates: [] };
   }
@@ -84,12 +88,20 @@ export const processMoodDataForDailyChart = (allMoods: MoodEntry[]) => {
     (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
   );
 
-  const minDate = new Date(sortedMoods[0].timestamp);
-  const maxDate = new Date(sortedMoods[sortedMoods.length - 1].timestamp);
-  const allDatesInRange = getDaysInRange(minDate, maxDate);
+  const latestDate = startOfDay(
+    new Date(sortedMoods[sortedMoods.length - 1].timestamp)
+  );
+  const earliestDate = startOfDay(subDays(latestDate, numDays - 1));
+
+  const filteredMoods = sortedMoods.filter((mood) => {
+    const moodDate = startOfDay(new Date(mood.timestamp));
+    return moodDate >= earliestDate && moodDate <= latestDate;
+  });
+
+  const allDatesInRange = getDaysInRange(earliestDate, latestDate);
 
   const moodsByDay: Record<string, number[]> = {};
-  sortedMoods.forEach((mood) => {
+  filteredMoods.forEach((mood) => {
     const dayKey = format(startOfDay(new Date(mood.timestamp)), "yyyy-MM-dd");
     if (!moodsByDay[dayKey]) {
       moodsByDay[dayKey] = [];
@@ -174,10 +186,9 @@ export const processMoodDataForDailyChart = (allMoods: MoodEntry[]) => {
     return { ...aggregate, finalAvg: interpolatedAvg, isInterpolated: true };
   });
 
-  return {
-    labels: finalAggregates.map((agg) => format(agg.date, "dd/MM")),
-    dailyAggregates: finalAggregates,
-  };
+  const labels = finalAggregates.map((agg) => format(agg.date, "d"));
+
+  return { labels, dailyAggregates: finalAggregates };
 };
 
 // Process weekly mood data

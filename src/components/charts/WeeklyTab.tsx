@@ -5,6 +5,7 @@ import {
   ScrollView,
   Dimensions,
   TouchableOpacity,
+  RefreshControl,
 } from "react-native";
 import { LineChart } from "react-native-chart-kit";
 import {
@@ -24,9 +25,22 @@ import {
   getTrendInterpretation,
 } from "./ChartComponents";
 
-export const WeeklyTab = ({ moods }: { moods: MoodEntry[] }) => {
+export const WeeklyTab = ({
+  moods,
+  onRefresh,
+}: {
+  moods: MoodEntry[];
+  onRefresh: () => void;
+}) => {
   const weeklyData = processWeeklyMoodData(moods);
   const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set());
+
+  const [refreshing, setRefreshing] = React.useState(false);
+  const handleRefresh = React.useCallback(() => {
+    setRefreshing(true);
+    onRefresh();
+    setRefreshing(false);
+  }, [onRefresh]);
 
   // Helper function to get mood entries for a specific week
   const getMoodEntriesForWeek = (weekStart: Date): MoodEntry[] => {
@@ -82,7 +96,12 @@ export const WeeklyTab = ({ moods }: { moods: MoodEntry[] }) => {
   };
 
   return (
-    <ScrollView className="flex-1">
+    <ScrollView
+      className="flex-1"
+      refreshControl={
+        <RefreshControl refreshing={false} onRefresh={onRefresh} />
+      }
+    >
       <Text className="text-xl font-semibold text-center mb-1 text-emerald-600 mx-4">
         📊 Weekly Mood Analysis
       </Text>
