@@ -43,6 +43,7 @@ export async function insertMood(mood: number, note?: string): Promise<MoodEntry
         new Date().getTime() // Use current timestamp
     );
     const inserted = await db.getFirstAsync('SELECT * FROM moods WHERE id = ?;', result.lastInsertRowId);
+
     return inserted as MoodEntry;
 }
 
@@ -61,6 +62,26 @@ export async function insertMoodEntry(entry: MoodEntry): Promise<MoodEntry> {
     );
     const inserted = await db.getFirstAsync('SELECT * FROM moods WHERE id = ?;', result.lastInsertRowId);
     return inserted as MoodEntry;
+}
+
+/**
+ * Checks if a mood has been logged today.
+ * @returns Promise resolving to boolean
+ */
+export async function hasMoodBeenLoggedToday(): Promise<boolean> {
+    const db = await getDb();
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
+    const result = await db.getFirstAsync(
+        'SELECT COUNT(*) as count FROM moods WHERE timestamp >= ? AND timestamp <= ?;',
+        todayStart.getTime(),
+        todayEnd.getTime()
+    );
+
+    return (result as any).count > 0;
 }
 
 /**
