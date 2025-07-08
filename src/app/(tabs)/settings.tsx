@@ -18,6 +18,7 @@ import {
   seedMoodsFromFile,
 } from "@db/db";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Notifications from "expo-notifications";
 
 // Storage key for show labels preference
 const SHOW_LABELS_KEY = "showLabelsPreference";
@@ -151,6 +152,20 @@ export default function SettingsScreen() {
     } finally {
       setLoading(null);
     }
+  };
+
+  const handleTestNotification = async () => {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "Test Notification",
+        body: "This is a test notification!",
+      },
+      trigger: { seconds: 2 },
+    });
+    Alert.alert(
+      "Notification Scheduled",
+      "A test notification has been scheduled and will appear in 2 seconds."
+    );
   };
 
   const handleClearMoods = async () => {
@@ -325,6 +340,35 @@ export default function SettingsScreen() {
                 </View>
               </View>
             </View>
+
+            {__DEV__ && (
+              <View className="space-y-4 pb-8">
+                <Text className="text-lg font-semibold mb-2 text-gray-700">
+                  Developer Options
+                </Text>
+
+                <View className="bg-white rounded-xl p-4 shadow-sm">
+                  <View className="space-y-4">
+                    <View>
+                      <Text className="text-base font-medium text-gray-800 mb-1">
+                        Test Notification
+                      </Text>
+                      <Text className="text-sm text-gray-600 mb-2">
+                        Schedule a test notification to appear in 2 seconds.
+                      </Text>
+                      <Pressable
+                        onPress={handleTestNotification}
+                        className="bg-gray-500 py-3 px-4 rounded-lg"
+                      >
+                        <Text className="text-white font-medium text-center">
+                          Send Test Notification
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                </View>
+              </View>
+            )}
           </View>
         </View>
       </ScrollView>
