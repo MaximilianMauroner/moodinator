@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, ScrollView } from "react-native";
+import { View, Text, ScrollView, RefreshControl } from "react-native";
 import { endOfWeek, format } from "date-fns";
 import type { MoodEntry } from "@db/types";
 import { moodScale } from "@/constants/moodScale";
@@ -10,7 +10,13 @@ import {
   getTrendInterpretation,
 } from "./ChartComponents";
 
-export const OverviewTab = ({ moods }: { moods: MoodEntry[] }) => {
+export const OverviewTab = ({
+  moods,
+  onRefresh,
+}: {
+  moods: MoodEntry[];
+  onRefresh: () => void;
+}) => {
   const weeklyData = processWeeklyMoodData(moods);
   const recentWeeks = weeklyData.weeklyAggregates.slice(0, 4); // Last 4 weeks
 
@@ -26,7 +32,12 @@ export const OverviewTab = ({ moods }: { moods: MoodEntry[] }) => {
   const trendInterpretation = getTrendInterpretation(weeklyTrend);
 
   return (
-    <ScrollView className="flex-1">
+    <ScrollView
+      className="flex-1"
+      refreshControl={
+        <RefreshControl refreshing={false} onRefresh={onRefresh} />
+      }
+    >
       {/* Weekly Comparison Card */}
       <View className="mx-4 mb-6 p-6 bg-white rounded-2xl shadow-lg">
         <Text className="text-xl font-bold text-gray-800 mb-4 text-center">

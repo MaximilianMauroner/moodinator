@@ -5,6 +5,7 @@ import {
   ScrollView,
   Dimensions,
   TouchableOpacity,
+  RefreshControl,
 } from "react-native";
 import { LineChart } from "react-native-chart-kit";
 import {
@@ -156,92 +157,75 @@ const DayItem = React.memo(
 );
 DayItem.displayName = "DayItem";
 
-export const DailyTab = ({ moods }: { moods: MoodEntry[] }) => {
-  const processedData = processMoodDataForDailyChart(moods);
+export const DailyTab = ({
+  moods,
+  onRefresh,
+}: {
+  moods: MoodEntry[];
+  onRefresh: () => void;
+}) => {
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
+  const [numDays, setNumDays] = useState(7);
 
-  // Memoize the recent seven days calculation
-  const recentSevenDays = useMemo(() => {
-    const today = new Date();
-    const recentDays = [];
+  const processedData = useMemo(() => {
+    return processMoodDataForDailyChart(moods, numDays);
+  }, [moods, numDays]);
 
-    for (let i = 0; i < 7; i++) {
-      const date = subDays(today, i);
-      const dayStart = startOfDay(date);
-      const dayEnd = endOfDay(date);
+  const { dailyAggregates, labels } = processedData;
 
-      const dayMoods = moods.filter((mood) => {
-        const moodDate = new Date(mood.timestamp);
-        return isWithinInterval(moodDate, { start: dayStart, end: dayEnd });
-      });
-
-      let dayData;
-      if (dayMoods.length > 0) {
-        const moodValues = dayMoods.map((m) => m.mood);
-        const avg =
-          moodValues.reduce((sum, val) => sum + val, 0) / moodValues.length;
-        const min = Math.min(...moodValues);
-        const max = Math.max(...moodValues);
-        dayData = {
-          date,
-          moods: moodValues,
-          finalAvg: avg,
-          min,
-          max,
-          hasRealData: true,
-        };
-      } else {
-        // Find the most recent mood entry to use for interpolation
-        const recentMood = moods
-          .filter((m) => new Date(m.timestamp) < dayStart)
-          .sort(
-            (a, b) =>
-              new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-          )[0];
-
-        dayData = {
-          date,
-          moods: null,
-          finalAvg: recentMood?.mood ?? 5, // Default to neutral if no previous mood
-          min: undefined,
-          max: undefined,
-          hasRealData: false,
-        };
-      }
-
-      recentDays.push(dayData);
-    }
-
-    return recentDays;
-  }, [moods]);
-
-  // Memoize mood entries lookup function
-  const getMoodEntriesForDay = useCallback(
-    (dayDate: Date): MoodEntry[] => {
-      const dayStart = startOfDay(dayDate);
-      const dayEnd = endOfDay(dayDate);
-      return moods
-        .filter((mood) => {
-          const moodDate = new Date(mood.timestamp);
-          return isWithinInterval(moodDate, { start: dayStart, end: dayEnd });
-        })
-        .sort(
-          (a, b) =>
-            new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-        );
-    },
-    [moods]
+  const reversedAggregates = useMemo(
+    () => [...dailyAggregates].reverse(),
+    [dailyAggregates]
   );
 
-  // Pre-calculate mood entries for all recent days to avoid repeated calculations
   const moodEntriesByDay = useMemo(() => {
-    const entriesMap = new Map<string, MoodEntry[]>();
-    recentSevenDays.forEach((day) => {
-      const dayKey = day.date.toString();
-      entriesMap.set(dayKey, getMoodEntriesForDay(day.date));
+    const map = new Map<string, MoodEntry[]>();
+    moods.forEach((mood) => {
+      const dayKey = startOfDay(new Date(mood.timestamp)).toString();
+      if (!map.has(dayKey)) {
+        map.set(dayKey, []);
+      }
+      map.get(dayKey)!.push(mood);
     });
-    return entriesMap;
-  }, [recentSevenDays, getMoodEntriesForDay]);
+    return map;
+  }, [moods]);
+
+  const dailyStats = useMemo(() => {
+    if (!dailyAggregates || dailyAggregates.length === 0) {
+      return {
+        bestDay: 0,
+        worstDay: 0,
+        averageDay: 0,
+        daysWithEntries: 0,
+        totalDays: 0,
+      };
+    }
+
+    const daysWithData = dailyAggregates.filter((d) => !d.isInterpolated);
+    if (daysWithData.length === 0) {
+      return {
+        bestDay: 0,
+        worstDay: 0,
+        averageDay: 0,
+        daysWithEntries: 0,
+        totalDays: dailyAggregates.length,
+      };
+    }
+
+    const bestDay = Math.min(...daysWithData.map((d) => d.finalAvg));
+    const worstDay = Math.max(...daysWithData.map((d) => d.finalAvg));
+    const averageDay =
+      daysWithData.reduce((sum, d) => sum + d.finalAvg, 0) /
+      daysWithData.length;
+
+    return {
+      bestDay,
+      worstDay,
+      averageDay,
+      daysWithEntries: daysWithData.length,
+      totalDays: dailyAggregates.length,
+    };
+  }, [dailyAggregates]);
 
   const toggleDayExpansion = useCallback((dayKey: string) => {
     setExpandedDays((prev) => {
@@ -255,61 +239,30 @@ export const DailyTab = ({ moods }: { moods: MoodEntry[] }) => {
     });
   }, []);
 
-  if (!processedData?.dailyAggregates.length) {
-    return (
-      <View className="flex-1 justify-center items-center p-8">
-        <Text className="text-gray-500 text-center text-lg">
-          No daily mood data available yet
-        </Text>
-      </View>
-    );
-  }
-
-  const reversedLabels = processedData.labels.slice().reverse();
-  const reversedAggregates = processedData.dailyAggregates.slice().reverse();
-
-  // Memoize daily statistics calculation
-  const dailyStats = useMemo(() => {
-    if (!reversedAggregates.length) return null;
-
-    return {
-      bestDay: Math.min(...reversedAggregates.map((d) => d.finalAvg)),
-      worstDay: Math.max(...reversedAggregates.map((d) => d.finalAvg)),
-      averageDay:
-        reversedAggregates.reduce((sum, d) => sum + d.finalAvg, 0) /
-        reversedAggregates.length,
-      daysWithEntries: reversedAggregates.filter(
-        (d) => d.moods && d.moods.length > 0
-      ).length,
-      totalDays: reversedAggregates.length,
-    };
-  }, [reversedAggregates]);
-
-  if (!dailyStats) {
-    return (
-      <View className="flex-1 justify-center items-center p-8">
-        <Text className="text-gray-500 text-center text-lg">
-          Unable to calculate daily statistics
-        </Text>
-      </View>
-    );
-  }
+  const toggleCallbacks = useMemo(() => {
+    const callbacks: { [key: string]: () => void } = {};
+    dailyAggregates.forEach((day) => {
+      const dayKey = day.date.toString();
+      callbacks[dayKey] = () => toggleDayExpansion(dayKey);
+    });
+    return callbacks;
+  }, [dailyAggregates, toggleDayExpansion]);
 
   // Memoize dot colors calculation
   const dotColors = useMemo(() => {
-    return reversedAggregates.map((agg) => {
+    return dailyAggregates.map((agg) => {
       const idx = Math.round(agg.finalAvg);
       return getColorFromTailwind(moodScale[idx]?.color);
     });
-  }, [reversedAggregates]);
+  }, [dailyAggregates]);
 
   // Memoize chart data
   const chartData = useMemo(
     () => ({
-      labels: reversedLabels,
+      labels,
       datasets: [
         {
-          data: reversedAggregates.map((agg) => agg.finalAvg),
+          data: dailyAggregates.map((agg) => agg.finalAvg),
           dotColor: dotColors,
           strokeWidth: 2,
           color: (o = 1) => `rgba(255,255,255,${o})`,
@@ -324,23 +277,18 @@ export const DailyTab = ({ moods }: { moods: MoodEntry[] }) => {
         },
       ],
     }),
-    [reversedLabels, reversedAggregates, dotColors]
+    [labels, dailyAggregates, dotColors]
   );
 
-  // Create stable toggle callbacks for each day
-  const toggleCallbacks = useMemo(() => {
-    const callbacks: Record<string, () => void> = {};
-    recentSevenDays.forEach((day) => {
-      const dayKey = day.date.toString();
-      callbacks[dayKey] = () => toggleDayExpansion(dayKey);
-    });
-    return callbacks;
-  }, [recentSevenDays, toggleDayExpansion]);
-
   return (
-    <ScrollView className="flex-1">
-      <Text className="text-xl font-semibold text-center mb-4 text-indigo-600 mx-4">
-        📈 Daily Mood Analysis
+    <ScrollView
+      className="flex-1"
+      refreshControl={
+        <RefreshControl refreshing={false} onRefresh={onRefresh} />
+      }
+    >
+      <Text className="text-xl font-semibold text-center mb-1 text-blue-600 mx-4">
+        📅 Daily Mood Analysis
       </Text>
 
       {/* Daily Statistics Summary */}
@@ -421,7 +369,7 @@ export const DailyTab = ({ moods }: { moods: MoodEntry[] }) => {
         <Text className="text-sm text-gray-500 mb-4">
           Tap any day to view detailed mood entries and notes
         </Text>
-        {recentSevenDays.map((day, index) => {
+        {reversedAggregates.map((day, index) => {
           const dayKey = day.date.toString();
           const isExpanded = expandedDays.has(dayKey);
           const dayMoodEntries = moodEntriesByDay.get(dayKey) || [];

@@ -1,5 +1,11 @@
 import React from "react";
-import { View, Text, ScrollView, Dimensions } from "react-native";
+import {
+  View,
+  Text,
+  ScrollView,
+  Dimensions,
+  RefreshControl,
+} from "react-native";
 import { LineChart } from "react-native-chart-kit";
 import { format } from "date-fns";
 import type { MoodEntry } from "@db/types";
@@ -11,7 +17,13 @@ import {
 } from "./ChartComponents";
 import { moodScale } from "@/constants/moodScale";
 
-export const RawDataTab = ({ moods }: { moods: MoodEntry[] }) => {
+export const RawDataTab = ({
+  moods,
+  onRefresh,
+}: {
+  moods: MoodEntry[];
+  onRefresh: () => void;
+}) => {
   if (!moods.length) {
     return (
       <View className="flex-1 justify-center items-center p-8">
@@ -21,6 +33,13 @@ export const RawDataTab = ({ moods }: { moods: MoodEntry[] }) => {
       </View>
     );
   }
+
+  const [refreshing, setRefreshing] = React.useState(false);
+  const handleRefresh = React.useCallback(() => {
+    setRefreshing(true);
+    onRefresh();
+    setRefreshing(false);
+  }, [onRefresh]);
 
   // Sort moods by timestamp for chronological display
   const sortedMoods = [...moods].sort(
@@ -69,7 +88,12 @@ export const RawDataTab = ({ moods }: { moods: MoodEntry[] }) => {
   };
 
   return (
-    <ScrollView className="flex-1">
+    <ScrollView
+      className="flex-1"
+      refreshControl={
+        <RefreshControl refreshing={false} onRefresh={onRefresh} />
+      }
+    >
       <Text className="text-xl font-semibold text-center mb-4 text-purple-600 mx-4">
         🔬 Raw Mood Data Analysis
       </Text>
