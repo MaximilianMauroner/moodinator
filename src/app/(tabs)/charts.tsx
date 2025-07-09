@@ -33,13 +33,16 @@ export default function ChartsScreen() {
   const [moods, setMoods] = useState<MoodEntry[]>([]);
   const [moodCount, setMoodCount] = useState<number>(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>("overview");
 
   const getMoodCount = useCallback(async () => {
+    setLoading(true);
     const allMoods = await getAllMoods();
     setMoods(allMoods);
     setMoodCount(allMoods.length);
     setRefreshing(false);
+    setLoading(false);
   }, []);
 
   const onRefresh = useCallback(() => {
@@ -121,17 +124,36 @@ export default function ChartsScreen() {
         )}
 
         {/* Content based on selected tab */}
-        {moodCount > 0 ? (
+        {loading ? (
+          <View className="flex-1 justify-center items-center p-8 mt-20">
+            <Text className="text-6xl mb-4">⏳</Text>
+            <Text className="text-gray-500 text-center text-lg font-semibold">
+              Loading your mood data...
+            </Text>
+          </View>
+        ) : moodCount > 0 ? (
           <ScrollView
             ref={horizontalPager}
             horizontal
             pagingEnabled
             showsHorizontalScrollIndicator={false}
+            scrollEventThrottle={1}
+            decelerationRate="fast"
             onMomentumScrollEnd={(e) => {
               const idx = Math.round(e.nativeEvent.contentOffset.x / width);
               setActiveTab(tabs[idx].id);
             }}
+            onScrollEndDrag={(e) => {
+              const idx = Math.round(e.nativeEvent.contentOffset.x / width);
+              setActiveTab(tabs[idx].id);
+            }}
+            onScrollBeginDrag={(e) => {
+              const currentOffset = e.nativeEvent.contentOffset.x;
+              const idx = Math.round(currentOffset / width);
+              setActiveTab(tabs[idx].id);
+            }}
             style={{ flex: 1 }}
+            directionalLockEnabled={true}
           >
             <View style={{ width }}>
               <OverviewTab moods={moods} onRefresh={onRefresh} />
@@ -146,7 +168,7 @@ export default function ChartsScreen() {
               <RawDataTab moods={moods} onRefresh={onRefresh} />
             </View>
           </ScrollView>
-        ) : (
+        ) : !loading ? (
           <View className="flex-1 justify-center items-center p-8 mt-20">
             <Text className="text-6xl mb-4">📊</Text>
             <Text className="text-gray-500 text-center text-lg font-semibold">
@@ -156,7 +178,7 @@ export default function ChartsScreen() {
               Start tracking your moods to see beautiful insights here!
             </Text>
           </View>
-        )}
+        ) : null}
       </SafeAreaView>
     </GestureHandlerRootView>
   );

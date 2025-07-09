@@ -391,12 +391,17 @@ export const DailyTab = ({
         <Text className="text-lg font-semibold mb-3 text-gray-800">
           Daily Mood Trend
         </Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          scrollEventThrottle={16}
+          contentContainerStyle={{ paddingVertical: 10 }}
+        >
           <LineChart
             data={chartData}
             width={Math.max(
-              Dimensions.get("window").width - 32,
-              processedData.labels.length * 60
+              Dimensions.get("window").width - 64,
+              chartData.labels.length * 50
             )}
             height={300}
             chartConfig={getBaseChartConfig("#7986CB", "#5C6BC0")}

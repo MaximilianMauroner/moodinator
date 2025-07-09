@@ -572,12 +572,17 @@ export const WeeklyTab = ({
         <Text className="text-sm text-gray-500 mb-3">
           Track your mood patterns over time • Lower is better
         </Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          scrollEventThrottle={16}
+          contentContainerStyle={{ paddingVertical: 10 }}
+        >
           <LineChart
             data={chartData}
             width={Math.max(
-              Dimensions.get("window").width - 32,
-              weeklyData.labels.length * 80
+              Dimensions.get("window").width - 64,
+              chartData.labels.length * 60
             )}
             height={300}
             chartConfig={getBaseChartConfig("#10B981", "#059669")}

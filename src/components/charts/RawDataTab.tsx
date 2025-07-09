@@ -265,12 +265,17 @@ export const RawDataTab = ({
         <Text className="text-lg font-semibold mb-3 text-gray-800">
           Complete Timeline
         </Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          scrollEventThrottle={16}
+          contentContainerStyle={{ paddingVertical: 10 }}
+        >
           <LineChart
             data={chartData}
             width={Math.max(
-              Dimensions.get("window").width,
-              sortedMoods.length * 90
+              Dimensions.get("window").width - 64,
+              chartData.labels.length * 40
             )}
             height={300}
             chartConfig={getBaseChartConfig("#9B59B6", "#8E44AD")}

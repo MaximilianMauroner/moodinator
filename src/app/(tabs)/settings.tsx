@@ -19,6 +19,11 @@ import {
 } from "@db/db";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Notifications from "expo-notifications";
+import {
+  getNotificationSettings,
+  saveNotificationSettings,
+} from "@/hooks/useNotifications";
+import { NotificationTimePickerModal } from "@/components/NotificationTimePickerModal";
 
 // Storage key for show labels preference
 const SHOW_LABELS_KEY = "showLabelsPreference";
@@ -33,10 +38,29 @@ export default function SettingsScreen() {
     source: "file" | "random";
   } | null>(null);
 
-  // Load saved preference on component mount
+  // Notification settings state
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [notificationHour, setNotificationHour] = useState(20);
+  const [notificationMinute, setNotificationMinute] = useState(0);
+  const [showTimePickerModal, setShowTimePickerModal] = useState(false);
+
+  // Load saved preferences on component mount
   useEffect(() => {
     loadShowLabelsPreference();
+    loadNotificationSettings();
   }, []);
+
+  // Load notification settings
+  const loadNotificationSettings = async () => {
+    try {
+      const settings = await getNotificationSettings();
+      setNotificationsEnabled(settings.enabled);
+      setNotificationHour(settings.hour);
+      setNotificationMinute(settings.minute);
+    } catch (error) {
+      console.error("Failed to load notification settings:", error);
+    }
+  };
 
   // Load the saved preference
   const loadShowLabelsPreference = async () => {
@@ -160,12 +184,38 @@ export default function SettingsScreen() {
         title: "Test Notification",
         body: "This is a test notification!",
       },
-      trigger: { seconds: 2 },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: 2,
+      },
     });
     Alert.alert(
       "Notification Scheduled",
       "A test notification has been scheduled and will appear in 2 seconds."
     );
+  };
+
+  // Handle notification settings
+  const handleToggleNotifications = async (value: boolean) => {
+    setNotificationsEnabled(value);
+    await saveNotificationSettings(value, notificationHour, notificationMinute);
+  };
+
+  const handleTimePickerSave = async (hour: number, minute: number) => {
+    setNotificationHour(hour);
+    setNotificationMinute(minute);
+    await saveNotificationSettings(notificationsEnabled, hour, minute);
+  };
+
+  const formatNotificationTime = () => {
+    const date = new Date();
+    date.setHours(notificationHour);
+    date.setMinutes(notificationMinute);
+    return date.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
   };
 
   const handleClearMoods = async () => {
@@ -337,6 +387,40 @@ export default function SettingsScreen() {
                       onValueChange={handleToggleLabels}
                     />
                   </View>
+
+                  <View className="border-t border-gray-200 my-4" />
+
+                  <View>
+                    <Text className="text-base font-medium text-gray-800 mb-1">
+                      Daily Mood Reminders
+                    </Text>
+                    <Text className="text-sm text-gray-600 mb-2">
+                      Get a daily notification to remind you to log your mood
+                    </Text>
+                    <Switch
+                      value={notificationsEnabled}
+                      onValueChange={handleToggleNotifications}
+                    />
+                  </View>
+
+                  {notificationsEnabled && (
+                    <View>
+                      <Text className="text-base font-medium text-gray-800 mb-1">
+                        Notification Time
+                      </Text>
+                      <Text className="text-sm text-gray-600 mb-2">
+                        Choose when you'd like to receive daily reminders
+                      </Text>
+                      <Pressable
+                        onPress={() => setShowTimePickerModal(true)}
+                        className="border border-gray-300 rounded-lg p-3 bg-gray-50"
+                      >
+                        <Text className="text-center text-lg font-medium">
+                          {formatNotificationTime()}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  )}
                 </View>
               </View>
             </View>
@@ -372,6 +456,15 @@ export default function SettingsScreen() {
           </View>
         </View>
       </ScrollView>
+
+      {/* Notification Time Picker Modal */}
+      <NotificationTimePickerModal
+        visible={showTimePickerModal}
+        initialHour={notificationHour}
+        initialMinute={notificationMinute}
+        onClose={() => setShowTimePickerModal(false)}
+        onSave={handleTimePickerSave}
+      />
     </SafeAreaView>
   );
 }
