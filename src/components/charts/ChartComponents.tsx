@@ -78,7 +78,7 @@ export const getDaysInRange = (start: Date, end: Date): Date[] => {
 // Process daily mood data
 export const processMoodDataForDailyChart = (
   allMoods: MoodEntry[],
-  numDays: number
+  numDays?: number
 ) => {
   if (!allMoods || allMoods.length === 0) {
     return { labels: [], dailyAggregates: [] };
@@ -91,7 +91,9 @@ export const processMoodDataForDailyChart = (
   const latestDate = startOfDay(
     new Date(sortedMoods[sortedMoods.length - 1].timestamp)
   );
-  const earliestDate = startOfDay(subDays(latestDate, numDays - 1));
+  const earliestDate = numDays
+    ? startOfDay(subDays(latestDate, numDays - 1))
+    : startOfDay(new Date(sortedMoods[0].timestamp));
 
   const filteredMoods = sortedMoods.filter((mood) => {
     const moodDate = startOfDay(new Date(mood.timestamp));

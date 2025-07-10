@@ -67,7 +67,7 @@ export const RawDataTab = ({
   };
 
   const chartData = {
-    labels: sortedMoods.map((m) => format(new Date(m.timestamp), "M/d HH:mm")),
+    labels: sortedMoods.map((m) => format(new Date(m.timestamp), "HH:mm")),
     datasets: [
       {
         data: sortedMoods.map((m) => m.mood),

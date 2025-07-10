@@ -204,13 +204,13 @@ export async function clearMoods() {
 void createMoodTable();
 
 /**
- * Retrieves the total count of mood entries in the database.
- * @returns Promise resolving to the count of mood entries
+ * Gets the total count of mood entries efficiently without loading all data.
+ * @returns Promise resolving to the number of mood entries
  */
 export async function getMoodCount(): Promise<number> {
     const db = await getDb();
-    const result = await db.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM moods;');
-    return result?.count ?? 0;
+    const result = await db.getFirstAsync('SELECT COUNT(*) as count FROM moods');
+    return (result as any)?.count || 0;
 }
 
 /**
