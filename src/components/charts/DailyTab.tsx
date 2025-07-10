@@ -165,17 +165,22 @@ export const DailyTab = ({
   onRefresh: () => void;
 }) => {
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
-  const [numDays, setNumDays] = useState(7);
 
   const processedData = useMemo(() => {
-    return processMoodDataForDailyChart(moods, numDays);
-  }, [moods, numDays]);
+    return processMoodDataForDailyChart(moods);
+  }, [moods]);
 
   const { dailyAggregates, labels } = processedData;
 
   const reversedAggregates = useMemo(
     () => [...dailyAggregates].reverse(),
     [dailyAggregates]
+  );
+
+  // Limit to last 7 days for Recent Days section
+  const recentDaysAggregates = useMemo(
+    () => reversedAggregates.slice(0, 7),
+    [reversedAggregates]
   );
 
   const moodEntriesByDay = useMemo(() => {
@@ -250,19 +255,19 @@ export const DailyTab = ({
 
   // Memoize dot colors calculation
   const dotColors = useMemo(() => {
-    return dailyAggregates.map((agg) => {
+    return reversedAggregates.map((agg) => {
       const idx = Math.round(agg.finalAvg);
       return getColorFromTailwind(moodScale[idx]?.color);
     });
-  }, [dailyAggregates]);
+  }, [reversedAggregates]);
 
   // Memoize chart data
   const chartData = useMemo(
     () => ({
-      labels,
+      labels: [...labels].reverse(), // Reverse labels to match reversed aggregates
       datasets: [
         {
-          data: dailyAggregates.map((agg) => agg.finalAvg),
+          data: reversedAggregates.map((agg) => agg.finalAvg),
           dotColor: dotColors,
           strokeWidth: 2,
           color: (o = 1) => `rgba(255,255,255,${o})`,
@@ -277,7 +282,7 @@ export const DailyTab = ({
         },
       ],
     }),
-    [labels, dailyAggregates, dotColors]
+    [labels, reversedAggregates, dotColors]
   );
 
   return (
@@ -369,7 +374,7 @@ export const DailyTab = ({
         <Text className="text-sm text-gray-500 mb-4">
           Tap any day to view detailed mood entries and notes
         </Text>
-        {reversedAggregates.map((day, index) => {
+        {recentDaysAggregates.map((day, index) => {
           const dayKey = day.date.toString();
           const isExpanded = expandedDays.has(dayKey);
           const dayMoodEntries = moodEntriesByDay.get(dayKey) || [];
@@ -401,7 +406,7 @@ export const DailyTab = ({
             data={chartData}
             width={Math.max(
               Dimensions.get("window").width - 64,
-              chartData.labels.length * 50
+              chartData.labels.length * 40
             )}
             height={300}
             chartConfig={getBaseChartConfig("#7986CB", "#5C6BC0")}
