@@ -362,7 +362,7 @@ export default function HomeScreen() {
           onSave={handleDateTimeSave}
         />
       )}
-      <ToastManager config={toastConfig} />
+      <ToastManager config={toastConfig} useModal={false} />
     </>
   );
 }
