@@ -67,12 +67,12 @@ export const DateTimePickerModal: React.FC<Props> = ({
         onRequestClose={onClose}
       >
         <View className="flex-1 bg-black/50 justify-center items-center">
-          <View className="bg-white rounded-xl p-6 mx-4 w-80">
-            <Text className="text-lg font-bold text-center mb-4">
+          <View className="bg-white dark:bg-slate-900 rounded-2xl p-6 mx-4 w-80 border border-slate-100 dark:border-slate-800">
+            <Text className="text-lg font-bold text-center mb-4 text-slate-900 dark:text-slate-100">
               Edit Date & Time
             </Text>
 
-            <Text className="text-sm text-gray-600 mb-4">
+            <Text className="text-sm text-gray-600 dark:text-slate-300 mb-4">
               Mood:{" "}
               <Text className={moodScale[mood.mood]?.color || "text-gray-600"}>
                 {mood.mood}
@@ -81,36 +81,46 @@ export const DateTimePickerModal: React.FC<Props> = ({
             </Text>
 
             <View className="mb-4">
-              <Text className="text-sm font-medium mb-2">Date:</Text>
+              <Text className="text-sm font-medium mb-2 text-slate-800 dark:text-slate-200">
+                Date:
+              </Text>
               <Pressable
                 onPress={() => setShowDatePicker(true)}
-                className="border border-gray-300 rounded-lg p-3"
+                className="border border-gray-300 dark:border-slate-700 rounded-lg p-3 bg-white dark:bg-slate-800"
               >
-                <Text>{selectedDate.toLocaleDateString()}</Text>
+                <Text className="text-slate-900 dark:text-slate-100">
+                  {selectedDate.toLocaleDateString()}
+                </Text>
               </Pressable>
             </View>
 
             <View className="mb-6">
-              <Text className="text-sm font-medium mb-2">Time:</Text>
+              <Text className="text-sm font-medium mb-2 text-slate-800 dark:text-slate-200">
+                Time:
+              </Text>
               <Pressable
                 onPress={() => setShowTimePicker(true)}
-                className="border border-gray-300 rounded-lg p-3"
+                className="border border-gray-300 dark:border-slate-700 rounded-lg p-3 bg-white dark:bg-slate-800"
               >
-                <Text>{selectedDate.toLocaleTimeString()}</Text>
+                <Text className="text-slate-900 dark:text-slate-100">
+                  {selectedDate.toLocaleTimeString()}
+                </Text>
               </Pressable>
             </View>
 
             <View className="flex-row justify-between">
               <Pressable
                 onPress={onClose}
-                className="flex-1 mr-2 py-3 bg-gray-200 rounded-lg"
+                className="flex-1 mr-2 py-3 bg-gray-200 dark:bg-slate-800 rounded-lg"
               >
-                <Text className="text-center font-medium">Cancel</Text>
+                <Text className="text-center font-medium text-slate-800 dark:text-slate-200">
+                  Cancel
+                </Text>
               </Pressable>
 
               <Pressable
                 onPress={handleSave}
-                className="flex-1 ml-2 py-3 bg-blue-500 rounded-lg"
+                className="flex-1 ml-2 py-3 bg-blue-600 rounded-lg"
               >
                 <Text className="text-center font-medium text-white">Save</Text>
               </Pressable>

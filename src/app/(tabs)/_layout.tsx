@@ -8,19 +8,31 @@ import TabBarBackground from "@/components/ui/TabBarBackground";
 import { useColorScheme } from "@/hooks/useColorScheme";
 
 export default function TabLayout() {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarBackground: TabBarBackground,
+        tabBarActiveTintColor: isDark ? "#93C5FD" : "#3B82F6",
+        tabBarInactiveTintColor: isDark ? "#9CA3AF" : "#94A3B8",
         tabBarStyle: Platform.select({
           ios: {
             // Use a transparent background on iOS to show the blur effect
             position: "absolute",
+            backgroundColor: "transparent",
           },
-          default: {},
+          default: {
+            backgroundColor: isDark ? "#0B1220" : "#FFFFFF",
+            borderTopColor: isDark ? "#1F2937" : "#E5E7EB",
+          },
         }),
+        tabBarLabelStyle: {
+          fontWeight: "600",
+        },
       }}
     >
       <Tabs.Screen

@@ -197,14 +197,14 @@ export default function ChartsScreen() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaView className="flex-1 bg-gradient-to-b from-blue-50 to-white">
+      <SafeAreaView className="flex-1 bg-gradient-to-b from-sky-50 to-white dark:from-slate-900 dark:to-slate-950">
         {/* Header */}
         <View className="mt-1 flex flex-row justify-center items-center p-4">
-          <Text className="text-3xl font-extrabold text-center text-sky-400">
+          <Text className="text-3xl font-extrabold text-center text-sky-600 dark:text-sky-400">
             Insights
           </Text>
           <View className="justify-center">
-            <Text className="font-semibold pl-2 text-purple-600">
+            <Text className="font-semibold pl-2 text-purple-600 dark:text-purple-300">
               ({moodCount})
             </Text>
           </View>
@@ -269,7 +269,7 @@ export default function ChartsScreen() {
         {loading ? (
           <View className="flex-1 justify-center items-center p-8 mt-20">
             <Text className="text-6xl mb-4">⏳</Text>
-            <Text className="text-gray-500 text-center text-lg font-semibold">
+            <Text className="text-gray-500 dark:text-slate-400 text-center text-lg font-semibold">
               Loading your mood data...
             </Text>
           </View>
@@ -299,7 +299,7 @@ export default function ChartsScreen() {
                 ) : (
                   <View className="flex-1 justify-center items-center">
                     <ActivityIndicator size="large" color="#3B82F6" />
-                    <Text className="text-gray-500 mt-4">
+                    <Text className="text-gray-500 dark:text-slate-400 mt-4">
                       {!dataLoaded
                         ? "Loading chart data..."
                         : "Loading components..."}
@@ -313,7 +313,7 @@ export default function ChartsScreen() {
                 ) : (
                   <View className="flex-1 justify-center items-center">
                     <ActivityIndicator size="large" color="#3B82F6" />
-                    <Text className="text-gray-500 mt-4">
+                    <Text className="text-gray-500 dark:text-slate-400 mt-4">
                       {!dataLoaded
                         ? "Loading chart data..."
                         : "Loading components..."}
@@ -327,7 +327,7 @@ export default function ChartsScreen() {
                 ) : (
                   <View className="flex-1 justify-center items-center">
                     <ActivityIndicator size="large" color="#3B82F6" />
-                    <Text className="text-gray-500 mt-4">
+                    <Text className="text-gray-500 dark:text-slate-400 mt-4">
                       {!dataLoaded
                         ? "Loading chart data..."
                         : "Loading components..."}
@@ -341,7 +341,7 @@ export default function ChartsScreen() {
                 ) : (
                   <View className="flex-1 justify-center items-center">
                     <ActivityIndicator size="large" color="#3B82F6" />
-                    <Text className="text-gray-500 mt-4">
+                    <Text className="text-gray-500 dark:text-slate-400 mt-4">
                       {!dataLoaded
                         ? "Loading chart data..."
                         : "Loading components..."}
@@ -353,7 +353,7 @@ export default function ChartsScreen() {
           ) : (
             <View className="flex-1 justify-center items-center p-8 mt-20">
               <ActivityIndicator size="large" color="#3B82F6" />
-              <Text className="text-gray-500 text-center text-lg font-semibold mt-4">
+              <Text className="text-gray-500 dark:text-slate-400 text-center text-lg font-semibold mt-4">
                 Loading chart components...
               </Text>
             </View>
@@ -361,10 +361,10 @@ export default function ChartsScreen() {
         ) : !loading ? (
           <View className="flex-1 justify-center items-center p-8 mt-20">
             <Text className="text-6xl mb-4">📊</Text>
-            <Text className="text-gray-500 text-center text-lg font-semibold">
+            <Text className="text-gray-500 dark:text-slate-400 text-center text-lg font-semibold">
               No mood data available yet
             </Text>
-            <Text className="text-gray-400 text-center mt-2">
+            <Text className="text-gray-400 dark:text-slate-500 text-center mt-2">
               Start tracking your moods to see beautiful insights here!
             </Text>
           </View>

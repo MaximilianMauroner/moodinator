@@ -1,26 +1,25 @@
 import * as Notifications from 'expo-notifications';
 import { useEffect } from 'react';
 import { Platform } from 'react-native';
-import { add, isBefore } from 'date-fns';
-import { hasMoodBeenLoggedToday } from '../../db/db';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const NOTIFICATION_ID = 'mood-reminder';
 const NOTIFICATIONS_ENABLED_KEY = 'notificationsEnabled';
 const NOTIFICATION_TIME_KEY = 'notificationTime';
+const NOTIFICATION_SCHEDULED_ID_KEY = 'moodReminderScheduledId';
+
+// Constants to identify our app's reminder notifications
+const MOOD_REMINDER_TITLE = '👋 How are you feeling?';
+const MOOD_REMINDER_TAG = 'mood-reminder';
 
 Notifications.setNotificationHandler({
     handleNotification: async () => ({
+        shouldShowAlert: true,
         shouldPlaySound: false,
         shouldSetBadge: false,
-        priority: Notifications.AndroidNotificationPriority.HIGH,
-        shouldShowBanner: true,
-        shouldShowList: true,
     }),
 });
 
 async function registerForPushNotificationsAsync() {
-    let token;
     if (Platform.OS === 'android') {
         await Notifications.setNotificationChannelAsync('default', {
             name: 'default',
@@ -37,32 +36,52 @@ async function registerForPushNotificationsAsync() {
         finalStatus = status;
     }
     if (finalStatus !== 'granted') {
-        alert('Failed to get push token for push notification!');
+        console.warn('Notifications permission not granted');
         return;
     }
-    token = (await Notifications.getExpoPushTokenAsync()).data;
-    console.log(token);
-
-    return token;
 }
 
+// Helper to cancel any stray mood reminder notifications (from older versions)
+async function cancelAllMoodReminders() {
+    try {
+        const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+        for (const n of scheduled) {
+            const anyN: any = n as any;
+            const title = anyN?.content?.title as string | undefined;
+            const tag = anyN?.content?.data?.type as string | undefined;
+            if (title === MOOD_REMINDER_TITLE || tag === MOOD_REMINDER_TAG) {
+                try {
+                    await Notifications.cancelScheduledNotificationAsync(anyN.identifier);
+                } catch { }
+            }
+        }
+    } catch { }
+}
+
+// Ensures only a single repeating daily reminder is scheduled
 export async function scheduleMoodReminder(customHour?: number, customMinute?: number) {
-    // Check if notifications are enabled
+    // Respect user setting
     const notificationsEnabled = await AsyncStorage.getItem(NOTIFICATIONS_ENABLED_KEY);
     if (notificationsEnabled === 'false') {
-        await Notifications.cancelScheduledNotificationAsync(NOTIFICATION_ID);
+        await cancelMoodReminder();
         return;
     }
 
-    const loggedToday = await hasMoodBeenLoggedToday();
-    if (loggedToday) {
-        await Notifications.cancelScheduledNotificationAsync(NOTIFICATION_ID);
-        return; // Don't schedule if already logged
+    // Cancel any previously scheduled reminder using stored ID
+    const existingId = await AsyncStorage.getItem(NOTIFICATION_SCHEDULED_ID_KEY);
+    if (existingId) {
+        try {
+            await Notifications.cancelScheduledNotificationAsync(existingId);
+        } catch (e) {
+            console.warn('Failed to cancel existing scheduled notification:', e);
+        }
+        await AsyncStorage.removeItem(NOTIFICATION_SCHEDULED_ID_KEY);
     }
 
-    await Notifications.cancelScheduledNotificationAsync(NOTIFICATION_ID);
+    // Additionally, clear any stray mood reminders that may not be tracked by ID
+    await cancelAllMoodReminders();
 
-    // Get custom time or use default
+    // Determine desired time
     let hour = customHour ?? 20; // Default 8 PM
     let minute = customMinute ?? 0;
 
@@ -75,10 +94,12 @@ export async function scheduleMoodReminder(customHour?: number, customMinute?: n
         }
     }
 
-    await Notifications.scheduleNotificationAsync({
+    // Schedule a daily repeating notification at the chosen time
+    const id = await Notifications.scheduleNotificationAsync({
         content: {
-            title: '👋 How are you feeling?',
+            title: MOOD_REMINDER_TITLE,
             body: "Don't forget to log your mood for today!",
+            data: { type: MOOD_REMINDER_TAG },
         },
         trigger: {
             type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
@@ -86,30 +107,44 @@ export async function scheduleMoodReminder(customHour?: number, customMinute?: n
             hour,
             minute,
         },
-        identifier: NOTIFICATION_ID,
     });
+
+    await AsyncStorage.setItem(NOTIFICATION_SCHEDULED_ID_KEY, id);
 }
 
 export async function cancelMoodReminder() {
-    await Notifications.cancelScheduledNotificationAsync(NOTIFICATION_ID);
+    const existingId = await AsyncStorage.getItem(NOTIFICATION_SCHEDULED_ID_KEY);
+    if (existingId) {
+        try {
+            await Notifications.cancelScheduledNotificationAsync(existingId);
+        } catch (e) {
+            console.warn('Failed to cancel scheduled notification:', e);
+        }
+        await AsyncStorage.removeItem(NOTIFICATION_SCHEDULED_ID_KEY);
+    }
+
+    // Also cancel any stray mood reminders that may exist
+    await cancelAllMoodReminders();
 }
 
 export function useNotifications() {
     useEffect(() => {
         registerForPushNotificationsAsync();
 
-        // Check if notifications should be scheduled on app start
+        // (Re)schedule on app start if enabled
         const checkAndSchedule = async () => {
             const notificationsEnabled = await AsyncStorage.getItem(NOTIFICATIONS_ENABLED_KEY);
             if (notificationsEnabled !== 'false') {
-                scheduleMoodReminder();
+                await scheduleMoodReminder();
+            } else {
+                await cancelMoodReminder();
             }
         };
 
         checkAndSchedule();
 
         const subscription = Notifications.addNotificationResponseReceivedListener(response => {
-            console.log(response);
+            // Handle notification response if needed
         });
 
         return () => subscription.remove();
