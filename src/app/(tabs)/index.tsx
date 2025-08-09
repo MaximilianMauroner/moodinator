@@ -42,15 +42,17 @@ const toastConfig = {
     hide: () => void;
     onPress: () => void;
   }) => (
-    <View className="flex-row items-center bg-blue-600 rounded-xl px-4 py-3 shadow-lg m-2">
+    <View className="flex-row items-center bg-blue-600 rounded-2xl px-4 py-3 shadow-lg m-3">
       <View className="flex-1 flex-row items-center" style={{ minHeight: 48 }}>
         <View className="flex-1 ml-3">
           <Text className="text-white font-bold text-base">{text1}</Text>
-          {text2 ? <Text className="text-white text-xs">{text2}</Text> : null}
+          {text2 ? (
+            <Text className="text-white/90 text-xs">{text2}</Text>
+          ) : null}
         </View>
         <HapticTab onPress={onPress}>
           <Text
-            className="text-blue-600 font-bold text-sm px-2 py-1 bg-white rounded-lg ml-2"
+            className="text-blue-600 font-semibold text-sm px-2 py-1 bg-white rounded-lg ml-2"
             accessibilityRole="button"
           >
             Undo
@@ -67,7 +69,6 @@ const toastConfig = {
       </HapticTab>
     </View>
   ),
-  // Add other toast types if needed
 };
 
 export default function HomeScreen() {
@@ -263,15 +264,18 @@ export default function HomeScreen() {
   return (
     <>
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <SafeAreaView className="flex-1 bg-gradient-to-b from-blue-50 to-white">
+        <SafeAreaView className="flex-1 bg-gradient-to-b from-sky-50 to-white dark:from-slate-900 dark:to-slate-950">
           <View className="flex-1 p-4 space-y-4">
             <View>
-              <Text className="text-3xl font-extrabold text-center mb-2 text-blue-700">
+              <Text className="text-3xl font-extrabold text-center mb-1 text-sky-600 dark:text-sky-400">
                 Moodinator
               </Text>
-              <View className="bg-white rounded-2xl shadow-lg p-4 mb-2">
+              <Text className="text-center text-xs text-slate-500 dark:text-slate-400 mb-2">
+                Track. Reflect. Improve.
+              </Text>
+              <View className="bg-white dark:bg-slate-900 rounded-2xl shadow-lg p-4 mb-2 border border-slate-100 dark:border-slate-800">
                 {lastTracked && (
-                  <Text className="text-xs text-gray-400 text-center mb-2">
+                  <Text className="text-xs text-gray-400 dark:text-slate-500 text-center mb-2">
                     Last tracked: {lastTracked.toLocaleTimeString()}
                   </Text>
                 )}
@@ -290,21 +294,27 @@ export default function HomeScreen() {
               </View>
             </View>
 
-            <View className="flex-1 bg-white rounded-2xl shadow-lg overflow-hidden">
+            <View className="flex-1 bg-white dark:bg-slate-900 rounded-2xl shadow-lg overflow-hidden border border-slate-100 dark:border-slate-800">
               <View className="flex-1 flex flex-col">
                 <View className="p-4 flex-row justify-between items-center">
-                  <Text className="font-bold text-xl text-blue-800">
+                  <Text className="font-bold text-xl text-blue-800 dark:text-blue-200">
                     Mood History {moods.length > 0 ? `(${moods.length})` : ""}
                   </Text>
                 </View>
                 {loading ? (
-                  <Text className="text-center py-4 text-gray-500">
+                  <Text className="text-center py-4 text-gray-500 dark:text-slate-400">
                     Loading...
                   </Text>
                 ) : moods.length === 0 ? (
-                  <Text className="text-center py-4 text-gray-500">
-                    No moods tracked yet.
-                  </Text>
+                  <View className="flex-1 items-center justify-center p-8">
+                    <Text className="text-6xl mb-2">📝</Text>
+                    <Text className="text-center text-slate-500 dark:text-slate-400">
+                      No moods tracked yet.
+                    </Text>
+                    <Text className="text-center text-slate-400 dark:text-slate-500 mt-1">
+                      Tap a mood above to get started.
+                    </Text>
+                  </View>
                 ) : (
                   <FlatList
                     data={moods}

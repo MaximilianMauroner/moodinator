@@ -249,62 +249,59 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-gradient-to-b from-blue-50 to-white">
+    <SafeAreaView className="flex-1 bg-gradient-to-b from-sky-50 to-white dark:from-slate-900 dark:to-slate-950">
       <ScrollView className="flex-1">
         <View className="p-4">
-          <Text
-            className="text-3xl font-extrabold text-center mb-6"
-            style={{ color: "#5DADE2" }}
-          >
+          <Text className="text-3xl font-extrabold text-center mb-6 text-sky-600 dark:text-sky-400">
             Settings
           </Text>
 
           <View className="space-y-4">
-            <Text className="text-lg font-semibold mb-2 text-gray-700">
+            <Text className="text-lg font-semibold mb-2 text-gray-700 dark:text-slate-200">
               Data Management
             </Text>
 
-            <View className="bg-white rounded-xl p-4 shadow-sm">
+            <View className="bg-white dark:bg-slate-900 rounded-xl p-4 shadow-sm border border-slate-100 dark:border-slate-800">
               <View className="space-y-4">
                 <View>
-                  <Text className="text-base font-medium text-gray-800 mb-1">
+                  <Text className="text-base font-medium text-gray-800 dark:text-slate-100 mb-1">
                     Export Data
                   </Text>
-                  <Text className="text-sm text-gray-600 mb-2">
+                  <Text className="text-sm text-gray-600 dark:text-slate-300 mb-2">
                     Export your mood data as a JSON file that you can save or
                     share
                   </Text>
                   <Pressable
                     onPress={handleExport}
-                    className="bg-blue-500 py-3 px-4 rounded-lg"
+                    className="bg-blue-600 py-3 px-4 rounded-lg"
                   >
                     {loading === "export" ? (
                       <ActivityIndicator color="#fff" />
                     ) : (
-                      <Text className="text-white font-medium text-center">
+                      <Text className="text-white font-semibold text-center">
                         Export Mood Data
                       </Text>
                     )}
                   </Pressable>
                 </View>
 
-                <View className="border-t border-gray-200 my-4" />
+                <View className="border-t border-gray-200 dark:border-slate-800 my-4" />
 
                 <View>
-                  <Text className="text-base font-medium text-gray-800 mb-1">
+                  <Text className="text-base font-medium text-gray-800 dark:text-slate-100 mb-1">
                     Import Data
                   </Text>
-                  <Text className="text-sm text-gray-600 mb-2">
+                  <Text className="text-sm text-gray-600 dark:text-slate-300 mb-2">
                     Import previously exported mood data from a JSON file
                   </Text>
                   <Pressable
                     onPress={handleImport}
-                    className="bg-green-500 py-3 px-4 rounded-lg"
+                    className="bg-green-600 py-3 px-4 rounded-lg"
                   >
                     {loading === "import" ? (
                       <ActivityIndicator color="#fff" />
                     ) : (
-                      <Text className="text-white font-medium text-center">
+                      <Text className="text-white font-semibold text-center">
                         Import Mood Data
                       </Text>
                     )}
@@ -312,46 +309,46 @@ export default function SettingsScreen() {
                 </View>
 
                 <>
-                  <View className="border-t border-gray-200 my-4" />
+                  <View className="border-t border-gray-200 dark:border-slate-800 my-4" />
 
                   <View>
-                    <Text className="text-base font-medium text-gray-800 mb-1">
+                    <Text className="text-base font-medium text-gray-800 dark:text-slate-100 mb-1">
                       Add Sample Data
                     </Text>
-                    <Text className="text-sm text-gray-600 mb-2">
+                    <Text className="text-sm text-gray-600 dark:text-slate-300 mb-2">
                       Add sample mood entries for testing and demonstration
                     </Text>
                     <Pressable
                       onPress={handleSeedMoods}
-                      className="bg-purple-500 py-3 px-4 rounded-lg"
+                      className="bg-purple-600 py-3 px-4 rounded-lg"
                     >
                       {loading === "seed" ? (
                         <ActivityIndicator color="#fff" />
                       ) : (
-                        <Text className="text-white font-medium text-center">
+                        <Text className="text-white font-semibold text-center">
                           Add Sample Data
                         </Text>
                       )}
                     </Pressable>
                   </View>
 
-                  <View className="border-t border-gray-200 my-4" />
+                  <View className="border-t border-gray-200 dark:border-slate-800 my-4" />
 
                   <View>
-                    <Text className="text-base font-medium text-gray-800 mb-1">
+                    <Text className="text-base font-medium text-gray-800 dark:text-slate-100 mb-1">
                       Clear All Data
                     </Text>
-                    <Text className="text-sm text-gray-600 mb-2">
+                    <Text className="text-sm text-gray-600 dark:text-slate-300 mb-2">
                       Remove all mood entries from the database
                     </Text>
                     <Pressable
                       onPress={handleClearMoods}
-                      className="bg-red-500 py-3 px-4 rounded-lg"
+                      className="bg-red-600 py-3 px-4 rounded-lg"
                     >
                       {loading === "clear" ? (
                         <ActivityIndicator color="#fff" />
                       ) : (
-                        <Text className="text-white font-medium text-center">
+                        <Text className="text-white font-semibold text-center">
                           Clear All Data
                         </Text>
                       )}
@@ -359,8 +356,8 @@ export default function SettingsScreen() {
                   </View>
                 </>
                 {lastSeedResult && (
-                  <View className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                    <Text className="text-green-800 text-center font-medium">
+                  <View className="mt-4 p-3 bg-green-50 dark:bg-emerald-950 border border-green-200 dark:border-emerald-800 rounded-lg">
+                    <Text className="text-green-800 dark:text-emerald-200 text-center font-medium">
                       ✅ Added {lastSeedResult.count} sample mood entries
                     </Text>
                   </View>
@@ -369,17 +366,17 @@ export default function SettingsScreen() {
             </View>
 
             <View className="space-y-4 pb-8">
-              <Text className="text-lg font-semibold mb-2 text-gray-700">
+              <Text className="text-lg font-semibold mb-2 text-gray-700 dark:text-slate-200">
                 Preferences
               </Text>
 
-              <View className="bg-white rounded-xl p-4 shadow-sm">
+              <View className="bg-white dark:bg-slate-900 rounded-xl p-4 shadow-sm border border-slate-100 dark:border-slate-800">
                 <View className="space-y-4">
                   <View>
-                    <Text className="text-base font-medium text-gray-800 mb-1">
+                    <Text className="text-base font-medium text-gray-800 dark:text-slate-100 mb-1">
                       Show Detailed Labels
                     </Text>
-                    <Text className="text-sm text-gray-600 mb-2">
+                    <Text className="text-sm text-gray-600 dark:text-slate-300 mb-2">
                       Toggle whether detailed labels are displayed in the app
                     </Text>
                     <Switch
@@ -388,13 +385,13 @@ export default function SettingsScreen() {
                     />
                   </View>
 
-                  <View className="border-t border-gray-200 my-4" />
+                  <View className="border-t border-gray-200 dark:border-slate-800 my-4" />
 
                   <View>
-                    <Text className="text-base font-medium text-gray-800 mb-1">
+                    <Text className="text-base font-medium text-gray-800 dark:text-slate-100 mb-1">
                       Daily Mood Reminders
                     </Text>
-                    <Text className="text-sm text-gray-600 mb-2">
+                    <Text className="text-sm text-gray-600 dark:text-slate-300 mb-2">
                       Get a daily notification to remind you to log your mood
                     </Text>
                     <Switch
@@ -405,17 +402,17 @@ export default function SettingsScreen() {
 
                   {notificationsEnabled && (
                     <View>
-                      <Text className="text-base font-medium text-gray-800 mb-1">
+                      <Text className="text-base font-medium text-gray-800 dark:text-slate-100 mb-1">
                         Notification Time
                       </Text>
-                      <Text className="text-sm text-gray-600 mb-2">
+                      <Text className="text-sm text-gray-600 dark:text-slate-300 mb-2">
                         Choose when you'd like to receive daily reminders
                       </Text>
                       <Pressable
                         onPress={() => setShowTimePickerModal(true)}
-                        className="border border-gray-300 rounded-lg p-3 bg-gray-50"
+                        className="border border-gray-300 dark:border-slate-700 rounded-lg p-3 bg-gray-50 dark:bg-slate-800"
                       >
-                        <Text className="text-center text-lg font-medium">
+                        <Text className="text-center text-lg font-medium text-slate-900 dark:text-slate-100">
                           {formatNotificationTime()}
                         </Text>
                       </Pressable>
@@ -427,24 +424,24 @@ export default function SettingsScreen() {
 
             {__DEV__ && (
               <View className="space-y-4 pb-8">
-                <Text className="text-lg font-semibold mb-2 text-gray-700">
+                <Text className="text-lg font-semibold mb-2 text-gray-700 dark:text-slate-200">
                   Developer Options
                 </Text>
 
-                <View className="bg-white rounded-xl p-4 shadow-sm">
+                <View className="bg-white dark:bg-slate-900 rounded-xl p-4 shadow-sm border border-slate-100 dark:border-slate-800">
                   <View className="space-y-4">
                     <View>
-                      <Text className="text-base font-medium text-gray-800 mb-1">
+                      <Text className="text-base font-medium text-gray-800 dark:text-slate-100 mb-1">
                         Test Notification
                       </Text>
-                      <Text className="text-sm text-gray-600 mb-2">
+                      <Text className="text-sm text-gray-600 dark:text-slate-300 mb-2">
                         Schedule a test notification to appear in 2 seconds.
                       </Text>
                       <Pressable
                         onPress={handleTestNotification}
-                        className="bg-gray-500 py-3 px-4 rounded-lg"
+                        className="bg-gray-600 py-3 px-4 rounded-lg"
                       >
-                        <Text className="text-white font-medium text-center">
+                        <Text className="text-white font-semibold text-center">
                           Send Test Notification
                         </Text>
                       </Pressable>
