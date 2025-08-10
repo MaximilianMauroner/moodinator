@@ -25,6 +25,7 @@ import {
 } from "./ChartComponents";
 import { moodScale } from "@/constants/moodScale";
 import type { MoodScale } from "@/types/mood";
+import { useColorScheme } from "@/hooks/useColorScheme";
 
 // Memoized component for individual day items to prevent unnecessary re-renders
 const DayItem = React.memo(
@@ -43,23 +44,23 @@ const DayItem = React.memo(
     const hasRealData = day.hasRealData;
 
     return (
-      <View className="bg-white p-4 rounded-xl mb-3 shadow-sm">
+      <View className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-xl mb-3 shadow-sm">
         <TouchableOpacity
           onPress={onToggle}
           className="flex-row justify-between items-center"
           activeOpacity={0.7}
         >
           <View className="flex-1">
-            <Text className="font-semibold text-gray-800">
+            <Text className="font-semibold text-gray-800 dark:text-slate-200">
               {format(day.date, "EEEE, MMM dd")}
             </Text>
-            <Text className="text-sm text-gray-500">
+            <Text className="text-sm text-gray-500 dark:text-slate-400">
               {hasRealData
                 ? `${day.moods!.length} entries • Range: ${day.min}-${day.max}`
                 : "No entries for this day"}
             </Text>
             {hasRealData && day.moods!.length > 1 && (
-              <Text className="text-xs text-gray-400 mt-1">
+              <Text className="text-xs text-gray-400 dark:text-slate-500 mt-1">
                 Individual moods: {day.moods!.join(", ")}
               </Text>
             )}
@@ -80,15 +81,17 @@ const DayItem = React.memo(
               </Text>
             </View>
             {!hasRealData && (
-              <Text className="text-xs text-gray-400 mt-1">(no data)</Text>
+              <Text className="text-xs text-gray-400 dark:text-slate-500 mt-1">
+                (no data)
+              </Text>
             )}
           </View>
         </TouchableOpacity>
 
         {/* Accordion Content - Mood Entries */}
         {isExpanded && (
-          <View className="mt-4 pt-4 border-t border-gray-100">
-            <Text className="text-sm font-semibold text-gray-800 mb-3">
+          <View className="mt-4 pt-4 border-t border-gray-100 dark:border-slate-800">
+            <Text className="text-sm font-semibold text-gray-800 dark:text-slate-200 mb-3">
               📝 Mood Entries for this Day:
             </Text>
             {dayMoodEntries.length > 0 ? (
@@ -100,7 +103,7 @@ const DayItem = React.memo(
                   return (
                     <View
                       key={entry.id}
-                      className="bg-gray-50 p-3 rounded-lg mb-2"
+                      className="bg-gray-50 dark:bg-slate-800 p-3 rounded-lg mb-2"
                     >
                       <View className="flex-row justify-between items-start">
                         <View className="flex-1">
@@ -129,11 +132,11 @@ const DayItem = React.memo(
                             </View>
                             <View>
                               {entry.note && (
-                                <Text className="text-sm text-gray-600 italic">
+                                <Text className="text-sm text-gray-600 dark:text-slate-300 italic">
                                   "{entry.note}"
                                 </Text>
                               )}
-                              <Text className="text-xs text-gray-500">
+                              <Text className="text-xs text-gray-500 dark:text-slate-400">
                                 {format(new Date(entry.timestamp), "HH:mm")}
                               </Text>
                             </View>
@@ -145,7 +148,7 @@ const DayItem = React.memo(
                 })}
               </View>
             ) : (
-              <Text className="text-sm text-gray-500 italic">
+              <Text className="text-sm text-gray-500 dark:text-slate-400 italic">
                 No detailed entries available for this day.
               </Text>
             )}
@@ -164,6 +167,8 @@ export const DailyTab = ({
   moods: MoodEntry[];
   onRefresh: () => void;
 }) => {
+  const scheme = useColorScheme();
+  const isDark = scheme === "dark";
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
 
   const processedData = useMemo(() => {
@@ -287,23 +292,25 @@ export const DailyTab = ({
 
   return (
     <ScrollView
-      className="flex-1"
+      className="flex-1 bg-transparent"
       refreshControl={
         <RefreshControl refreshing={false} onRefresh={onRefresh} />
       }
     >
-      <Text className="text-xl font-semibold text-center mb-1 text-blue-600 mx-4">
+      <Text className="text-xl font-semibold text-center mb-1 text-blue-600 dark:text-blue-400 mx-4">
         📅 Daily Mood Analysis
       </Text>
 
       {/* Daily Statistics Summary */}
-      <View className="mx-4 mb-6 bg-white p-4 rounded-xl shadow-sm">
-        <Text className="text-lg font-semibold mb-3 text-gray-800">
+      <View className="mx-4 mb-6 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-xl shadow-sm">
+        <Text className="text-lg font-semibold mb-3 text-gray-800 dark:text-slate-200">
           Daily Statistics
         </Text>
         <View className="flex-row justify-between mb-3">
           <View className="flex-1">
-            <Text className="text-sm text-gray-500">Best Day</Text>
+            <Text className="text-sm text-gray-500 dark:text-slate-400">
+              Best Day
+            </Text>
             <Text
               className={`text-lg font-bold ${
                 getMoodInterpretation(dailyStats.bestDay).textClass
@@ -311,12 +318,14 @@ export const DailyTab = ({
             >
               {dailyStats.bestDay.toFixed(1)}
             </Text>
-            <Text className="text-xs text-gray-400">
+            <Text className="text-xs text-gray-400 dark:text-slate-500">
               {getMoodInterpretation(dailyStats.bestDay).text}
             </Text>
           </View>
           <View className="flex-1">
-            <Text className="text-sm text-gray-500">Challenging Day</Text>
+            <Text className="text-sm text-gray-500 dark:text-slate-400">
+              Challenging Day
+            </Text>
             <Text
               className={`text-lg font-bold ${
                 getMoodInterpretation(dailyStats.worstDay).textClass
@@ -324,12 +333,14 @@ export const DailyTab = ({
             >
               {dailyStats.worstDay.toFixed(1)}
             </Text>
-            <Text className="text-xs text-gray-400">
+            <Text className="text-xs text-gray-400 dark:text-slate-500">
               {getMoodInterpretation(dailyStats.worstDay).text}
             </Text>
           </View>
           <View className="flex-1">
-            <Text className="text-sm text-gray-500">Average</Text>
+            <Text className="text-sm text-gray-500 dark:text-slate-400">
+              Average
+            </Text>
             <Text
               className={`text-lg font-bold ${
                 getMoodInterpretation(dailyStats.averageDay).textClass
@@ -337,23 +348,27 @@ export const DailyTab = ({
             >
               {dailyStats.averageDay.toFixed(1)}
             </Text>
-            <Text className="text-xs text-gray-400">
+            <Text className="text-xs text-gray-400 dark:text-slate-500">
               {getMoodInterpretation(dailyStats.averageDay).text}
             </Text>
           </View>
         </View>
         <View className="flex-row justify-between">
           <View className="flex-1">
-            <Text className="text-sm text-gray-500">Days Tracked</Text>
+            <Text className="text-sm text-gray-500 dark:text-slate-400">
+              Days Tracked
+            </Text>
             <Text className="text-lg font-bold text-purple-600">
               {dailyStats.daysWithEntries}
             </Text>
-            <Text className="text-xs text-gray-400">
+            <Text className="text-xs text-gray-400 dark:text-slate-500">
               of {dailyStats.totalDays} days
             </Text>
           </View>
           <View className="flex-1">
-            <Text className="text-sm text-gray-500">Consistency</Text>
+            <Text className="text-sm text-gray-500 dark:text-slate-400">
+              Consistency
+            </Text>
             <Text className="text-lg font-bold text-teal-600">
               {(
                 (dailyStats.daysWithEntries / dailyStats.totalDays) *
@@ -361,17 +376,19 @@ export const DailyTab = ({
               ).toFixed(0)}
               %
             </Text>
-            <Text className="text-xs text-gray-400">tracking rate</Text>
+            <Text className="text-xs text-gray-400 dark:text-slate-500">
+              tracking rate
+            </Text>
           </View>
         </View>
       </View>
 
       {/* Recent Days Summary */}
       <View className="mx-4 mb-6">
-        <Text className="text-lg font-semibold mb-1 text-gray-800">
+        <Text className="text-lg font-semibold mb-1 text-gray-800 dark:text-slate-200">
           Recent Days
         </Text>
-        <Text className="text-sm text-gray-500 mb-4">
+        <Text className="text-sm text-gray-500 dark:text-slate-400 mb-4">
           Tap any day to view detailed mood entries and notes
         </Text>
         {recentDaysAggregates.map((day, index) => {
@@ -392,8 +409,8 @@ export const DailyTab = ({
       </View>
 
       {/* Daily Chart */}
-      <View className="bg-white mx-4 p-4 rounded-2xl shadow-lg mb-6">
-        <Text className="text-lg font-semibold mb-3 text-gray-800">
+      <View className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 mx-4 p-4 rounded-2xl shadow-lg mb-6">
+        <Text className="text-lg font-semibold mb-3 text-gray-800 dark:text-slate-200">
           Daily Mood Trend
         </Text>
         <ScrollView
@@ -409,7 +426,7 @@ export const DailyTab = ({
               chartData.labels.length * 40
             )}
             height={300}
-            chartConfig={getBaseChartConfig("#7986CB", "#5C6BC0")}
+            chartConfig={getBaseChartConfig("#7986CB", "#5C6BC0", isDark)}
             style={{ borderRadius: 16 }}
             bezier
             segments={10}
@@ -462,16 +479,16 @@ export const DailyTab = ({
       </View>
 
       {/* Daily Patterns Analysis */}
-      <View className="mx-4 mb-6 bg-white p-4 rounded-xl shadow-sm">
-        <Text className="text-lg font-semibold mb-3 text-gray-800">
+      <View className="mx-4 mb-6 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-xl shadow-sm">
+        <Text className="text-lg font-semibold mb-3 text-gray-800 dark:text-slate-200">
           Patterns & Insights
         </Text>
 
         <View className="mb-3">
-          <Text className="text-sm font-medium text-gray-700 mb-1">
+          <Text className="text-sm font-medium text-gray-700 dark:text-slate-200 mb-1">
             Most Consistent Period
           </Text>
-          <Text className="text-sm text-gray-600">
+          <Text className="text-sm text-gray-600 dark:text-slate-400">
             Last 7 days have{" "}
             {dailyStats.daysWithEntries >= 5 ? "excellent" : "good"} tracking
             consistency
@@ -479,10 +496,10 @@ export const DailyTab = ({
         </View>
 
         <View className="mb-3">
-          <Text className="text-sm font-medium text-gray-700 mb-1">
+          <Text className="text-sm font-medium text-gray-700 dark:text-slate-200 mb-1">
             Trend Direction
           </Text>
-          <Text className="text-sm text-gray-600">
+          <Text className="text-sm text-gray-600 dark:text-slate-400">
             {reversedAggregates.length >= 7
               ? reversedAggregates
                   .slice(0, 3)

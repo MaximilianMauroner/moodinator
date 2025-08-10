@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, memo } from "react";
 import {
   View,
   Text,
@@ -27,12 +27,14 @@ import { NotificationTimePickerModal } from "@/components/NotificationTimePicker
 
 // Storage key for show labels preference
 const SHOW_LABELS_KEY = "showLabelsPreference";
+const DEV_OPTIONS_KEY = "devOptionsEnabled";
 
 export default function SettingsScreen() {
   const [loading, setLoading] = useState<
     "export" | "import" | "seed" | "clear" | null
   >(null);
   const [showDetailedLabels, setShowDetailedLabels] = useState(false);
+  const [devOptionsEnabled, setDevOptionsEnabled] = useState(false);
   const [lastSeedResult, setLastSeedResult] = useState<{
     count: number;
     source: "file" | "random";
@@ -48,6 +50,7 @@ export default function SettingsScreen() {
   useEffect(() => {
     loadShowLabelsPreference();
     loadNotificationSettings();
+    loadDevOptionsPreference();
   }, []);
 
   // Load notification settings
@@ -74,6 +77,18 @@ export default function SettingsScreen() {
     }
   };
 
+  // Load dev options preference
+  const loadDevOptionsPreference = async () => {
+    try {
+      const value = await AsyncStorage.getItem(DEV_OPTIONS_KEY);
+      if (value !== null) {
+        setDevOptionsEnabled(value === "true");
+      }
+    } catch (error) {
+      console.error("Failed to load dev options preference:", error);
+    }
+  };
+
   // Save preference when changed
   const handleToggleLabels = async (value: boolean) => {
     setShowDetailedLabels(value);
@@ -81,6 +96,16 @@ export default function SettingsScreen() {
       await AsyncStorage.setItem(SHOW_LABELS_KEY, value.toString());
     } catch (error) {
       console.error("Failed to save label preference:", error);
+    }
+  };
+
+  // Save dev options when changed
+  const handleToggleDevOptions = async (value: boolean) => {
+    setDevOptionsEnabled(value);
+    try {
+      await AsyncStorage.setItem(DEV_OPTIONS_KEY, value.toString());
+    } catch (error) {
+      console.error("Failed to save dev options preference:", error);
     }
   };
 
@@ -248,8 +273,44 @@ export default function SettingsScreen() {
     );
   };
 
+  // Simple reusable toggle row for consistent styling
+  const ToggleRow = memo(function ToggleRow({
+    title,
+    description,
+    value,
+    onChange,
+    testID,
+  }: {
+    title: string;
+    description?: string;
+    value: boolean;
+    onChange: (v: boolean) => void;
+    testID?: string;
+  }) {
+    return (
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => onChange(!value)}
+        className="flex-row items-center justify-between"
+        testID={testID}
+      >
+        <View className="flex-1 pr-3">
+          <Text className="text-base font-medium text-gray-800 dark:text-slate-100">
+            {title}
+          </Text>
+          {description ? (
+            <Text className="text-sm text-gray-600 dark:text-slate-300 mt-0.5">
+              {description}
+            </Text>
+          ) : null}
+        </View>
+        <Switch value={value} onValueChange={onChange} />
+      </Pressable>
+    );
+  });
+
   return (
-    <SafeAreaView className="flex-1 bg-gradient-to-b from-sky-50 to-white dark:from-slate-900 dark:to-slate-950">
+    <SafeAreaView className="flex-1 bg-white dark:bg-slate-950">
       <ScrollView className="flex-1">
         <View className="p-4">
           <Text className="text-3xl font-extrabold text-center mb-6 text-sky-600 dark:text-sky-400">
@@ -308,60 +369,7 @@ export default function SettingsScreen() {
                   </Pressable>
                 </View>
 
-                <>
-                  <View className="border-t border-gray-200 dark:border-slate-800 my-4" />
-
-                  <View>
-                    <Text className="text-base font-medium text-gray-800 dark:text-slate-100 mb-1">
-                      Add Sample Data
-                    </Text>
-                    <Text className="text-sm text-gray-600 dark:text-slate-300 mb-2">
-                      Add sample mood entries for testing and demonstration
-                    </Text>
-                    <Pressable
-                      onPress={handleSeedMoods}
-                      className="bg-purple-600 py-3 px-4 rounded-lg"
-                    >
-                      {loading === "seed" ? (
-                        <ActivityIndicator color="#fff" />
-                      ) : (
-                        <Text className="text-white font-semibold text-center">
-                          Add Sample Data
-                        </Text>
-                      )}
-                    </Pressable>
-                  </View>
-
-                  <View className="border-t border-gray-200 dark:border-slate-800 my-4" />
-
-                  <View>
-                    <Text className="text-base font-medium text-gray-800 dark:text-slate-100 mb-1">
-                      Clear All Data
-                    </Text>
-                    <Text className="text-sm text-gray-600 dark:text-slate-300 mb-2">
-                      Remove all mood entries from the database
-                    </Text>
-                    <Pressable
-                      onPress={handleClearMoods}
-                      className="bg-red-600 py-3 px-4 rounded-lg"
-                    >
-                      {loading === "clear" ? (
-                        <ActivityIndicator color="#fff" />
-                      ) : (
-                        <Text className="text-white font-semibold text-center">
-                          Clear All Data
-                        </Text>
-                      )}
-                    </Pressable>
-                  </View>
-                </>
-                {lastSeedResult && (
-                  <View className="mt-4 p-3 bg-green-50 dark:bg-emerald-950 border border-green-200 dark:border-emerald-800 rounded-lg">
-                    <Text className="text-green-800 dark:text-emerald-200 text-center font-medium">
-                      ✅ Added {lastSeedResult.count} sample mood entries
-                    </Text>
-                  </View>
-                )}
+                {/* Dev-only actions moved into the Developer Options card below */}
               </View>
             </View>
 
@@ -372,33 +380,23 @@ export default function SettingsScreen() {
 
               <View className="bg-white dark:bg-slate-900 rounded-xl p-4 shadow-sm border border-slate-100 dark:border-slate-800">
                 <View className="space-y-4">
-                  <View>
-                    <Text className="text-base font-medium text-gray-800 dark:text-slate-100 mb-1">
-                      Show Detailed Labels
-                    </Text>
-                    <Text className="text-sm text-gray-600 dark:text-slate-300 mb-2">
-                      Toggle whether detailed labels are displayed in the app
-                    </Text>
-                    <Switch
-                      value={showDetailedLabels}
-                      onValueChange={handleToggleLabels}
-                    />
-                  </View>
+                  <ToggleRow
+                    title="Show Detailed Labels"
+                    description="Toggle whether detailed labels are displayed in the app"
+                    value={showDetailedLabels}
+                    onChange={handleToggleLabels}
+                    testID="toggle-detailed-labels"
+                  />
 
                   <View className="border-t border-gray-200 dark:border-slate-800 my-4" />
 
-                  <View>
-                    <Text className="text-base font-medium text-gray-800 dark:text-slate-100 mb-1">
-                      Daily Mood Reminders
-                    </Text>
-                    <Text className="text-sm text-gray-600 dark:text-slate-300 mb-2">
-                      Get a daily notification to remind you to log your mood
-                    </Text>
-                    <Switch
-                      value={notificationsEnabled}
-                      onValueChange={handleToggleNotifications}
-                    />
-                  </View>
+                  <ToggleRow
+                    title="Daily Mood Reminders"
+                    description="Get a daily notification to remind you to log your mood"
+                    value={notificationsEnabled}
+                    onChange={handleToggleNotifications}
+                    testID="toggle-reminders"
+                  />
 
                   {notificationsEnabled && (
                     <View>
@@ -418,18 +416,74 @@ export default function SettingsScreen() {
                       </Pressable>
                     </View>
                   )}
+
+                  <View className="border-t border-gray-200 dark:border-slate-800 my-4" />
+
+                  <ToggleRow
+                    title="Developer Options"
+                    description="Show tools for testing: Add Sample Data, Clear All Data, Test Notification"
+                    value={devOptionsEnabled}
+                    onChange={handleToggleDevOptions}
+                    testID="toggle-developer-options"
+                  />
                 </View>
               </View>
             </View>
 
-            {__DEV__ && (
+            {devOptionsEnabled && (
               <View className="space-y-4 pb-8">
                 <Text className="text-lg font-semibold mb-2 text-gray-700 dark:text-slate-200">
                   Developer Options
                 </Text>
 
                 <View className="bg-white dark:bg-slate-900 rounded-xl p-4 shadow-sm border border-slate-100 dark:border-slate-800">
-                  <View className="space-y-4">
+                  <View className="space-y-6">
+                    <View>
+                      <Text className="text-base font-medium text-gray-800 dark:text-slate-100 mb-1">
+                        Add Sample Data
+                      </Text>
+                      <Text className="text-sm text-gray-600 dark:text-slate-300 mb-2">
+                        Add sample mood entries for testing and demonstration
+                      </Text>
+                      <Pressable
+                        onPress={handleSeedMoods}
+                        className="bg-purple-600 py-3 px-4 rounded-lg"
+                      >
+                        {loading === "seed" ? (
+                          <ActivityIndicator color="#fff" />
+                        ) : (
+                          <Text className="text-white font-semibold text-center">
+                            Add Sample Data
+                          </Text>
+                        )}
+                      </Pressable>
+                    </View>
+
+                    <View className="border-t border-gray-200 dark:border-slate-800" />
+
+                    <View>
+                      <Text className="text-base font-medium text-gray-800 dark:text-slate-100 mb-1">
+                        Clear All Data
+                      </Text>
+                      <Text className="text-sm text-gray-600 dark:text-slate-300 mb-2">
+                        Remove all mood entries from the database
+                      </Text>
+                      <Pressable
+                        onPress={handleClearMoods}
+                        className="bg-red-600 py-3 px-4 rounded-lg"
+                      >
+                        {loading === "clear" ? (
+                          <ActivityIndicator color="#fff" />
+                        ) : (
+                          <Text className="text-white font-semibold text-center">
+                            Clear All Data
+                          </Text>
+                        )}
+                      </Pressable>
+                    </View>
+
+                    <View className="border-t border-gray-200 dark:border-slate-800" />
+
                     <View>
                       <Text className="text-base font-medium text-gray-800 dark:text-slate-100 mb-1">
                         Test Notification
@@ -446,6 +500,14 @@ export default function SettingsScreen() {
                         </Text>
                       </Pressable>
                     </View>
+
+                    {lastSeedResult && (
+                      <View className="mt-2 p-3 bg-green-50 dark:bg-emerald-950 border border-green-200 dark:border-emerald-800 rounded-lg">
+                        <Text className="text-green-800 dark:text-emerald-200 text-center font-medium">
+                          ✅ Added {lastSeedResult.count} sample mood entries
+                        </Text>
+                      </View>
+                    )}
                   </View>
                 </View>
               </View>

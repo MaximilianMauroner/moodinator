@@ -9,6 +9,7 @@ import {
   getMoodInterpretation,
   getTrendInterpretation,
 } from "./ChartComponents";
+import { useColorScheme } from "@/hooks/useColorScheme";
 
 export const OverviewTab = ({
   moods,
@@ -30,29 +31,33 @@ export const OverviewTab = ({
   const currentInterpretation = getMoodInterpretation(currentWeekAvg);
   const lastInterpretation = getMoodInterpretation(lastWeekAvg);
   const trendInterpretation = getTrendInterpretation(weeklyTrend);
+  const scheme = useColorScheme();
+  const isDark = scheme === "dark";
 
   return (
     <ScrollView
-      className="flex-1"
+      className="flex-1 bg-transparent"
       refreshControl={
         <RefreshControl refreshing={false} onRefresh={onRefresh} />
       }
     >
       {/* Weekly Comparison Card */}
-      <View className="mx-4 mb-6 p-6 bg-white rounded-2xl shadow-lg">
-        <Text className="text-xl font-bold text-gray-800 mb-4 text-center">
+      <View className="mx-4 mb-6 p-6 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-lg">
+        <Text className="text-xl font-bold text-gray-800 dark:text-slate-200 mb-4 text-center">
           📈 This Week vs Last Week
         </Text>
 
         <View className="flex-row justify-between items-center mb-4">
           <View className="flex-1 items-center">
-            <Text className="text-sm text-gray-500 mb-1">This Week</Text>
+            <Text className="text-sm text-gray-500 dark:text-slate-400 mb-1">
+              This Week
+            </Text>
             <Text
               className={`text-3xl font-bold ${currentInterpretation.textClass}`}
             >
               {currentWeekAvg.toFixed(1)}
             </Text>
-            <Text className="text-xs text-gray-400">
+            <Text className="text-xs text-gray-400 dark:text-slate-500">
               {currentInterpretation.text}
             </Text>
           </View>
@@ -67,13 +72,15 @@ export const OverviewTab = ({
           </View>
 
           <View className="flex-1 items-center">
-            <Text className="text-sm text-gray-500 mb-1">Last Week</Text>
+            <Text className="text-sm text-gray-500 dark:text-slate-400 mb-1">
+              Last Week
+            </Text>
             <Text
               className={`text-3xl font-bold ${lastInterpretation.textClass}`}
             >
               {lastWeekAvg.toFixed(1)}
             </Text>
-            <Text className="text-xs text-gray-400">
+            <Text className="text-xs text-gray-400 dark:text-slate-500">
               {lastInterpretation.text}
             </Text>
           </View>
@@ -94,7 +101,7 @@ export const OverviewTab = ({
       {/* Quick Stats */}
       <View className="mx-4 mb-6">
         <View className="flex-row">
-          <View className="flex-1 bg-white p-4 rounded-xl mr-2 shadow-sm">
+          <View className="flex-1 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-xl mr-2 shadow-sm">
             <Text
               className={`text-center text-2xl font-bold ${
                 getMoodInterpretation(overallAvg).textClass
@@ -102,21 +109,21 @@ export const OverviewTab = ({
             >
               {overallAvg.toFixed(1)}
             </Text>
-            <Text className="text-center text-xs text-gray-500 mt-1">
+            <Text className="text-center text-xs text-gray-500 dark:text-slate-400 mt-1">
               Overall Average
             </Text>
-            <Text className="text-center text-xs text-gray-400">
+            <Text className="text-center text-xs text-gray-400 dark:text-slate-500">
               {getMoodInterpretation(overallAvg).text}
             </Text>
           </View>
-          <View className="flex-1 bg-white p-4 rounded-xl ml-2 shadow-sm">
+          <View className="flex-1 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-xl ml-2 shadow-sm">
             <Text className="text-center text-2xl font-bold text-purple-600">
               {moods.length}
             </Text>
-            <Text className="text-center text-xs text-gray-500 mt-1">
+            <Text className="text-center text-xs text-gray-500 dark:text-slate-400 mt-1">
               Total Entries
             </Text>
-            <Text className="text-center text-xs text-gray-400">
+            <Text className="text-center text-xs text-gray-400 dark:text-slate-500">
               {recentWeeks.length} weeks tracked
             </Text>
           </View>
@@ -125,7 +132,7 @@ export const OverviewTab = ({
 
       {/* Recent Week Summary */}
       <View className="mx-4 mb-6">
-        <Text className="text-lg font-semibold mb-3 text-gray-800">
+        <Text className="text-lg font-semibold mb-3 text-gray-800 dark:text-slate-200">
           Recent Weeks
         </Text>
         {recentWeeks.slice(0, 3).map((week, index) => {
@@ -133,18 +140,18 @@ export const OverviewTab = ({
           return (
             <View
               key={week.weekStart.toString()}
-              className="bg-white p-4 rounded-xl mb-3 shadow-sm"
+              className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-xl mb-3 shadow-sm"
             >
               <View className="flex-row justify-between items-center">
                 <View>
-                  <Text className="font-semibold text-gray-800">
+                  <Text className="font-semibold text-gray-800 dark:text-slate-200">
                     Week of {format(week.weekStart, "MMM dd")} -{" "}
                     {format(
                       endOfWeek(week.weekStart, { weekStartsOn: 1 }),
                       "MMM dd"
                     )}
                   </Text>
-                  <Text className="text-sm text-gray-500">
+                  <Text className="text-sm text-gray-500 dark:text-slate-400">
                     {week.moods.length} entries • Avg: {week.avg.toFixed(1)}
                   </Text>
                 </View>

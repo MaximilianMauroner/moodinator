@@ -1,5 +1,6 @@
 import React from "react";
 import { View, Text, ScrollView, Dimensions } from "react-native";
+import { useColorScheme } from "@/hooks/useColorScheme";
 import { LineChart } from "react-native-chart-kit";
 import { Circle, Line } from "react-native-svg";
 import {
@@ -47,14 +48,21 @@ export const getMoodScaleBg = (moodValue: number) => {
 // Shared chart configuration with proper y-axis range (0-10)
 export const getBaseChartConfig = (
   gradientFrom: string,
-  gradientTo: string
+  gradientTo: string,
+  isDark?: boolean
 ) => ({
-  backgroundColor: "#ffffff",
-  backgroundGradientFrom: gradientFrom,
-  backgroundGradientTo: gradientTo,
+  backgroundColor: isDark ? "#0f172a" : "#ffffff",
+  backgroundGradientFrom: isDark ? "#0f172a" : gradientFrom,
+  backgroundGradientTo: isDark ? "#0b1220" : gradientTo,
   decimalPlaces: 1,
-  color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-  labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+  color: (opacity = 1) =>
+    isDark
+      ? `rgba(255, 255, 255, ${opacity})`
+      : `rgba(59, 130, 246, ${opacity})`,
+  labelColor: (opacity = 1) =>
+    isDark
+      ? `rgba(226, 232, 240, ${opacity})`
+      : `rgba(100, 116, 139, ${opacity})`,
   style: { borderRadius: 16 },
   propsForDots: { r: "6", strokeWidth: "2" },
   yAxisMin: 0,
@@ -259,6 +267,9 @@ export const processWeeklyMoodData = (allMoods: MoodEntry[]) => {
 export const MiniWeeklyChart = ({ weeklyData }: { weeklyData: any[] }) => {
   if (!weeklyData.length) return null;
 
+  const scheme = useColorScheme();
+  const isDark = scheme === "dark";
+
   const weeklyAverages = weeklyData.map((week) => week.avg);
   const minValue = Math.min(...weeklyAverages);
   const maxValue = Math.max(...weeklyAverages);
@@ -297,12 +308,15 @@ export const MiniWeeklyChart = ({ weeklyData }: { weeklyData: any[] }) => {
 
   // Custom chart config with visible labels and dynamic y-axis
   const chartConfig = {
-    backgroundColor: "#ffffff",
-    backgroundGradientFrom: "#f8fafc",
-    backgroundGradientTo: "#e2e8f0",
+    backgroundColor: isDark ? "#0f172a" : "#ffffff",
+    backgroundGradientFrom: isDark ? "#0f172a" : "#f8fafc",
+    backgroundGradientTo: isDark ? "#0b1220" : "#e2e8f0",
     decimalPlaces: 1,
     color: (opacity = 1) => `rgba(59, 130, 246, ${opacity})`,
-    labelColor: (opacity = 1) => `rgba(55, 65, 81, ${opacity})`, // Dark gray for visibility
+    labelColor: (opacity = 1) =>
+      isDark
+        ? `rgba(203, 213, 225, ${opacity})`
+        : `rgba(55, 65, 81, ${opacity})`,
     style: { borderRadius: 16 },
     propsForDots: { r: "6", strokeWidth: "2" },
     yAxisMin: yMin,
@@ -311,8 +325,8 @@ export const MiniWeeklyChart = ({ weeklyData }: { weeklyData: any[] }) => {
   };
 
   return (
-    <View className="mx-4 mb-6 bg-white p-4 rounded-2xl shadow-lg">
-      <Text className="text-lg font-semibold text-center mb-3 text-gray-800">
+    <View className="mx-4 mb-6 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-2xl shadow-lg">
+      <Text className="text-lg font-semibold text-center mb-3 text-gray-800 dark:text-slate-200">
         📅 Last 4 Weeks Trend
       </Text>
       <LineChart
