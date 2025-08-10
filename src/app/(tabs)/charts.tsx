@@ -6,6 +6,7 @@ import {
   ScrollView,
   ActivityIndicator,
 } from "react-native";
+import { useColorScheme } from "@/hooks/useColorScheme";
 import type { MoodEntry } from "@db/types";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -37,6 +38,8 @@ export default function ChartsScreen() {
   const [componentsLoaded, setComponentsLoaded] = useState(false);
   const pagerRef = useRef<PagerView>(null);
   const tabScrollRef = useRef<ScrollView>(null);
+  const scheme = useColorScheme();
+  const isDark = scheme === "dark";
 
   const getCurrentTabIndex = () => {
     return tabs.findIndex((tab) => tab.id === activeTab);
@@ -197,7 +200,7 @@ export default function ChartsScreen() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaView className="flex-1 bg-gradient-to-b from-sky-50 to-white dark:from-slate-900 dark:to-slate-950">
+      <SafeAreaView className="flex-1 bg-white dark:bg-slate-950">
         {/* Header */}
         <View className="mt-1 flex flex-row justify-center items-center p-4">
           <Text className="text-3xl font-extrabold text-center text-sky-600 dark:text-sky-400">
@@ -221,46 +224,54 @@ export default function ChartsScreen() {
               contentContainerStyle={{ paddingHorizontal: 8 }}
               decelerationRate="fast"
             >
-              {tabs.map((tab) => (
-                <TouchableOpacity
-                  key={tab.id}
-                  onPress={() => handleTabPress(tab.id)}
-                  style={{
-                    paddingHorizontal: 20,
-                    paddingVertical: 12,
-                    borderRadius: 25,
-                    marginHorizontal: 6,
-                    backgroundColor:
-                      activeTab === tab.id ? "#3B82F6" : "#F8FAFC",
-                    borderWidth: activeTab === tab.id ? 0 : 1.5,
-                    borderColor:
-                      activeTab === tab.id ? "transparent" : "#E2E8F0",
-                    shadowColor:
-                      activeTab === tab.id ? "#3B82F6" : "transparent",
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: activeTab === tab.id ? 0.25 : 0,
-                    shadowRadius: 4,
-                    elevation: activeTab === tab.id ? 4 : 0,
-                    transform: [{ scale: activeTab === tab.id ? 1.02 : 1 }],
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={{ flexDirection: "row", alignItems: "center" }}>
-                    <Text style={{ fontSize: 18, marginRight: 8 }}>
-                      {tab.icon}
-                    </Text>
-                    <Text
-                      style={{
-                        fontWeight: activeTab === tab.id ? "700" : "600",
-                        color: activeTab === tab.id ? "#FFFFFF" : "#475569",
-                        fontSize: 14,
-                      }}
+              {tabs.map((tab) => {
+                const inactiveBg = isDark ? "#0f172a" : "#F8FAFC";
+                const inactiveBorder = isDark ? "#1f2937" : "#E2E8F0";
+                const inactiveText = isDark ? "#E5E7EB" : "#475569";
+                return (
+                  <TouchableOpacity
+                    key={tab.id}
+                    onPress={() => handleTabPress(tab.id)}
+                    style={{
+                      paddingHorizontal: 20,
+                      paddingVertical: 12,
+                      borderRadius: 25,
+                      marginHorizontal: 6,
+                      backgroundColor:
+                        activeTab === tab.id ? "#3B82F6" : inactiveBg,
+                      borderWidth: activeTab === tab.id ? 0 : 1.5,
+                      borderColor:
+                        activeTab === tab.id ? "transparent" : inactiveBorder,
+                      shadowColor:
+                        activeTab === tab.id ? "#3B82F6" : "transparent",
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: activeTab === tab.id ? 0.25 : 0,
+                      shadowRadius: 4,
+                      elevation: activeTab === tab.id ? 4 : 0,
+                      transform: [{ scale: activeTab === tab.id ? 1.02 : 1 }],
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View
+                      style={{ flexDirection: "row", alignItems: "center" }}
                     >
-                      {tab.label}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
+                      <Text style={{ fontSize: 18, marginRight: 8 }}>
+                        {tab.icon}
+                      </Text>
+                      <Text
+                        style={{
+                          fontWeight: activeTab === tab.id ? "700" : "600",
+                          color:
+                            activeTab === tab.id ? "#FFFFFF" : inactiveText,
+                          fontSize: 14,
+                        }}
+                      >
+                        {tab.label}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
           </View>
         )}

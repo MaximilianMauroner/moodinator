@@ -264,7 +264,8 @@ export default function HomeScreen() {
   return (
     <>
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <SafeAreaView className="flex-1 bg-gradient-to-b from-sky-50 to-white dark:from-slate-900 dark:to-slate-950">
+        {/* Use solid backgrounds (NativeWind gradients are not supported on native) */}
+        <SafeAreaView className="flex-1 bg-white dark:bg-slate-950">
           <View className="flex-1 p-4 space-y-4">
             <View>
               <Text className="text-3xl font-extrabold text-center mb-1 text-sky-600 dark:text-sky-400">

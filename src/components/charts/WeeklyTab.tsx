@@ -24,6 +24,7 @@ import {
   getMoodInterpretation,
   getTrendInterpretation,
 } from "./ChartComponents";
+import { useColorScheme } from "@/hooks/useColorScheme";
 
 export const WeeklyTab = ({
   moods,
@@ -34,6 +35,8 @@ export const WeeklyTab = ({
 }) => {
   const weeklyData = processWeeklyMoodData(moods);
   const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set());
+  const scheme = useColorScheme();
+  const isDark = scheme === "dark";
 
   const [refreshing, setRefreshing] = React.useState(false);
   const handleRefresh = React.useCallback(() => {
@@ -97,29 +100,31 @@ export const WeeklyTab = ({
 
   return (
     <ScrollView
-      className="flex-1"
+      className="flex-1 bg-transparent"
       refreshControl={
         <RefreshControl refreshing={false} onRefresh={onRefresh} />
       }
     >
-      <Text className="text-xl font-semibold text-center mb-1 text-emerald-600 mx-4">
+      <Text className="text-xl font-semibold text-center mb-1 text-emerald-600 dark:text-emerald-400 mx-4">
         📊 Weekly Mood Analysis
       </Text>
-      <Text className="text-sm text-gray-500 text-center mb-4 mx-4">
+      <Text className="text-sm text-gray-500 dark:text-slate-400 text-center mb-4 mx-4">
         {weeklyData.weeklyAggregates.length} weeks of data • Detailed insights
         and patterns
       </Text>
 
       {/* Enhanced Weekly Statistics Summary */}
-      <View className="mx-4 mb-6 bg-white p-4 rounded-xl shadow-sm">
-        <Text className="text-lg font-semibold mb-3 text-gray-800">
+      <View className="mx-4 mb-6 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-xl shadow-sm">
+        <Text className="text-lg font-semibold mb-3 text-gray-800 dark:text-slate-200">
           📊 Weekly Overview
         </Text>
 
         {/* Primary Stats */}
         <View className="flex-row justify-between mb-4">
           <View className="flex-1">
-            <Text className="text-sm text-gray-500">Best Week</Text>
+            <Text className="text-sm text-gray-500 dark:text-slate-400">
+              Best Week
+            </Text>
             <Text
               className={`text-lg font-bold ${
                 getMoodInterpretation(
@@ -152,7 +157,9 @@ export const WeeklyTab = ({
             </Text>
           </View>
           <View className="flex-1">
-            <Text className="text-sm text-gray-500">Most Challenging</Text>
+            <Text className="text-sm text-gray-500 dark:text-slate-400">
+              Most Challenging
+            </Text>
             <Text
               className={`text-lg font-bold ${
                 getMoodInterpretation(
@@ -185,7 +192,9 @@ export const WeeklyTab = ({
             </Text>
           </View>
           <View className="flex-1">
-            <Text className="text-sm text-gray-500">Overall Average</Text>
+            <Text className="text-sm text-gray-500 dark:text-slate-400">
+              Overall Average
+            </Text>
             <Text
               className={`text-lg font-bold ${
                 getMoodInterpretation(
@@ -230,14 +239,16 @@ export const WeeklyTab = ({
         </View>
 
         {/* Additional Insights */}
-        <View className="bg-gray-50 p-3 rounded-lg">
-          <Text className="text-sm font-medium text-gray-700 mb-2">
+        <View className="bg-gray-50 dark:bg-slate-800 p-3 rounded-lg">
+          <Text className="text-sm font-medium text-gray-700 dark:text-slate-200 mb-2">
             💡 Key Insights:
           </Text>
 
           {/* Consistency Score */}
           <View className="flex-row justify-between mb-1">
-            <Text className="text-xs text-gray-600">Consistency Score:</Text>
+            <Text className="text-xs text-gray-600 dark:text-slate-400">
+              Consistency Score:
+            </Text>
             <Text
               className={`text-xs font-medium ${
                 weeklyData.weeklyAggregates.length >= 7
@@ -272,7 +283,9 @@ export const WeeklyTab = ({
 
               return (
                 <View className="flex-row justify-between">
-                  <Text className="text-xs text-gray-600">Recent Trend:</Text>
+                  <Text className="text-xs text-gray-600 dark:text-slate-400">
+                    Recent Trend:
+                  </Text>
                   <Text
                     className={`text-xs font-medium ${
                       trend < -0.5
@@ -296,10 +309,10 @@ export const WeeklyTab = ({
 
       {/* Detailed Weekly Breakdown */}
       <View className="mb-2 mx-4">
-        <Text className="text-lg font-semibold mb-1 text-gray-800">
+        <Text className="text-lg font-semibold mb-1 text-gray-800 dark:text-slate-200">
           🗓️ Week-by-Week Details
         </Text>
-        <Text className="text-sm text-gray-500 mb-4">
+        <Text className="text-sm text-gray-500 dark:text-slate-400 mb-4">
           Tap any week to view detailed mood entries and notes
         </Text>
       </View>
@@ -317,7 +330,7 @@ export const WeeklyTab = ({
           return (
             <View
               key={weekKey}
-              className="bg-white mx-4 p-4 rounded-xl mb-3 shadow-sm"
+              className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 mx-4 p-4 rounded-xl mb-3 shadow-sm"
             >
               <TouchableOpacity
                 onPress={() => toggleWeekExpansion(weekKey)}
@@ -325,14 +338,14 @@ export const WeeklyTab = ({
                 activeOpacity={0.7}
               >
                 <View className="flex-1">
-                  <Text className="font-semibold text-gray-800">
+                  <Text className="font-semibold text-gray-800 dark:text-slate-200">
                     {format(week.weekStart, "MMM dd")} -{" "}
                     {format(
                       endOfWeek(week.weekStart, { weekStartsOn: 1 }),
                       "MMM dd"
                     )}
                   </Text>
-                  <Text className="text-sm text-gray-500 mb-2">
+                  <Text className="text-sm text-gray-500 dark:text-slate-400 mb-2">
                     {week.moods.length} entries • Range: {week.min}-{week.max}
                   </Text>
                   <View className="flex-row">
@@ -368,8 +381,8 @@ export const WeeklyTab = ({
 
               {/* Accordion Content - Mood Entries */}
               {isExpanded && (
-                <View className="mt-4 pt-4 border-t border-gray-100">
-                  <Text className="text-sm font-semibold text-gray-800 mb-3">
+                <View className="mt-4 pt-4 border-t border-gray-100 dark:border-slate-800">
+                  <Text className="text-sm font-semibold text-gray-800 dark:text-slate-200 mb-3">
                     📝 Mood Entries for this Week:
                   </Text>
                   {weekMoodEntries.length > 0 ? (
@@ -387,7 +400,7 @@ export const WeeklyTab = ({
                           return (
                             <View
                               key={entry.id}
-                              className="bg-gray-50 p-3 rounded-lg mb-2"
+                              className="bg-gray-50 dark:bg-slate-800 p-3 rounded-lg mb-2"
                             >
                               <View className="flex-row justify-between items-start">
                                 <View className="flex-1">
@@ -419,11 +432,11 @@ export const WeeklyTab = ({
                                     </View>
                                     <View>
                                       {entry.note && (
-                                        <Text className="text-sm text-gray-600 italic">
+                                        <Text className="text-sm text-gray-600 dark:text-slate-300 italic">
                                           "{entry.note}"
                                         </Text>
                                       )}
-                                      <Text className="text-xs text-gray-500">
+                                      <Text className="text-xs text-gray-500 dark:text-slate-400">
                                         {format(
                                           new Date(entry.timestamp),
                                           "dd/MM HH:mm"
@@ -438,7 +451,7 @@ export const WeeklyTab = ({
                         })}
                     </View>
                   ) : (
-                    <Text className="text-sm text-gray-500 italic">
+                    <Text className="text-sm text-gray-500 dark:text-slate-400 italic">
                       No detailed entries available for this week.
                     </Text>
                   )}
@@ -446,8 +459,8 @@ export const WeeklyTab = ({
               )}
 
               {/* Enhanced Mood distribution for this week */}
-              <View className="mt-3 pt-3 border-t border-gray-100">
-                <Text className="text-xs text-gray-500 mb-3">
+              <View className="mt-3 pt-3 border-t border-gray-100 dark:border-slate-800">
+                <Text className="text-xs text-gray-500 dark:text-slate-400 mb-3">
                   Mood Distribution & Patterns:
                 </Text>
 
@@ -478,7 +491,7 @@ export const WeeklyTab = ({
                             {count} ({percentage.toFixed(0)}%)
                           </Text>
                         </View>
-                        <View className="bg-gray-200 h-2 rounded-full overflow-hidden">
+                        <View className="bg-gray-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
                           <View
                             className={`h-full rounded-full ${
                               moodInfo?.bg || "bg-gray-300"
@@ -492,14 +505,14 @@ export const WeeklyTab = ({
                 </View>
 
                 {/* Weekly Insights */}
-                <View className="bg-gray-50 p-3 rounded-lg">
-                  <Text className="text-xs font-medium text-gray-700 mb-2">
+                <View className="bg-gray-50 dark:bg-slate-800 p-3 rounded-lg">
+                  <Text className="text-xs font-medium text-gray-700 dark:text-slate-200 mb-2">
                     📈 Weekly Insights:
                   </Text>
 
                   {/* Mood Stability */}
                   <View className="flex-row justify-between mb-1">
-                    <Text className="text-xs text-gray-600">
+                    <Text className="text-xs text-gray-600 dark:text-slate-400">
                       Mood Stability:
                     </Text>
                     <Text
@@ -536,7 +549,7 @@ export const WeeklyTab = ({
 
                     return (
                       <View className="flex-row justify-between mb-1">
-                        <Text className="text-xs text-gray-600">
+                        <Text className="text-xs text-gray-600 dark:text-slate-400">
                           Most Common:
                         </Text>
                         <Text
@@ -552,8 +565,10 @@ export const WeeklyTab = ({
 
                   {/* Mood Range */}
                   <View className="flex-row justify-between">
-                    <Text className="text-xs text-gray-600">Daily Range:</Text>
-                    <Text className="text-xs font-medium text-gray-700">
+                    <Text className="text-xs text-gray-600 dark:text-slate-400">
+                      Daily Range:
+                    </Text>
+                    <Text className="text-xs font-medium text-gray-700 dark:text-slate-300">
                       {week.min} - {week.max} (span: {week.max - week.min})
                     </Text>
                   </View>
@@ -565,11 +580,11 @@ export const WeeklyTab = ({
       </View>
 
       {/* Weekly Trend Chart */}
-      <View className="bg-white mx-4 p-4 rounded-2xl shadow-lg mb-6">
-        <Text className="text-lg font-semibold mb-1 text-gray-800">
+      <View className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 mx-4 p-4 rounded-2xl shadow-lg mb-6">
+        <Text className="text-lg font-semibold mb-1 text-gray-800 dark:text-slate-200">
           📈 Weekly Mood Trend
         </Text>
-        <Text className="text-sm text-gray-500 mb-3">
+        <Text className="text-sm text-gray-500 dark:text-slate-400 mb-3">
           Track your mood patterns over time • Lower is better
         </Text>
         <ScrollView
@@ -585,7 +600,7 @@ export const WeeklyTab = ({
               chartData.labels.length * 60
             )}
             height={300}
-            chartConfig={getBaseChartConfig("#10B981", "#059669")}
+            chartConfig={getBaseChartConfig("#10B981", "#059669", isDark)}
             style={{ borderRadius: 16 }}
             bezier
             segments={10}
@@ -593,8 +608,8 @@ export const WeeklyTab = ({
         </ScrollView>
 
         {/* Chart Legend */}
-        <View className="mt-3 pt-3 border-t border-gray-100">
-          <Text className="text-xs text-gray-500 text-center">
+        <View className="mt-3 pt-3 border-t border-gray-100 dark:border-slate-800">
+          <Text className="text-xs text-gray-500 dark:text-slate-400 text-center">
             💡 Tip: Look for patterns in your weekly averages to identify
             triggers and positive trends
           </Text>
@@ -602,21 +617,21 @@ export const WeeklyTab = ({
       </View>
 
       {/* Overall Weekly Summary & Recommendations */}
-      <View className="bg-gradient-to-br from-emerald-50 to-teal-50 mx-4 p-4 rounded-2xl shadow-sm mb-6">
-        <Text className="text-lg font-semibold mb-3 text-emerald-800">
+      <View className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 mx-4 p-4 rounded-2xl shadow-sm mb-6">
+        <Text className="text-lg font-semibold mb-3 text-emerald-800 dark:text-emerald-300">
           🎯 Weekly Summary & Insights
         </Text>
 
         {/* Data Quality */}
-        <View className="bg-white p-3 rounded-lg mb-3">
-          <Text className="text-sm font-medium text-gray-700 mb-2">
+        <View className="bg-gray-50 dark:bg-slate-800 p-3 rounded-lg mb-3">
+          <Text className="text-sm font-medium text-gray-700 dark:text-slate-200 mb-2">
             📊 Tracking Quality:
           </Text>
           <View className="flex-row justify-between">
-            <Text className="text-xs text-gray-600">
+            <Text className="text-xs text-gray-600 dark:text-slate-400">
               Total weeks tracked: {weeklyData.weeklyAggregates.length}
             </Text>
-            <Text className="text-xs text-gray-600">
+            <Text className="text-xs text-gray-600 dark:text-slate-400">
               Avg entries/week:{" "}
               {(
                 weeklyData.weeklyAggregates.reduce(
@@ -629,8 +644,8 @@ export const WeeklyTab = ({
         </View>
 
         {/* Actionable Insights */}
-        <View className="bg-white p-3 rounded-lg">
-          <Text className="text-sm font-medium text-gray-700 mb-2">
+        <View className="bg-gray-50 dark:bg-slate-800 p-3 rounded-lg">
+          <Text className="text-sm font-medium text-gray-700 dark:text-slate-200 mb-2">
             💡 Recommendations:
           </Text>
 
@@ -680,7 +695,10 @@ export const WeeklyTab = ({
             }
 
             return recommendations.map((rec, index) => (
-              <Text key={index} className="text-xs text-gray-600 mb-1">
+              <Text
+                key={index}
+                className="text-xs text-gray-600 dark:text-slate-400 mb-1"
+              >
                 {rec}
               </Text>
             ));
