@@ -99,25 +99,54 @@ export default function ChartsScreen() {
     }
   }, []);
 
-  // Fast initial load - just get count first
+  // Fast initial load - just get count first, prefer warm cache
   const getInitialMoodCount = useCallback(async () => {
     try {
       // Use inline require to defer loading the db module
-      const { getMoodCount } = require("@db/db");
-      const count = await getMoodCount();
+      const {
+        getMoodCount: dbGetMoodCount,
+        getAllMoods: dbGetAllMoods,
+        getCachedMoodCount,
+        isMoodsCacheWarm,
+        getCachedMoods,
+      } = require("@db/db");
+
+      // If cache is warm, hydrate from it immediately for a snappy UI
+      const cachedCount = getCachedMoodCount?.();
+      const cacheWarm = isMoodsCacheWarm?.();
+      if (cacheWarm) {
+        const cachedMoodsSync: MoodEntry[] | null = getCachedMoods?.() ?? null;
+        if (cachedMoodsSync && cachedMoodsSync.length > 0) {
+          setMoods(cachedMoodsSync);
+          setMoodCount(cachedMoodsSync.length);
+        } else {
+          const cachedMoodsAsync: MoodEntry[] = await dbGetAllMoods();
+          setMoods(cachedMoodsAsync);
+          setMoodCount(cachedMoodsAsync.length);
+        }
+        setDataLoaded(true);
+        setLoading(false);
+        // ensure components are ready soon
+        setTimeout(() => loadChartComponents(), 0);
+        // Revalidate in background
+        setTimeout(() => {
+          loadFullMoodData();
+        }, 100);
+        return;
+      }
+
+      // Otherwise query the count first (fast path), then lazily fetch all
+      const count = await dbGetMoodCount();
       setMoodCount(count);
       setLoading(false);
 
-      // Only load components and data when count > 0, but delay it
       if (count > 0) {
-        // Use a longer delay to ensure UI is fully rendered first
         setTimeout(() => {
           loadChartComponents();
-          // Load data after components are loaded
           setTimeout(() => {
             loadFullMoodData();
-          }, 200);
-        }, 100);
+          }, 150);
+        }, 50);
       }
     } catch (error) {
       console.error("Failed to get mood count:", error);
@@ -157,30 +186,6 @@ export default function ChartsScreen() {
       if (selectedTab && selectedTab.id !== activeTab) {
         setActiveTab(selectedTab.id);
         scrollToActiveTab(pageIndex);
-      }
-    },
-    [activeTab, scrollToActiveTab]
-  );
-
-  const handlePageScroll = useCallback(
-    (e: any) => {
-      const { position, offset } = e.nativeEvent;
-
-      // Determine which tab should be active based on scroll position
-      let targetPosition = position;
-
-      // If we're scrolling significantly toward the next page, switch early for responsiveness
-      if (offset > 0.3) {
-        targetPosition = position + 1;
-      }
-
-      // Make sure we're within bounds
-      if (targetPosition >= 0 && targetPosition < tabs.length) {
-        const selectedTab = tabs[targetPosition];
-        if (selectedTab && selectedTab.id !== activeTab) {
-          setActiveTab(selectedTab.id);
-          scrollToActiveTab(targetPosition);
-        }
       }
     },
     [activeTab, scrollToActiveTab]
@@ -296,7 +301,6 @@ export default function ChartsScreen() {
               style={{ flex: 1 }}
               initialPage={getCurrentTabIndex()}
               onPageSelected={handlePageSelected}
-              onPageScroll={handlePageScroll}
               scrollEnabled={true}
               overScrollMode="never"
               overdrag={false}

@@ -19,6 +19,10 @@ export default function TabLayout() {
         tabBarBackground: TabBarBackground,
         tabBarActiveTintColor: isDark ? "#93C5FD" : "#3B82F6",
         tabBarInactiveTintColor: isDark ? "#9CA3AF" : "#94A3B8",
+        sceneStyle: {
+          paddingBottom: 40,
+          backgroundColor: isDark ? "#0B1220" : "#FFFFFF", // optional
+        },
         tabBarStyle: Platform.select({
           ios: {
             // Use a transparent background on iOS to show the blur effect
