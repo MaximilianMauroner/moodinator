@@ -10,7 +10,12 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.lab4code.moodinator"
+      "bundleIdentifier": "com.lab4code.moodinator",
+      "infoPlist": {
+        "NSCameraUsageDescription": "We use the camera to capture your daily picture for your note.",
+        "NSPhotoLibraryUsageDescription": "We need access to your photo library so you can pick a picture for your note.",
+        "NSPhotoLibraryAddUsageDescription": "We save the processed photo to your library when needed."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -26,6 +31,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-image-picker",
       [
         "expo-splash-screen",
         {
@@ -75,7 +81,9 @@
           "defaultChannel": "default",
           "enableBackgroundRemoteNotifications": true
         }
-      ]
+      ],
+      "expo-font",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true
