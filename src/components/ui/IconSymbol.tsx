@@ -14,6 +14,8 @@ const MAPPING = {
   "chevron.left.forwardslash.chevron.right": "code",
   "chevron.right": "chevron-right",
   "chart.bar": "pie-chart-outline",
+  "camera.fill": "photo-camera",
+  "camera.aperture": "cameraswitch",
   gear: "settings",
 } as Partial<
   Record<
