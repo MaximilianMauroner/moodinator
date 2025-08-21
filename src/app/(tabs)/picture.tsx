@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
+import * as ImageManipulator from "expo-image-manipulator";
 import * as Linking from "expo-linking";
 import * as Sharing from "expo-sharing";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -80,6 +81,7 @@ function vaultRelativePath(
 
 // Settings persisted in AsyncStorage keys
 const SETTINGS_KEYS = {
+  androidVaultRootDir: "obsidianVaultRootDirUri", // SAF directoryUri for vault root
   androidAttachmentsDir: "obsidianAttachmentsDirUri", // SAF directoryUri for attachments
   androidDailyNotesDir: "obsidianDailyNotesDirUri", // SAF directoryUri for daily notes
   attachmentsSubfolder: "obsidianAttachmentsSubfolder", // fallback when derivation fails
@@ -94,6 +96,7 @@ export default function PictureScreen() {
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [lastSavedPath, setLastSavedPath] = useState<string | null>(null);
+  const [imageExt, setImageExt] = useState<"webp" | "jpg">("webp");
   const [attachmentsSubfolder, setAttachmentsSubfolder] =
     useState("attachments_");
   const [dailyNotesFolder, setDailyNotesFolder] = useState("daily");
@@ -105,6 +108,9 @@ export default function PictureScreen() {
   const [androidDailyNotesDirUri, setAndroidDailyNotesDirUri] = useState<
     string | null
   >(null);
+  const [androidVaultRootDirUri, setAndroidVaultRootDirUri] = useState<
+    string | null
+  >(null);
   const [vaultName, setVaultName] = useState("");
   const [noteDatePattern, setNoteDatePattern] = useState("YYYY-MM-DD");
   const [previewContent, setPreviewContent] = useState<string | null>(null);
@@ -114,17 +120,28 @@ export default function PictureScreen() {
     // Load saved settings
     (async () => {
       try {
-        const [attachDir, noteDir, attach, daily, pre, suf, vName, pat] =
-          await Promise.all([
-            AsyncStorage.getItem(SETTINGS_KEYS.androidAttachmentsDir),
-            AsyncStorage.getItem(SETTINGS_KEYS.androidDailyNotesDir),
-            AsyncStorage.getItem(SETTINGS_KEYS.attachmentsSubfolder),
-            AsyncStorage.getItem(SETTINGS_KEYS.dailyNotesFolder),
-            AsyncStorage.getItem(SETTINGS_KEYS.dailyNotePrefix),
-            AsyncStorage.getItem(SETTINGS_KEYS.dailyNoteSuffix),
-            AsyncStorage.getItem(SETTINGS_KEYS.vaultName),
-            AsyncStorage.getItem(SETTINGS_KEYS.dailyNoteDatePattern),
-          ]);
+        const [
+          vaultDir,
+          attachDir,
+          noteDir,
+          attach,
+          daily,
+          pre,
+          suf,
+          vName,
+          pat,
+        ] = await Promise.all([
+          AsyncStorage.getItem(SETTINGS_KEYS.androidVaultRootDir),
+          AsyncStorage.getItem(SETTINGS_KEYS.androidAttachmentsDir),
+          AsyncStorage.getItem(SETTINGS_KEYS.androidDailyNotesDir),
+          AsyncStorage.getItem(SETTINGS_KEYS.attachmentsSubfolder),
+          AsyncStorage.getItem(SETTINGS_KEYS.dailyNotesFolder),
+          AsyncStorage.getItem(SETTINGS_KEYS.dailyNotePrefix),
+          AsyncStorage.getItem(SETTINGS_KEYS.dailyNoteSuffix),
+          AsyncStorage.getItem(SETTINGS_KEYS.vaultName),
+          AsyncStorage.getItem(SETTINGS_KEYS.dailyNoteDatePattern),
+        ]);
+        if (vaultDir) setAndroidVaultRootDirUri(vaultDir);
         if (attachDir) setAndroidAttachmentsDirUri(attachDir);
         if (noteDir) setAndroidDailyNotesDirUri(noteDir);
         if (attach) setAttachmentsSubfolder(attach);
@@ -183,65 +200,92 @@ export default function PictureScreen() {
     }
   }, []);
 
-  const computeFilenames = useCallback(() => {
-    const { ymd } = formatDateParts();
-    const fileName = `${ymd}.jpg`;
-    let coverRelPath: string;
-    if (
-      Platform.OS === "android" &&
-      androidAttachmentsDirUri &&
-      androidDailyNotesDirUri
-    ) {
-      const a = decodeSafDirPath(androidAttachmentsDirUri);
-      const d = decodeSafDirPath(androidDailyNotesDirUri);
-      if (a && d) {
-        const rel = relativePath(d, a); // from daily note dir to attachments dir
-        coverRelPath = `${rel}/${fileName}`.replace(/\\/g, "/");
+  const computeFilenames = useCallback(
+    (ext: "webp" | "jpg" = imageExt) => {
+      const { ymd } = formatDateParts();
+      const fileName = `${ymd}.${ext}`;
+      // Compute a short relative path from the daily note folder to the attachments folder
+      let coverShortPath: string;
+      const hasBothSAF =
+        Platform.OS === "android" &&
+        androidAttachmentsDirUri &&
+        androidDailyNotesDirUri;
+      if (hasBothSAF) {
+        const a = decodeSafDirPath(androidAttachmentsDirUri!);
+        const d = decodeSafDirPath(androidDailyNotesDirUri!);
+        if (a && d) {
+          const rel = relativePath(d, a); // from daily to attachments
+          if (rel === "." || rel.length === 0) {
+            coverShortPath = fileName;
+          } else {
+            coverShortPath = `${rel}/${fileName}`.replace(/\\/g, "/");
+          }
+        } else {
+          coverShortPath = `${attachmentsSubfolder}/${fileName}`.replace(
+            /\\/g,
+            "/"
+          );
+        }
       } else {
-        coverRelPath = `${attachmentsSubfolder}/${fileName}`.replace(
-          /\\/g,
-          "/"
-        );
-      }
-    } else {
-      coverRelPath = `${attachmentsSubfolder}/${fileName}`.replace(/\\/g, "/");
-    }
-
-    const dateStr = formatDateWithPattern(noteDatePattern);
-    const dailyNoteName = `${dailyNotePrefix}${dateStr}${dailyNoteSuffix}`;
-    let dailyNotePath = `${dailyNotesFolder}/${dailyNoteName}.md`.replace(
-      /\\/g,
-      "/"
-    );
-    if (
-      Platform.OS === "android" &&
-      androidAttachmentsDirUri &&
-      androidDailyNotesDirUri
-    ) {
-      const a = decodeSafDirPath(androidAttachmentsDirUri);
-      const d = decodeSafDirPath(androidDailyNotesDirUri);
-      if (a && d) {
-        const vr = vaultRelativePath(a, d);
-        if (vr) {
-          dailyNotePath = `${vr.bRel}/${dailyNoteName}.md`.replace(/\\/g, "/");
+        // Fallback: use configured folder names (vault-relative strings) to compute a relative path
+        const rel = relativePath(dailyNotesFolder, attachmentsSubfolder);
+        if (rel === "." || rel.length === 0) {
+          coverShortPath = fileName;
+        } else {
+          coverShortPath = `${rel}/${fileName}`.replace(/\\/g, "/");
         }
       }
-    }
 
-    return { fileName, coverRelPath, dailyNoteName, dailyNotePath };
-  }, [
-    attachmentsSubfolder,
-    dailyNotesFolder,
-    dailyNotePrefix,
-    dailyNoteSuffix,
-    noteDatePattern,
-    androidAttachmentsDirUri,
-    androidDailyNotesDirUri,
-  ]);
+      const dateStr = formatDateWithPattern(noteDatePattern);
+      const dailyNoteName = `${dailyNotePrefix}${dateStr}${dailyNoteSuffix}`;
+      let dailyNoteVaultPath =
+        `${dailyNotesFolder}/${dailyNoteName}.md`.replace(/\\/g, "/");
+      if (Platform.OS === "android" && androidDailyNotesDirUri) {
+        const d = decodeSafDirPath(androidDailyNotesDirUri);
+        const v = androidVaultRootDirUri
+          ? decodeSafDirPath(androidVaultRootDirUri)
+          : null;
+        if (d && v) {
+          const vr = vaultRelativePath(v, d);
+          if (vr) {
+            const withinVault = vr.bRel; // may be '' if same
+            dailyNoteVaultPath = `${
+              withinVault ? withinVault + "/" : ""
+            }${dailyNoteName}.md`.replace(/\\/g, "/");
+          }
+        } else if (d && androidAttachmentsDirUri) {
+          // Derive common vault root from attachments and daily directories
+          const a = decodeSafDirPath(androidAttachmentsDirUri);
+          if (a) {
+            const vr2 = vaultRelativePath(a, d);
+            if (vr2) {
+              const dailyWithinVault = vr2.bRel; // d relative to common root
+              dailyNoteVaultPath = `${
+                dailyWithinVault ? dailyWithinVault + "/" : ""
+              }${dailyNoteName}.md`.replace(/\\/g, "/");
+            }
+          }
+        }
+      }
+
+      return { fileName, coverShortPath, dailyNoteName, dailyNoteVaultPath };
+    },
+    [
+      attachmentsSubfolder,
+      dailyNotesFolder,
+      dailyNotePrefix,
+      dailyNoteSuffix,
+      noteDatePattern,
+      androidVaultRootDirUri,
+      androidAttachmentsDirUri,
+      androidDailyNotesDirUri,
+      imageExt,
+    ]
+  );
 
   const yamlSnippet = useMemo(() => {
-    const { coverRelPath } = computeFilenames();
-    return `cover: ${coverRelPath}`;
+    const { coverShortPath } = computeFilenames();
+    return `cover: ${coverShortPath}\nbanner: ![[${coverShortPath}]]`;
   }, [computeFilenames]);
 
   const pickAndroidAttachmentsDirectory = useCallback(async () => {
@@ -278,6 +322,23 @@ export default function PictureScreen() {
     }
   }, []);
 
+  const pickAndroidVaultRootDirectory = useCallback(async () => {
+    try {
+      const res =
+        await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+      if (!res.granted) return;
+      setAndroidVaultRootDirUri(res.directoryUri);
+      await AsyncStorage.setItem(
+        SETTINGS_KEYS.androidVaultRootDir,
+        res.directoryUri
+      );
+      Alert.alert("Saved", "Selected vault root folder.");
+    } catch (e) {
+      console.error(e);
+      Alert.alert("Error", "Couldn't select folder.");
+    }
+  }, []);
+
   const saveSettings = useCallback(async () => {
     await Promise.all([
       AsyncStorage.setItem(
@@ -300,11 +361,11 @@ export default function PictureScreen() {
     noteDatePattern,
   ]);
 
-  // Update (or create) the daily note file with YAML cover line; Android only via SAF.
+  // Update (or create) the daily note file with YAML cover and banner lines; Android only via SAF.
   const ensureDailyNoteHasCoverAndroid = useCallback(
     async (
       dailyNotesDirUri: string,
-      coverRelativePath: string,
+      coverPath: string,
       dailyNoteFileName: string
     ) => {
       const displayName = dailyNoteFileName;
@@ -326,7 +387,7 @@ export default function PictureScreen() {
           }
         }
 
-        let content = `---\ncover: ${coverRelativePath}\n---\n`;
+        let content = `---\ncover: ${coverPath}\nbanner: ![[${coverPath}]]\n---\n`;
         if (existingUri) {
           try {
             const prev = await FileSystem.readAsStringAsync(existingUri, {
@@ -337,18 +398,17 @@ export default function PictureScreen() {
             if (m) {
               const yaml = m[1];
               const rest = prev.slice(m[0].length);
-              let newYaml: string;
-              if (/^\s*cover\s*:\s*.*$/m.test(yaml)) {
-                newYaml = yaml.replace(
-                  /^\s*cover\s*:\s*.*$/m,
-                  `cover: ${coverRelativePath}`
-                );
-              } else {
-                newYaml = `cover: ${coverRelativePath}\n${yaml}`;
-              }
+              // Remove any existing cover/banner lines to avoid duplicates, then prepend ours
+              const cleaned = yaml
+                .replace(/^\s*cover\s*:\s*.*$/m, "")
+                .replace(/^\s*banner\s*:\s*.*$/m, "")
+                .trim();
+              const newYaml =
+                `cover: ${coverPath}\nbanner: ![[${coverPath}]]` +
+                (cleaned ? `\n${cleaned}` : "");
               content = `---\n${newYaml}\n---\n${rest}`;
             } else {
-              content = `---\ncover: ${coverRelativePath}\n---\n${prev}`;
+              content = `---\ncover: ${coverPath}\nbanner: ![[${coverPath}]]\n---\n${prev}`;
             }
             await FileSystem.writeAsStringAsync(existingUri, content, {
               encoding: FileSystem.EncodingType.UTF8,
@@ -384,8 +444,8 @@ export default function PictureScreen() {
     setPreviewLoading(true);
     setPreviewContent(null);
     try {
-      const { coverRelPath, dailyNoteName } = computeFilenames();
-      let content = `---\ncover: ${coverRelPath}\n---\n`;
+      const { coverShortPath, dailyNoteName } = computeFilenames();
+      let content = `---\ncover: ${coverShortPath}\nbanner: ![[${coverShortPath}]]\n---\n`;
       if (Platform.OS === "android" && androidDailyNotesDirUri) {
         try {
           const children =
@@ -413,18 +473,16 @@ export default function PictureScreen() {
             if (m) {
               const yaml = m[1];
               const rest = prev.slice(m[0].length);
-              let newYaml: string;
-              if (/^\s*cover\s*:\s*.*$/m.test(yaml)) {
-                newYaml = yaml.replace(
-                  /^\s*cover\s*:\s*.*$/m,
-                  `cover: ${coverRelPath}`
-                );
-              } else {
-                newYaml = `cover: ${coverRelPath}\n${yaml}`;
-              }
+              const cleaned = yaml
+                .replace(/^\s*cover\s*:\s*.*$/m, "")
+                .replace(/^\s*banner\s*:\s*.*$/m, "")
+                .trim();
+              const newYaml =
+                `cover: ${coverShortPath}\nbanner: ![[${coverShortPath}]]` +
+                (cleaned ? `\n${cleaned}` : "");
               content = `---\n${newYaml}\n---\n${rest}`;
             } else {
-              content = `---\ncover: ${coverRelPath}\n---\n${prev}`;
+              content = `---\ncover: ${coverShortPath}\nbanner: ![[${coverShortPath}]]\n---\n${prev}`;
             }
           }
         } catch {
@@ -443,11 +501,43 @@ export default function PictureScreen() {
       return;
     }
     setSaving(true);
-    const { fileName, coverRelPath, dailyNoteName } = computeFilenames();
+    // Plan to save as WebP; may fall back to JPEG
+    let { fileName, coverShortPath, dailyNoteName } = computeFilenames("webp");
     try {
-      const imgData = await FileSystem.readAsStringAsync(imageUri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
+      // Convert to WebP (fallback to JPEG if WebP unsupported)
+      let convertedBase64: string | undefined;
+      let convertedMime: string = "image/webp";
+      let convertedExt: string = "webp";
+      try {
+        const manipulated = await ImageManipulator.manipulateAsync(
+          imageUri,
+          [],
+          {
+            compress: 0.8,
+            format: ImageManipulator.SaveFormat.WEBP,
+            base64: true,
+          }
+        );
+        convertedBase64 = manipulated.base64;
+      } catch (err) {
+        console.warn("WEBP conversion failed, falling back to JPEG", err);
+        const manipulated = await ImageManipulator.manipulateAsync(
+          imageUri,
+          [],
+          {
+            compress: 0.8,
+            format: ImageManipulator.SaveFormat.JPEG,
+            base64: true,
+          }
+        );
+        convertedBase64 = manipulated.base64;
+        convertedMime = "image/jpeg";
+        convertedExt = "jpg";
+        // Recompute filenames and paths for JPEG
+        ({ fileName, coverShortPath, dailyNoteName } = computeFilenames("jpg"));
+        setImageExt("jpg");
+      }
+      if (!convertedBase64) throw new Error("Failed to convert image");
 
       if (Platform.OS === "android") {
         if (!androidAttachmentsDirUri) {
@@ -457,6 +547,17 @@ export default function PictureScreen() {
             [
               { text: "Cancel", style: "cancel" },
               { text: "Pick Folder", onPress: pickAndroidAttachmentsDirectory },
+            ]
+          );
+          return;
+        }
+        if (!androidVaultRootDirUri) {
+          Alert.alert(
+            "Select Vault Root",
+            "Pick your Obsidian vault root folder once, so we can build vault-root paths.",
+            [
+              { text: "Cancel", style: "cancel" },
+              { text: "Pick Folder", onPress: pickAndroidVaultRootDirectory },
             ]
           );
           return;
@@ -485,31 +586,20 @@ export default function PictureScreen() {
           await FileSystem.StorageAccessFramework.createFileAsync(
             androidAttachmentsDirUri,
             fileName,
-            "image/jpeg"
+            convertedMime
           );
-        await FileSystem.writeAsStringAsync(targetUri, imgData, {
+        await FileSystem.writeAsStringAsync(targetUri, convertedBase64, {
           encoding: FileSystem.EncodingType.Base64,
         });
 
-        // Prefer showing the note-relative path for clarity if we can derive it
-        let displayPath = `${attachmentsSubfolder}/${fileName}`;
-        const a = androidAttachmentsDirUri
-          ? decodeSafDirPath(androidAttachmentsDirUri)
-          : null;
-        const d = androidDailyNotesDirUri
-          ? decodeSafDirPath(androidDailyNotesDirUri)
-          : null;
-        if (a && d) {
-          const rel = relativePath(d, a);
-          if (rel) displayPath = `${rel}/${fileName}`;
-        }
-        setLastSavedPath(displayPath);
+        // Show the short path used in YAML
+        setLastSavedPath(coverShortPath);
 
         // Try to update daily note YAML
         if (androidDailyNotesDirUri) {
           await ensureDailyNoteHasCoverAndroid(
             androidDailyNotesDirUri,
-            coverRelPath,
+            coverShortPath,
             `${dailyNoteName}.md`
           );
         }
@@ -523,7 +613,7 @@ export default function PictureScreen() {
       } else {
         // iOS: share/export and provide YAML snippet.
         const tmpPath = `${FileSystem.cacheDirectory}${fileName}`;
-        await FileSystem.writeAsStringAsync(tmpPath, imgData, {
+        await FileSystem.writeAsStringAsync(tmpPath, convertedBase64, {
           encoding: FileSystem.EncodingType.Base64,
         });
         if (await Sharing.isAvailableAsync()) {
@@ -606,6 +696,17 @@ export default function PictureScreen() {
               </Text>
               {Platform.OS === "android" && (
                 <>
+                  <Pressable
+                    onPress={pickAndroidVaultRootDirectory}
+                    className="bg-gray-700 py-2 px-3 rounded-lg mb-3"
+                  >
+                    <Text className="text-white text-center">
+                      Select Vault Root Folder (Android)
+                    </Text>
+                  </Pressable>
+                  <Text className="text-xs text-gray-500 dark:text-slate-400 mb-2">
+                    {androidVaultRootDirUri ?? "No vault root selected"}
+                  </Text>
                   <Pressable
                     onPress={pickAndroidAttachmentsDirectory}
                     className="bg-gray-700 py-2 px-3 rounded-lg mb-3"
@@ -742,17 +843,19 @@ export default function PictureScreen() {
                   onPress={() => {
                     const dateStr = formatDateWithPattern(noteDatePattern);
                     let file = `${dailyNotesFolder}/${dailyNotePrefix}${dateStr}${dailyNoteSuffix}.md`;
-                    if (
-                      Platform.OS === "android" &&
-                      androidAttachmentsDirUri &&
-                      androidDailyNotesDirUri
-                    ) {
-                      const a = decodeSafDirPath(androidAttachmentsDirUri);
+                    if (Platform.OS === "android" && androidDailyNotesDirUri) {
                       const d = decodeSafDirPath(androidDailyNotesDirUri);
-                      if (a && d) {
-                        const vr = vaultRelativePath(a, d);
-                        if (vr)
-                          file = `${vr.bRel}/${dailyNotePrefix}${dateStr}${dailyNoteSuffix}.md`;
+                      const v = androidVaultRootDirUri
+                        ? decodeSafDirPath(androidVaultRootDirUri)
+                        : null;
+                      if (d && v) {
+                        const vr = vaultRelativePath(v, d);
+                        if (vr) {
+                          const withinVault = vr.bRel;
+                          file = `${
+                            withinVault ? withinVault + "/" : ""
+                          }${dailyNotePrefix}${dateStr}${dailyNoteSuffix}.md`;
+                        }
                       }
                     }
                     const url = `obsidian://open?vault=${encodeURIComponent(
