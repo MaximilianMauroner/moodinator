@@ -285,7 +285,7 @@ export default function PictureScreen() {
 
   const yamlSnippet = useMemo(() => {
     const { coverShortPath } = computeFilenames();
-    return `cover: ${coverShortPath}\nbanner: ![[${coverShortPath}]]`;
+    return `cover: "[[${coverShortPath}]]"`;
   }, [computeFilenames]);
 
   const pickAndroidAttachmentsDirectory = useCallback(async () => {
@@ -361,7 +361,7 @@ export default function PictureScreen() {
     noteDatePattern,
   ]);
 
-  // Update (or create) the daily note file with YAML cover and banner lines; Android only via SAF.
+  // Update (or create) the daily note file with YAML cover; Android only via SAF.
   const ensureDailyNoteHasCoverAndroid = useCallback(
     async (
       dailyNotesDirUri: string,
@@ -387,7 +387,7 @@ export default function PictureScreen() {
           }
         }
 
-        let content = `---\ncover: ${coverPath}\nbanner: ![[${coverPath}]]\n---\n`;
+        let content = `---\ncover: "[[${coverPath}]]"\n---\n`;
         if (existingUri) {
           try {
             const prev = await FileSystem.readAsStringAsync(existingUri, {
@@ -398,17 +398,13 @@ export default function PictureScreen() {
             if (m) {
               const yaml = m[1];
               const rest = prev.slice(m[0].length);
-              // Remove any existing cover/banner lines to avoid duplicates, then prepend ours
-              const cleaned = yaml
-                .replace(/^\s*cover\s*:\s*.*$/m, "")
-                .replace(/^\s*banner\s*:\s*.*$/m, "")
-                .trim();
+              // Remove any existing cover lines to avoid duplicates, then prepend ours
+              const cleaned = yaml.replace(/^\s*cover\s*:\s*.*$/m, "").trim();
               const newYaml =
-                `cover: ${coverPath}\nbanner: ![[${coverPath}]]` +
-                (cleaned ? `\n${cleaned}` : "");
+                `cover: "[[${coverPath}]]"` + (cleaned ? `\n${cleaned}` : "");
               content = `---\n${newYaml}\n---\n${rest}`;
             } else {
-              content = `---\ncover: ${coverPath}\nbanner: ![[${coverPath}]]\n---\n${prev}`;
+              content = `---\ncover: "[[${coverPath}]]"\n---\n${prev}`;
             }
             await FileSystem.writeAsStringAsync(existingUri, content, {
               encoding: FileSystem.EncodingType.UTF8,
@@ -445,7 +441,7 @@ export default function PictureScreen() {
     setPreviewContent(null);
     try {
       const { coverShortPath, dailyNoteName } = computeFilenames();
-      let content = `---\ncover: ${coverShortPath}\nbanner: ![[${coverShortPath}]]\n---\n`;
+      let content = `---\ncover: "[[${coverShortPath}]]"\n---\n`;
       if (Platform.OS === "android" && androidDailyNotesDirUri) {
         try {
           const children =
@@ -473,16 +469,13 @@ export default function PictureScreen() {
             if (m) {
               const yaml = m[1];
               const rest = prev.slice(m[0].length);
-              const cleaned = yaml
-                .replace(/^\s*cover\s*:\s*.*$/m, "")
-                .replace(/^\s*banner\s*:\s*.*$/m, "")
-                .trim();
+              const cleaned = yaml.replace(/^\s*cover\s*:\s*.*$/m, "").trim();
               const newYaml =
-                `cover: ${coverShortPath}\nbanner: ![[${coverShortPath}]]` +
+                `cover: "[[${coverShortPath}]]"` +
                 (cleaned ? `\n${cleaned}` : "");
               content = `---\n${newYaml}\n---\n${rest}`;
             } else {
-              content = `---\ncover: ${coverShortPath}\nbanner: ![[${coverShortPath}]]\n---\n${prev}`;
+              content = `---\ncover: "[[${coverShortPath}]]"\n---\n${prev}`;
             }
           }
         } catch {
