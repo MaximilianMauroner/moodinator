@@ -213,9 +213,9 @@ export default function HomeScreen() {
 
   const onSwipeableWillOpen = useCallback(
     (direction: SwipeDirection, mood: MoodEntry) => {
-      if (direction === "right") {
+      if (direction === "left") {
         handleDeleteMood(mood);
-      } else if (direction === "left") {
+      } else if (direction === "right") {
         setSelectedMoodId(mood.id);
         setNoteText(mood.note || "");
         setModalVisible(true);
@@ -249,16 +249,6 @@ export default function HomeScreen() {
     ),
     [onSwipeableWillOpen, handleMoodItemLongPress]
   );
-
-  const toggleLabelsPreference = useCallback(async () => {
-    const newValue = !showDetailedLabels;
-    setShowDetailedLabels(newValue);
-    try {
-      await AsyncStorage.setItem(SHOW_LABELS_KEY, newValue.toString());
-    } catch (error) {
-      console.error("Failed to save label preference:", error);
-    }
-  }, [showDetailedLabels]);
 
   const loadShowLabelsPreference = useCallback(async () => {
     try {
