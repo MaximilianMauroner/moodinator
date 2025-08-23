@@ -92,6 +92,46 @@ const SETTINGS_KEYS = {
   dailyNoteDatePattern: "obsidianDailyNoteDatePattern",
 };
 
+// Frontmatter utilities (CRLF-safe) to preserve all keys and only replace 'cover'
+function updateFrontmatterCover(
+  prevContent: string,
+  coverPath: string
+): string {
+  // Normalize line endings only for matching while preserving original style
+  // Detect whether file uses CRLF to retain it in output
+  const usesCRLF = /\r\n/.test(prevContent);
+  const nl = usesCRLF ? "\r\n" : "\n";
+
+  // Match YAML frontmatter at file start with optional trailing newline
+  const yamlRegex = new RegExp(
+    `^---(?:\r?\n)([\u0000-\uFFFF]*?)(?:\r?\n)---(?:\r?\n)?`
+  );
+  const m = prevContent.match(yamlRegex);
+
+  if (m) {
+    const yamlBody = m[1];
+    const rest = prevContent.slice(m[0].length);
+
+    // Remove any existing 'cover:' key line only; keep everything else
+    // Handle leading spaces and any value format; multi-line values for other keys are preserved
+    const cleanedYaml = yamlBody
+      .split(/\r?\n/)
+      .filter((line) => !/^\s*cover\s*:/.test(line))
+      .join(nl)
+      .replace(/^(?:\s*\n)+|(?:\n\s*)+$/g, "");
+
+    const newYamlBody = [
+      `cover: "[[${coverPath}]]"`,
+      ...(cleanedYaml ? [cleanedYaml] : []),
+    ].join(nl);
+
+    return `---${nl}${newYamlBody}${nl}---${nl}${rest}`;
+  }
+
+  // No frontmatter: insert a new block on top
+  return `---${nl}cover: "[[${coverPath}]]"${nl}---${nl}${prevContent}`;
+}
+
 export default function PictureScreen() {
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -393,19 +433,7 @@ export default function PictureScreen() {
             const prev = await FileSystem.readAsStringAsync(existingUri, {
               encoding: FileSystem.EncodingType.UTF8,
             });
-            const yamlRegex = /^---\n([\s\S]*?)\n---\n?/;
-            const m = prev.match(yamlRegex);
-            if (m) {
-              const yaml = m[1];
-              const rest = prev.slice(m[0].length);
-              // Remove any existing cover lines to avoid duplicates, then prepend ours
-              const cleaned = yaml.replace(/^\s*cover\s*:\s*.*$/m, "").trim();
-              const newYaml =
-                `cover: "[[${coverPath}]]"` + (cleaned ? `\n${cleaned}` : "");
-              content = `---\n${newYaml}\n---\n${rest}`;
-            } else {
-              content = `---\ncover: "[[${coverPath}]]"\n---\n${prev}`;
-            }
+            content = updateFrontmatterCover(prev, coverPath);
             await FileSystem.writeAsStringAsync(existingUri, content, {
               encoding: FileSystem.EncodingType.UTF8,
             });
@@ -464,19 +492,7 @@ export default function PictureScreen() {
             const prev = await FileSystem.readAsStringAsync(existingUri, {
               encoding: FileSystem.EncodingType.UTF8,
             });
-            const yamlRegex = /^---\n([\s\S]*?)\n---\n?/;
-            const m = prev.match(yamlRegex);
-            if (m) {
-              const yaml = m[1];
-              const rest = prev.slice(m[0].length);
-              const cleaned = yaml.replace(/^\s*cover\s*:\s*.*$/m, "").trim();
-              const newYaml =
-                `cover: "[[${coverShortPath}]]"` +
-                (cleaned ? `\n${cleaned}` : "");
-              content = `---\n${newYaml}\n---\n${rest}`;
-            } else {
-              content = `---\ncover: "[[${coverShortPath}]]"\n---\n${prev}`;
-            }
+            content = updateFrontmatterCover(prev, coverShortPath);
           }
         } catch {
           // ignore, use base content
