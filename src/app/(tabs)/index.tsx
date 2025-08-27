@@ -5,6 +5,7 @@ import {
   SafeAreaView,
   RefreshControl,
   FlatList,
+  Alert,
 } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import {
@@ -151,19 +152,29 @@ export default function HomeScreen() {
   }, []);
 
   const handleAddNote = useCallback(async () => {
-    if (selectedMoodId !== null) {
-      const updatedMood = await updateMoodNote(selectedMoodId, noteText);
-      if (updatedMood) {
-        setMoods((prev) =>
-          prev.map((m) =>
-            m.id === updatedMood.id ? { ...m, note: noteText } : m
-          )
-        );
+    try {
+      if (selectedMoodId !== null) {
+        const updatedMood = await updateMoodNote(selectedMoodId, noteText);
+        if (updatedMood) {
+          setMoods((prev) =>
+            prev.map((m) =>
+              m.id === updatedMood.id ? { ...m, note: noteText } : m
+            )
+          );
+        } else {
+          Alert.alert("Error", "Failed to update note. Mood not found.");
+        }
       }
-    }
-    if (currentMoodPressed !== null) {
-      const newMood = await insertMood(currentMoodPressed, noteText);
-      setMoods((prev) => [newMood, ...prev]);
+      if (currentMoodPressed !== null) {
+        const newMood = await insertMood(currentMoodPressed, noteText);
+        setMoods((prev) => [newMood, ...prev]);
+      }
+    } catch (error) {
+      console.error("Error in handleAddNote:", error);
+      Alert.alert(
+        "Error",
+        "An error occurred while saving the note. Please try again."
+      );
     }
     setCurrentMoodPressed(null);
     setModalVisible(false);
