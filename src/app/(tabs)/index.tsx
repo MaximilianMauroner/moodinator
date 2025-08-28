@@ -15,8 +15,6 @@ import {
   updateMoodNote,
   insertMoodEntry,
   updateMoodTimestamp,
-  getCachedMoods,
-  isMoodsCacheWarm,
 } from "@db/db";
 import { DisplayMoodItem } from "@/components/DisplayMoodItem";
 import { NoteModal } from "@/components/NoteModal";
@@ -123,20 +121,8 @@ export default function HomeScreen() {
   }, [refreshMoods]);
 
   useEffect(() => {
-    // Hydrate from cache instantly if available, then revalidate
-    if (isMoodsCacheWarm()) {
-      const cached = getCachedMoods();
-      if (cached && cached.length > 0) {
-        setMoods(cached);
-        setLastTracked(new Date(cached[0].timestamp));
-        setLoading(false);
-        // Soft refresh
-        refreshMoods();
-        return;
-      }
-    }
     fetchMoods();
-  }, [fetchMoods, refreshMoods]);
+  }, []);
 
   const handleMoodPress = useCallback(async (mood: number) => {
     const newMood = await insertMood(mood);

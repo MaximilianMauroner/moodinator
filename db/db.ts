@@ -2,36 +2,6 @@ import * as SQLite from 'expo-sqlite';
 import type { MoodEntry } from './types';
 
 let db: SQLite.SQLiteDatabase | null = null;
-
-// Simple in-memory cache for fast subsequent reads within the app session
-let cachedMoods: MoodEntry[] | null = null;
-let cachedCount: number | null = null;
-let fetchAllMoodsPromise: Promise<MoodEntry[]> | null = null;
-
-function invalidateMoodsCache() {
-    cachedMoods = null;
-    cachedCount = null;
-}
-
-function setMoodsCache(moods: MoodEntry[]) {
-    cachedMoods = moods;
-    cachedCount = moods.length;
-}
-
-export function isMoodsCacheWarm(): boolean {
-    return Array.isArray(cachedMoods);
-}
-
-export function getCachedMoodCount(): number | null {
-    if (cachedCount != null) return cachedCount;
-    if (cachedMoods) return cachedMoods.length;
-    return null;
-}
-
-export function getCachedMoods(): MoodEntry[] | null {
-    return cachedMoods;
-}
-
 /**
  * Opens the database if not already open.
  */
@@ -72,8 +42,6 @@ export async function insertMood(mood: number, note?: string): Promise<MoodEntry
         new Date().getTime() // Use current timestamp
     );
     const inserted = await db.getFirstAsync('SELECT * FROM moods WHERE id = ?;', result.lastInsertRowId);
-    // Data changed -> invalidate cache
-    invalidateMoodsCache();
     return inserted as MoodEntry;
 }
 
@@ -91,8 +59,6 @@ export async function insertMoodEntry(entry: MoodEntry): Promise<MoodEntry> {
         entry.timestamp
     );
     const inserted = await db.getFirstAsync('SELECT * FROM moods WHERE id = ?;', result.lastInsertRowId);
-    // Data changed -> invalidate cache
-    invalidateMoodsCache();
     return inserted as MoodEntry;
 }
 
@@ -130,8 +96,6 @@ export async function updateMoodNote(id: number, note: string): Promise<MoodEntr
         id
     );
     const updated = await db.getFirstAsync('SELECT * FROM moods WHERE id = ?;', id);
-    // Data changed -> invalidate cache
-    invalidateMoodsCache();
     return updated as MoodEntry | undefined;
 }
 
@@ -149,8 +113,6 @@ export async function updateMoodTimestamp(id: number, timestamp: number): Promis
         id
     );
     const updated = await db.getFirstAsync('SELECT * FROM moods WHERE id = ?;', id);
-    // Data changed -> invalidate cache
-    invalidateMoodsCache();
     return updated as MoodEntry | undefined;
 }
 
@@ -160,22 +122,8 @@ export async function updateMoodTimestamp(id: number, timestamp: number): Promis
  */
 export async function getAllMoods(): Promise<MoodEntry[]> {
     const db = await getDb();
-    if (cachedMoods) {
-        return cachedMoods;
-    }
-    if (!fetchAllMoodsPromise) {
-        fetchAllMoodsPromise = (async () => {
-            const rows = await db.getAllAsync('SELECT * FROM moods ORDER BY timestamp DESC;');
-            setMoodsCache(rows as MoodEntry[]);
-            return rows as MoodEntry[];
-        })();
-    }
-    try {
-        return await fetchAllMoodsPromise;
-    } finally {
-        // Clear pending promise to allow future refreshes
-        fetchAllMoodsPromise = null;
-    }
+    const rows = await db.getAllAsync('SELECT * FROM moods ORDER BY timestamp DESC;');
+    return rows as MoodEntry[];
 }
 
 /**
@@ -186,8 +134,6 @@ export async function getAllMoods(): Promise<MoodEntry[]> {
 export async function deleteMood(id: number) {
     const db = await getDb();
     const res = await db.runAsync('DELETE FROM moods WHERE id = ?;', id);
-    // Data changed -> invalidate cache
-    invalidateMoodsCache();
     return res;
 }
 
@@ -242,8 +188,6 @@ export async function seedMoods() {
             totalEntries++;
         }
     }
-    // Data changed -> invalidate cache
-    invalidateMoodsCache();
     return totalEntries;
 }
 
@@ -254,8 +198,6 @@ export async function clearMoods() {
     if (!__DEV__) return;
     const db = await getDb();
     await db.runAsync('DELETE FROM moods;');
-    // Data changed -> invalidate cache
-    invalidateMoodsCache();
 }
 
 // Ensure the moods table exists as soon as this module is loaded
@@ -268,11 +210,8 @@ void createMoodTable();
 export async function getMoodCount(): Promise<number> {
     const db = await getDb();
     // Prefer cached count when available
-    if (cachedCount != null) return cachedCount;
-    if (cachedMoods) return cachedMoods.length;
     const result = await db.getFirstAsync('SELECT COUNT(*) as count FROM moods');
     const count = (result as any)?.count || 0;
-    cachedCount = count;
     return count;
 }
 
@@ -303,8 +242,6 @@ export async function importMoods(jsonData: string): Promise<number> {
                 mood.timestamp
             );
         }
-        // Data changed -> invalidate cache
-        invalidateMoodsCache();
         return moods.length;
     } catch (error) {
         console.error('Error importing moods:', error);
@@ -337,8 +274,6 @@ export async function seedMoodsFromFile(): Promise<{ source: 'file' | 'random'; 
                     );
                 }
 
-                // Data changed -> invalidate cache
-                invalidateMoodsCache();
                 return { source: 'file', count: jsonData.length };
             }
         } catch (error) {
