@@ -13,13 +13,15 @@ const MOOD_REMINDER_TAG = 'mood-reminder';
 
 Notifications.setNotificationHandler({
     handleNotification: async () => ({
-        shouldShowAlert: true,
         shouldPlaySound: false,
         shouldSetBadge: false,
+        // Use the newer flags instead of the deprecated shouldShowAlert
+        shouldShowBanner: true,
+        shouldShowList: true,
     }),
 });
 
-async function registerForPushNotificationsAsync() {
+async function registerForPushNotificationsAsync(): Promise<boolean> {
     if (Platform.OS === 'android') {
         await Notifications.setNotificationChannelAsync('default', {
             name: 'default',
@@ -37,8 +39,10 @@ async function registerForPushNotificationsAsync() {
     }
     if (finalStatus !== 'granted') {
         console.warn('Notifications permission not granted');
-        return;
+        return false;
     }
+
+    return true;
 }
 
 // Helper to cancel any stray mood reminder notifications (from older versions)
@@ -60,6 +64,12 @@ async function cancelAllMoodReminders() {
 
 // Ensures only a single repeating daily reminder is scheduled
 export async function scheduleMoodReminder(customHour?: number, customMinute?: number) {
+    // Ensure we have permission (especially when called from settings)
+    const granted = await registerForPushNotificationsAsync();
+    if (!granted) {
+        return;
+    }
+
     // Respect user setting
     const notificationsEnabled = await AsyncStorage.getItem(NOTIFICATIONS_ENABLED_KEY);
     if (notificationsEnabled === 'false') {
@@ -94,19 +104,21 @@ export async function scheduleMoodReminder(customHour?: number, customMinute?: n
         }
     }
 
-    // Schedule a daily repeating notification at the chosen time
+    // Schedule a daily repeating notification at the chosen time.
+    // Use the calendar trigger shape supported by expo-notifications: { hour, minute, repeats: true }
+    // Add channelId on Android so the scheduled notification is delivered on that channel.
+    const trigger: any = { hour, minute, second: 0, repeats: true };
+    if (Platform.OS === 'android') {
+        trigger.channelId = 'default';
+    }
+
     const id = await Notifications.scheduleNotificationAsync({
         content: {
             title: MOOD_REMINDER_TITLE,
             body: "Don't forget to log your mood for today!",
             data: { type: MOOD_REMINDER_TAG },
         },
-        trigger: {
-            type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
-            repeats: true,
-            hour,
-            minute,
-        },
+        trigger,
     });
 
     await AsyncStorage.setItem(NOTIFICATION_SCHEDULED_ID_KEY, id);
@@ -129,19 +141,19 @@ export async function cancelMoodReminder() {
 
 export function useNotifications() {
     useEffect(() => {
-        registerForPushNotificationsAsync();
+        const init = async () => {
+            const granted = await registerForPushNotificationsAsync();
 
-        // (Re)schedule on app start if enabled
-        const checkAndSchedule = async () => {
+            // (Re)schedule on app start if enabled and permissions granted
             const notificationsEnabled = await AsyncStorage.getItem(NOTIFICATIONS_ENABLED_KEY);
-            if (notificationsEnabled !== 'false') {
+            if (notificationsEnabled !== 'false' && granted) {
                 await scheduleMoodReminder();
-            } else {
+            } else if (notificationsEnabled === 'false') {
                 await cancelMoodReminder();
             }
         };
 
-        checkAndSchedule();
+        init();
 
         const subscription = Notifications.addNotificationResponseReceivedListener(response => {
             // Handle notification response if needed
