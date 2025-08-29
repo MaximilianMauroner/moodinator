@@ -139,34 +139,41 @@ export default function HomeScreen() {
 
   const handleAddNote = useCallback(async () => {
     try {
+      const trimmed = noteText.trim();
+
       if (selectedMoodId !== null) {
-        const updatedMood = await updateMoodNote(selectedMoodId, noteText);
+        // Edit an existing mood's note
+        const updatedMood = await updateMoodNote(selectedMoodId, trimmed);
         if (updatedMood) {
           setMoods((prev) =>
             prev.map((m) =>
-              m.id === updatedMood.id ? { ...m, note: noteText } : m
+              m.id === updatedMood.id ? { ...m, note: updatedMood.note } : m
             )
           );
         } else {
           Alert.alert("Error", "Failed to update note. Mood not found.");
+          console.error("Failed to update note. Mood not found.");
+          return;
         }
-      }
-      if (currentMoodPressed !== null) {
-        const newMood = await insertMood(currentMoodPressed, noteText);
+      } else if (currentMoodPressed !== null) {
+        // Create a new mood with a note
+        const newMood = await insertMood(currentMoodPressed, trimmed);
         setMoods((prev) => [newMood, ...prev]);
+        // keep "Last tracked" accurate for this path as well
+        setLastTracked(new Date(newMood.timestamp ?? Date.now()));
+      } else {
+        console.warn("handleAddNote called with no target mood");
       }
-    } catch (error) {
-      console.error("Error in handleAddNote:", error);
-      Alert.alert(
-        "Error",
-        "An error occurred while saving the note. Please try again."
-      );
+    } catch (e) {
+      console.error("Failed to save note:", e);
+      Alert.alert("Error", "Failed to save note.");
+    } finally {
+      setCurrentMoodPressed(null);
+      setSelectedMoodId(null);
+      setNoteText("");
+      setModalVisible(false);
     }
-    setCurrentMoodPressed(null);
-    setModalVisible(false);
-    setNoteText("");
-    setSelectedMoodId(null);
-  }, [selectedMoodId, noteText, currentMoodPressed]);
+  }, [selectedMoodId, currentMoodPressed, noteText]);
 
   const handleDeleteMood = useCallback(async (mood: MoodEntry) => {
     await deleteMood(mood.id);
