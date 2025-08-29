@@ -7,7 +7,10 @@ let db: SQLite.SQLiteDatabase | null = null;
  */
 async function getDb(): Promise<SQLite.SQLiteDatabase> {
     if (!db) {
-        db = await SQLite.openDatabaseAsync('moodinator.db');
+        db = await SQLite.openDatabaseAsync('moodinator.db', {
+            useNewConnection: true,
+            finalizeUnusedStatementsBeforeClosing: true,
+        });
     }
     return db;
 }

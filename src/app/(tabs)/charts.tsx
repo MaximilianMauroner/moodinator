@@ -11,13 +11,13 @@ import type { MoodEntry } from "@db/types";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import PagerView from "react-native-pager-view";
-
-// Use inline requires for lazy loading - these will only be loaded when needed
-let OverviewTab: any = null;
-let WeeklyTab: any = null;
-let DailyTab: any = null;
-let RawDataTab: any = null;
-let getAllMoods: any = null;
+import { getAllMoods } from "@db/db";
+import {
+  DailyTab,
+  OverviewTab,
+  RawDataTab,
+  WeeklyTab,
+} from "@/components/charts";
 
 type TabType = "overview" | "weekly" | "daily" | "raw";
 
@@ -59,35 +59,10 @@ export default function ChartsScreen() {
     }
   }, []);
 
-  // Load chart components lazily when needed
-  const loadChartComponents = useCallback(() => {
-    if (!componentsLoaded) {
-      try {
-        const charts = require("@/components/charts");
-        OverviewTab = charts.OverviewTab;
-        WeeklyTab = charts.WeeklyTab;
-        DailyTab = charts.DailyTab;
-        RawDataTab = charts.RawDataTab;
-
-        // Only set componentsLoaded if all components are successfully loaded
-        if (OverviewTab && WeeklyTab && DailyTab && RawDataTab) {
-          setComponentsLoaded(true);
-        } else {
-          console.error("Some chart components failed to load");
-        }
-      } catch (error) {
-        console.error("Failed to load chart components:", error);
-      }
-    }
-  }, [componentsLoaded]);
-
   // Load full mood data in background
   const loadFullMoodData = useCallback(async () => {
     try {
-      // Use inline require to load getAllMoods only when needed
-      if (!getAllMoods) {
-        getAllMoods = require("@db/db").getAllMoods;
-      }
+      setLoading(true);
       const allMoods = await getAllMoods();
       setMoods(allMoods);
       setMoodCount(allMoods.length);
@@ -96,63 +71,10 @@ export default function ChartsScreen() {
     } catch (error) {
       console.error("Failed to load mood data:", error);
       setRefreshing(false);
+    } finally {
+      setLoading(false);
     }
   }, []);
-
-  // Fast initial load - just get count first, prefer warm cache
-  const getInitialMoodCount = useCallback(async () => {
-    try {
-      // Use inline require to defer loading the db module
-      const {
-        getMoodCount: dbGetMoodCount,
-        getAllMoods: dbGetAllMoods,
-        getCachedMoodCount,
-        isMoodsCacheWarm,
-        getCachedMoods,
-      } = require("@db/db");
-
-      // If cache is warm, hydrate from it immediately for a snappy UI
-      const cachedCount = getCachedMoodCount?.();
-      const cacheWarm = isMoodsCacheWarm?.();
-      if (cacheWarm) {
-        const cachedMoodsSync: MoodEntry[] | null = getCachedMoods?.() ?? null;
-        if (cachedMoodsSync && cachedMoodsSync.length > 0) {
-          setMoods(cachedMoodsSync);
-          setMoodCount(cachedMoodsSync.length);
-        } else {
-          const cachedMoodsAsync: MoodEntry[] = await dbGetAllMoods();
-          setMoods(cachedMoodsAsync);
-          setMoodCount(cachedMoodsAsync.length);
-        }
-        setDataLoaded(true);
-        setLoading(false);
-        // ensure components are ready soon
-        setTimeout(() => loadChartComponents(), 0);
-        // Revalidate in background
-        setTimeout(() => {
-          loadFullMoodData();
-        }, 100);
-        return;
-      }
-
-      // Otherwise query the count first (fast path), then lazily fetch all
-      const count = await dbGetMoodCount();
-      setMoodCount(count);
-      setLoading(false);
-
-      if (count > 0) {
-        setTimeout(() => {
-          loadChartComponents();
-          setTimeout(() => {
-            loadFullMoodData();
-          }, 150);
-        }, 50);
-      }
-    } catch (error) {
-      console.error("Failed to get mood count:", error);
-      setLoading(false);
-    }
-  }, [loadChartComponents, loadFullMoodData]);
 
   const getMoodCount = useCallback(async () => {
     setRefreshing(true);
@@ -170,13 +92,8 @@ export default function ChartsScreen() {
       setActiveTab(tabId);
       pagerRef.current?.setPage(tabIndex);
       scrollToActiveTab(tabIndex);
-
-      // Load components when user first interacts with tabs
-      if (!componentsLoaded) {
-        loadChartComponents();
-      }
     },
-    [componentsLoaded, loadChartComponents, scrollToActiveTab]
+    [componentsLoaded, scrollToActiveTab]
   );
 
   const handlePageSelected = useCallback(
@@ -192,8 +109,8 @@ export default function ChartsScreen() {
   );
 
   useEffect(() => {
-    getInitialMoodCount();
-  }, [getInitialMoodCount]);
+    getMoodCount();
+  }, [getMoodCount]);
 
   // Scroll to active tab when components are loaded
   useEffect(() => {
@@ -290,89 +207,75 @@ export default function ChartsScreen() {
             </Text>
           </View>
         ) : moodCount > 0 ? (
-          componentsLoaded &&
-          OverviewTab &&
-          WeeklyTab &&
-          DailyTab &&
-          RawDataTab &&
-          moods.length > 0 ? (
-            <PagerView
-              ref={pagerRef}
-              style={{ flex: 1 }}
-              initialPage={getCurrentTabIndex()}
-              onPageSelected={handlePageSelected}
-              scrollEnabled={true}
-              overScrollMode="never"
-              overdrag={false}
-              orientation="horizontal"
-              pageMargin={0}
-              keyboardDismissMode="on-drag"
-            >
-              <View key="overview" style={{ flex: 1 }} collapsable={false}>
-                {dataLoaded && OverviewTab ? (
-                  <OverviewTab moods={moods} onRefresh={onRefresh} />
-                ) : (
-                  <View className="flex-1 justify-center items-center">
-                    <ActivityIndicator size="large" color="#3B82F6" />
-                    <Text className="text-gray-500 dark:text-slate-400 mt-4">
-                      {!dataLoaded
-                        ? "Loading chart data..."
-                        : "Loading components..."}
-                    </Text>
-                  </View>
-                )}
-              </View>
-              <View key="weekly" style={{ flex: 1 }} collapsable={false}>
-                {dataLoaded && WeeklyTab ? (
-                  <WeeklyTab moods={moods} onRefresh={onRefresh} />
-                ) : (
-                  <View className="flex-1 justify-center items-center">
-                    <ActivityIndicator size="large" color="#3B82F6" />
-                    <Text className="text-gray-500 dark:text-slate-400 mt-4">
-                      {!dataLoaded
-                        ? "Loading chart data..."
-                        : "Loading components..."}
-                    </Text>
-                  </View>
-                )}
-              </View>
-              <View key="daily" style={{ flex: 1 }} collapsable={false}>
-                {dataLoaded && DailyTab ? (
-                  <DailyTab moods={moods} onRefresh={onRefresh} />
-                ) : (
-                  <View className="flex-1 justify-center items-center">
-                    <ActivityIndicator size="large" color="#3B82F6" />
-                    <Text className="text-gray-500 dark:text-slate-400 mt-4">
-                      {!dataLoaded
-                        ? "Loading chart data..."
-                        : "Loading components..."}
-                    </Text>
-                  </View>
-                )}
-              </View>
-              <View key="raw" style={{ flex: 1 }} collapsable={false}>
-                {dataLoaded && RawDataTab ? (
-                  <RawDataTab moods={moods} onRefresh={onRefresh} />
-                ) : (
-                  <View className="flex-1 justify-center items-center">
-                    <ActivityIndicator size="large" color="#3B82F6" />
-                    <Text className="text-gray-500 dark:text-slate-400 mt-4">
-                      {!dataLoaded
-                        ? "Loading chart data..."
-                        : "Loading components..."}
-                    </Text>
-                  </View>
-                )}
-              </View>
-            </PagerView>
-          ) : (
-            <View className="flex-1 justify-center items-center p-8 mt-20">
-              <ActivityIndicator size="large" color="#3B82F6" />
-              <Text className="text-gray-500 dark:text-slate-400 text-center text-lg font-semibold mt-4">
-                Loading chart components...
-              </Text>
+          <PagerView
+            ref={pagerRef}
+            style={{ flex: 1 }}
+            initialPage={getCurrentTabIndex()}
+            onPageSelected={handlePageSelected}
+            scrollEnabled={true}
+            overScrollMode="never"
+            overdrag={false}
+            orientation="horizontal"
+            pageMargin={0}
+            keyboardDismissMode="on-drag"
+          >
+            <View key="overview" style={{ flex: 1 }} collapsable={false}>
+              {dataLoaded ? (
+                <OverviewTab moods={moods} onRefresh={onRefresh} />
+              ) : (
+                <View className="flex-1 justify-center items-center">
+                  <ActivityIndicator size="large" color="#3B82F6" />
+                  <Text className="text-gray-500 dark:text-slate-400 mt-4">
+                    {!dataLoaded
+                      ? "Loading chart data..."
+                      : "Loading components..."}
+                  </Text>
+                </View>
+              )}
             </View>
-          )
+            <View key="weekly" style={{ flex: 1 }} collapsable={false}>
+              {dataLoaded ? (
+                <WeeklyTab moods={moods} onRefresh={onRefresh} />
+              ) : (
+                <View className="flex-1 justify-center items-center">
+                  <ActivityIndicator size="large" color="#3B82F6" />
+                  <Text className="text-gray-500 dark:text-slate-400 mt-4">
+                    {!dataLoaded
+                      ? "Loading chart data..."
+                      : "Loading components..."}
+                  </Text>
+                </View>
+              )}
+            </View>
+            <View key="daily" style={{ flex: 1 }} collapsable={false}>
+              {dataLoaded ? (
+                <DailyTab moods={moods} onRefresh={onRefresh} />
+              ) : (
+                <View className="flex-1 justify-center items-center">
+                  <ActivityIndicator size="large" color="#3B82F6" />
+                  <Text className="text-gray-500 dark:text-slate-400 mt-4">
+                    {!dataLoaded
+                      ? "Loading chart data..."
+                      : "Loading components..."}
+                  </Text>
+                </View>
+              )}
+            </View>
+            <View key="raw" style={{ flex: 1 }} collapsable={false}>
+              {dataLoaded ? (
+                <RawDataTab moods={moods} onRefresh={onRefresh} />
+              ) : (
+                <View className="flex-1 justify-center items-center">
+                  <ActivityIndicator size="large" color="#3B82F6" />
+                  <Text className="text-gray-500 dark:text-slate-400 mt-4">
+                    {!dataLoaded
+                      ? "Loading chart data..."
+                      : "Loading components..."}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </PagerView>
         ) : !loading ? (
           <View className="flex-1 justify-center items-center p-8 mt-20">
             <Text className="text-6xl mb-4">📊</Text>
