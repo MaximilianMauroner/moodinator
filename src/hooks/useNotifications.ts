@@ -12,12 +12,14 @@ const MOOD_REMINDER_TITLE = '👋 How are you feeling?';
 const MOOD_REMINDER_TAG = 'mood-reminder';
 
 Notifications.setNotificationHandler({
+    handleError(notificationId, error) {
+        console.error(`[notifications] Error handling notification ${notificationId}:`, error);
+    },
     handleNotification: async () => ({
         shouldPlaySound: false,
         shouldSetBadge: false,
-        // Use the newer flags instead of the deprecated shouldShowAlert
         shouldShowBanner: true,
-        shouldShowList: true,
+        shouldShowList: true
     }),
 });
 
@@ -63,7 +65,7 @@ async function cancelAllMoodReminders() {
 }
 
 // Ensures only a single repeating daily reminder is scheduled
-export async function scheduleMoodReminder(customHour?: number, customMinute?: number) {
+async function scheduleMoodReminder(customHour?: number, customMinute?: number) {
     // Ensure we have permission (especially when called from settings)
     const granted = await registerForPushNotificationsAsync();
     if (!granted) {
@@ -104,13 +106,10 @@ export async function scheduleMoodReminder(customHour?: number, customMinute?: n
         }
     }
 
-    // Schedule a daily repeating notification at the chosen time.
-    // Use the calendar trigger shape supported by expo-notifications: { hour, minute, repeats: true }
-    // Add channelId on Android so the scheduled notification is delivered on that channel.
-    const trigger: any = { hour, minute, second: 0, repeats: true };
-    if (Platform.OS === 'android') {
-        trigger.channelId = 'default';
-    }
+    const now = new Date();
+    const next = new Date(now);
+    next.setHours(hour, minute, 0, 0);
+    if (next <= now) next.setDate(next.getDate() + 1);
 
     const id = await Notifications.scheduleNotificationAsync({
         content: {
@@ -118,7 +117,12 @@ export async function scheduleMoodReminder(customHour?: number, customMinute?: n
             body: "Don't forget to log your mood for today!",
             data: { type: MOOD_REMINDER_TAG },
         },
-        trigger,
+        trigger: {
+            channelId: "default",
+            hour,
+            minute,
+            type: Notifications.SchedulableTriggerInputTypes.DAILY
+        },
     });
 
     await AsyncStorage.setItem(NOTIFICATION_SCHEDULED_ID_KEY, id);
@@ -139,22 +143,27 @@ export async function cancelMoodReminder() {
     await cancelAllMoodReminders();
 }
 
+async function isNotificationScheduled() {
+    const existingId = await AsyncStorage.getItem(NOTIFICATION_SCHEDULED_ID_KEY);
+    const notification = await Notifications.getAllScheduledNotificationsAsync()
+    return existingId !== null || notification.length > 0;
+}
+
 export function useNotifications() {
     useEffect(() => {
         const init = async () => {
             const granted = await registerForPushNotificationsAsync();
 
-            // (Re)schedule on app start if enabled and permissions granted
-            const notificationsEnabled = await AsyncStorage.getItem(NOTIFICATIONS_ENABLED_KEY);
-            if (notificationsEnabled !== 'false' && granted) {
-                await scheduleMoodReminder();
-            } else if (notificationsEnabled === 'false') {
-                await cancelMoodReminder();
+
+            const scheduled = await isNotificationScheduled();
+            if (granted) {
+                if (!scheduled) {
+                    await scheduleMoodReminder();
+                }
             }
         };
 
         init();
-
         const subscription = Notifications.addNotificationResponseReceivedListener(response => {
             // Handle notification response if needed
         });

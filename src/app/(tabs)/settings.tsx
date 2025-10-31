@@ -22,6 +22,7 @@ import * as Notifications from "expo-notifications";
 import {
   getNotificationSettings,
   saveNotificationSettings,
+  useNotifications,
 } from "@/hooks/useNotifications";
 import { NotificationTimePickerModal } from "@/components/NotificationTimePickerModal";
 
@@ -45,6 +46,7 @@ export default function SettingsScreen() {
   const [notificationHour, setNotificationHour] = useState(20);
   const [notificationMinute, setNotificationMinute] = useState(0);
   const [showTimePickerModal, setShowTimePickerModal] = useState(false);
+  useNotifications();
 
   // Load saved preferences on component mount
   useEffect(() => {
