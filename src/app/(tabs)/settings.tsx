@@ -7,7 +7,6 @@ import {
   Alert,
   ScrollView,
   Switch,
-  TextInput,
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system";
@@ -26,15 +25,13 @@ import {
   useNotifications,
 } from "@/hooks/useNotifications";
 import { NotificationTimePickerModal } from "@/components/NotificationTimePickerModal";
-import { DEFAULT_EMOTIONS, getEmotions, saveEmotions } from "@/hooks/useEmotions";
-
 // Storage key for show labels preference
 const SHOW_LABELS_KEY = "showLabelsPreference";
 const DEV_OPTIONS_KEY = "devOptionsEnabled";
 
 export default function SettingsScreen() {
   const [loading, setLoading] = useState<
-    "export" | "import" | "seed" | "clear" | "emotions" | null
+    "export" | "import" | "seed" | "clear" | null
   >(null);
   const [showDetailedLabels, setShowDetailedLabels] = useState(false);
   const [devOptionsEnabled, setDevOptionsEnabled] = useState(false);
@@ -50,18 +47,11 @@ export default function SettingsScreen() {
   const [showTimePickerModal, setShowTimePickerModal] = useState(false);
   useNotifications();
 
-  // Emotions state
-  const [emotionsInput, setEmotionsInput] = useState("");
-
   // Load saved preferences on component mount
   useEffect(() => {
     loadShowLabelsPreference();
     loadNotificationSettings();
     loadDevOptionsPreference();
-    (async () => {
-      const list = await getEmotions();
-      setEmotionsInput(list.join(", "));
-    })();
   }, []);
 
   // Load notification settings
@@ -118,27 +108,6 @@ export default function SettingsScreen() {
     } catch (error) {
       console.error("Failed to save dev options preference:", error);
     }
-  };
-
-  const handleSaveEmotions = async () => {
-    try {
-      setLoading("emotions");
-      const parsed = emotionsInput
-        .split(",")
-        .map((e) => e.trim())
-        .filter((e) => e.length > 0);
-      await saveEmotions(parsed.length ? parsed : DEFAULT_EMOTIONS);
-      Alert.alert("Saved", "Emotions list updated.");
-    } catch (e) {
-      Alert.alert("Error", "Failed to save emotions list.");
-    } finally {
-      setLoading(null);
-    }
-  };
-
-  const handleResetEmotions = async () => {
-    setEmotionsInput(DEFAULT_EMOTIONS.join(", "));
-    await saveEmotions(DEFAULT_EMOTIONS);
   };
 
   const handleExport = async () => {
@@ -419,44 +388,6 @@ export default function SettingsScreen() {
                     onChange={handleToggleLabels}
                     testID="toggle-detailed-labels"
                   />
-
-                  <View className="border-t border-gray-200 dark:border-slate-800 my-4" />
-
-                  {/* Emotions editor */}
-                  <View>
-                    <Text className="text-base font-medium text-gray-800 dark:text-slate-100 mb-1">
-                      Emotions List
-                    </Text>
-                    <Text className="text-sm text-gray-600 dark:text-slate-300 mb-2">
-                      Comma-separated. Used when long-pressing a mood to pick an emotion.
-                    </Text>
-                    <TextInput
-                      className="border border-gray-300 dark:border-slate-700 rounded-lg p-3 bg-gray-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                      multiline
-                      value={emotionsInput}
-                      onChangeText={setEmotionsInput}
-                      placeholder={DEFAULT_EMOTIONS.join(", ")}
-                      placeholderTextColor="#94a3b8"
-                    />
-                    <View className="flex-row mt-2">
-                      <Pressable
-                        onPress={handleSaveEmotions}
-                        className="bg-blue-600 py-2 px-4 rounded-lg mr-2"
-                      >
-                        {loading === "emotions" ? (
-                          <ActivityIndicator color="#fff" />
-                        ) : (
-                          <Text className="text-white font-semibold text-center">Save</Text>
-                        )}
-                      </Pressable>
-                      <Pressable
-                        onPress={handleResetEmotions}
-                        className="bg-gray-600 py-2 px-4 rounded-lg"
-                      >
-                        <Text className="text-white font-semibold text-center">Reset</Text>
-                      </Pressable>
-                    </View>
-                  </View>
 
                   <View className="border-t border-gray-200 dark:border-slate-800 my-4" />
 
