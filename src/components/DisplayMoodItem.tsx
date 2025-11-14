@@ -92,11 +92,6 @@ export const DisplayMoodItem = React.memo(
                   {mood.mood}
                 </Text>
               </View>
-              {mood.emotion ? (
-                <Text className="text-xs text-slate-700 dark:text-slate-300 mb-1">
-                  Emotion: {mood.emotion}
-                </Text>
-              ) : null}
               {mood.note ? (
                 <Text
                   className="text-sm text-slate-700 dark:text-slate-300"

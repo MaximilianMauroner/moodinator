@@ -1,60 +1,57 @@
-import * as SQLite from 'expo-sqlite';
-import type { MoodEntry } from './types';
+import * as SQLite from "expo-sqlite";
+import type { MoodEntry } from "./types";
 
 let db: SQLite.SQLiteDatabase | null = null;
 /**
  * Opens the database if not already open.
  */
 async function getDb(): Promise<SQLite.SQLiteDatabase> {
-    if (!db) {
-        db = await SQLite.openDatabaseAsync('moodinator.db', {
-            useNewConnection: true,
-            finalizeUnusedStatementsBeforeClosing: true,
-        });
-    }
-    return db;
+  if (!db) {
+    db = await SQLite.openDatabaseAsync("moodinator.db", {
+      useNewConnection: true,
+      finalizeUnusedStatementsBeforeClosing: true,
+    });
+  }
+  return db;
 }
 
 /**
  * Creates the 'moods' table if it does not exist.
  */
 export async function createMoodTable() {
-    const db = await getDb();
-    await db.execAsync(`
+  const db = await getDb();
+  await db.execAsync(`
         CREATE TABLE IF NOT EXISTS moods (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             mood INTEGER NOT NULL,
-            emotion TEXT,
             note TEXT,
             timestamp DATETIME
         );
     `);
-    // Add emotion column if it doesn't exist (migration for existing databases)
-    await db.execAsync(`
-        ALTER TABLE moods ADD COLUMN emotion TEXT;
-    `).catch(() => {
-        // Column already exists, ignore error
-    });
 }
 
 /**
  * Inserts a new mood entry into the database.
  * @param mood - Mood value (integer)
  * @param note - Optional note
- * @param emotion - Optional emotion label
  * @returns Promise with the SQLite result
  */
-export async function insertMood(mood: number, note?: string, emotion?: string): Promise<MoodEntry> {
-    const db = await getDb();
-    const result = await db.runAsync(
-        'INSERT INTO moods (mood, emotion, note, timestamp) VALUES (?, ?, ?, ?);',
-        mood,
-        emotion ?? null,
-        note ?? null,
-        new Date().getTime() // Use current timestamp
-    );
-    const inserted = await db.getFirstAsync('SELECT * FROM moods WHERE id = ?;', result.lastInsertRowId);
-    return inserted as MoodEntry;
+export async function insertMood(
+  mood: number,
+  note?: string
+): Promise<MoodEntry> {
+  const db = await getDb();
+  const result = await db.runAsync(
+    "INSERT INTO moods (mood, note, timestamp) VALUES (?, ?, ?);",
+    mood,
+    note ?? null,
+    new Date().getTime() // Use current timestamp
+  );
+  const inserted = await db.getFirstAsync(
+    "SELECT * FROM moods WHERE id = ?;",
+    result.lastInsertRowId
+  );
+  return inserted as MoodEntry;
 }
 
 /**
@@ -63,16 +60,18 @@ export async function insertMood(mood: number, note?: string, emotion?: string):
  * @returns Promise with the inserted MoodEntry
  */
 export async function insertMoodEntry(entry: MoodEntry): Promise<MoodEntry> {
-    const db = await getDb();
-    const result = await db.runAsync(
-        'INSERT INTO moods (mood, emotion, note, timestamp) VALUES (?, ?, ?, ?);',
-        entry.mood,
-        entry.emotion ?? null,
-        entry.note ?? null,
-        entry.timestamp
-    );
-    const inserted = await db.getFirstAsync('SELECT * FROM moods WHERE id = ?;', result.lastInsertRowId);
-    return inserted as MoodEntry;
+  const db = await getDb();
+  const result = await db.runAsync(
+    "INSERT INTO moods (mood, note, timestamp) VALUES (?, ?, ?);",
+    entry.mood,
+    entry.note ?? null,
+    entry.timestamp
+  );
+  const inserted = await db.getFirstAsync(
+    "SELECT * FROM moods WHERE id = ?;",
+    result.lastInsertRowId
+  );
+  return inserted as MoodEntry;
 }
 
 /**
@@ -80,19 +79,19 @@ export async function insertMoodEntry(entry: MoodEntry): Promise<MoodEntry> {
  * @returns Promise resolving to boolean
  */
 export async function hasMoodBeenLoggedToday(): Promise<boolean> {
-    const db = await getDb();
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayEnd = new Date();
-    todayEnd.setHours(23, 59, 59, 999);
+  const db = await getDb();
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayEnd = new Date();
+  todayEnd.setHours(23, 59, 59, 999);
 
-    const result = await db.getFirstAsync(
-        'SELECT COUNT(*) as count FROM moods WHERE timestamp >= ? AND timestamp <= ?;',
-        todayStart.getTime(),
-        todayEnd.getTime()
-    );
+  const result = await db.getFirstAsync(
+    "SELECT COUNT(*) as count FROM moods WHERE timestamp >= ? AND timestamp <= ?;",
+    todayStart.getTime(),
+    todayEnd.getTime()
+  );
 
-    return (result as any).count > 0;
+  return (result as any).count > 0;
 }
 
 /**
@@ -101,15 +100,17 @@ export async function hasMoodBeenLoggedToday(): Promise<boolean> {
  * @param note - The new note
  * @returns Promise resolving to the updated MoodEntry
  */
-export async function updateMoodNote(id: number, note: string): Promise<MoodEntry | undefined> {
-    const db = await getDb();
-    await db.runAsync(
-        'UPDATE moods SET note = ? WHERE id = ?;',
-        note,
-        id
-    );
-    const updated = await db.getFirstAsync('SELECT * FROM moods WHERE id = ?;', id);
-    return updated as MoodEntry | undefined;
+export async function updateMoodNote(
+  id: number,
+  note: string
+): Promise<MoodEntry | undefined> {
+  const db = await getDb();
+  await db.runAsync("UPDATE moods SET note = ? WHERE id = ?;", note, id);
+  const updated = await db.getFirstAsync(
+    "SELECT * FROM moods WHERE id = ?;",
+    id
+  );
+  return updated as MoodEntry | undefined;
 }
 
 /**
@@ -118,15 +119,21 @@ export async function updateMoodNote(id: number, note: string): Promise<MoodEntr
  * @param timestamp - The new timestamp
  * @returns Promise resolving to the updated MoodEntry
  */
-export async function updateMoodTimestamp(id: number, timestamp: number): Promise<MoodEntry | undefined> {
-    const db = await getDb();
-    await db.runAsync(
-        'UPDATE moods SET timestamp = ? WHERE id = ?;',
-        timestamp,
-        id
-    );
-    const updated = await db.getFirstAsync('SELECT * FROM moods WHERE id = ?;', id);
-    return updated as MoodEntry | undefined;
+export async function updateMoodTimestamp(
+  id: number,
+  timestamp: number
+): Promise<MoodEntry | undefined> {
+  const db = await getDb();
+  await db.runAsync(
+    "UPDATE moods SET timestamp = ? WHERE id = ?;",
+    timestamp,
+    id
+  );
+  const updated = await db.getFirstAsync(
+    "SELECT * FROM moods WHERE id = ?;",
+    id
+  );
+  return updated as MoodEntry | undefined;
 }
 
 /**
@@ -134,9 +141,11 @@ export async function updateMoodTimestamp(id: number, timestamp: number): Promis
  * @returns Promise resolving to an array of MoodEntry
  */
 export async function getAllMoods(): Promise<MoodEntry[]> {
-    const db = await getDb();
-    const rows = await db.getAllAsync('SELECT * FROM moods ORDER BY timestamp DESC;');
-    return rows as MoodEntry[];
+  const db = await getDb();
+  const rows = await db.getAllAsync(
+    "SELECT * FROM moods ORDER BY timestamp DESC;"
+  );
+  return rows as MoodEntry[];
 }
 
 /**
@@ -145,73 +154,75 @@ export async function getAllMoods(): Promise<MoodEntry[]> {
  * @returns Promise with the SQLite result
  */
 export async function deleteMood(id: number) {
-    const db = await getDb();
-    const res = await db.runAsync('DELETE FROM moods WHERE id = ?;', id);
-    return res;
+  const db = await getDb();
+  const res = await db.runAsync("DELETE FROM moods WHERE id = ?;", id);
+  return res;
 }
 
 /**
  * Seeds the database with random mood entries (DEV only)
  */
 export async function seedMoods() {
-    const db = await getDb();
-    const days = 60;
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
-    let totalEntries = 0;
+  const db = await getDb();
+  const days = 60;
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+  let totalEntries = 0;
 
-    for (let i = 0; i < days; i++) {
-        // Random number of entries per day (0-3, more realistic)
-        const entriesCount = Math.floor(Math.random() * 4);
+  for (let i = 0; i < days; i++) {
+    // Random number of entries per day (0-3, more realistic)
+    const entriesCount = Math.floor(Math.random() * 4);
 
-        for (let j = 0; j < entriesCount; j++) {
-            const currentDate = new Date(startDate);
-            currentDate.setDate(startDate.getDate() + i);
+    for (let j = 0; j < entriesCount; j++) {
+      const currentDate = new Date(startDate);
+      currentDate.setDate(startDate.getDate() + i);
 
-            // Random time during the day
-            currentDate.setHours(Math.floor(Math.random() * 24));
-            currentDate.setMinutes(Math.floor(Math.random() * 60));
+      // Random time during the day
+      currentDate.setHours(Math.floor(Math.random() * 24));
+      currentDate.setMinutes(Math.floor(Math.random() * 60));
 
-            // More realistic mood distribution (3-8 most common, with occasional extremes)
-            let mood: number;
-            const rand = Math.random();
-            if (rand < 0.7) {
-                // 70% chance for moderate moods (4-6)
-                mood = Math.floor(Math.random() * 3) + 4;
-            } else if (rand < 0.9) {
-                // 20% chance for good moods (7-8)
-                mood = Math.floor(Math.random() * 2) + 7;
-            } else if (rand < 0.95) {
-                // 5% chance for low moods (2-3)
-                mood = Math.floor(Math.random() * 2) + 2;
-            } else {
-                // 5% chance for extreme moods (0-1, 9-10)
-                mood = Math.random() < 0.5 ? Math.floor(Math.random() * 2) : Math.floor(Math.random() * 2) + 9;
-            }
+      // More realistic mood distribution (3-8 most common, with occasional extremes)
+      let mood: number;
+      const rand = Math.random();
+      if (rand < 0.7) {
+        // 70% chance for moderate moods (4-6)
+        mood = Math.floor(Math.random() * 3) + 4;
+      } else if (rand < 0.9) {
+        // 20% chance for good moods (7-8)
+        mood = Math.floor(Math.random() * 2) + 7;
+      } else if (rand < 0.95) {
+        // 5% chance for low moods (2-3)
+        mood = Math.floor(Math.random() * 2) + 2;
+      } else {
+        // 5% chance for extreme moods (0-1, 9-10)
+        mood =
+          Math.random() < 0.5
+            ? Math.floor(Math.random() * 2)
+            : Math.floor(Math.random() * 2) + 9;
+      }
 
-            // Occasionally add notes (10% chance)
-            const note = Math.random() < 0.1 ? "Random seed entry" : null;
+      // Occasionally add notes (10% chance)
+      const note = Math.random() < 0.1 ? "Random seed entry" : null;
 
-            await db.runAsync(
-                'INSERT INTO moods (mood, emotion, note, timestamp) VALUES (?, ?, ?, ?);',
-                mood,
-                null,
-                note,
-                currentDate.getTime()
-            );
-            totalEntries++;
-        }
+      await db.runAsync(
+        "INSERT INTO moods (mood, note, timestamp) VALUES (?, ?, ?);",
+        mood,
+        note,
+        currentDate.getTime()
+      );
+      totalEntries++;
     }
-    return totalEntries;
+  }
+  return totalEntries;
 }
 
 /**
  * Clears all mood entries from the database (DEV only)
  */
 export async function clearMoods() {
-    if (!__DEV__) return;
-    const db = await getDb();
-    await db.runAsync('DELETE FROM moods;');
+  if (!__DEV__) return;
+  const db = await getDb();
+  await db.runAsync("DELETE FROM moods;");
 }
 
 // Ensure the moods table exists as soon as this module is loaded
@@ -222,36 +233,11 @@ void createMoodTable();
  * @returns Promise resolving to the number of mood entries
  */
 export async function getMoodCount(): Promise<number> {
-    const db = await getDb();
-    // Prefer cached count when available
-    const result = await db.getFirstAsync('SELECT COUNT(*) as count FROM moods');
-    const count = (result as any)?.count || 0;
-    return count;
-}
-
-/**
- * Returns the most common emotions from the most recent mood entries.
- * @param topN - number of emotions to return
- * @param recentLimit - how many recent rows to consider for frequency (default 200)
- */
-export async function getTopEmotions(topN: number, recentLimit: number = 200): Promise<string[]> {
-    const db = await getDb();
-    const rows = await db.getAllAsync(
-        `SELECT emotion, COUNT(*) as cnt
-         FROM (
-            SELECT emotion FROM moods
-            WHERE emotion IS NOT NULL
-            ORDER BY timestamp DESC
-            LIMIT ?
-         )
-         WHERE emotion IS NOT NULL
-         GROUP BY emotion
-         ORDER BY cnt DESC, emotion ASC
-         LIMIT ?;`,
-        recentLimit,
-        topN
-    );
-    return (rows as any[]).map((r) => r.emotion as string);
+  const db = await getDb();
+  // Prefer cached count when available
+  const result = await db.getFirstAsync("SELECT COUNT(*) as count FROM moods");
+  const count = (result as any)?.count || 0;
+  return count;
 }
 
 /**
@@ -259,8 +245,8 @@ export async function getTopEmotions(topN: number, recentLimit: number = 200): P
  * @returns Promise resolving to a JSON string of all mood entries
  */
 export async function exportMoods(): Promise<string> {
-    const moods = await getAllMoods();
-    return JSON.stringify(moods);
+  const moods = await getAllMoods();
+  return JSON.stringify(moods);
 }
 
 /**
@@ -269,61 +255,62 @@ export async function exportMoods(): Promise<string> {
  * @returns Promise resolving to the number of imported entries
  */
 export async function importMoods(jsonData: string): Promise<number> {
-    try {
-        const moods = JSON.parse(jsonData) as MoodEntry[];
-        const db = await getDb();
+  try {
+    const moods = JSON.parse(jsonData) as MoodEntry[];
+    const db = await getDb();
 
-        for (const mood of moods) {
-            await db.runAsync(
-                'INSERT INTO moods (mood, emotion, note, timestamp) VALUES (?, ?, ?, ?);',
-                mood.mood,
-                mood.emotion ?? null,
-                mood.note ?? null,
-                mood.timestamp
-            );
-        }
-        return moods.length;
-    } catch (error) {
-        console.error('Error importing moods:', error);
-        throw new Error('Invalid mood data format');
+    for (const mood of moods) {
+      await db.runAsync(
+        "INSERT INTO moods (mood, note, timestamp) VALUES (?, ?, ?);",
+        mood.mood,
+        mood.note ?? null,
+        mood.timestamp
+      );
     }
+    return moods.length;
+  } catch (error) {
+    console.error("Error importing moods:", error);
+    throw new Error("Invalid mood data format");
+  }
 }
 
 /**
  * Seeds the database from a JSON file or with random data based on environment
  */
-export async function seedMoodsFromFile(): Promise<{ source: 'file' | 'random'; count: number }> {
+export async function seedMoodsFromFile(): Promise<{
+  source: "file" | "random";
+  count: number;
+}> {
+  // First clear existing data
+  await clearMoods();
 
-    // First clear existing data
-    await clearMoods();
+  if (__DEV__) {
+    // In development mode, try to load from JSON file
+    try {
+      const jsonData = require("./export.json");
 
-    if (__DEV__) {
-        // In development mode, try to load from JSON file
-        try {
-            const jsonData = require('./export.json');
+      if (Array.isArray(jsonData) && jsonData.length > 0) {
+        const db = await getDb();
 
-            if (Array.isArray(jsonData) && jsonData.length > 0) {
-                const db = await getDb();
-
-                for (const mood of jsonData) {
-                    await db.runAsync(
-                        'INSERT INTO moods (mood, emotion, note, timestamp) VALUES (?, ?, ?, ?);',
-                        mood.mood,
-                        mood.emotion ?? null,
-                        mood.note ?? null,
-                        mood.timestamp
-                    );
-                }
-
-                return { source: 'file', count: jsonData.length };
-            }
-        } catch (error) {
-            console.log('JSON file not found or invalid in dev mode, falling back to random seed');
+        for (const mood of jsonData) {
+          await db.runAsync(
+            "INSERT INTO moods (mood, note, timestamp) VALUES (?, ?, ?);",
+            mood.mood,
+            mood.note ?? null,
+            mood.timestamp
+          );
         }
+
+        return { source: "file", count: jsonData.length };
+      }
+    } catch (error) {
+      console.log(
+        "JSON file not found or invalid in dev mode, falling back to random seed"
+      );
     }
+  }
 
-    // In production mode or if file loading fails in dev mode, use random seeding
-    const totalEntries = await seedMoods();
-    return { source: 'random', count: totalEntries };
+  // In production mode or if file loading fails in dev mode, use random seeding
+  const totalEntries = await seedMoods();
+  return { source: "random", count: totalEntries };
 }
-
