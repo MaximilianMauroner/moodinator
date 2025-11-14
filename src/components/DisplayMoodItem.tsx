@@ -30,7 +30,7 @@ const renderRightActions = () => (
 const renderLeftActions = () => (
   <Animated.View className="flex justify-center items-start h-full">
     <View className="h-full px-6 justify-center bg-blue-50 rounded-xl">
-      <Text className="text-blue-500 font-bold">Add Note</Text>
+      <Text className="text-blue-500 font-bold">Edit Entry</Text>
     </View>
   </Animated.View>
 );
@@ -99,6 +99,44 @@ export const DisplayMoodItem = React.memo(
                 >
                   “{mood.note}”
                 </Text>
+              ) : null}
+              {mood.emotions && mood.emotions.length > 0 ? (
+                <View className="flex-row flex-wrap gap-2 mt-2">
+                  {mood.emotions.map((emotion) => (
+                    <View
+                      key={`${mood.id}-${emotion}`}
+                      className="bg-blue-50 dark:bg-slate-800 px-2 py-0.5 rounded-full border border-blue-100 dark:border-slate-700"
+                    >
+                      <Text className="text-xs font-medium text-blue-700 dark:text-slate-100">
+                        {emotion}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+              {mood.contextTags && mood.contextTags.length > 0 ? (
+                <View className="flex-row flex-wrap gap-2 mt-2">
+                  {mood.contextTags.map((context) => (
+                    <View
+                      key={`${mood.id}-${context}`}
+                      className="bg-emerald-50 dark:bg-slate-800 px-2 py-0.5 rounded-full border border-emerald-100 dark:border-slate-700"
+                    >
+                      <Text className="text-xs font-medium text-emerald-700 dark:text-emerald-200">
+                        {context}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+              {typeof mood.energy === "number" ? (
+                <View className="mt-2 flex-row items-center space-x-2">
+                  <Text className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                    Energy
+                  </Text>
+                  <Text className="text-sm font-semibold text-orange-600 dark:text-orange-300">
+                    {mood.energy}/10
+                  </Text>
+                </View>
               ) : null}
               <Text className="text-xs text-gray-500 dark:text-slate-400 mt-1">
                 {new Date(mood.timestamp).toLocaleString()}

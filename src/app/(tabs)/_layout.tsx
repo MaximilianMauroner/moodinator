@@ -20,7 +20,6 @@ export default function TabLayout() {
         tabBarActiveTintColor: isDark ? "#93C5FD" : "#3B82F6",
         tabBarInactiveTintColor: isDark ? "#9CA3AF" : "#94A3B8",
         sceneStyle: {
-          paddingBottom: 40,
           backgroundColor: isDark ? "#0B1220" : "#FFFFFF", // optional
         },
         tabBarStyle: Platform.select({

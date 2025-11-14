@@ -1,5 +1,5 @@
 import * as SQLite from "expo-sqlite";
-import type { MoodEntry } from "./types";
+import type { MoodEntry, MoodEntryInput } from "./types";
 
 let db: SQLite.SQLiteDatabase | null = null;
 /**
@@ -25,9 +25,124 @@ export async function createMoodTable() {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             mood INTEGER NOT NULL,
             note TEXT,
-            timestamp DATETIME
+            timestamp DATETIME,
+            emotions TEXT DEFAULT '[]',
+            context_tags TEXT DEFAULT '[]',
+            energy INTEGER
         );
     `);
+  await ensureMoodTableColumns(db);
+}
+
+async function ensureMoodTableColumns(database: SQLite.SQLiteDatabase) {
+  const columns = await database.getAllAsync("PRAGMA table_info(moods);");
+  const existing = new Set(columns.map((col: any) => col.name));
+
+  const migrations: Array<{ name: string; sql: string }> = [
+    {
+      name: "emotions",
+      sql: "ALTER TABLE moods ADD COLUMN emotions TEXT DEFAULT '[]';",
+    },
+    {
+      name: "context_tags",
+      sql: "ALTER TABLE moods ADD COLUMN context_tags TEXT DEFAULT '[]';",
+    },
+    {
+      name: "energy",
+      sql: "ALTER TABLE moods ADD COLUMN energy INTEGER;",
+    },
+  ];
+
+  for (const migration of migrations) {
+    if (!existing.has(migration.name)) {
+      await database.execAsync(migration.sql);
+    }
+  }
+}
+
+function serializeArray(value?: string[]): string {
+  if (!value || value.length === 0) {
+    return "[]";
+  }
+  return JSON.stringify(value.slice(0, 50));
+}
+
+function deserializeArray(value: unknown): string[] {
+  if (typeof value !== "string" || value.length === 0) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed)
+      ? parsed.filter((v) => typeof v === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function parseTimestamp(value: unknown): number {
+  if (value instanceof Date) {
+    return value.getTime();
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const numeric = Number(value);
+    if (!Number.isNaN(numeric)) {
+      return numeric;
+    }
+    const parsed = Date.parse(value);
+    if (!Number.isNaN(parsed)) {
+      return parsed;
+    }
+  }
+  return Date.now();
+}
+
+function toMoodEntry(row: any): MoodEntry {
+  return {
+    id: row.id,
+    mood: row.mood,
+    note: row.note ?? null,
+    timestamp: parseTimestamp(row.timestamp),
+    emotions: deserializeArray(row.emotions),
+    contextTags: deserializeArray(row.context_tags),
+    energy:
+      row.energy === null || row.energy === undefined
+        ? null
+        : Number(row.energy),
+  };
+}
+
+function normalizeInput(entry: MoodEntryInput) {
+  return {
+    note: entry.note ?? null,
+    emotions: entry.emotions ? entry.emotions.slice(0, 50) : [],
+    contextTags: entry.contextTags ? entry.contextTags.slice(0, 50) : [],
+    energy:
+      entry.energy === null || entry.energy === undefined
+        ? null
+        : Math.min(10, Math.max(0, Math.round(entry.energy))),
+    timestamp: entry.timestamp ?? Date.now(),
+  };
+}
+
+function sanitizeImportedArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .slice(0, 50);
+}
+
+function sanitizeEnergy(value: unknown): number | null {
+  if (typeof value !== "number" || Number.isNaN(value)) {
+    return null;
+  }
+  return Math.min(10, Math.max(0, Math.round(value)));
 }
 
 /**
@@ -38,20 +153,29 @@ export async function createMoodTable() {
  */
 export async function insertMood(
   mood: number,
-  note?: string
+  note?: string,
+  metadata?: Omit<MoodEntryInput, "mood" | "note">
 ): Promise<MoodEntry> {
   const db = await getDb();
-  const result = await db.runAsync(
-    "INSERT INTO moods (mood, note, timestamp) VALUES (?, ?, ?);",
+  const normalized = normalizeInput({
     mood,
-    note ?? null,
-    new Date().getTime() // Use current timestamp
+    note: note ?? null,
+    ...metadata,
+  });
+  const result = await db.runAsync(
+    "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy) VALUES (?, ?, ?, ?, ?, ?);",
+    mood,
+    normalized.note,
+    normalized.timestamp,
+    serializeArray(normalized.emotions),
+    serializeArray(normalized.contextTags),
+    normalized.energy
   );
   const inserted = await db.getFirstAsync(
     "SELECT * FROM moods WHERE id = ?;",
     result.lastInsertRowId
   );
-  return inserted as MoodEntry;
+  return toMoodEntry(inserted);
 }
 
 /**
@@ -59,19 +183,25 @@ export async function insertMood(
  * @param entry - MoodEntry object containing all fields
  * @returns Promise with the inserted MoodEntry
  */
-export async function insertMoodEntry(entry: MoodEntry): Promise<MoodEntry> {
+export async function insertMoodEntry(
+  entry: MoodEntryInput
+): Promise<MoodEntry> {
   const db = await getDb();
+  const normalized = normalizeInput(entry);
   const result = await db.runAsync(
-    "INSERT INTO moods (mood, note, timestamp) VALUES (?, ?, ?);",
+    "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy) VALUES (?, ?, ?, ?, ?, ?);",
     entry.mood,
-    entry.note ?? null,
-    entry.timestamp
+    normalized.note,
+    normalized.timestamp,
+    serializeArray(normalized.emotions),
+    serializeArray(normalized.contextTags),
+    normalized.energy
   );
   const inserted = await db.getFirstAsync(
     "SELECT * FROM moods WHERE id = ?;",
     result.lastInsertRowId
   );
-  return inserted as MoodEntry;
+  return toMoodEntry(inserted);
 }
 
 /**
@@ -110,7 +240,7 @@ export async function updateMoodNote(
     "SELECT * FROM moods WHERE id = ?;",
     id
   );
-  return updated as MoodEntry | undefined;
+  return updated ? toMoodEntry(updated) : undefined;
 }
 
 /**
@@ -133,7 +263,64 @@ export async function updateMoodTimestamp(
     "SELECT * FROM moods WHERE id = ?;",
     id
   );
-  return updated as MoodEntry | undefined;
+  return updated ? toMoodEntry(updated) : undefined;
+}
+
+export async function updateMoodEntry(
+  id: number,
+  updates: Partial<MoodEntryInput & { mood: number }>
+): Promise<MoodEntry | undefined> {
+  const db = await getDb();
+  const fields: string[] = [];
+  const params: any[] = [];
+
+  if (typeof updates.mood === "number") {
+    fields.push("mood = ?");
+    params.push(updates.mood);
+  }
+  if (updates.note !== undefined) {
+    fields.push("note = ?");
+    params.push(updates.note);
+  }
+  if (updates.timestamp !== undefined) {
+    fields.push("timestamp = ?");
+    params.push(updates.timestamp);
+  }
+  if (updates.emotions !== undefined) {
+    fields.push("emotions = ?");
+    params.push(serializeArray(updates.emotions));
+  }
+  if (updates.contextTags !== undefined) {
+    fields.push("context_tags = ?");
+    params.push(serializeArray(updates.contextTags));
+  }
+  if (updates.energy !== undefined) {
+    fields.push("energy = ?");
+    params.push(
+      updates.energy === null
+        ? null
+        : Math.min(10, Math.max(0, Math.round(updates.energy)))
+    );
+  }
+
+  if (!fields.length) {
+    const current = await db.getFirstAsync(
+      "SELECT * FROM moods WHERE id = ?;",
+      id
+    );
+    return current ? toMoodEntry(current) : undefined;
+  }
+
+  await db.runAsync(
+    `UPDATE moods SET ${fields.join(", ")} WHERE id = ?;`,
+    ...params,
+    id
+  );
+  const updated = await db.getFirstAsync(
+    "SELECT * FROM moods WHERE id = ?;",
+    id
+  );
+  return updated ? toMoodEntry(updated) : undefined;
 }
 
 /**
@@ -145,7 +332,7 @@ export async function getAllMoods(): Promise<MoodEntry[]> {
   const rows = await db.getAllAsync(
     "SELECT * FROM moods ORDER BY timestamp DESC;"
   );
-  return rows as MoodEntry[];
+  return rows.map(toMoodEntry);
 }
 
 /**
@@ -205,10 +392,13 @@ export async function seedMoods() {
       const note = Math.random() < 0.1 ? "Random seed entry" : null;
 
       await db.runAsync(
-        "INSERT INTO moods (mood, note, timestamp) VALUES (?, ?, ?);",
+        "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy) VALUES (?, ?, ?, ?, ?, ?);",
         mood,
         note,
-        currentDate.getTime()
+        currentDate.getTime(),
+        serializeArray([]),
+        serializeArray([]),
+        Math.floor(Math.random() * 11)
       );
       totalEntries++;
     }
@@ -244,9 +434,71 @@ export async function getMoodCount(): Promise<number> {
  * Exports all mood entries to a JSON string
  * @returns Promise resolving to a JSON string of all mood entries
  */
-export async function exportMoods(): Promise<string> {
-  const moods = await getAllMoods();
-  return JSON.stringify(moods);
+export type MoodRangePreset = "week" | "twoWeeks" | "month";
+
+export type MoodDateRange =
+  | { preset: MoodRangePreset }
+  | { startDate: number; endDate: number };
+
+function resolveDateRange(range?: MoodDateRange) {
+  if (!range) {
+    return {};
+  }
+  if ("preset" in range) {
+    const now = Date.now();
+    const days =
+      range.preset === "week" ? 7 : range.preset === "twoWeeks" ? 14 : 30;
+    const startDate = new Date();
+    startDate.setHours(0, 0, 0, 0);
+    startDate.setDate(startDate.getDate() - (days - 1));
+    return { startDate: startDate.getTime(), endDate: now };
+  }
+  return {
+    startDate: range.startDate,
+    endDate: range.endDate,
+  };
+}
+
+export async function getMoodsWithinRange(
+  range?: MoodDateRange
+): Promise<MoodEntry[]> {
+  const db = await getDb();
+  const { startDate, endDate } = resolveDateRange(range);
+  const conditions: string[] = [];
+  const params: any[] = [];
+
+  if (typeof startDate === "number") {
+    conditions.push("timestamp >= ?");
+    params.push(startDate);
+  }
+  if (typeof endDate === "number") {
+    conditions.push("timestamp <= ?");
+    params.push(endDate);
+  }
+
+  const whereClause = conditions.length
+    ? `WHERE ${conditions.join(" AND ")}`
+    : "";
+
+  const rows = await db.getAllAsync(
+    `SELECT * FROM moods ${whereClause} ORDER BY timestamp DESC;`,
+    ...params
+  );
+  return rows.map(toMoodEntry);
+}
+
+export async function exportMoods(range?: MoodDateRange): Promise<string> {
+  const moods = await getMoodsWithinRange(range);
+  return JSON.stringify(
+    moods.map((entry) => ({
+      timestamp: entry.timestamp,
+      mood: entry.mood,
+      emotions: entry.emotions,
+      context: entry.contextTags,
+      energy: entry.energy,
+      notes: entry.note,
+    }))
+  );
 }
 
 /**
@@ -260,11 +512,21 @@ export async function importMoods(jsonData: string): Promise<number> {
     const db = await getDb();
 
     for (const mood of moods) {
+      const note = (mood as any)?.notes ?? (mood as any)?.note ?? null;
+      const timestamp = parseTimestamp((mood as any)?.timestamp);
+      const emotions = sanitizeImportedArray((mood as any)?.emotions);
+      const contextSource =
+        (mood as any)?.contextTags ?? (mood as any)?.context ?? [];
+      const contextTags = sanitizeImportedArray(contextSource);
+      const energy = sanitizeEnergy((mood as any)?.energy);
       await db.runAsync(
-        "INSERT INTO moods (mood, note, timestamp) VALUES (?, ?, ?);",
+        "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy) VALUES (?, ?, ?, ?, ?, ?);",
         mood.mood,
-        mood.note ?? null,
-        mood.timestamp
+        note,
+        timestamp,
+        serializeArray(emotions),
+        serializeArray(contextTags),
+        energy
       );
     }
     return moods.length;
@@ -293,11 +555,21 @@ export async function seedMoodsFromFile(): Promise<{
         const db = await getDb();
 
         for (const mood of jsonData) {
+          const note = (mood as any)?.notes ?? (mood as any)?.note ?? null;
+          const emotions = sanitizeImportedArray((mood as any)?.emotions);
+          const contextSource =
+            (mood as any)?.contextTags ?? (mood as any)?.context ?? [];
+          const contextTags = sanitizeImportedArray(contextSource);
+          const energy = sanitizeEnergy((mood as any)?.energy);
+          const timestamp = parseTimestamp((mood as any)?.timestamp);
           await db.runAsync(
-            "INSERT INTO moods (mood, note, timestamp) VALUES (?, ?, ?);",
+            "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy) VALUES (?, ?, ?, ?, ?, ?);",
             mood.mood,
-            mood.note ?? null,
-            mood.timestamp
+            note,
+            timestamp,
+            serializeArray(emotions),
+            serializeArray(contextTags),
+            energy
           );
         }
 

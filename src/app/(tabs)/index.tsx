@@ -1,23 +1,15 @@
-import React, { useEffect, useState, useCallback } from "react";
-import {
-  View,
-  Text,
-  SafeAreaView,
-  RefreshControl,
-  FlatList,
-  Alert,
-} from "react-native";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
+import { View, Text, SafeAreaView, RefreshControl, FlatList } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import {
   insertMood,
   getAllMoods,
   deleteMood,
-  updateMoodNote,
   insertMoodEntry,
   updateMoodTimestamp,
+  updateMoodEntry,
 } from "@db/db";
 import { DisplayMoodItem } from "@/components/DisplayMoodItem";
-import { NoteModal } from "@/components/NoteModal";
 import { DateTimePickerModal } from "@/components/DateTimePickerModal";
 import { MoodButtonsDetailed } from "@/components/MoodButtonsDetailed";
 import { MoodButtonsCompact } from "@/components/MoodButtonsCompact";
@@ -28,6 +20,19 @@ import { useFocusEffect } from "@react-navigation/native";
 import ToastManager, { Toast } from "toastify-react-native";
 import { IconSymbol } from "@/components/ui/IconSymbol";
 import { HapticTab } from "@/components/HapticTab";
+import {
+  DEFAULT_CONTEXTS,
+  DEFAULT_EMOTIONS,
+  DEFAULT_QUICK_ENTRY_PREFS,
+  getContextTags,
+  getEmotionPresets,
+  getQuickEntryPrefs,
+  QuickEntryPrefs,
+} from "@/lib/entrySettings";
+import {
+  MoodEntryFormValues,
+  MoodEntryModal,
+} from "@/components/MoodEntryModal";
 const SHOW_LABELS_KEY = "showLabelsPreference";
 
 const toastConfig = {
@@ -75,16 +80,39 @@ export default function HomeScreen() {
   const [moods, setMoods] = useState<MoodEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastTracked, setLastTracked] = useState<Date | null>(null);
-  const [noteModalVisible, setNoteModalVisible] = useState(false);
-  const [noteText, setNoteText] = useState("");
-  const [selectedMoodId, setSelectedMoodId] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [currentMoodPressed, setCurrentMoodPressed] = useState<number | null>(
-    null
-  );
   const [showDetailedLabels, setShowDetailedLabels] = useState(false);
   const [showDateModal, setShowDateModal] = useState(false);
   const [selectedMood, setSelectedMood] = useState<MoodEntry | null>(null);
+  const [quickEntryVisible, setQuickEntryVisible] = useState(false);
+  const [detailedEntryVisible, setDetailedEntryVisible] = useState(false);
+  const [pendingMood, setPendingMood] = useState(5);
+  const [editingEntry, setEditingEntry] = useState<MoodEntry | null>(null);
+  const [emotionOptions, setEmotionOptions] =
+    useState<string[]>(DEFAULT_EMOTIONS);
+  const [contextOptions, setContextOptions] =
+    useState<string[]>(DEFAULT_CONTEXTS);
+  const [quickEntryPrefs, setQuickEntryPrefs] = useState<QuickEntryPrefs>(
+    DEFAULT_QUICK_ENTRY_PREFS
+  );
+  const quickEntryFieldConfig = useMemo(
+    () => ({
+      emotions: quickEntryPrefs.showEmotions,
+      context: quickEntryPrefs.showContext,
+      energy: quickEntryPrefs.showEnergy,
+      notes: quickEntryPrefs.showNotes,
+    }),
+    [quickEntryPrefs]
+  );
+  const detailedFieldConfig = useMemo(
+    () => ({
+      emotions: true,
+      context: true,
+      energy: true,
+      notes: true,
+    }),
+    []
+  );
 
   const SWIPE_THRESHOLD = 100; // pixels to trigger action
 
@@ -123,55 +151,16 @@ export default function HomeScreen() {
     fetchMoods();
   }, []);
 
-  const handleMoodPress = useCallback(async (mood: number) => {
-    const newMood = await insertMood(mood);
-    setMoods((prev) => [newMood, ...prev]);
-    setLastTracked(new Date(newMood.timestamp ?? Date.now()));
+  const handleMoodPress = useCallback((mood: number) => {
+    setPendingMood(mood);
+    setQuickEntryVisible(true);
   }, []);
 
   const handleLongPress = useCallback((mood: number) => {
-    setCurrentMoodPressed(mood);
-    setSelectedMoodId(null);
-    setNoteText("");
-    setNoteModalVisible(true);
+    setPendingMood(mood);
+    setDetailedEntryVisible(true);
   }, []);
 
-  const handleAddNote = useCallback(async () => {
-    try {
-      const trimmed = noteText.trim();
-
-      if (selectedMoodId !== null) {
-        // Edit an existing mood's note
-        const updatedMood = await updateMoodNote(selectedMoodId, trimmed);
-        if (updatedMood) {
-          setMoods((prev) =>
-            prev.map((m) =>
-              m.id === updatedMood.id ? { ...m, note: updatedMood.note } : m
-            )
-          );
-        } else {
-          Alert.alert("Error", "Failed to update note. Mood not found.");
-          console.error("Failed to update note. Mood not found.");
-          return;
-        }
-      } else if (currentMoodPressed !== null) {
-        // Create a new mood with a note
-        const newMood = await insertMood(currentMoodPressed, trimmed);
-        setMoods((prev) => [newMood, ...prev]);
-        setLastTracked(new Date(newMood.timestamp ?? Date.now()));
-      } else {
-        console.warn("handleAddNote called with no target mood");
-      }
-    } catch (e) {
-      console.error("Failed to save note:", e);
-      Alert.alert("Error", "Failed to save note.");
-    } finally {
-      setCurrentMoodPressed(null);
-      setSelectedMoodId(null);
-      setNoteText("");
-      setNoteModalVisible(false);
-    }
-  }, [selectedMoodId, currentMoodPressed, noteText]);
 
   const handleDeleteMood = useCallback(async (mood: MoodEntry) => {
     await deleteMood(mood.id);
@@ -185,7 +174,14 @@ export default function HomeScreen() {
       progressBarColor: "#3b82f6",
       onPress: async () => {
         if (mood) {
-          const crmood = await insertMoodEntry(mood);
+          const crmood = await insertMoodEntry({
+            mood: mood.mood,
+            note: mood.note,
+            timestamp: new Date(mood.timestamp).getTime(),
+            emotions: mood.emotions,
+            contextTags: mood.contextTags,
+            energy: mood.energy,
+          });
 
           setMoods((prev) => {
             const updated = [...prev, crmood].sort(
@@ -218,9 +214,7 @@ export default function HomeScreen() {
       if (direction === "left") {
         handleDeleteMood(mood);
       } else if (direction === "right") {
-        setSelectedMoodId(mood.id);
-        setNoteText(mood.note || "");
-        setNoteModalVisible(true);
+        setEditingEntry(mood);
       }
     },
     [handleDeleteMood]
@@ -263,6 +257,21 @@ export default function HomeScreen() {
     }
   }, []);
 
+  const loadEntrySettings = useCallback(async () => {
+    try {
+      const [emotionList, contextList, prefs] = await Promise.all([
+        getEmotionPresets(),
+        getContextTags(),
+        getQuickEntryPrefs(),
+      ]);
+      setEmotionOptions(emotionList);
+      setContextOptions(contextList);
+      setQuickEntryPrefs(prefs);
+    } catch (error) {
+      console.error("Failed to load entry settings:", error);
+    }
+  }, []);
+
   useEffect(() => {
     loadShowLabelsPreference();
   }, [loadShowLabelsPreference]);
@@ -270,14 +279,81 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       loadShowLabelsPreference();
-    }, [loadShowLabelsPreference])
+      loadEntrySettings();
+    }, [loadShowLabelsPreference, loadEntrySettings])
   );
 
-  const handleCloseNoteModal = useCallback(() => {
-    setNoteModalVisible(false);
-    setCurrentMoodPressed(null);
-    setSelectedMoodId(null);
-  }, []);
+  const handleEntrySave = useCallback(
+    async (values: MoodEntryFormValues) => {
+      const newMood = await insertMood(values.mood, values.note || undefined, {
+        emotions: values.emotions,
+        contextTags: values.contextTags,
+        energy: values.energy,
+      });
+      setMoods((prev) => [newMood, ...prev]);
+      setLastTracked(new Date(newMood.timestamp ?? Date.now()));
+    },
+    []
+  );
+
+  const handleEditEntrySave = useCallback(
+    async (values: MoodEntryFormValues) => {
+      if (!editingEntry) return;
+      const updatedMood = await updateMoodEntry(editingEntry.id, {
+        mood: values.mood,
+        note: values.note ? values.note : null,
+        emotions: values.emotions,
+        contextTags: values.contextTags,
+        energy: values.energy,
+      });
+      if (updatedMood) {
+        setMoods((prev) =>
+          prev.map((m) => (m.id === updatedMood.id ? updatedMood : m))
+        );
+      }
+    },
+    [editingEntry]
+  );
+
+  const editingInitialValues = useMemo(
+    () =>
+      editingEntry
+        ? {
+            mood: editingEntry.mood,
+            emotions: editingEntry.emotions,
+            contextTags: editingEntry.contextTags,
+            energy: editingEntry.energy,
+            note: editingEntry.note ?? "",
+          }
+        : undefined,
+    [editingEntry]
+  );
+
+  useEffect(() => {
+    loadEntrySettings();
+  }, [loadEntrySettings]);
+
+  const renderEmptyComponent = useCallback(() => {
+    return (
+      <View className="flex-1 items-center justify-center p-8">
+        {loading ? (
+          <Text className="text-center text-slate-500 dark:text-slate-400">
+            Loading...
+          </Text>
+        ) : (
+          <>
+            <Text className="text-6xl mb-2">📝</Text>
+            <Text className="text-center text-slate-500 dark:text-slate-400">
+              No moods tracked yet.
+            </Text>
+            <Text className="text-center text-slate-400 dark:text-slate-500 mt-1">
+              Tap a mood above to get started.
+            </Text>
+          </>
+        )}
+      </View>
+    );
+  }, [loading]);
 
   return (
     <>
@@ -313,66 +389,43 @@ export default function HomeScreen() {
               </View>
             </View>
 
-            <View className="flex-1 bg-white dark:bg-slate-900 rounded-2xl shadow-lg overflow-hidden border border-slate-100 dark:border-slate-800">
+            <View className="flex-1 bg-white dark:bg-slate-900 rounded-2xl shadow-lg border border-slate-100 dark:border-slate-800">
               <View className="flex-1 flex flex-col">
                 <View className="p-4 flex-row justify-between items-center">
                   <Text className="font-bold text-xl text-blue-800 dark:text-blue-200">
                     Mood History {moods.length > 0 ? `(${moods.length})` : ""}
                   </Text>
                 </View>
-                {loading ? (
-                  <Text className="text-center py-4 text-gray-500 dark:text-slate-400">
-                    Loading...
-                  </Text>
-                ) : moods.length === 0 ? (
-                  <View className="flex-1 items-center justify-center p-8">
-                    <Text className="text-6xl mb-2">📝</Text>
-                    <Text className="text-center text-slate-500 dark:text-slate-400">
-                      No moods tracked yet.
-                    </Text>
-                    <Text className="text-center text-slate-400 dark:text-slate-500 mt-1">
-                      Tap a mood above to get started.
-                    </Text>
-                  </View>
-                ) : (
-                  <FlatList
-                    data={moods}
-                    initialNumToRender={10}
-                    contentContainerStyle={{
-                      padding: 16,
-                    }}
-                    renderItem={renderMoodItem}
-                    keyExtractor={(item) => item.id.toString()}
-                    refreshControl={
-                      <RefreshControl
-                        refreshing={refreshing}
-                        onRefresh={onRefresh}
-                        colors={["#3b82f6"]}
-                        tintColor="#3b82f6"
-                      />
-                    }
-                    removeClippedSubviews={true}
-                    windowSize={7}
-                    maxToRenderPerBatch={10}
-                    updateCellsBatchingPeriod={50}
-                    extraData={moods}
-                    style={{ flex: 1 }}
-                  />
-                )}
+                <FlatList
+                  data={moods}
+                  initialNumToRender={10}
+                  contentContainerStyle={{
+                    padding: 16,
+                    flexGrow: moods.length === 0 ? 1 : 0,
+                  }}
+                  renderItem={renderMoodItem}
+                  keyExtractor={(item) => item.id.toString()}
+                  refreshControl={
+                    <RefreshControl
+                      refreshing={refreshing}
+                      onRefresh={onRefresh}
+                      colors={["#3b82f6"]}
+                      tintColor="#3b82f6"
+                    />
+                  }
+                  removeClippedSubviews={true}
+                  windowSize={7}
+                  maxToRenderPerBatch={10}
+                  updateCellsBatchingPeriod={50}
+                  extraData={moods}
+                  style={{ flex: 1 }}
+                  ListEmptyComponent={renderEmptyComponent}
+                />
               </View>
             </View>
           </View>
         </SafeAreaView>
       </GestureHandlerRootView>
-      {noteModalVisible && (
-        <NoteModal
-          visible={noteModalVisible}
-          noteText={noteText}
-          setNoteText={setNoteText}
-          onCancel={handleCloseNoteModal}
-          onSave={handleAddNote}
-        />
-      )}
       {showDateModal && (
         <DateTimePickerModal
           visible={showDateModal}
@@ -381,6 +434,39 @@ export default function HomeScreen() {
           onSave={handleDateTimeSave}
         />
       )}
+      <MoodEntryModal
+        visible={quickEntryVisible}
+        title="Quick Entry"
+        initialMood={pendingMood}
+        emotionOptions={emotionOptions}
+        contextOptions={contextOptions}
+        fieldConfig={quickEntryFieldConfig}
+        showMoodSelector={false}
+        onClose={() => setQuickEntryVisible(false)}
+        onSubmit={handleEntrySave}
+      />
+      <MoodEntryModal
+        visible={detailedEntryVisible}
+        title="Detailed Entry"
+        initialMood={pendingMood}
+        emotionOptions={emotionOptions}
+        contextOptions={contextOptions}
+        fieldConfig={detailedFieldConfig}
+        showMoodSelector={false}
+        onClose={() => setDetailedEntryVisible(false)}
+        onSubmit={handleEntrySave}
+      />
+      <MoodEntryModal
+        visible={Boolean(editingEntry)}
+        title="Edit Entry"
+        initialMood={editingEntry?.mood ?? pendingMood}
+        emotionOptions={emotionOptions}
+        contextOptions={contextOptions}
+        fieldConfig={detailedFieldConfig}
+        initialValues={editingInitialValues}
+        onClose={() => setEditingEntry(null)}
+        onSubmit={handleEditEntrySave}
+      />
       <ToastManager config={toastConfig} useModal={false} />
     </>
   );

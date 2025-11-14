@@ -69,6 +69,45 @@ export const RawDataTab = ({
       .filter((item) => item.count > 0),
   };
 
+  const emotionCounts = moods.reduce<Record<string, number>>((acc, mood) => {
+    if (Array.isArray(mood.emotions)) {
+      mood.emotions.forEach((emotion) => {
+        if (!emotion) return;
+        acc[emotion] = (acc[emotion] || 0) + 1;
+      });
+    }
+    return acc;
+  }, {});
+
+  const contextCounts = moods.reduce<Record<string, number>>(
+    (acc, mood) => {
+      if (Array.isArray(mood.contextTags)) {
+        mood.contextTags.forEach((context) => {
+          if (!context) return;
+          acc[context] = (acc[context] || 0) + 1;
+        });
+      }
+      return acc;
+    },
+    {}
+  );
+
+  const topEmotions = Object.entries(emotionCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3);
+
+  const topContexts = Object.entries(contextCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3);
+
+  const energyValues = moods
+    .map((m) => (typeof m.energy === "number" ? m.energy : null))
+    .filter((value): value is number => value !== null);
+  const avgEnergy =
+    energyValues.length > 0
+      ? energyValues.reduce((sum, val) => sum + val, 0) / energyValues.length
+      : null;
+
   const chartData = {
     labels: sortedMoods.map((m) => format(new Date(m.timestamp), "HH:mm")),
     datasets: [
@@ -358,6 +397,68 @@ export const RawDataTab = ({
               : rawStats.worstMood - rawStats.bestMood <= 6
               ? "Moderate variability - some ups and downs"
               : "High variability - wide range of experiences tracked"}
+          </Text>
+        </View>
+      </View>
+
+      <View className="mx-4 mb-6 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-xl shadow-sm">
+        <Text className="text-lg font-semibold mb-3 text-gray-800 dark:text-slate-200">
+          Emotions, Context & Energy
+        </Text>
+        <View className="mb-4">
+          <Text className="text-sm text-gray-500 dark:text-slate-400 mb-1">
+            Top Emotions
+          </Text>
+          {topEmotions.length ? (
+            <View className="flex-row flex-wrap gap-2">
+              {topEmotions.map(([emotion, count]) => (
+                <View
+                  key={emotion}
+                  className="px-3 py-1 rounded-full bg-blue-50 dark:bg-slate-800 border border-blue-100 dark:border-slate-700"
+                >
+                  <Text className="text-xs font-medium text-blue-700 dark:text-slate-100">
+                    {emotion} · {count}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <Text className="text-sm text-gray-400 dark:text-slate-500">
+              No emotions logged yet.
+            </Text>
+          )}
+        </View>
+
+        <View className="mb-4">
+          <Text className="text-sm text-gray-500 dark:text-slate-400 mb-1">
+            Top Contexts
+          </Text>
+          {topContexts.length ? (
+            <View className="flex-row flex-wrap gap-2">
+              {topContexts.map(([context, count]) => (
+                <View
+                  key={context}
+                  className="px-3 py-1 rounded-full bg-emerald-50 dark:bg-slate-800 border border-emerald-100 dark:border-slate-700"
+                >
+                  <Text className="text-xs font-medium text-emerald-700 dark:text-emerald-200">
+                    {context} · {count}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <Text className="text-sm text-gray-400 dark:text-slate-500">
+              No contexts logged yet.
+            </Text>
+          )}
+        </View>
+
+        <View className="flex-row items-center justify-between">
+          <Text className="text-sm text-gray-500 dark:text-slate-400">
+            Average Energy
+          </Text>
+          <Text className="text-lg font-semibold text-orange-500 dark:text-orange-300">
+            {avgEnergy !== null ? `${avgEnergy.toFixed(1)}/10` : "—"}
           </Text>
         </View>
       </View>
