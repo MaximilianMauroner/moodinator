@@ -24,23 +24,32 @@ export async function createMoodTable() {
         CREATE TABLE IF NOT EXISTS moods (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             mood INTEGER NOT NULL,
+            emotion TEXT,
             note TEXT,
             timestamp DATETIME
         );
     `);
+    // Add emotion column if it doesn't exist (migration for existing databases)
+    await db.execAsync(`
+        ALTER TABLE moods ADD COLUMN emotion TEXT;
+    `).catch(() => {
+        // Column already exists, ignore error
+    });
 }
 
 /**
  * Inserts a new mood entry into the database.
  * @param mood - Mood value (integer)
  * @param note - Optional note
+ * @param emotion - Optional emotion label
  * @returns Promise with the SQLite result
  */
-export async function insertMood(mood: number, note?: string): Promise<MoodEntry> {
+export async function insertMood(mood: number, note?: string, emotion?: string): Promise<MoodEntry> {
     const db = await getDb();
     const result = await db.runAsync(
-        'INSERT INTO moods (mood, note, timestamp) VALUES (?, ?, ?);',
+        'INSERT INTO moods (mood, emotion, note, timestamp) VALUES (?, ?, ?, ?);',
         mood,
+        emotion ?? null,
         note ?? null,
         new Date().getTime() // Use current timestamp
     );
@@ -56,8 +65,9 @@ export async function insertMood(mood: number, note?: string): Promise<MoodEntry
 export async function insertMoodEntry(entry: MoodEntry): Promise<MoodEntry> {
     const db = await getDb();
     const result = await db.runAsync(
-        'INSERT INTO moods (mood, note, timestamp) VALUES (?, ?, ?);',
+        'INSERT INTO moods (mood, emotion, note, timestamp) VALUES (?, ?, ?, ?);',
         entry.mood,
+        entry.emotion ?? null,
         entry.note ?? null,
         entry.timestamp
     );
@@ -183,8 +193,9 @@ export async function seedMoods() {
             const note = Math.random() < 0.1 ? "Random seed entry" : null;
 
             await db.runAsync(
-                'INSERT INTO moods (mood, note, timestamp) VALUES (?, ?, ?);',
+                'INSERT INTO moods (mood, emotion, note, timestamp) VALUES (?, ?, ?, ?);',
                 mood,
+                null,
                 note,
                 currentDate.getTime()
             );
@@ -219,6 +230,31 @@ export async function getMoodCount(): Promise<number> {
 }
 
 /**
+ * Returns the most common emotions from the most recent mood entries.
+ * @param topN - number of emotions to return
+ * @param recentLimit - how many recent rows to consider for frequency (default 200)
+ */
+export async function getTopEmotions(topN: number, recentLimit: number = 200): Promise<string[]> {
+    const db = await getDb();
+    const rows = await db.getAllAsync(
+        `SELECT emotion, COUNT(*) as cnt
+         FROM (
+            SELECT emotion FROM moods
+            WHERE emotion IS NOT NULL
+            ORDER BY timestamp DESC
+            LIMIT ?
+         )
+         WHERE emotion IS NOT NULL
+         GROUP BY emotion
+         ORDER BY cnt DESC, emotion ASC
+         LIMIT ?;`,
+        recentLimit,
+        topN
+    );
+    return (rows as any[]).map((r) => r.emotion as string);
+}
+
+/**
  * Exports all mood entries to a JSON string
  * @returns Promise resolving to a JSON string of all mood entries
  */
@@ -239,9 +275,10 @@ export async function importMoods(jsonData: string): Promise<number> {
 
         for (const mood of moods) {
             await db.runAsync(
-                'INSERT INTO moods (mood, note, timestamp) VALUES (?, ?, ?);',
+                'INSERT INTO moods (mood, emotion, note, timestamp) VALUES (?, ?, ?, ?);',
                 mood.mood,
-                mood.note,
+                mood.emotion ?? null,
+                mood.note ?? null,
                 mood.timestamp
             );
         }
@@ -270,9 +307,10 @@ export async function seedMoodsFromFile(): Promise<{ source: 'file' | 'random'; 
 
                 for (const mood of jsonData) {
                     await db.runAsync(
-                        'INSERT INTO moods (mood, note, timestamp) VALUES (?, ?, ?);',
+                        'INSERT INTO moods (mood, emotion, note, timestamp) VALUES (?, ?, ?, ?);',
                         mood.mood,
-                        mood.note,
+                        mood.emotion ?? null,
+                        mood.note ?? null,
                         mood.timestamp
                     );
                 }

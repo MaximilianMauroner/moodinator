@@ -15,6 +15,7 @@ import {
   updateMoodNote,
   insertMoodEntry,
   updateMoodTimestamp,
+  getTopEmotions,
 } from "@db/db";
 import { DisplayMoodItem } from "@/components/DisplayMoodItem";
 import { NoteModal } from "@/components/NoteModal";
@@ -28,8 +29,11 @@ import { useFocusEffect } from "@react-navigation/native";
 import ToastManager, { Toast } from "toastify-react-native";
 import { IconSymbol } from "@/components/ui/IconSymbol";
 import { HapticTab } from "@/components/HapticTab";
+import { EmotionPickerModal } from "@/components/EmotionPickerModal";
+import { getEmotions, DEFAULT_EMOTIONS } from "@/hooks/useEmotions";
 
 const SHOW_LABELS_KEY = "showLabelsPreference";
+const COMMON_EMOTION_COUNT = 8;
 
 const toastConfig = {
   success: ({
@@ -76,18 +80,35 @@ export default function HomeScreen() {
   const [moods, setMoods] = useState<MoodEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastTracked, setLastTracked] = useState<Date | null>(null);
-  const [modalVisible, setModalVisible] = useState(false);
+  const [noteModalVisible, setNoteModalVisible] = useState(false);
   const [noteText, setNoteText] = useState("");
   const [selectedMoodId, setSelectedMoodId] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [currentMoodPressed, setCurrentMoodPressed] = useState<number | null>(
     null
   );
+  const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null);
+  const [emotions, setEmotions] = useState<string[]>(DEFAULT_EMOTIONS);
+  const [commonEmotions, setCommonEmotions] = useState<string[]>([]);
   const [showDetailedLabels, setShowDetailedLabels] = useState(false);
   const [showDateModal, setShowDateModal] = useState(false);
   const [selectedMood, setSelectedMood] = useState<MoodEntry | null>(null);
+  const [emotionPickerVisible, setEmotionPickerVisible] = useState(false);
 
   const SWIPE_THRESHOLD = 100; // pixels to trigger action
+
+  const loadCommonEmotions = useCallback(async () => {
+    try {
+      const top = await getTopEmotions(COMMON_EMOTION_COUNT, 200);
+      if (top && top.length > 0) {
+        setCommonEmotions(top);
+      } else {
+        setCommonEmotions(emotions.slice(0, COMMON_EMOTION_COUNT));
+      }
+    } catch {
+      setCommonEmotions(emotions.slice(0, COMMON_EMOTION_COUNT));
+    }
+  }, [emotions]);
 
   const fetchMoods = useCallback(async () => {
     setLoading(true);
@@ -122,20 +143,37 @@ export default function HomeScreen() {
 
   useEffect(() => {
     fetchMoods();
+    getEmotions().then(setEmotions).catch(() => setEmotions(DEFAULT_EMOTIONS));
   }, []);
+
+  useEffect(() => {
+    loadCommonEmotions();
+  }, [loadCommonEmotions]);
 
   const handleMoodPress = useCallback(async (mood: number) => {
     const newMood = await insertMood(mood);
     setMoods((prev) => [newMood, ...prev]);
     setLastTracked(new Date());
-  }, []);
+    loadCommonEmotions();
+  }, [loadCommonEmotions]);
 
   const handleLongPress = useCallback((mood: number) => {
     setCurrentMoodPressed(mood);
     setSelectedMoodId(null);
     setNoteText("");
-    setModalVisible(true);
+    setSelectedEmotion(null);
+    setEmotionPickerVisible(true);
   }, []);
+
+  const proceedToNoteModal = useCallback(() => {
+    setEmotionPickerVisible(false);
+    setNoteModalVisible(true);
+  }, []);
+
+  const handleSelectEmotion = useCallback((emotion: string | null) => {
+    setSelectedEmotion(emotion);
+    proceedToNoteModal();
+  }, [proceedToNoteModal]);
 
   const handleAddNote = useCallback(async () => {
     try {
@@ -156,11 +194,16 @@ export default function HomeScreen() {
           return;
         }
       } else if (currentMoodPressed !== null) {
-        // Create a new mood with a note
-        const newMood = await insertMood(currentMoodPressed, trimmed);
+        // Create a new mood with a note and optional emotion
+        const newMood = await insertMood(
+          currentMoodPressed,
+          trimmed,
+          selectedEmotion ?? undefined
+        );
         setMoods((prev) => [newMood, ...prev]);
         // keep "Last tracked" accurate for this path as well
         setLastTracked(new Date(newMood.timestamp ?? Date.now()));
+        loadCommonEmotions();
       } else {
         console.warn("handleAddNote called with no target mood");
       }
@@ -170,10 +213,11 @@ export default function HomeScreen() {
     } finally {
       setCurrentMoodPressed(null);
       setSelectedMoodId(null);
+      setSelectedEmotion(null);
       setNoteText("");
-      setModalVisible(false);
+      setNoteModalVisible(false);
     }
-  }, [selectedMoodId, currentMoodPressed, noteText]);
+  }, [selectedMoodId, currentMoodPressed, noteText, selectedEmotion, loadCommonEmotions]);
 
   const handleDeleteMood = useCallback(async (mood: MoodEntry) => {
     await deleteMood(mood.id);
@@ -208,12 +252,13 @@ export default function HomeScreen() {
             return prevLastTracked;
           });
           Toast.hide();
+          loadCommonEmotions();
         } else {
           Toast.error("Failed to restore mood");
         }
       },
     });
-  }, []);
+  }, [loadCommonEmotions]);
 
   const onSwipeableWillOpen = useCallback(
     (direction: SwipeDirection, mood: MoodEntry) => {
@@ -222,7 +267,7 @@ export default function HomeScreen() {
       } else if (direction === "right") {
         setSelectedMoodId(mood.id);
         setNoteText(mood.note || "");
-        setModalVisible(true);
+        setNoteModalVisible(true);
       }
     },
     [handleDeleteMood]
@@ -272,13 +317,16 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       loadShowLabelsPreference();
-    }, [loadShowLabelsPreference])
+      getEmotions().then(setEmotions).catch(() => setEmotions(DEFAULT_EMOTIONS));
+      loadCommonEmotions();
+    }, [loadShowLabelsPreference, loadCommonEmotions])
   );
 
-  const handleCloseModal = useCallback(() => {
-    setModalVisible(false);
+  const handleCloseNoteModal = useCallback(() => {
+    setNoteModalVisible(false);
     setCurrentMoodPressed(null);
     setSelectedMoodId(null);
+    setSelectedEmotion(null);
   }, []);
 
   return (
@@ -366,12 +414,24 @@ export default function HomeScreen() {
           </View>
         </SafeAreaView>
       </GestureHandlerRootView>
-      {modalVisible && (
+      {/* Emotion Picker then Note modal */}
+      {emotionPickerVisible && currentMoodPressed !== null && (
+        <EmotionPickerModal
+          visible={emotionPickerVisible}
+          moodValue={currentMoodPressed}
+          emotions={emotions}
+          commonEmotions={commonEmotions}
+          onCancel={() => setEmotionPickerVisible(false)}
+          onSelectEmotion={handleSelectEmotion}
+          onSkip={proceedToNoteModal}
+        />
+      )}
+      {noteModalVisible && (
         <NoteModal
-          visible={modalVisible}
+          visible={noteModalVisible}
           noteText={noteText}
           setNoteText={setNoteText}
-          onCancel={handleCloseModal}
+          onCancel={handleCloseNoteModal}
           onSave={handleAddNote}
         />
       )}
