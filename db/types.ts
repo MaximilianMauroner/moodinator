@@ -4,6 +4,7 @@
 export type MoodEntry = {
     id: number;
     mood: number; // 0-10
+    emotion: string | null; // Selected emotion label from mood scale
     note: string | null;
     timestamp: string; // ISO format
 };
