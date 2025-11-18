@@ -38,12 +38,7 @@ import {
 } from "@/lib/entrySettings";
 import * as Notifications from "expo-notifications";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import {
-  getNotificationSettings,
-  saveNotificationSettings,
-  useNotifications,
-} from "@/hooks/useNotifications";
-import { NotificationTimePickerModal } from "@/components/NotificationTimePickerModal";
+import { useNotifications } from "@/hooks/useNotifications";
 // Storage key for show labels preference
 const SHOW_LABELS_KEY = "showLabelsPreference";
 const DEV_OPTIONS_KEY = "devOptionsEnabled";
@@ -59,11 +54,6 @@ export default function SettingsScreen() {
     source: "file" | "random";
   } | null>(null);
 
-  // Notification settings state
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [notificationHour, setNotificationHour] = useState(20);
-  const [notificationMinute, setNotificationMinute] = useState(0);
-  const [showTimePickerModal, setShowTimePickerModal] = useState(false);
   const [emotions, setEmotions] = useState<string[]>(DEFAULT_EMOTIONS);
   const [contexts, setContexts] = useState<string[]>(DEFAULT_CONTEXTS);
   const [quickEntryPrefs, setQuickEntryPrefs] = useState<QuickEntryPrefs>(
@@ -86,24 +76,11 @@ export default function SettingsScreen() {
   // Load saved preferences on component mount
   useEffect(() => {
     loadShowLabelsPreference();
-    loadNotificationSettings();
     loadDevOptionsPreference();
     loadEmotionPresets();
     loadContextTags();
     loadQuickEntryPrefs();
   }, []);
-
-  // Load notification settings
-  const loadNotificationSettings = async () => {
-    try {
-      const settings = await getNotificationSettings();
-      setNotificationsEnabled(settings.enabled);
-      setNotificationHour(settings.hour);
-      setNotificationMinute(settings.minute);
-    } catch (error) {
-      console.error("Failed to load notification settings:", error);
-    }
-  };
 
   // Load the saved preference
   const loadShowLabelsPreference = async () => {
@@ -380,28 +357,6 @@ export default function SettingsScreen() {
     );
   };
 
-  // Handle notification settings
-  const handleToggleNotifications = async (value: boolean) => {
-    setNotificationsEnabled(value);
-    await saveNotificationSettings(value, notificationHour, notificationMinute);
-  };
-
-  const handleTimePickerSave = async (hour: number, minute: number) => {
-    setNotificationHour(hour);
-    setNotificationMinute(minute);
-    await saveNotificationSettings(notificationsEnabled, hour, minute);
-  };
-
-  const formatNotificationTime = () => {
-    const date = new Date();
-    date.setHours(notificationHour);
-    date.setMinutes(notificationMinute);
-    return date.toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    });
-  };
 
   const handleClearMoods = async () => {
     Alert.alert(
@@ -642,32 +597,21 @@ export default function SettingsScreen() {
 
                   <View className="border-t border-gray-200 dark:border-slate-800 my-4" />
 
-                  <ToggleRow
-                    title="Daily Mood Reminders"
-                    description="Get a daily notification to remind you to log your mood"
-                    value={notificationsEnabled}
-                    onChange={handleToggleNotifications}
-                    testID="toggle-reminders"
-                  />
-
-                  {notificationsEnabled && (
-                    <View>
-                      <Text className="text-base font-medium text-gray-800 dark:text-slate-100 mb-1">
-                        Notification Time
-                      </Text>
-                      <Text className="text-sm text-gray-600 dark:text-slate-300 mb-2">
-                        Choose when you'd like to receive daily reminders
-                      </Text>
-                      <Pressable
-                        onPress={() => setShowTimePickerModal(true)}
-                        className="border border-gray-300 dark:border-slate-700 rounded-lg p-3 bg-gray-50 dark:bg-slate-800"
-                      >
-                        <Text className="text-center text-lg font-medium text-slate-900 dark:text-slate-100">
-                          {formatNotificationTime()}
+                  <View>
+                    <Text className="text-base font-medium text-gray-800 dark:text-slate-100 mb-1">
+                      Notifications
+                    </Text>
+                    <Text className="text-sm text-gray-600 dark:text-slate-300 mb-3">
+                      Manage your mood reminder notifications
+                    </Text>
+                    <Link href="/notifications" asChild>
+                      <Pressable className="bg-blue-600 rounded-xl py-3 px-4 items-center">
+                        <Text className="text-white font-semibold">
+                          Manage Notifications
                         </Text>
                       </Pressable>
-                    </View>
-                  )}
+                    </Link>
+                  </View>
 
                   <View className="border-t border-gray-200 dark:border-slate-800 my-4" />
 
@@ -974,14 +918,6 @@ export default function SettingsScreen() {
         </View>
       </Modal>
 
-      {/* Notification Time Picker Modal */}
-      <NotificationTimePickerModal
-        visible={showTimePickerModal}
-        initialHour={notificationHour}
-        initialMinute={notificationMinute}
-        onClose={() => setShowTimePickerModal(false)}
-        onSave={handleTimePickerSave}
-      />
     </SafeAreaView>
   );
 }

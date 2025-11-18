@@ -6,10 +6,21 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const NOTIFICATIONS_ENABLED_KEY = 'notificationsEnabled';
 const NOTIFICATION_TIME_KEY = 'notificationTime';
 const NOTIFICATION_SCHEDULED_ID_KEY = 'moodReminderScheduledId';
+const NOTIFICATIONS_LIST_KEY = 'notificationsList';
 
 // Constants to identify our app's reminder notifications
 const MOOD_REMINDER_TITLE = '👋 How are you feeling?';
 const MOOD_REMINDER_TAG = 'mood-reminder';
+
+export interface NotificationConfig {
+    id: string;
+    title: string;
+    body: string;
+    hour: number;
+    minute: number;
+    enabled: boolean;
+    scheduledId?: string;
+}
 
 Notifications.setNotificationHandler({
     handleError(notificationId, error) {
@@ -202,4 +213,123 @@ export async function getNotificationSettings(): Promise<{ enabled: boolean; hou
         hour,
         minute,
     };
+}
+
+// New functions for managing multiple notifications
+export async function getAllNotifications(): Promise<NotificationConfig[]> {
+    try {
+        const stored = await AsyncStorage.getItem(NOTIFICATIONS_LIST_KEY);
+        if (stored) {
+            return JSON.parse(stored);
+        }
+        // Migrate from old single notification if it exists
+        const oldSettings = await getNotificationSettings();
+        if (oldSettings.enabled) {
+            const migrated: NotificationConfig = {
+                id: 'migrated-1',
+                title: MOOD_REMINDER_TITLE,
+                body: "Don't forget to log your mood for today!",
+                hour: oldSettings.hour,
+                minute: oldSettings.minute,
+                enabled: true,
+            };
+            await saveAllNotifications([migrated]);
+            return [migrated];
+        }
+        return [];
+    } catch (error) {
+        console.error('Failed to get notifications:', error);
+        return [];
+    }
+}
+
+export async function saveAllNotifications(notifications: NotificationConfig[]): Promise<void> {
+    try {
+        await AsyncStorage.setItem(NOTIFICATIONS_LIST_KEY, JSON.stringify(notifications));
+        // Reschedule all enabled notifications
+        await rescheduleAllNotifications(notifications);
+    } catch (error) {
+        console.error('Failed to save notifications:', error);
+    }
+}
+
+async function rescheduleAllNotifications(notifications: NotificationConfig[]): Promise<void> {
+    const granted = await registerForPushNotificationsAsync();
+    if (!granted) {
+        return;
+    }
+
+    // Cancel all existing notifications
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    for (const n of scheduled) {
+        const anyN: any = n as any;
+        const tag = anyN?.content?.data?.type as string | undefined;
+        if (tag === MOOD_REMINDER_TAG) {
+            try {
+                await Notifications.cancelScheduledNotificationAsync(anyN.identifier);
+            } catch { }
+        }
+    }
+
+    // Schedule all enabled notifications
+    for (const notification of notifications) {
+        if (notification.enabled) {
+            try {
+                const id = await Notifications.scheduleNotificationAsync({
+                    content: {
+                        title: notification.title,
+                        body: notification.body,
+                        data: { type: MOOD_REMINDER_TAG, notificationId: notification.id },
+                    },
+                    trigger: {
+                        channelId: "default",
+                        hour: notification.hour,
+                        minute: notification.minute,
+                        type: Notifications.SchedulableTriggerInputTypes.DAILY
+                    },
+                });
+                notification.scheduledId = id;
+            } catch (error) {
+                console.error(`Failed to schedule notification ${notification.id}:`, error);
+            }
+        }
+    }
+
+    // Save updated scheduled IDs
+    await AsyncStorage.setItem(NOTIFICATIONS_LIST_KEY, JSON.stringify(notifications));
+}
+
+export async function addNotification(notification: Omit<NotificationConfig, 'id' | 'scheduledId'>): Promise<NotificationConfig> {
+    const notifications = await getAllNotifications();
+    const newNotification: NotificationConfig = {
+        ...notification,
+        id: `notification-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    };
+    notifications.push(newNotification);
+    await saveAllNotifications(notifications);
+    return newNotification;
+}
+
+export async function updateNotification(id: string, updates: Partial<Omit<NotificationConfig, 'id'>>): Promise<void> {
+    const notifications = await getAllNotifications();
+    const index = notifications.findIndex(n => n.id === id);
+    if (index === -1) {
+        throw new Error(`Notification with id ${id} not found`);
+    }
+    notifications[index] = { ...notifications[index], ...updates };
+    await saveAllNotifications(notifications);
+}
+
+export async function deleteNotification(id: string): Promise<void> {
+    const notifications = await getAllNotifications();
+    const notification = notifications.find(n => n.id === id);
+    if (notification?.scheduledId) {
+        try {
+            await Notifications.cancelScheduledNotificationAsync(notification.scheduledId);
+        } catch (error) {
+            console.error(`Failed to cancel notification ${id}:`, error);
+        }
+    }
+    const filtered = notifications.filter(n => n.id !== id);
+    await saveAllNotifications(filtered);
 }
