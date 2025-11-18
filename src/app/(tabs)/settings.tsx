@@ -1,4 +1,4 @@
-import React, { useState, useEffect, memo } from "react";
+import React, { useState, useEffect, memo, useCallback } from "react";
 import {
   View,
   Text,
@@ -43,6 +43,112 @@ import { useNotifications } from "@/hooks/useNotifications";
 const SHOW_LABELS_KEY = "showLabelsPreference";
 const DEV_OPTIONS_KEY = "devOptionsEnabled";
 
+const ToggleRow = memo(function ToggleRow({
+  title,
+  description,
+  value,
+  onChange,
+  testID,
+}: {
+  title: string;
+  description?: string;
+  value: boolean;
+  onChange: (v: boolean) => void;
+  testID?: string;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={() => onChange(!value)}
+      className="flex-row items-center justify-between"
+      testID={testID}
+    >
+      <View className="flex-1 pr-3">
+        <Text className="text-base font-medium text-gray-800 dark:text-slate-100">
+          {title}
+        </Text>
+        {description ? (
+          <Text className="text-sm text-gray-600 dark:text-slate-300 mt-0.5">
+            {description}
+          </Text>
+        ) : null}
+      </View>
+      <Switch value={value} onValueChange={onChange} />
+    </Pressable>
+  );
+});
+
+const ListEditor = memo(function ListEditor({
+  title,
+  description,
+  placeholder,
+  items,
+  newValue,
+  onChangeNewValue,
+  onAdd,
+  onRemove,
+}: {
+  title: string;
+  description: string;
+  placeholder: string;
+  items: string[];
+  newValue: string;
+  onChangeNewValue: (value: string) => void;
+  onAdd: () => void;
+  onRemove: (value: string) => void;
+}) {
+  return (
+    <View className="space-y-3">
+      <View>
+        <Text className="text-base font-medium text-gray-800 dark:text-slate-100">
+          {title}
+        </Text>
+        <Text className="text-sm text-gray-600 dark:text-slate-300 mt-1">
+          {description}
+        </Text>
+      </View>
+      <View className="flex-row gap-3 items-stretch">
+        <TextInput
+          value={newValue}
+          onChangeText={onChangeNewValue}
+          placeholder={placeholder}
+          placeholderTextColor="#94a3b8"
+          className="flex-1 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-3 text-base bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+          blurOnSubmit={false}
+          returnKeyType="done"
+        />
+        <Pressable
+          onPress={onAdd}
+          className="bg-blue-600 px-5 py-3 rounded-2xl self-stretch justify-center"
+        >
+          <Text className="text-white font-semibold">Add</Text>
+        </Pressable>
+      </View>
+      <View className="flex-row flex-wrap gap-3 pt-1">
+        {items.map((item) => (
+          <Pressable
+            key={item}
+            onPress={() => onRemove(item)}
+            className="flex-row items-center bg-blue-50 dark:bg-slate-800 border border-blue-200 dark:border-slate-700 rounded-full px-4 py-1.5"
+          >
+            <Text className="text-sm font-medium text-blue-800 dark:text-slate-100 mr-2">
+              {item}
+            </Text>
+            <Text className="text-xs uppercase tracking-wide text-blue-600 dark:text-slate-300">
+              Remove
+            </Text>
+          </Pressable>
+        ))}
+        {items.length === 0 && (
+          <Text className="text-sm text-gray-500 dark:text-slate-400">
+            No items yet.
+          </Text>
+        )}
+      </View>
+    </View>
+  );
+});
+
 export default function SettingsScreen() {
   const [loading, setLoading] = useState<
     "export" | "import" | "seed" | "clear" | null
@@ -71,6 +177,8 @@ export default function SettingsScreen() {
     return date;
   });
   const [customEndDate, setCustomEndDate] = useState(() => new Date());
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   useNotifications();
 
   // Load saved preferences on component mount
@@ -121,7 +229,7 @@ export default function SettingsScreen() {
     setQuickEntryPrefs(prefs);
   };
 
-  const handleAddEmotion = async () => {
+  const handleAddEmotion = useCallback(async () => {
     const trimmed = newEmotion.trim();
     if (!trimmed) return;
     if (emotions.includes(trimmed)) {
@@ -132,16 +240,18 @@ export default function SettingsScreen() {
     setEmotions(updated);
     setNewEmotion("");
     await saveEmotionPresets(updated);
-  };
+  }, [newEmotion, emotions]);
 
-  const handleRemoveEmotion = async (value: string) => {
-    const updated = emotions.filter((item) => item !== value);
-    const finalList = updated.length > 0 ? updated : DEFAULT_EMOTIONS;
-    setEmotions(finalList);
-    await saveEmotionPresets(finalList);
-  };
+  const handleRemoveEmotion = useCallback(async (value: string) => {
+    setEmotions((prev) => {
+      const updated = prev.filter((item) => item !== value);
+      const finalList = updated.length > 0 ? updated : DEFAULT_EMOTIONS;
+      saveEmotionPresets(finalList);
+      return finalList;
+    });
+  }, []);
 
-  const handleAddContext = async () => {
+  const handleAddContext = useCallback(async () => {
     const trimmed = newContext.trim();
     if (!trimmed) return;
     if (contexts.includes(trimmed)) {
@@ -152,14 +262,16 @@ export default function SettingsScreen() {
     setContexts(updated);
     setNewContext("");
     await saveContextTags(updated);
-  };
+  }, [newContext, contexts]);
 
-  const handleRemoveContext = async (value: string) => {
-    const updated = contexts.filter((item) => item !== value);
-    const finalList = updated.length > 0 ? updated : DEFAULT_CONTEXTS;
-    setContexts(finalList);
-    await saveContextTags(finalList);
-  };
+  const handleRemoveContext = useCallback(async (value: string) => {
+    setContexts((prev) => {
+      const updated = prev.filter((item) => item !== value);
+      const finalList = updated.length > 0 ? updated : DEFAULT_CONTEXTS;
+      saveContextTags(finalList);
+      return finalList;
+    });
+  }, []);
 
   const handleQuickEntryToggle = async (
     key: keyof QuickEntryPrefs,
@@ -212,11 +324,19 @@ export default function SettingsScreen() {
       });
       Alert.alert("Export Ready", "Mood data shared successfully.");
     } else {
-      await Clipboard.setStringAsync(jsonData);
-      Alert.alert(
-        "Copied Instead",
-        "Sharing isn't available on this device, so the JSON was copied to your clipboard."
-      );
+      try {
+        await Clipboard.setStringAsync(jsonData);
+        Alert.alert(
+          "Copied Instead",
+          "Sharing isn't available on this device, so the JSON was copied to your clipboard."
+        );
+      } catch (clipboardError) {
+        console.error("Clipboard not available:", clipboardError);
+        Alert.alert(
+          "Export Ready",
+          "Export file created. Please use a file manager to access it."
+        );
+      }
     }
 
     try {
@@ -248,9 +368,17 @@ export default function SettingsScreen() {
     try {
       setLoading("export");
       const jsonData = await exportMoods(rangePayload);
-      await Clipboard.setStringAsync(jsonData);
-      Alert.alert("Copied", "Mood data copied to your clipboard.");
-      setExportModalVisible(false);
+      try {
+        await Clipboard.setStringAsync(jsonData);
+        Alert.alert("Copied", "Mood data copied to your clipboard.");
+        setExportModalVisible(false);
+      } catch (clipboardError) {
+        console.error("Clipboard not available:", clipboardError);
+        Alert.alert(
+          "Clipboard Unavailable",
+          "Unable to copy to clipboard. Please use the Share option instead."
+        );
+      }
     } catch (error) {
       Alert.alert("Export Error", "Failed to copy mood data");
       console.error(error);
@@ -289,6 +417,8 @@ export default function SettingsScreen() {
   const handleExport = () => {
     resetCustomRange();
     setExportRange("week");
+    setShowStartDatePicker(false);
+    setShowEndDatePicker(false);
     setExportModalVisible(true);
   };
 
@@ -357,7 +487,6 @@ export default function SettingsScreen() {
     );
   };
 
-
   const handleClearMoods = async () => {
     Alert.alert(
       "Clear All Data",
@@ -388,114 +517,16 @@ export default function SettingsScreen() {
     );
   };
 
-  // Simple reusable toggle row for consistent styling
-  const ToggleRow = memo(function ToggleRow({
-    title,
-    description,
-    value,
-    onChange,
-    testID,
-  }: {
-    title: string;
-    description?: string;
-    value: boolean;
-    onChange: (v: boolean) => void;
-    testID?: string;
-  }) {
-    return (
-      <Pressable
-        accessibilityRole="button"
-        onPress={() => onChange(!value)}
-        className="flex-row items-center justify-between"
-        testID={testID}
-      >
-        <View className="flex-1 pr-3">
-          <Text className="text-base font-medium text-gray-800 dark:text-slate-100">
-            {title}
-          </Text>
-          {description ? (
-            <Text className="text-sm text-gray-600 dark:text-slate-300 mt-0.5">
-              {description}
-            </Text>
-          ) : null}
-        </View>
-        <Switch value={value} onValueChange={onChange} />
-      </Pressable>
-    );
-  });
-
-  const ListEditor = memo(function ListEditor({
-    title,
-    description,
-    placeholder,
-    items,
-    newValue,
-    onChangeNewValue,
-    onAdd,
-    onRemove,
-  }: {
-    title: string;
-    description: string;
-    placeholder: string;
-    items: string[];
-    newValue: string;
-    onChangeNewValue: (value: string) => void;
-    onAdd: () => void;
-    onRemove: (value: string) => void;
-  }) {
-    return (
-      <View className="space-y-3">
-        <View>
-          <Text className="text-base font-medium text-gray-800 dark:text-slate-100">
-            {title}
-          </Text>
-          <Text className="text-sm text-gray-600 dark:text-slate-300 mt-1">
-            {description}
-          </Text>
-        </View>
-        <View className="flex-row gap-3 items-stretch">
-          <TextInput
-            value={newValue}
-            onChangeText={onChangeNewValue}
-            placeholder={placeholder}
-            placeholderTextColor="#94a3b8"
-            className="flex-1 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-3 text-base bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-          />
-          <Pressable
-            onPress={onAdd}
-            className="bg-blue-600 px-5 py-3 rounded-2xl self-stretch justify-center"
-          >
-            <Text className="text-white font-semibold">Add</Text>
-          </Pressable>
-        </View>
-        <View className="flex-row flex-wrap gap-3 pt-1">
-          {items.map((item) => (
-            <Pressable
-              key={item}
-              onPress={() => onRemove(item)}
-              className="flex-row items-center bg-blue-50 dark:bg-slate-800 border border-blue-200 dark:border-slate-700 rounded-full px-4 py-1.5"
-            >
-              <Text className="text-sm font-medium text-blue-800 dark:text-slate-100 mr-2">
-                {item}
-              </Text>
-              <Text className="text-xs uppercase tracking-wide text-blue-600 dark:text-slate-300">
-                Remove
-              </Text>
-            </Pressable>
-          ))}
-          {items.length === 0 && (
-            <Text className="text-sm text-gray-500 dark:text-slate-400">
-              No items yet.
-            </Text>
-          )}
-        </View>
-      </View>
-    );
-  });
-
   return (
     <SafeAreaView className="flex-1 bg-white dark:bg-slate-950">
-      <ScrollView className="flex-1">
+      <ScrollView
+        className="flex-1"
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        nestedScrollEnabled={true}
+        scrollEnabled={true}
+        showsVerticalScrollIndicator={true}
+      >
         <View className="p-4">
           <Text className="text-3xl font-extrabold text-center mb-6 text-sky-600 dark:text-sky-400">
             Settings
@@ -786,7 +817,11 @@ export default function SettingsScreen() {
         visible={exportModalVisible}
         transparent
         animationType="slide"
-        onRequestClose={() => setExportModalVisible(false)}
+        onRequestClose={() => {
+          setExportModalVisible(false);
+          setShowStartDatePicker(false);
+          setShowEndDatePicker(false);
+        }}
       >
         <View className="flex-1 bg-black/60 justify-end">
           <View className="bg-white dark:bg-slate-900 rounded-t-3xl p-5 border-t border-slate-200 dark:border-slate-800">
@@ -806,9 +841,11 @@ export default function SettingsScreen() {
               ].map((option) => (
                 <Pressable
                   key={option.key}
-                  onPress={() =>
-                    setExportRange(option.key as "week" | "month" | "custom")
-                  }
+                  onPress={() => {
+                    setExportRange(option.key as "week" | "month" | "custom");
+                    setShowStartDatePicker(false);
+                    setShowEndDatePicker(false);
+                  }}
                   className={`flex-1 mx-1 rounded-xl border px-2 py-2 ${
                     exportRange === option.key
                       ? "bg-blue-600 border-blue-600"
@@ -834,13 +871,24 @@ export default function SettingsScreen() {
                   <Text className="text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">
                     Start Date
                   </Text>
-                  <View className="rounded-2xl border border-slate-200 dark:border-slate-700 p-2 bg-gray-50 dark:bg-slate-800">
+                  <Pressable
+                    onPress={() => setShowStartDatePicker(true)}
+                    className="rounded-2xl border border-slate-200 dark:border-slate-700 p-2 bg-gray-50 dark:bg-slate-800"
+                  >
+                    <Text className="text-slate-900 dark:text-slate-100">
+                      {customStartDate.toLocaleDateString()}
+                    </Text>
+                  </Pressable>
+                  {showStartDatePicker && (
                     <DateTimePicker
                       value={customStartDate}
                       mode="date"
                       display={Platform.OS === "ios" ? "spinner" : "default"}
                       maximumDate={customEndDate}
                       onChange={(_, date) => {
+                        if (Platform.OS === "android") {
+                          setShowStartDatePicker(false);
+                        }
                         if (date) {
                           setCustomStartDate(date);
                           if (date > customEndDate) {
@@ -849,14 +897,22 @@ export default function SettingsScreen() {
                         }
                       }}
                     />
-                  </View>
+                  )}
                 </View>
 
                 <View>
                   <Text className="text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">
                     End Date
                   </Text>
-                  <View className="rounded-2xl border border-slate-200 dark:border-slate-700 p-2 bg-gray-50 dark:bg-slate-800">
+                  <Pressable
+                    onPress={() => setShowEndDatePicker(true)}
+                    className="rounded-2xl border border-slate-200 dark:border-slate-700 p-2 bg-gray-50 dark:bg-slate-800"
+                  >
+                    <Text className="text-slate-900 dark:text-slate-100">
+                      {customEndDate.toLocaleDateString()}
+                    </Text>
+                  </Pressable>
+                  {showEndDatePicker && (
                     <DateTimePicker
                       value={customEndDate}
                       mode="date"
@@ -864,6 +920,9 @@ export default function SettingsScreen() {
                       minimumDate={customStartDate}
                       maximumDate={new Date()}
                       onChange={(_, date) => {
+                        if (Platform.OS === "android") {
+                          setShowEndDatePicker(false);
+                        }
                         if (date) {
                           setCustomEndDate(date);
                           if (date < customStartDate) {
@@ -872,7 +931,7 @@ export default function SettingsScreen() {
                         }
                       }}
                     />
-                  </View>
+                  )}
                 </View>
               </View>
             )}
@@ -905,7 +964,11 @@ export default function SettingsScreen() {
               </Pressable>
 
               <Pressable
-                onPress={() => setExportModalVisible(false)}
+                onPress={() => {
+                  setExportModalVisible(false);
+                  setShowStartDatePicker(false);
+                  setShowEndDatePicker(false);
+                }}
                 disabled={loading === "export"}
                 className="rounded-2xl py-3 items-center bg-gray-100 dark:bg-slate-800"
               >
@@ -917,7 +980,6 @@ export default function SettingsScreen() {
           </View>
         </View>
       </Modal>
-
     </SafeAreaView>
   );
 }
