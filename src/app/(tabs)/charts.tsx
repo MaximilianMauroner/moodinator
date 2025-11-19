@@ -1,4 +1,10 @@
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, {
+  useEffect,
+  useState,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
 import { View, Text, TouchableOpacity, ActivityIndicator } from "react-native";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import type { MoodEntry } from "@db/types";
@@ -29,67 +35,77 @@ const tabs: {
   { id: "raw", label: "Data", icon: "list" },
 ];
 
-const TabSelector = ({
-  activeTab,
-  onTabPress,
-}: {
-  activeTab: TabType;
-  onTabPress: (id: TabType) => void;
-}) => {
-  const containerShadow = {
-    shadowColor: "#0f172a",
-    shadowOpacity: 0.08,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 8,
-  };
+const TAB_SELECTOR_SHADOW = {
+  shadowColor: "#0f172a",
+  shadowOpacity: 0.08,
+  shadowRadius: 18,
+  shadowOffset: { width: 0, height: 10 },
+  elevation: 8,
+} as const;
 
-  const activeTabShadow = {
-    shadowColor: "#0f172a",
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 4,
-  };
+const ACTIVE_TAB_SHADOW = {
+  shadowColor: "#0f172a",
+  shadowOpacity: 0.12,
+  shadowRadius: 12,
+  shadowOffset: { width: 0, height: 6 },
+  elevation: 4,
+} as const;
 
-  return (
-    <View
-      className="mx-4 mb-4 bg-slate-100 dark:bg-slate-900 rounded-xl p-1 flex-row"
-      style={containerShadow}
-    >
-      {tabs.map((tab) => {
-        const isActive = activeTab === tab.id;
-        return (
-          <TouchableOpacity
-            key={tab.id}
-            onPress={() => onTabPress(tab.id)}
-            className={`flex-1 flex-row items-center justify-center py-2 rounded-lg transition-all ${
-              isActive ? "bg-white dark:bg-slate-800" : ""
-            }`}
-            style={isActive ? activeTabShadow : undefined}
-            activeOpacity={0.8}
-          >
-            <Ionicons
-              name={tab.icon}
-              size={16}
-              color={isActive ? "#3b82f6" : "#94a3b8"}
-              style={{ marginRight: 6 }}
-            />
-            <Text
-              className={`text-xs font-bold ${
-                isActive
-                  ? "text-slate-900 dark:text-white"
-                  : "text-slate-500 dark:text-slate-400"
+const MemoOverviewTab = React.memo(OverviewTab);
+const MemoWeeklyTab = React.memo(WeeklyTab);
+const MemoDailyTab = React.memo(DailyTab);
+const MemoRawDataTab = React.memo(RawDataTab);
+
+const TabSelector = React.memo(
+  ({
+    activeTab,
+    onTabPress,
+  }: {
+    activeTab: TabType;
+    onTabPress: (id: TabType) => void;
+  }) => {
+    return (
+      <View
+        className="mx-4 mb-4 bg-slate-100 dark:bg-slate-900 rounded-xl p-1 flex-row"
+        style={TAB_SELECTOR_SHADOW}
+      >
+        {tabs.map((tab) => {
+          const isActive = activeTab === tab.id;
+
+          return (
+            <TouchableOpacity
+              key={tab.id}
+              onPress={() => onTabPress(tab.id)}
+              className={`flex-1 flex-row items-center justify-center py-2 rounded-lg transition-all ${
+                isActive ? "bg-white dark:bg-slate-800" : ""
               }`}
+              style={isActive ? ACTIVE_TAB_SHADOW : undefined}
+              activeOpacity={0.8}
             >
-              {tab.label}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
-};
+              <Ionicons
+                name={tab.icon}
+                size={16}
+                color={isActive ? "#3b82f6" : "#94a3b8"}
+                style={{ marginRight: 6 }}
+              />
+              <Text
+                className={`text-xs font-bold ${
+                  isActive
+                    ? "text-slate-900 dark:text-white"
+                    : "text-slate-500 dark:text-slate-400"
+                }`}
+              >
+                {tab.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    );
+  },
+  (prev, next) =>
+    prev.activeTab === next.activeTab && prev.onTabPress === next.onTabPress
+);
 
 export default function ChartsScreen() {
   const [moods, setMoods] = useState<MoodEntry[]>([]);
@@ -99,6 +115,11 @@ export default function ChartsScreen() {
   const [activeTab, setActiveTab] = useState<TabType>("overview");
 
   const pagerRef = useRef<PagerView>(null);
+  const tabIndexMap = useMemo(() => {
+    const map = new Map<TabType, number>();
+    tabs.forEach((tab, index) => map.set(tab.id, index));
+    return map;
+  }, []);
 
   const loadFullMoodData = useCallback(async () => {
     try {
@@ -122,12 +143,22 @@ export default function ChartsScreen() {
     loadFullMoodData();
   }, [loadFullMoodData]);
 
-  const handleTabPress = (tabId: TabType) => {
-    const tabIndex = tabs.findIndex((tab) => tab.id === tabId);
-    if (tabIndex === -1) return;
-    pagerRef.current?.setPage(tabIndex);
-    setActiveTab(tabId);
-  };
+  const handleTabPress = useCallback(
+    (tabId: TabType) => {
+      if (tabId === activeTab) {
+        return;
+      }
+      const tabIndex = tabIndexMap.get(tabId);
+      if (tabIndex === undefined) {
+        return;
+      }
+      if (pagerRef.current) {
+        pagerRef.current.setPageWithoutAnimation(tabIndex);
+      }
+      setActiveTab(tabId);
+    },
+    [activeTab, tabIndexMap]
+  );
 
   const handlePageSelected = useCallback(
     (event: PagerViewOnPageSelectedEvent) => {
@@ -188,16 +219,16 @@ export default function ChartsScreen() {
               onPageSelected={handlePageSelected}
             >
               <View key="overview" className="flex-1">
-                <OverviewTab moods={moods} onRefresh={onRefresh} />
+                <MemoOverviewTab moods={moods} onRefresh={onRefresh} />
               </View>
               <View key="weekly" className="flex-1">
-                <WeeklyTab moods={moods} onRefresh={onRefresh} />
+                <MemoWeeklyTab moods={moods} onRefresh={onRefresh} />
               </View>
               <View key="daily" className="flex-1">
-                <DailyTab moods={moods} onRefresh={onRefresh} />
+                <MemoDailyTab moods={moods} onRefresh={onRefresh} />
               </View>
               <View key="raw" className="flex-1">
-                <RawDataTab moods={moods} onRefresh={onRefresh} />
+                <MemoRawDataTab moods={moods} onRefresh={onRefresh} />
               </View>
             </PagerView>
           </>
