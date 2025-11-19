@@ -11,9 +11,6 @@ import { LineChart } from "react-native-chart-kit";
 import {
   format,
   startOfDay,
-  endOfDay,
-  isWithinInterval,
-  subDays,
 } from "date-fns";
 import type { MoodEntry } from "@db/types";
 import { Circle, Line } from "react-native-svg";
@@ -26,8 +23,9 @@ import {
 import { moodScale } from "@/constants/moodScale";
 import type { MoodScale } from "@/types/mood";
 import { useColorScheme } from "@/hooks/useColorScheme";
+import { Ionicons } from "@expo/vector-icons";
 
-// Memoized component for individual day items to prevent unnecessary re-renders
+// Memoized component for individual day items
 const DayItem = React.memo(
   ({
     day,
@@ -42,114 +40,95 @@ const DayItem = React.memo(
   }) => {
     const interpretation = getMoodInterpretation(day.finalAvg);
     const hasRealData = day.hasRealData;
+    const scheme = useColorScheme();
+    const isDark = scheme === "dark";
 
     return (
-      <View className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-xl mb-3 shadow-sm">
+      <View className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 mb-3 overflow-hidden shadow-sm">
         <TouchableOpacity
           onPress={onToggle}
-          className="flex-row justify-between items-center"
-          activeOpacity={0.7}
+          className="p-4 flex-row justify-between items-center active:bg-slate-50 dark:active:bg-slate-800/50"
+          activeOpacity={0.9}
         >
           <View className="flex-1">
-            <Text className="font-semibold text-gray-800 dark:text-slate-200">
+            <Text className="font-semibold text-slate-800 dark:text-slate-200 text-base">
               {format(day.date, "EEEE, MMM dd")}
             </Text>
-            <Text className="text-sm text-gray-500 dark:text-slate-400">
+            <Text className="text-sm text-slate-500 dark:text-slate-400 mt-1">
               {hasRealData
-                ? `${day.moods!.length} entries • Range: ${day.min}-${day.max}`
-                : "No entries for this day"}
+                ? `${day.moods!.length} entries`
+                : "No entries"}
             </Text>
-            {hasRealData && day.moods!.length > 1 && (
-              <Text className="text-xs text-gray-400 dark:text-slate-500 mt-1">
-                Individual moods: {day.moods!.join(", ")}
-              </Text>
-            )}
           </View>
-          <View className="items-end">
-            <Text className={`text-2xl font-bold ${interpretation.textClass}`}>
-              {day.finalAvg.toFixed(1)}
-            </Text>
-            <View
-              className={`px-2 py-1 rounded mt-1 ${interpretation.bgClass}`}
-            >
-              <Text
-                className={`text-xs font-medium ${interpretation.textClass
-                  .replace("500", "700")
-                  .replace("600", "700")}`}
-              >
-                {interpretation.text}
-              </Text>
-            </View>
-            {!hasRealData && (
-              <Text className="text-xs text-gray-400 dark:text-slate-500 mt-1">
-                (no data)
-              </Text>
+          
+          <View className="flex-row items-center gap-3">
+            {hasRealData ? (
+                <View className="items-end">
+                    <Text className={`text-xl font-bold ${interpretation.textClass}`}>
+                        {day.finalAvg.toFixed(1)}
+                    </Text>
+                    <View className={`px-2 py-0.5 rounded-full ${interpretation.bgClass}`}>
+                        <Text className={`text-[10px] font-bold uppercase ${interpretation.textClass}`}>
+                            {interpretation.text}
+                        </Text>
+                    </View>
+                </View>
+            ) : (
+                 <Text className="text-xs text-slate-300 dark:text-slate-600 italic mr-2">No Data</Text>
             )}
+            <Ionicons 
+                name={isExpanded ? "chevron-up" : "chevron-down"} 
+                size={20} 
+                color={isDark ? "#475569" : "#cbd5e1"} 
+            />
           </View>
         </TouchableOpacity>
 
-        {/* Accordion Content - Mood Entries */}
+        {/* Accordion Content */}
         {isExpanded && (
-          <View className="mt-4 pt-4 border-t border-gray-100 dark:border-slate-800">
-            <Text className="text-sm font-semibold text-gray-800 dark:text-slate-200 mb-3">
-              📝 Mood Entries for this Day:
+          <View className="bg-slate-50 dark:bg-slate-950/30 border-t border-slate-100 dark:border-slate-800 p-4">
+            <Text className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-3">
+              Timeline
             </Text>
             {dayMoodEntries.length > 0 ? (
-              <View className="space-y-2">
-                {dayMoodEntries.map((entry) => {
+              <View className="gap-3">
+                {dayMoodEntries.map((entry, idx) => {
                   const entryMoodInfo = moodScale.find(
                     (m: MoodScale) => m.value === entry.mood
                   );
+                  const isLast = idx === dayMoodEntries.length - 1;
+                  
                   return (
-                    <View
-                      key={entry.id}
-                      className="bg-gray-50 dark:bg-slate-800 p-3 rounded-lg mb-2"
-                    >
-                      <View className="flex-row justify-between items-start">
-                        <View className="flex-1">
-                          <View className="flex flex-row justify-between items-center">
-                            <View className="flex flex-row items-center space-x-1">
-                              <Text
-                                className={`text-lg font-bold ${
-                                  entryMoodInfo?.color || "text-gray-600"
-                                }`}
-                              >
-                                {entry.mood}
-                              </Text>
-                              <View
-                                className={`px-2 py-1 rounded-full ml-2 ${
-                                  entryMoodInfo?.bg || "bg-gray-200"
-                                }`}
-                              >
-                                <Text
-                                  className={`text-xs font-medium ${
-                                    entryMoodInfo?.color || "text-gray-600"
-                                  }`}
-                                >
-                                  {entryMoodInfo?.label || `Mood ${entry.mood}`}
-                                </Text>
-                              </View>
-                            </View>
-                            <View>
-                              {entry.note && (
-                                <Text className="text-sm text-gray-600 dark:text-slate-300 italic">
-                                  "{entry.note}"
-                                </Text>
-                              )}
-                              <Text className="text-xs text-gray-500 dark:text-slate-400">
-                                {format(new Date(entry.timestamp), "HH:mm")}
-                              </Text>
-                            </View>
-                          </View>
+                    <View key={entry.id} className="flex-row">
+                        {/* Timeline visuals */}
+                        <View className="items-center mr-3 w-6">
+                             <View className={`w-2.5 h-2.5 rounded-full ${entryMoodInfo?.color ? entryMoodInfo.color.replace('text-', 'bg-') : 'bg-slate-400'}`} />
+                             {!isLast && <View className="w-0.5 flex-1 bg-slate-200 dark:bg-slate-700 my-1" />}
                         </View>
-                      </View>
+
+                        <View className="flex-1 pb-1">
+                            <View className="flex-row justify-between items-center">
+                                <Text className={`text-sm font-bold ${entryMoodInfo?.color || 'text-slate-700'}`}>
+                                    {entry.mood} - {entryMoodInfo?.label}
+                                </Text>
+                                <Text className="text-xs text-slate-400">
+                                    {format(new Date(entry.timestamp), "HH:mm")}
+                                </Text>
+                            </View>
+                            {entry.note && (
+                                <Text className="text-sm text-slate-600 dark:text-slate-400 mt-1 leading-5">
+                                    {entry.note}
+                                </Text>
+                            )}
+                             {/* Tags if available? (Future improvement) */}
+                        </View>
                     </View>
                   );
                 })}
               </View>
             ) : (
-              <Text className="text-sm text-gray-500 dark:text-slate-400 italic">
-                No detailed entries available for this day.
+              <Text className="text-sm text-slate-500 italic">
+                No entries for this day.
               </Text>
             )}
           </View>
@@ -182,7 +161,6 @@ export const DailyTab = ({
     [dailyAggregates]
   );
 
-  // Limit to last 7 days for Recent Days section
   const recentDaysAggregates = useMemo(
     () => reversedAggregates.slice(0, 7),
     [reversedAggregates]
@@ -199,43 +177,6 @@ export const DailyTab = ({
     });
     return map;
   }, [moods]);
-
-  const dailyStats = useMemo(() => {
-    if (!dailyAggregates || dailyAggregates.length === 0) {
-      return {
-        bestDay: 0,
-        worstDay: 0,
-        averageDay: 0,
-        daysWithEntries: 0,
-        totalDays: 0,
-      };
-    }
-
-    const daysWithData = dailyAggregates.filter((d) => !d.isInterpolated);
-    if (daysWithData.length === 0) {
-      return {
-        bestDay: 0,
-        worstDay: 0,
-        averageDay: 0,
-        daysWithEntries: 0,
-        totalDays: dailyAggregates.length,
-      };
-    }
-
-    const bestDay = Math.min(...daysWithData.map((d) => d.finalAvg));
-    const worstDay = Math.max(...daysWithData.map((d) => d.finalAvg));
-    const averageDay =
-      daysWithData.reduce((sum, d) => sum + d.finalAvg, 0) /
-      daysWithData.length;
-
-    return {
-      bestDay,
-      worstDay,
-      averageDay,
-      daysWithEntries: daysWithData.length,
-      totalDays: dailyAggregates.length,
-    };
-  }, [dailyAggregates]);
 
   const toggleDayExpansion = useCallback((dayKey: string) => {
     setExpandedDays((prev) => {
@@ -258,7 +199,6 @@ export const DailyTab = ({
     return callbacks;
   }, [dailyAggregates, toggleDayExpansion]);
 
-  // Memoize dot colors calculation
   const dotColors = useMemo(() => {
     return reversedAggregates.map((agg) => {
       const idx = Math.round(agg.finalAvg);
@@ -266,10 +206,9 @@ export const DailyTab = ({
     });
   }, [reversedAggregates]);
 
-  // Memoize chart data
   const chartData = useMemo(
     () => ({
-      labels: [...labels].reverse(), // Reverse labels to match reversed aggregates
+      labels: [...labels].reverse(),
       datasets: [
         {
           data: reversedAggregates.map((agg) => agg.finalAvg),
@@ -277,14 +216,8 @@ export const DailyTab = ({
           strokeWidth: 2,
           color: (o = 1) => `rgba(255,255,255,${o})`,
         },
-        {
-          data: [0], // Min value for y-axis
-          withDots: false,
-        },
-        {
-          data: [10], // Max value for y-axis
-          withDots: false,
-        },
+        { data: [0], withDots: false },
+        { data: [10], withDots: false },
       ],
     }),
     [labels, reversedAggregates, dotColors]
@@ -293,105 +226,75 @@ export const DailyTab = ({
   return (
     <ScrollView
       className="flex-1 bg-transparent"
+      contentContainerStyle={{ paddingBottom: 20 }}
+      showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl refreshing={false} onRefresh={onRefresh} />
       }
     >
-      <Text className="text-xl font-semibold text-center mb-1 text-blue-600 dark:text-blue-400 mx-4">
-        📅 Daily Mood Analysis
-      </Text>
+      {/* Daily Chart */}
+      <View className="mx-4 mb-6 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 p-4 overflow-hidden">
+         <View className="flex-row justify-between items-center mb-4 px-2">
+             <View>
+                <Text className="text-lg font-bold text-slate-800 dark:text-slate-200">
+                Daily Fluctuation
+                </Text>
+                <Text className="text-xs text-slate-400 dark:text-slate-500 font-medium">
+                Last 30 Days
+                </Text>
+            </View>
+             <View className="w-8 h-8 bg-blue-50 dark:bg-blue-900/20 rounded-full items-center justify-center">
+                 <Ionicons name="pulse" size={18} color="#3b82f6" />
+             </View>
+        </View>
 
-      {/* Daily Statistics Summary */}
-      <View className="mx-4 mb-6 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-xl shadow-sm">
-        <Text className="text-lg font-semibold mb-3 text-gray-800 dark:text-slate-200">
-          Daily Statistics
-        </Text>
-        <View className="flex-row justify-between mb-3">
-          <View className="flex-1">
-            <Text className="text-sm text-gray-500 dark:text-slate-400">
-              Best Day
-            </Text>
-            <Text
-              className={`text-lg font-bold ${
-                getMoodInterpretation(dailyStats.bestDay).textClass
-              }`}
-            >
-              {dailyStats.bestDay.toFixed(1)}
-            </Text>
-            <Text className="text-xs text-gray-400 dark:text-slate-500">
-              {getMoodInterpretation(dailyStats.bestDay).text}
-            </Text>
-          </View>
-          <View className="flex-1">
-            <Text className="text-sm text-gray-500 dark:text-slate-400">
-              Challenging Day
-            </Text>
-            <Text
-              className={`text-lg font-bold ${
-                getMoodInterpretation(dailyStats.worstDay).textClass
-              }`}
-            >
-              {dailyStats.worstDay.toFixed(1)}
-            </Text>
-            <Text className="text-xs text-gray-400 dark:text-slate-500">
-              {getMoodInterpretation(dailyStats.worstDay).text}
-            </Text>
-          </View>
-          <View className="flex-1">
-            <Text className="text-sm text-gray-500 dark:text-slate-400">
-              Average
-            </Text>
-            <Text
-              className={`text-lg font-bold ${
-                getMoodInterpretation(dailyStats.averageDay).textClass
-              }`}
-            >
-              {dailyStats.averageDay.toFixed(1)}
-            </Text>
-            <Text className="text-xs text-gray-400 dark:text-slate-500">
-              {getMoodInterpretation(dailyStats.averageDay).text}
-            </Text>
-          </View>
-        </View>
-        <View className="flex-row justify-between">
-          <View className="flex-1">
-            <Text className="text-sm text-gray-500 dark:text-slate-400">
-              Days Tracked
-            </Text>
-            <Text className="text-lg font-bold text-purple-600">
-              {dailyStats.daysWithEntries}
-            </Text>
-            <Text className="text-xs text-gray-400 dark:text-slate-500">
-              of {dailyStats.totalDays} days
-            </Text>
-          </View>
-          <View className="flex-1">
-            <Text className="text-sm text-gray-500 dark:text-slate-400">
-              Consistency
-            </Text>
-            <Text className="text-lg font-bold text-teal-600">
-              {(
-                (dailyStats.daysWithEntries / dailyStats.totalDays) *
-                100
-              ).toFixed(0)}
-              %
-            </Text>
-            <Text className="text-xs text-gray-400 dark:text-slate-500">
-              tracking rate
-            </Text>
-          </View>
-        </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          scrollEventThrottle={16}
+          contentContainerStyle={{ paddingRight: 20 }}
+        >
+          <LineChart
+            data={chartData}
+            width={Math.max(
+              Dimensions.get("window").width - 64,
+              chartData.labels.length * 40
+            )}
+            height={220}
+            chartConfig={getBaseChartConfig("#7986CB", "#5C6BC0", isDark)}
+            style={{ borderRadius: 16 }}
+            bezier
+            segments={5}
+            renderDotContent={({ x, y, index }) => {
+              // Custom dot rendering logic remains
+              const agg = reversedAggregates[index];
+              const startY = 176; // Adjusted for new height
+              const endY = 10;
+              const split = Math.abs(startY - endY) / 10;
+              
+              // Just render simple main dot to keep it clean, or keep complex logic if needed
+              return (
+                  <Circle
+                    key={index}
+                    cx={x}
+                    cy={y}
+                    r="4"
+                    fill={dotColors[index]}
+                    stroke="#fff"
+                    strokeWidth="1.5"
+                  />
+              );
+            }}
+          />
+        </ScrollView>
       </View>
 
-      {/* Recent Days Summary */}
-      <View className="mx-4 mb-6">
-        <Text className="text-lg font-semibold mb-1 text-gray-800 dark:text-slate-200">
+      {/* Recent Days List */}
+      <View className="mx-4">
+        <Text className="text-base font-bold mb-3 text-slate-800 dark:text-slate-200 px-1">
           Recent Days
         </Text>
-        <Text className="text-sm text-gray-500 dark:text-slate-400 mb-4">
-          Tap any day to view detailed mood entries and notes
-        </Text>
-        {recentDaysAggregates.map((day, index) => {
+        {recentDaysAggregates.map((day) => {
           const dayKey = day.date.toString();
           const isExpanded = expandedDays.has(dayKey);
           const dayMoodEntries = moodEntriesByDay.get(dayKey) || [];
@@ -406,114 +309,6 @@ export const DailyTab = ({
             />
           );
         })}
-      </View>
-
-      {/* Daily Chart */}
-      <View className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 mx-4 p-4 rounded-2xl shadow-lg mb-6">
-        <Text className="text-lg font-semibold mb-3 text-gray-800 dark:text-slate-200">
-          Daily Mood Trend
-        </Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          scrollEventThrottle={16}
-          contentContainerStyle={{ paddingVertical: 10 }}
-        >
-          <LineChart
-            data={chartData}
-            width={Math.max(
-              Dimensions.get("window").width - 64,
-              chartData.labels.length * 40
-            )}
-            height={300}
-            chartConfig={getBaseChartConfig("#7986CB", "#5C6BC0", isDark)}
-            style={{ borderRadius: 16 }}
-            bezier
-            segments={10}
-            renderDotContent={({ x, y, index }) => {
-              const agg = reversedAggregates[index];
-              const startY = 240,
-                endY = 15,
-                split = Math.abs(startY - endY) / 10;
-              const uniqueMoods = Array.from(new Set(agg.moods ?? []));
-              const moodCircles = uniqueMoods.map((val) => (
-                <Circle
-                  key={`m-${index}-${val}`}
-                  cx={x}
-                  cy={startY - split * val}
-                  r="3"
-                  fill={getColorFromTailwind(moodScale[val].color)}
-                  stroke={getColorFromTailwind(moodScale[val].color)}
-                />
-              ));
-              const y1 = startY - split * (agg.min ?? agg.finalAvg);
-              const y2 = startY - split * (agg.max ?? agg.finalAvg);
-              const lineEl =
-                agg.min !== undefined && agg.max !== undefined ? (
-                  <Line
-                    x1={x}
-                    x2={x}
-                    y1={y1}
-                    y2={y2}
-                    stroke={dotColors[index]}
-                    strokeWidth="3"
-                  />
-                ) : null;
-              return (
-                <React.Fragment key={index}>
-                  {lineEl}
-                  {moodCircles}
-                  <Circle
-                    cx={x}
-                    cy={y}
-                    r="5"
-                    fill={dotColors[index]}
-                    stroke={dotColors[index]}
-                    strokeWidth="1"
-                  />
-                </React.Fragment>
-              );
-            }}
-          />
-        </ScrollView>
-      </View>
-
-      {/* Daily Patterns Analysis */}
-      <View className="mx-4 mb-6 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-xl shadow-sm">
-        <Text className="text-lg font-semibold mb-3 text-gray-800 dark:text-slate-200">
-          Patterns & Insights
-        </Text>
-
-        <View className="mb-3">
-          <Text className="text-sm font-medium text-gray-700 dark:text-slate-200 mb-1">
-            Most Consistent Period
-          </Text>
-          <Text className="text-sm text-gray-600 dark:text-slate-400">
-            Last 7 days have{" "}
-            {dailyStats.daysWithEntries >= 5 ? "excellent" : "good"} tracking
-            consistency
-          </Text>
-        </View>
-
-        <View className="mb-3">
-          <Text className="text-sm font-medium text-gray-700 dark:text-slate-200 mb-1">
-            Trend Direction
-          </Text>
-          <Text className="text-sm text-gray-600 dark:text-slate-400">
-            {reversedAggregates.length >= 7
-              ? reversedAggregates
-                  .slice(0, 3)
-                  .reduce((sum, d) => sum + d.finalAvg, 0) /
-                  3 <
-                reversedAggregates
-                  .slice(-3)
-                  .reduce((sum, d) => sum + d.finalAvg, 0) /
-                  3
-                ? "Recent days show improvement compared to a week ago"
-                : "Consider what might help improve recent patterns"
-              : "More data needed for trend analysis"}
-          </Text>
-        </View>
       </View>
     </ScrollView>
   );

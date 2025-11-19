@@ -359,22 +359,27 @@ export default function HomeScreen() {
     <>
       <GestureHandlerRootView style={{ flex: 1 }}>
         {/* Use solid backgrounds (NativeWind gradients are not supported on native) */}
-        <SafeAreaView className="flex-1 bg-white dark:bg-slate-950">
-          <View className="flex-1 p-4 space-y-4">
-            <View>
-              <Text className="text-3xl font-extrabold text-center mb-1 text-sky-600 dark:text-sky-400">
-                Moodinator
-              </Text>
-              <Text className="text-center text-xs text-slate-500 dark:text-slate-400 mb-2">
-                Track. Reflect. Improve.
-              </Text>
-              <View className="bg-white dark:bg-slate-900 rounded-2xl shadow-lg p-4 mb-2 border border-slate-100 dark:border-slate-800">
-                {lastTracked && (
-                  <Text className="text-xs text-gray-400 dark:text-slate-500 text-center mb-2">
-                    Last tracked: {lastTracked.toLocaleTimeString()}
+        <SafeAreaView className="flex-1 bg-slate-50 dark:bg-slate-950">
+          <View className="flex-1 px-4 pt-4">
+            <View className="flex-row justify-between items-end mb-6">
+              <View>
+                <Text className="text-3xl font-bold text-slate-900 dark:text-white">
+                  Moodinator
+                </Text>
+                <Text className="text-sm text-slate-500 dark:text-slate-400 font-medium">
+                  How are you feeling right now?
+                </Text>
+              </View>
+              {lastTracked && (
+                <View className="bg-white dark:bg-slate-800 px-3 py-1 rounded-full border border-slate-200 dark:border-slate-700">
+                  <Text className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                    Latest: {lastTracked.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </Text>
-                )}
+                </View>
+              )}
+            </View>
 
+            <View>
                 {showDetailedLabels ? (
                   <MoodButtonsDetailed
                     onMoodPress={handleMoodPress}
@@ -386,22 +391,24 @@ export default function HomeScreen() {
                     onLongPress={handleLongPress}
                   />
                 )}
-              </View>
             </View>
 
-            <View className="flex-1 bg-white dark:bg-slate-900 rounded-2xl shadow-lg border border-slate-100 dark:border-slate-800">
-              <View className="flex-1 flex flex-col">
-                <View className="p-4 flex-row justify-between items-center">
-                  <Text className="font-bold text-xl text-blue-800 dark:text-blue-200">
-                    Mood History {moods.length > 0 ? `(${moods.length})` : ""}
+            <View className="flex-1 mt-6">
+                <View className="flex-row justify-between items-center mb-3 px-1">
+                  <Text className="font-bold text-lg text-slate-800 dark:text-slate-200">
+                    Recent History
                   </Text>
+                  {moods.length > 0 && (
+                      <Text className="text-xs text-slate-400 dark:text-slate-500 font-medium bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md">
+                        {moods.length} entries
+                      </Text>
+                  )}
                 </View>
                 <FlatList
                   data={moods}
                   initialNumToRender={10}
                   contentContainerStyle={{
-                    padding: 16,
-                    flexGrow: moods.length === 0 ? 1 : 0,
+                    paddingBottom: 100,
                   }}
                   renderItem={renderMoodItem}
                   keyExtractor={(item) => item.id.toString()}
@@ -413,6 +420,7 @@ export default function HomeScreen() {
                       tintColor="#3b82f6"
                     />
                   }
+                  showsVerticalScrollIndicator={false}
                   removeClippedSubviews={true}
                   windowSize={7}
                   maxToRenderPerBatch={10}
@@ -421,7 +429,6 @@ export default function HomeScreen() {
                   style={{ flex: 1 }}
                   ListEmptyComponent={renderEmptyComponent}
                 />
-              </View>
             </View>
           </View>
         </SafeAreaView>

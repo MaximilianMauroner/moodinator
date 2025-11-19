@@ -10,6 +10,7 @@ import {
   TextInput,
   Modal,
   Platform,
+  TouchableOpacity,
 } from "react-native";
 import { Link } from "expo-router";
 import * as DocumentPicker from "expo-document-picker";
@@ -39,42 +40,116 @@ import {
 import * as Notifications from "expo-notifications";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useNotifications } from "@/hooks/useNotifications";
-// Storage key for show labels preference
+import { Ionicons } from "@expo/vector-icons";
+
 const SHOW_LABELS_KEY = "showLabelsPreference";
 const DEV_OPTIONS_KEY = "devOptionsEnabled";
+
+const SectionHeader = ({ title, icon }: { title: string; icon?: string }) => (
+  <View className="flex-row items-center mb-3 mt-6 px-1">
+    {icon && <Text className="mr-2 text-lg">{icon}</Text>}
+    <Text className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+      {title}
+    </Text>
+  </View>
+);
+
+const SettingCard = ({ children }: { children: React.ReactNode }) => (
+  <View className="bg-white dark:bg-slate-900 rounded-2xl overflow-hidden shadow-sm border border-slate-100 dark:border-slate-800">
+    {children}
+  </View>
+);
+
+const SettingRow = ({
+  label,
+  subLabel,
+  action,
+  onPress,
+  isLast,
+  icon,
+  destructive,
+}: {
+  label: string;
+  subLabel?: string;
+  action?: React.ReactNode;
+  onPress?: () => void;
+  isLast?: boolean;
+  icon?: keyof typeof Ionicons.glyphMap;
+  destructive?: boolean;
+}) => (
+  <Pressable
+    onPress={onPress}
+    className={`flex-row items-center justify-between p-4 ${
+      !isLast ? "border-b border-slate-100 dark:border-slate-800" : ""
+    } ${onPress ? "active:bg-slate-50 dark:active:bg-slate-800/50" : ""}`}
+  >
+    <View className="flex-row items-center flex-1 mr-4">
+      {icon && (
+        <View
+          className={`w-8 h-8 rounded-full items-center justify-center mr-3 ${
+            destructive
+              ? "bg-red-100 dark:bg-red-900/20"
+              : "bg-slate-100 dark:bg-slate-800"
+          }`}
+        >
+          <Ionicons
+            name={icon}
+            size={18}
+            color={destructive ? "#ef4444" : "#64748b"}
+          />
+        </View>
+      )}
+      <View className="flex-1">
+        <Text
+          className={`text-base font-medium ${
+            destructive
+              ? "text-red-600 dark:text-red-400"
+              : "text-slate-900 dark:text-slate-100"
+          }`}
+        >
+          {label}
+        </Text>
+        {subLabel && (
+          <Text className="text-sm text-slate-500 dark:text-slate-400 mt-0.5 leading-5">
+            {subLabel}
+          </Text>
+        )}
+      </View>
+    </View>
+    {action && <View>{action}</View>}
+    {!action && onPress && (
+      <Ionicons name="chevron-forward" size={20} color="#cbd5e1" />
+    )}
+  </Pressable>
+);
 
 const ToggleRow = memo(function ToggleRow({
   title,
   description,
   value,
   onChange,
-  testID,
+  isLast,
 }: {
   title: string;
   description?: string;
   value: boolean;
   onChange: (v: boolean) => void;
-  testID?: string;
+  isLast?: boolean;
 }) {
   return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={() => onChange(!value)}
-      className="flex-row items-center justify-between"
-      testID={testID}
-    >
-      <View className="flex-1 pr-3">
-        <Text className="text-base font-medium text-gray-800 dark:text-slate-100">
-          {title}
-        </Text>
-        {description ? (
-          <Text className="text-sm text-gray-600 dark:text-slate-300 mt-0.5">
-            {description}
-          </Text>
-        ) : null}
-      </View>
-      <Switch value={value} onValueChange={onChange} />
-    </Pressable>
+    <SettingRow
+      label={title}
+      subLabel={description}
+      isLast={isLast}
+      action={
+        <Switch
+          value={value}
+          onValueChange={onChange}
+          trackColor={{ false: "#e2e8f0", true: "#3b82f6" }}
+          thumbColor={Platform.OS === "ios" ? undefined : "#fff"}
+        />
+      }
+    />
   );
 });
 
@@ -87,6 +162,7 @@ const ListEditor = memo(function ListEditor({
   onChangeNewValue,
   onAdd,
   onRemove,
+  isLast,
 }: {
   title: string;
   description: string;
@@ -96,52 +172,56 @@ const ListEditor = memo(function ListEditor({
   onChangeNewValue: (value: string) => void;
   onAdd: () => void;
   onRemove: (value: string) => void;
+  isLast?: boolean;
 }) {
   return (
-    <View className="space-y-3">
-      <View>
-        <Text className="text-base font-medium text-gray-800 dark:text-slate-100">
-          {title}
-        </Text>
-        <Text className="text-sm text-gray-600 dark:text-slate-300 mt-1">
-          {description}
-        </Text>
-      </View>
-      <View className="flex-row gap-3 items-stretch">
+    <View
+      className={`p-4 ${
+        !isLast ? "border-b border-slate-100 dark:border-slate-800" : ""
+      }`}
+    >
+      <Text className="text-base font-medium text-slate-900 dark:text-slate-100 mb-1">
+        {title}
+      </Text>
+      <Text className="text-sm text-slate-500 dark:text-slate-400 mb-3">
+        {description}
+      </Text>
+
+      <View className="flex-row gap-2 mb-4">
         <TextInput
           value={newValue}
           onChangeText={onChangeNewValue}
           placeholder={placeholder}
           placeholderTextColor="#94a3b8"
-          className="flex-1 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-3 text-base bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+          className="flex-1 bg-slate-100 dark:bg-slate-800 rounded-xl px-4 py-2.5 text-slate-900 dark:text-slate-100 border border-transparent focus:border-blue-500 transition-colors"
           blurOnSubmit={false}
           returnKeyType="done"
+          onSubmitEditing={onAdd}
         />
-        <Pressable
+        <TouchableOpacity
           onPress={onAdd}
-          className="bg-blue-600 px-5 py-3 rounded-2xl self-stretch justify-center"
+          className="bg-blue-600 w-12 h-12 rounded-xl items-center justify-center active:bg-blue-700"
         >
-          <Text className="text-white font-semibold">Add</Text>
-        </Pressable>
+          <Ionicons name="add" size={24} color="white" />
+        </TouchableOpacity>
       </View>
-      <View className="flex-row flex-wrap gap-3 pt-1">
+
+      <View className="flex-row flex-wrap gap-2">
         {items.map((item) => (
-          <Pressable
+          <TouchableOpacity
             key={item}
             onPress={() => onRemove(item)}
-            className="flex-row items-center bg-blue-50 dark:bg-slate-800 border border-blue-200 dark:border-slate-700 rounded-full px-4 py-1.5"
+            className="flex-row items-center bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full pl-3 pr-2 py-1.5"
           >
-            <Text className="text-sm font-medium text-blue-800 dark:text-slate-100 mr-2">
+            <Text className="text-sm font-medium text-slate-700 dark:text-slate-300 mr-1">
               {item}
             </Text>
-            <Text className="text-xs uppercase tracking-wide text-blue-600 dark:text-slate-300">
-              Remove
-            </Text>
-          </Pressable>
+            <Ionicons name="close-circle" size={16} color="#94a3b8" />
+          </TouchableOpacity>
         ))}
         {items.length === 0 && (
-          <Text className="text-sm text-gray-500 dark:text-slate-400">
-            No items yet.
+          <Text className="text-sm text-slate-400 italic p-1">
+            No items added yet.
           </Text>
         )}
       </View>
@@ -181,7 +261,6 @@ export default function SettingsScreen() {
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   useNotifications();
 
-  // Load saved preferences on component mount
   useEffect(() => {
     loadShowLabelsPreference();
     loadDevOptionsPreference();
@@ -190,25 +269,19 @@ export default function SettingsScreen() {
     loadQuickEntryPrefs();
   }, []);
 
-  // Load the saved preference
   const loadShowLabelsPreference = async () => {
     try {
       const value = await AsyncStorage.getItem(SHOW_LABELS_KEY);
-      if (value !== null) {
-        setShowDetailedLabels(value === "true");
-      }
+      if (value !== null) setShowDetailedLabels(value === "true");
     } catch (error) {
       console.error("Failed to load label preference:", error);
     }
   };
 
-  // Load dev options preference
   const loadDevOptionsPreference = async () => {
     try {
       const value = await AsyncStorage.getItem(DEV_OPTIONS_KEY);
-      if (value !== null) {
-        setDevOptionsEnabled(value === "true");
-      }
+      if (value !== null) setDevOptionsEnabled(value === "true");
     } catch (error) {
       console.error("Failed to load dev options preference:", error);
     }
@@ -277,10 +350,7 @@ export default function SettingsScreen() {
     key: keyof QuickEntryPrefs,
     value: boolean
   ) => {
-    const updated = {
-      ...quickEntryPrefs,
-      [key]: value,
-    };
+    const updated = { ...quickEntryPrefs, [key]: value };
     setQuickEntryPrefs(updated);
     await saveQuickEntryPrefs(updated);
   };
@@ -297,10 +367,7 @@ export default function SettingsScreen() {
       Alert.alert("Invalid Range", "End date must be after the start date.");
       return null;
     }
-    return {
-      startDate: start.getTime(),
-      endDate: end.getTime(),
-    };
+    return { startDate: start.getTime(), endDate: end.getTime() };
   };
 
   const formatDateSlug = (date: Date) => date.toISOString().split("T")[0];
@@ -322,27 +389,22 @@ export default function SettingsScreen() {
         mimeType: "application/json",
         dialogTitle: "Moodinator Export",
       });
-      Alert.alert("Export Ready", "Mood data shared successfully.");
     } else {
       try {
         await Clipboard.setStringAsync(jsonData);
         Alert.alert(
-          "Copied Instead",
-          "Sharing isn't available on this device, so the JSON was copied to your clipboard."
+          "Copied",
+          "Sharing isn't available, so the JSON was copied to your clipboard."
         );
-      } catch (clipboardError) {
-        console.error("Clipboard not available:", clipboardError);
-        Alert.alert(
-          "Export Ready",
-          "Export file created. Please use a file manager to access it."
-        );
+      } catch (error) {
+        Alert.alert("Error", "Export file created but could not be shared.");
       }
     }
 
     try {
       await FileSystem.deleteAsync(fileUri, { idempotent: true });
-    } catch (error) {
-      console.warn("Failed to clean up export file:", error);
+    } catch (e) {
+      console.warn("Cleanup failed:", e);
     }
   };
 
@@ -368,26 +430,16 @@ export default function SettingsScreen() {
     try {
       setLoading("export");
       const jsonData = await exportMoods(rangePayload);
-      try {
-        await Clipboard.setStringAsync(jsonData);
-        Alert.alert("Copied", "Mood data copied to your clipboard.");
-        setExportModalVisible(false);
-      } catch (clipboardError) {
-        console.error("Clipboard not available:", clipboardError);
-        Alert.alert(
-          "Clipboard Unavailable",
-          "Unable to copy to clipboard. Please use the Share option instead."
-        );
-      }
+      await Clipboard.setStringAsync(jsonData);
+      Alert.alert("Copied", "Mood data copied to clipboard.");
+      setExportModalVisible(false);
     } catch (error) {
       Alert.alert("Export Error", "Failed to copy mood data");
-      console.error(error);
     } finally {
       setLoading(null);
     }
   };
 
-  // Save preference when changed
   const handleToggleLabels = async (value: boolean) => {
     setShowDetailedLabels(value);
     try {
@@ -397,7 +449,6 @@ export default function SettingsScreen() {
     }
   };
 
-  // Save dev options when changed
   const handleToggleDevOptions = async (value: boolean) => {
     setDevOptionsEnabled(value);
     try {
@@ -429,24 +480,18 @@ export default function SettingsScreen() {
         type: "application/json",
       });
 
-      if (result.canceled) {
-        return;
-      }
+      if (result.canceled) return;
 
       const fileContent = await FileSystem.readAsStringAsync(
         result.assets[0].uri
       );
       const importedCount = await importMoods(fileContent);
-
       Alert.alert(
         "Import Successful",
         `Successfully imported ${importedCount} mood entries.`
       );
     } catch (error) {
-      Alert.alert(
-        "Import Error",
-        "Failed to import mood data. Please make sure the file is a valid JSON export."
-      );
+      Alert.alert("Import Error", "Failed to import mood data.");
       console.error(error);
     } finally {
       setLoading(null);
@@ -464,7 +509,6 @@ export default function SettingsScreen() {
       );
     } catch (error) {
       Alert.alert("Error", "Failed to add sample data");
-      console.error(error);
     } finally {
       setLoading(null);
     }
@@ -481,21 +525,15 @@ export default function SettingsScreen() {
         seconds: 2,
       },
     });
-    Alert.alert(
-      "Notification Scheduled",
-      "A test notification has been scheduled and will appear in 2 seconds."
-    );
+    Alert.alert("Scheduled", "Notification will appear in 2 seconds.");
   };
 
   const handleClearMoods = async () => {
     Alert.alert(
       "Clear All Data",
-      "Are you sure you want to delete all mood data? This action cannot be undone.",
+      "Are you sure you want to delete all mood data? This cannot be undone.",
       [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
+        { text: "Cancel", style: "cancel" },
         {
           text: "Delete All",
           style: "destructive",
@@ -507,7 +545,6 @@ export default function SettingsScreen() {
               Alert.alert("Success", "All mood data has been cleared.");
             } catch (error) {
               Alert.alert("Error", "Failed to clear mood data");
-              console.error(error);
             } finally {
               setLoading(null);
             }
@@ -518,464 +555,298 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-white dark:bg-slate-950">
+    <SafeAreaView
+      className="flex-1 bg-slate-50 dark:bg-slate-950"
+      edges={["top"]}
+    >
+      <View className="px-6 pt-2 pb-4 bg-white dark:bg-slate-950 border-b border-slate-100 dark:border-slate-800">
+        <Text className="text-3xl font-extrabold text-slate-900 dark:text-white">
+          Settings
+        </Text>
+      </View>
+
       <ScrollView
-        className="flex-1"
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-        nestedScrollEnabled={true}
-        scrollEnabled={true}
-        showsVerticalScrollIndicator={true}
+        className="flex-1 px-4"
+        contentContainerStyle={{ paddingBottom: 40 }}
+        showsVerticalScrollIndicator={false}
       >
-        <View className="p-4">
-          <Text className="text-3xl font-extrabold text-center mb-6 text-sky-600 dark:text-sky-400">
-            Settings
-          </Text>
-
-          <View className="space-y-4">
-            <Text className="text-lg font-semibold mb-2 text-gray-700 dark:text-slate-200">
-              Data Management
-            </Text>
-
-            <View className="bg-white dark:bg-slate-900 rounded-xl p-4 shadow-sm border border-slate-100 dark:border-slate-800">
-              <View className="space-y-4">
-                <View>
-                  <Text className="text-base font-medium text-gray-800 dark:text-slate-100 mb-1">
-                    Export Data
-                  </Text>
-                  <Text className="text-sm text-gray-600 dark:text-slate-300 mb-2">
-                    Export your mood data as a JSON file that you can save or
-                    share
-                  </Text>
-                  <Pressable
-                    onPress={handleExport}
-                    className="bg-blue-600 py-3 px-4 rounded-lg"
-                  >
-                    {loading === "export" ? (
-                      <ActivityIndicator color="#fff" />
-                    ) : (
-                      <Text className="text-white font-semibold text-center">
-                        Export Mood Data
-                      </Text>
-                    )}
-                  </Pressable>
-                </View>
-
-                <View className="border-t border-gray-200 dark:border-slate-800 my-4" />
-
-                <View>
-                  <Text className="text-base font-medium text-gray-800 dark:text-slate-100 mb-1">
-                    Import Data
-                  </Text>
-                  <Text className="text-sm text-gray-600 dark:text-slate-300 mb-2">
-                    Import previously exported mood data from a JSON file
-                  </Text>
-                  <Pressable
-                    onPress={handleImport}
-                    className="bg-green-600 py-3 px-4 rounded-lg"
-                  >
-                    {loading === "import" ? (
-                      <ActivityIndicator color="#fff" />
-                    ) : (
-                      <Text className="text-white font-semibold text-center">
-                        Import Mood Data
-                      </Text>
-                    )}
-                  </Pressable>
-                </View>
-
-                {/* Dev-only actions moved into the Developer Options card below */}
-              </View>
-            </View>
-
-            <View className="space-y-4 pb-8">
-              <Text className="text-lg font-semibold mb-2 text-gray-700 dark:text-slate-200">
-                Therapy Export
-              </Text>
-
-              <View className="bg-white dark:bg-slate-900 rounded-xl p-4 shadow-sm border border-slate-100 dark:border-slate-800 space-y-3">
-                <Text className="text-base font-medium text-gray-800 dark:text-slate-100">
-                  Therapy Export Profile
-                </Text>
-                <Text className="text-sm text-gray-600 dark:text-slate-300">
-                  Choose which fields to include, define date ranges, and export
-                  a therapist-friendly CSV.
-                </Text>
-                <Link href="/therapy-export" asChild>
-                  <Pressable className="mt-2 bg-blue-600 rounded-xl py-3 px-4 items-center">
-                    <Text className="text-white font-semibold">
-                      Open Therapy Export
+        {/* App Settings */}
+        <SectionHeader title="Preferences" icon="⚙️" />
+        <SettingCard>
+          <ToggleRow
+            title="Detailed Labels"
+            description="Show mood descriptions in charts"
+            value={showDetailedLabels}
+            onChange={handleToggleLabels}
+          />
+          <SettingRow
+            label="Notifications"
+            subLabel="Manage reminders"
+            icon="notifications-outline"
+            isLast
+            action={
+              <Link href="/notifications" asChild>
+                <TouchableOpacity>
+                  <View className="bg-blue-100 dark:bg-blue-900/30 px-3 py-1 rounded-full">
+                    <Text className="text-blue-600 dark:text-blue-400 font-medium text-sm">
+                      Configure
                     </Text>
-                  </Pressable>
-                </Link>
-              </View>
-            </View>
-
-            <View className="space-y-4 pb-8">
-              <Text className="text-lg font-semibold mb-2 text-gray-700 dark:text-slate-200">
-                Preferences
-              </Text>
-
-              <View className="bg-white dark:bg-slate-900 rounded-xl p-4 shadow-sm border border-slate-100 dark:border-slate-800">
-                <View className="space-y-4">
-                  <ToggleRow
-                    title="Show Detailed Labels"
-                    description="Toggle whether detailed labels are displayed in the app"
-                    value={showDetailedLabels}
-                    onChange={handleToggleLabels}
-                    testID="toggle-detailed-labels"
-                  />
-
-                  <View className="border-t border-gray-200 dark:border-slate-800 my-4" />
-
-                  <View>
-                    <Text className="text-base font-medium text-gray-800 dark:text-slate-100 mb-1">
-                      Notifications
-                    </Text>
-                    <Text className="text-sm text-gray-600 dark:text-slate-300 mb-3">
-                      Manage your mood reminder notifications
-                    </Text>
-                    <Link href="/notifications" asChild>
-                      <Pressable className="bg-blue-600 rounded-xl py-3 px-4 items-center">
-                        <Text className="text-white font-semibold">
-                          Manage Notifications
-                        </Text>
-                      </Pressable>
-                    </Link>
                   </View>
+                </TouchableOpacity>
+              </Link>
+            }
+          />
+        </SettingCard>
 
-                  <View className="border-t border-gray-200 dark:border-slate-800 my-4" />
+        {/* Customization */}
+        <SectionHeader title="Entry Customization" icon="✨" />
+        <SettingCard>
+          <ToggleRow
+            title="Quick Entry: Emotions"
+            value={quickEntryPrefs.showEmotions}
+            onChange={(v) => handleQuickEntryToggle("showEmotions", v)}
+          />
+          <ToggleRow
+            title="Quick Entry: Context"
+            value={quickEntryPrefs.showContext}
+            onChange={(v) => handleQuickEntryToggle("showContext", v)}
+          />
+          <ToggleRow
+            title="Quick Entry: Energy"
+            value={quickEntryPrefs.showEnergy}
+            onChange={(v) => handleQuickEntryToggle("showEnergy", v)}
+          />
+          <ToggleRow
+            title="Quick Entry: Notes"
+            value={quickEntryPrefs.showNotes}
+            onChange={(v) => handleQuickEntryToggle("showNotes", v)}
+          />
+          <ListEditor
+            title="Emotions"
+            description="Custom emotions for entries"
+            placeholder="Add emotion..."
+            items={emotions}
+            newValue={newEmotion}
+            onChangeNewValue={setNewEmotion}
+            onAdd={handleAddEmotion}
+            onRemove={handleRemoveEmotion}
+          />
+          <ListEditor
+            title="Contexts"
+            description="Tags for where/who/what"
+            placeholder="Add context..."
+            items={contexts}
+            newValue={newContext}
+            onChangeNewValue={setNewContext}
+            onAdd={handleAddContext}
+            onRemove={handleRemoveContext}
+            isLast
+          />
+        </SettingCard>
 
-                  <ToggleRow
-                    title="Developer Options"
-                    description="Show tools for testing: Add Sample Data, Clear All Data, Test Notification"
-                    value={devOptionsEnabled}
-                    onChange={handleToggleDevOptions}
-                    testID="toggle-developer-options"
-                  />
-                </View>
-              </View>
-            </View>
-
-            <View className="space-y-4 pb-8">
-              <Text className="text-lg font-semibold mb-2 text-gray-700 dark:text-slate-200">
-                Entry Customization
-              </Text>
-
-              <View className="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-100 dark:border-slate-800 space-y-6 flex gap-2">
-                <ToggleRow
-                  title="Quick Entry: Show Emotions"
-                  description="Display emotion selection in Quick Entry modal"
-                  value={quickEntryPrefs.showEmotions}
-                  onChange={(value) =>
-                    handleQuickEntryToggle("showEmotions", value)
-                  }
-                />
-
-                <ToggleRow
-                  title="Quick Entry: Show Context"
-                  description="Display context tags in Quick Entry modal"
-                  value={quickEntryPrefs.showContext}
-                  onChange={(value) =>
-                    handleQuickEntryToggle("showContext", value)
-                  }
-                />
-
-                <ToggleRow
-                  title="Quick Entry: Show Energy"
-                  description="Display energy slider in Quick Entry modal"
-                  value={quickEntryPrefs.showEnergy}
-                  onChange={(value) =>
-                    handleQuickEntryToggle("showEnergy", value)
-                  }
-                />
-
-                <ToggleRow
-                  title="Quick Entry: Show Notes"
-                  description="Allow notes input directly in Quick Entry"
-                  value={quickEntryPrefs.showNotes}
-                  onChange={(value) =>
-                    handleQuickEntryToggle("showNotes", value)
-                  }
-                />
-
-                <View className="border-t border-gray-200 dark:border-slate-800" />
-
-                <ListEditor
-                  title="Emotion Presets"
-                  description="Pick up to 3 emotions when logging. Add your own with the field below."
-                  placeholder="Add emotion"
-                  items={emotions}
-                  newValue={newEmotion}
-                  onChangeNewValue={setNewEmotion}
-                  onAdd={handleAddEmotion}
-                  onRemove={handleRemoveEmotion}
-                />
-
-                <View className="border-t border-gray-200 dark:border-slate-800" />
-
-                <ListEditor
-                  title="Context Tags"
-                  description="Label where or with whom you were during an entry."
-                  placeholder="Add context"
-                  items={contexts}
-                  newValue={newContext}
-                  onChangeNewValue={setNewContext}
-                  onAdd={handleAddContext}
-                  onRemove={handleRemoveContext}
-                />
-              </View>
-            </View>
-
-            {devOptionsEnabled && (
-              <View className="space-y-4 pb-8">
-                <Text className="text-lg font-semibold mb-2 text-gray-700 dark:text-slate-200">
-                  Developer Options
-                </Text>
-
-                <View className="bg-white dark:bg-slate-900 rounded-xl p-4 shadow-sm border border-slate-100 dark:border-slate-800">
-                  <View className="space-y-6">
-                    <View>
-                      <Text className="text-base font-medium text-gray-800 dark:text-slate-100 mb-1">
-                        Add Sample Data
-                      </Text>
-                      <Text className="text-sm text-gray-600 dark:text-slate-300 mb-2">
-                        Add sample mood entries for testing and demonstration
-                      </Text>
-                      <Pressable
-                        onPress={handleSeedMoods}
-                        className="bg-purple-600 py-3 px-4 rounded-lg"
-                      >
-                        {loading === "seed" ? (
-                          <ActivityIndicator color="#fff" />
-                        ) : (
-                          <Text className="text-white font-semibold text-center">
-                            Add Sample Data
-                          </Text>
-                        )}
-                      </Pressable>
-                    </View>
-
-                    <View className="border-t border-gray-200 dark:border-slate-800" />
-
-                    <View>
-                      <Text className="text-base font-medium text-gray-800 dark:text-slate-100 mb-1">
-                        Clear All Data
-                      </Text>
-                      <Text className="text-sm text-gray-600 dark:text-slate-300 mb-2">
-                        Remove all mood entries from the database
-                      </Text>
-                      <Pressable
-                        onPress={handleClearMoods}
-                        className="bg-red-600 py-3 px-4 rounded-lg"
-                      >
-                        {loading === "clear" ? (
-                          <ActivityIndicator color="#fff" />
-                        ) : (
-                          <Text className="text-white font-semibold text-center">
-                            Clear All Data
-                          </Text>
-                        )}
-                      </Pressable>
-                    </View>
-
-                    <View className="border-t border-gray-200 dark:border-slate-800" />
-
-                    <View>
-                      <Text className="text-base font-medium text-gray-800 dark:text-slate-100 mb-1">
-                        Test Notification
-                      </Text>
-                      <Text className="text-sm text-gray-600 dark:text-slate-300 mb-2">
-                        Schedule a test notification to appear in 2 seconds.
-                      </Text>
-                      <Pressable
-                        onPress={handleTestNotification}
-                        className="bg-gray-600 py-3 px-4 rounded-lg"
-                      >
-                        <Text className="text-white font-semibold text-center">
-                          Send Test Notification
-                        </Text>
-                      </Pressable>
-                    </View>
-
-                    {lastSeedResult && (
-                      <View className="mt-2 p-3 bg-green-50 dark:bg-emerald-950 border border-green-200 dark:border-emerald-800 rounded-lg">
-                        <Text className="text-green-800 dark:text-emerald-200 text-center font-medium">
-                          ✅ Added {lastSeedResult.count} sample mood entries
-                        </Text>
-                      </View>
-                    )}
+        {/* Data Management */}
+        <SectionHeader title="Data" icon="💾" />
+        <SettingCard>
+          <SettingRow
+            label="Export Data"
+            subLabel="Save your history as JSON"
+            icon="download-outline"
+            onPress={handleExport}
+          />
+          <SettingRow
+            label="Import Data"
+            subLabel="Restore from JSON backup"
+            icon="refresh-outline"
+            onPress={handleImport}
+          />
+          <SettingRow
+            label="Therapy Export"
+            subLabel="Create a report for your therapist"
+            icon="document-text-outline"
+            isLast
+            action={
+              <Link href="/therapy-export" asChild>
+                <TouchableOpacity>
+                  <View className="bg-purple-100 dark:bg-purple-900/30 px-3 py-1 rounded-full">
+                    <Text className="text-purple-600 dark:text-purple-400 font-medium text-sm">
+                      Create
+                    </Text>
                   </View>
-                </View>
-              </View>
-            )}
-          </View>
+                </TouchableOpacity>
+              </Link>
+            }
+          />
+        </SettingCard>
+
+        {/* Developer Options */}
+        <SectionHeader title="Advanced" icon="🛠️" />
+        <SettingCard>
+          <ToggleRow
+            title="Developer Mode"
+            value={devOptionsEnabled}
+            onChange={handleToggleDevOptions}
+            isLast={!devOptionsEnabled}
+          />
+          {devOptionsEnabled && (
+            <>
+              <SettingRow
+                label="Add Sample Data"
+                subLabel="Generate test entries"
+                icon="flask-outline"
+                onPress={handleSeedMoods}
+              />
+              <SettingRow
+                label="Test Notification"
+                subLabel="Send a push in 2s"
+                icon="notifications-circle-outline"
+                onPress={handleTestNotification}
+              />
+              <SettingRow
+                label="Clear All Data"
+                subLabel="Permanently delete everything"
+                icon="trash-outline"
+                destructive
+                isLast
+                onPress={handleClearMoods}
+              />
+            </>
+          )}
+        </SettingCard>
+
+        <View className="mt-8 mb-4 items-center">
+          <Text className="text-slate-400 text-xs">Moodinator v1.0.0</Text>
         </View>
       </ScrollView>
 
+      {/* Export Modal */}
       <Modal
         visible={exportModalVisible}
         transparent
         animationType="slide"
-        onRequestClose={() => {
-          setExportModalVisible(false);
-          setShowStartDatePicker(false);
-          setShowEndDatePicker(false);
-        }}
+        onRequestClose={() => setExportModalVisible(false)}
       >
-        <View className="flex-1 bg-black/60 justify-end">
-          <View className="bg-white dark:bg-slate-900 rounded-t-3xl p-5 border-t border-slate-200 dark:border-slate-800">
-            <Text className="text-xl font-semibold text-center text-slate-900 dark:text-slate-100 mb-2">
-              Export Mood Data
-            </Text>
-            <Text className="text-sm text-center text-slate-500 dark:text-slate-400 mb-4">
-              Choose a date range to include timestamp, mood, emotions, context,
-              energy, and notes.
-            </Text>
+        <View className="flex-1 bg-black/40 justify-end">
+          <View className="bg-white dark:bg-slate-900 rounded-t-3xl p-6 border-t border-slate-200 dark:border-slate-800 pb-10">
+            <View className="items-center mb-6">
+              <View className="w-12 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full mb-4" />
+              <Text className="text-xl font-bold text-slate-900 dark:text-slate-100">
+                Export Data
+              </Text>
+            </View>
 
-            <View className="flex-row justify-between mb-4">
-              {[
-                { key: "week", label: "Last 7 Days" },
-                { key: "month", label: "Last 30 Days" },
-                { key: "custom", label: "Custom" },
-              ].map((option) => (
+            <View className="flex-row bg-slate-100 dark:bg-slate-800 p-1 rounded-xl mb-6">
+              {(["week", "month", "custom"] as const).map((opt) => (
                 <Pressable
-                  key={option.key}
-                  onPress={() => {
-                    setExportRange(option.key as "week" | "month" | "custom");
-                    setShowStartDatePicker(false);
-                    setShowEndDatePicker(false);
-                  }}
-                  className={`flex-1 mx-1 rounded-xl border px-2 py-2 ${
-                    exportRange === option.key
-                      ? "bg-blue-600 border-blue-600"
-                      : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700"
+                  key={opt}
+                  onPress={() => setExportRange(opt)}
+                  className={`flex-1 py-2 rounded-lg ${
+                    exportRange === opt
+                      ? "bg-white dark:bg-slate-700 shadow-sm"
+                      : ""
                   }`}
                 >
                   <Text
-                    className={`text-center text-sm font-semibold ${
-                      exportRange === option.key
-                        ? "text-white"
-                        : "text-slate-800 dark:text-slate-200"
+                    className={`text-center font-medium capitalize ${
+                      exportRange === opt
+                        ? "text-slate-900 dark:text-slate-100"
+                        : "text-slate-500 dark:text-slate-400"
                     }`}
                   >
-                    {option.label}
+                    {opt === "week"
+                      ? "7 Days"
+                      : opt === "month"
+                      ? "30 Days"
+                      : "Custom"}
                   </Text>
                 </Pressable>
               ))}
             </View>
 
             {exportRange === "custom" && (
-              <View className="space-y-4 mb-4">
-                <View>
-                  <Text className="text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">
-                    Start Date
+              <View className="flex-row gap-3 mb-6">
+                <Pressable
+                  onPress={() => setShowStartDatePicker(true)}
+                  className="flex-1 bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700"
+                >
+                  <Text className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                    From
                   </Text>
-                  <Pressable
-                    onPress={() => setShowStartDatePicker(true)}
-                    className="rounded-2xl border border-slate-200 dark:border-slate-700 p-2 bg-gray-50 dark:bg-slate-800"
-                  >
-                    <Text className="text-slate-900 dark:text-slate-100">
-                      {customStartDate.toLocaleDateString()}
-                    </Text>
-                  </Pressable>
-                  {showStartDatePicker && (
-                    <DateTimePicker
-                      value={customStartDate}
-                      mode="date"
-                      display={Platform.OS === "ios" ? "spinner" : "default"}
-                      maximumDate={customEndDate}
-                      onChange={(_, date) => {
-                        if (Platform.OS === "android") {
-                          setShowStartDatePicker(false);
-                        }
-                        if (date) {
-                          setCustomStartDate(date);
-                          if (date > customEndDate) {
-                            setCustomEndDate(date);
-                          }
-                        }
-                      }}
-                    />
-                  )}
-                </View>
-
-                <View>
-                  <Text className="text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">
-                    End Date
+                  <Text className="text-base font-medium text-slate-900 dark:text-slate-100">
+                    {customStartDate.toLocaleDateString()}
                   </Text>
-                  <Pressable
-                    onPress={() => setShowEndDatePicker(true)}
-                    className="rounded-2xl border border-slate-200 dark:border-slate-700 p-2 bg-gray-50 dark:bg-slate-800"
-                  >
-                    <Text className="text-slate-900 dark:text-slate-100">
-                      {customEndDate.toLocaleDateString()}
-                    </Text>
-                  </Pressable>
-                  {showEndDatePicker && (
-                    <DateTimePicker
-                      value={customEndDate}
-                      mode="date"
-                      display={Platform.OS === "ios" ? "spinner" : "default"}
-                      minimumDate={customStartDate}
-                      maximumDate={new Date()}
-                      onChange={(_, date) => {
-                        if (Platform.OS === "android") {
-                          setShowEndDatePicker(false);
-                        }
-                        if (date) {
-                          setCustomEndDate(date);
-                          if (date < customStartDate) {
-                            setCustomStartDate(date);
-                          }
-                        }
-                      }}
-                    />
-                  )}
-                </View>
+                </Pressable>
+                <Pressable
+                  onPress={() => setShowEndDatePicker(true)}
+                  className="flex-1 bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700"
+                >
+                  <Text className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                    To
+                  </Text>
+                  <Text className="text-base font-medium text-slate-900 dark:text-slate-100">
+                    {customEndDate.toLocaleDateString()}
+                  </Text>
+                </Pressable>
               </View>
             )}
 
-            <View className="space-y-3 mt-2">
-              <Pressable
+            {/* Date Pickers */}
+            {showStartDatePicker && (
+              <DateTimePicker
+                value={customStartDate}
+                mode="date"
+                display={Platform.OS === "ios" ? "spinner" : "default"}
+                maximumDate={customEndDate}
+                onChange={(e, d) => {
+                  if (Platform.OS !== "ios") setShowStartDatePicker(false);
+                  if (d) setCustomStartDate(d);
+                }}
+              />
+            )}
+            {showEndDatePicker && (
+              <DateTimePicker
+                value={customEndDate}
+                mode="date"
+                display={Platform.OS === "ios" ? "spinner" : "default"}
+                minimumDate={customStartDate}
+                maximumDate={new Date()}
+                onChange={(e, d) => {
+                  if (Platform.OS !== "ios") setShowEndDatePicker(false);
+                  if (d) setCustomEndDate(d);
+                }}
+              />
+            )}
+
+            <View className="gap-3">
+              <TouchableOpacity
                 onPress={handleExportShare}
                 disabled={loading === "export"}
-                className={`rounded-2xl py-3 items-center ${
-                  loading === "export" ? "bg-blue-400" : "bg-blue-600"
-                }`}
+                className="bg-blue-600 p-4 rounded-xl flex-row justify-center items-center"
               >
                 {loading === "export" ? (
-                  <ActivityIndicator color="#fff" />
+                  <ActivityIndicator color="white" />
                 ) : (
-                  <Text className="text-white font-semibold">
-                    Share JSON (Therapist)
-                  </Text>
+                  <>
+                    <Ionicons
+                      name="share-outline"
+                      size={20}
+                      color="white"
+                      style={{ marginRight: 8 }}
+                    />
+                    <Text className="text-white font-bold text-base">
+                      Share JSON
+                    </Text>
+                  </>
                 )}
-              </Pressable>
+              </TouchableOpacity>
 
-              <Pressable
-                onPress={handleExportCopy}
-                disabled={loading === "export"}
-                className="rounded-2xl py-3 items-center border border-slate-300 dark:border-slate-700"
+              <TouchableOpacity
+                onPress={() => setExportModalVisible(false)}
+                className="bg-slate-100 dark:bg-slate-800 p-4 rounded-xl items-center"
               >
-                <Text className="text-slate-800 dark:text-slate-100 font-semibold">
-                  Copy JSON to Clipboard
-                </Text>
-              </Pressable>
-
-              <Pressable
-                onPress={() => {
-                  setExportModalVisible(false);
-                  setShowStartDatePicker(false);
-                  setShowEndDatePicker(false);
-                }}
-                disabled={loading === "export"}
-                className="rounded-2xl py-3 items-center bg-gray-100 dark:bg-slate-800"
-              >
-                <Text className="text-slate-700 dark:text-slate-100 font-semibold">
+                <Text className="text-slate-900 dark:text-slate-300 font-semibold">
                   Cancel
                 </Text>
-              </Pressable>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
