@@ -1,16 +1,12 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  ActivityIndicator,
-} from "react-native";
+import { View, Text, TouchableOpacity, ActivityIndicator } from "react-native";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import type { MoodEntry } from "@db/types";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import PagerView from "react-native-pager-view";
+import PagerView, {
+  PagerViewOnPageSelectedEvent,
+} from "react-native-pager-view";
 import { getAllMoods } from "@db/db";
 import {
   DailyTab,
@@ -18,48 +14,92 @@ import {
   RawDataTab,
   WeeklyTab,
 } from "@/components/charts";
+import { Ionicons } from "@expo/vector-icons";
 
 type TabType = "overview" | "weekly" | "daily" | "raw";
 
-const tabs: { id: TabType; label: string; icon: string }[] = [
-  { id: "overview", label: "Overview", icon: "📊" },
-  { id: "weekly", label: "Weekly", icon: "📅" },
-  { id: "daily", label: "Daily", icon: "📈" },
-  { id: "raw", label: "Raw Data", icon: "🔬" },
+const tabs: {
+  id: TabType;
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+}[] = [
+  { id: "overview", label: "Overview", icon: "stats-chart" },
+  { id: "weekly", label: "Weekly", icon: "calendar" },
+  { id: "daily", label: "Daily", icon: "today" },
+  { id: "raw", label: "Data", icon: "list" },
 ];
+
+const TabSelector = ({
+  activeTab,
+  onTabPress,
+}: {
+  activeTab: TabType;
+  onTabPress: (id: TabType) => void;
+}) => {
+  const containerShadow = {
+    shadowColor: "#0f172a",
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 8,
+  };
+
+  const activeTabShadow = {
+    shadowColor: "#0f172a",
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
+  };
+
+  return (
+    <View
+      className="mx-4 mb-4 bg-slate-100 dark:bg-slate-900 rounded-xl p-1 flex-row"
+      style={containerShadow}
+    >
+      {tabs.map((tab) => {
+        const isActive = activeTab === tab.id;
+        return (
+          <TouchableOpacity
+            key={tab.id}
+            onPress={() => onTabPress(tab.id)}
+            className={`flex-1 flex-row items-center justify-center py-2 rounded-lg transition-all ${
+              isActive ? "bg-white dark:bg-slate-800" : ""
+            }`}
+            style={isActive ? activeTabShadow : undefined}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name={tab.icon}
+              size={16}
+              color={isActive ? "#3b82f6" : "#94a3b8"}
+              style={{ marginRight: 6 }}
+            />
+            <Text
+              className={`text-xs font-bold ${
+                isActive
+                  ? "text-slate-900 dark:text-white"
+                  : "text-slate-500 dark:text-slate-400"
+              }`}
+            >
+              {tab.label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+};
 
 export default function ChartsScreen() {
   const [moods, setMoods] = useState<MoodEntry[]>([]);
   const [moodCount, setMoodCount] = useState<number>(0);
-  const [_, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>("overview");
-  const [componentsLoaded, setComponentsLoaded] = useState(false);
+
   const pagerRef = useRef<PagerView>(null);
-  const tabScrollRef = useRef<ScrollView>(null);
-  const scheme = useColorScheme();
-  const isDark = scheme === "dark";
 
-  const getCurrentTabIndex = () => {
-    return tabs.findIndex((tab) => tab.id === activeTab);
-  };
-
-  // Scroll the active tab into view
-  const scrollToActiveTab = useCallback((tabIndex: number) => {
-    if (tabScrollRef.current) {
-      // Calculate the position to scroll to keep the active tab centered
-      const tabWidth = 120; // Approximate tab width including margins
-      const scrollPosition = Math.max(0, tabIndex * tabWidth - tabWidth * 1.5);
-
-      tabScrollRef.current.scrollTo({
-        x: scrollPosition,
-        animated: true,
-      });
-    }
-  }, []);
-
-  // Load full mood data in background
   const loadFullMoodData = useCallback(async () => {
     try {
       setLoading(true);
@@ -67,226 +107,114 @@ export default function ChartsScreen() {
       setMoods(allMoods);
       setMoodCount(allMoods.length);
       setDataLoaded(true);
-      setRefreshing(false);
     } catch (error) {
       console.error("Failed to load mood data:", error);
-      setRefreshing(false);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const getMoodCount = useCallback(async () => {
-    setRefreshing(true);
-    await loadFullMoodData();
+  const onRefresh = useCallback(() => {
+    loadFullMoodData();
   }, [loadFullMoodData]);
 
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    getMoodCount();
-  }, [getMoodCount]);
+  useEffect(() => {
+    loadFullMoodData();
+  }, [loadFullMoodData]);
 
-  const handleTabPress = useCallback(
-    (tabId: TabType) => {
-      const tabIndex = tabs.findIndex((tab) => tab.id === tabId);
-      setActiveTab(tabId);
-      pagerRef.current?.setPage(tabIndex);
-      scrollToActiveTab(tabIndex);
-    },
-    [componentsLoaded, scrollToActiveTab]
-  );
+  const handleTabPress = (tabId: TabType) => {
+    const tabIndex = tabs.findIndex((tab) => tab.id === tabId);
+    if (tabIndex === -1) return;
+    pagerRef.current?.setPage(tabIndex);
+    setActiveTab(tabId);
+  };
 
   const handlePageSelected = useCallback(
-    (e: any) => {
-      const pageIndex = e.nativeEvent.position;
+    (event: PagerViewOnPageSelectedEvent) => {
+      const pageIndex = event.nativeEvent.position;
       const selectedTab = tabs[pageIndex];
-      if (selectedTab && selectedTab.id !== activeTab) {
+      if (selectedTab) {
         setActiveTab(selectedTab.id);
-        scrollToActiveTab(pageIndex);
       }
     },
-    [activeTab, scrollToActiveTab]
+    []
   );
 
-  useEffect(() => {
-    getMoodCount();
-  }, [getMoodCount]);
-
-  // Scroll to active tab when components are loaded
-  useEffect(() => {
-    if (componentsLoaded && moodCount > 0) {
-      const currentIndex = getCurrentTabIndex();
-      scrollToActiveTab(currentIndex);
-    }
-  }, [componentsLoaded, moodCount, scrollToActiveTab]);
+  if (loading && !dataLoaded) {
+    return (
+      <View className="flex-1 justify-center items-center bg-white dark:bg-slate-950">
+        <ActivityIndicator size="large" color="#3B82F6" />
+        <Text className="text-slate-400 mt-4 font-medium">
+          Loading Insights...
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaView className="flex-1 bg-white dark:bg-slate-950">
+      <SafeAreaView
+        className="flex-1 bg-slate-50 dark:bg-slate-950"
+        edges={["top"]}
+      >
         {/* Header */}
-        <View className="mt-1 flex flex-row justify-center items-center p-4">
-          <Text className="text-3xl font-extrabold text-center text-sky-600 dark:text-sky-400">
-            Insights
-          </Text>
-          <View className="justify-center">
-            <Text className="font-semibold pl-2 text-purple-600 dark:text-purple-300">
-              ({moodCount})
-            </Text>
+        <View className="px-6 py-4 bg-slate-50 dark:bg-slate-950">
+          <View className="flex-row justify-between items-end">
+            <View>
+              <Text className="text-3xl font-extrabold text-slate-900 dark:text-white">
+                Insights
+              </Text>
+              <Text className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                {moodCount} entries tracked
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={onRefresh}
+              className="bg-white dark:bg-slate-800 p-2 rounded-full border border-slate-200 dark:border-slate-700"
+            >
+              <Ionicons name="refresh" size={20} color="#64748b" />
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Tab Navigation */}
-        {moodCount > 0 && (
-          <View className="mx-4 mb-6">
-            <ScrollView
-              ref={tabScrollRef}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              className="flex-row"
-              contentContainerStyle={{ paddingHorizontal: 8 }}
-              decelerationRate="fast"
+        {moodCount > 0 ? (
+          <>
+            <TabSelector activeTab={activeTab} onTabPress={handleTabPress} />
+            <PagerView
+              ref={pagerRef}
+              style={{ flex: 1 }}
+              initialPage={0}
+              scrollEnabled={true}
+              onPageSelected={handlePageSelected}
             >
-              {tabs.map((tab) => {
-                const inactiveBg = isDark ? "#0f172a" : "#F8FAFC";
-                const inactiveBorder = isDark ? "#1f2937" : "#E2E8F0";
-                const inactiveText = isDark ? "#E5E7EB" : "#475569";
-                return (
-                  <TouchableOpacity
-                    key={tab.id}
-                    onPress={() => handleTabPress(tab.id)}
-                    style={{
-                      paddingHorizontal: 20,
-                      paddingVertical: 12,
-                      borderRadius: 25,
-                      marginHorizontal: 6,
-                      backgroundColor:
-                        activeTab === tab.id ? "#3B82F6" : inactiveBg,
-                      borderWidth: activeTab === tab.id ? 0 : 1.5,
-                      borderColor:
-                        activeTab === tab.id ? "transparent" : inactiveBorder,
-                      shadowColor:
-                        activeTab === tab.id ? "#3B82F6" : "transparent",
-                      shadowOffset: { width: 0, height: 2 },
-                      shadowOpacity: activeTab === tab.id ? 0.25 : 0,
-                      shadowRadius: 4,
-                      elevation: activeTab === tab.id ? 4 : 0,
-                      transform: [{ scale: activeTab === tab.id ? 1.02 : 1 }],
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <View
-                      style={{ flexDirection: "row", alignItems: "center" }}
-                    >
-                      <Text style={{ fontSize: 18, marginRight: 8 }}>
-                        {tab.icon}
-                      </Text>
-                      <Text
-                        style={{
-                          fontWeight: activeTab === tab.id ? "700" : "600",
-                          color:
-                            activeTab === tab.id ? "#FFFFFF" : inactiveText,
-                          fontSize: 14,
-                        }}
-                      >
-                        {tab.label}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
+              <View key="overview" className="flex-1">
+                <OverviewTab moods={moods} onRefresh={onRefresh} />
+              </View>
+              <View key="weekly" className="flex-1">
+                <WeeklyTab moods={moods} onRefresh={onRefresh} />
+              </View>
+              <View key="daily" className="flex-1">
+                <DailyTab moods={moods} onRefresh={onRefresh} />
+              </View>
+              <View key="raw" className="flex-1">
+                <RawDataTab moods={moods} onRefresh={onRefresh} />
+              </View>
+            </PagerView>
+          </>
+        ) : (
+          <View className="flex-1 justify-center items-center p-8 opacity-70">
+            <View className="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-full items-center justify-center mb-6">
+              <Text className="text-4xl">📊</Text>
+            </View>
+            <Text className="text-slate-900 dark:text-white text-xl font-bold mb-2">
+              No Data Yet
+            </Text>
+            <Text className="text-slate-500 dark:text-slate-400 text-center leading-6">
+              Start tracking your moods to unlock insights about your patterns
+              and well-being.
+            </Text>
           </View>
         )}
-
-        {/* Content based on selected tab */}
-        {loading ? (
-          <View className="flex-1 justify-center items-center p-8 mt-20">
-            <Text className="text-6xl mb-4">⏳</Text>
-            <Text className="text-gray-500 dark:text-slate-400 text-center text-lg font-semibold">
-              Loading your mood data...
-            </Text>
-          </View>
-        ) : moodCount > 0 ? (
-          <PagerView
-            ref={pagerRef}
-            style={{ flex: 1 }}
-            initialPage={getCurrentTabIndex()}
-            onPageSelected={handlePageSelected}
-            scrollEnabled={true}
-            overScrollMode="never"
-            overdrag={false}
-            orientation="horizontal"
-            pageMargin={0}
-            keyboardDismissMode="on-drag"
-          >
-            <View key="overview" style={{ flex: 1 }} collapsable={false}>
-              {dataLoaded ? (
-                <OverviewTab moods={moods} onRefresh={onRefresh} />
-              ) : (
-                <View className="flex-1 justify-center items-center">
-                  <ActivityIndicator size="large" color="#3B82F6" />
-                  <Text className="text-gray-500 dark:text-slate-400 mt-4">
-                    {!dataLoaded
-                      ? "Loading chart data..."
-                      : "Loading components..."}
-                  </Text>
-                </View>
-              )}
-            </View>
-            <View key="weekly" style={{ flex: 1 }} collapsable={false}>
-              {dataLoaded ? (
-                <WeeklyTab moods={moods} onRefresh={onRefresh} />
-              ) : (
-                <View className="flex-1 justify-center items-center">
-                  <ActivityIndicator size="large" color="#3B82F6" />
-                  <Text className="text-gray-500 dark:text-slate-400 mt-4">
-                    {!dataLoaded
-                      ? "Loading chart data..."
-                      : "Loading components..."}
-                  </Text>
-                </View>
-              )}
-            </View>
-            <View key="daily" style={{ flex: 1 }} collapsable={false}>
-              {dataLoaded ? (
-                <DailyTab moods={moods} onRefresh={onRefresh} />
-              ) : (
-                <View className="flex-1 justify-center items-center">
-                  <ActivityIndicator size="large" color="#3B82F6" />
-                  <Text className="text-gray-500 dark:text-slate-400 mt-4">
-                    {!dataLoaded
-                      ? "Loading chart data..."
-                      : "Loading components..."}
-                  </Text>
-                </View>
-              )}
-            </View>
-            <View key="raw" style={{ flex: 1 }} collapsable={false}>
-              {dataLoaded ? (
-                <RawDataTab moods={moods} onRefresh={onRefresh} />
-              ) : (
-                <View className="flex-1 justify-center items-center">
-                  <ActivityIndicator size="large" color="#3B82F6" />
-                  <Text className="text-gray-500 dark:text-slate-400 mt-4">
-                    {!dataLoaded
-                      ? "Loading chart data..."
-                      : "Loading components..."}
-                  </Text>
-                </View>
-              )}
-            </View>
-          </PagerView>
-        ) : !loading ? (
-          <View className="flex-1 justify-center items-center p-8 mt-20">
-            <Text className="text-6xl mb-4">📊</Text>
-            <Text className="text-gray-500 dark:text-slate-400 text-center text-lg font-semibold">
-              No mood data available yet
-            </Text>
-            <Text className="text-gray-400 dark:text-slate-500 text-center mt-2">
-              Start tracking your moods to see beautiful insights here!
-            </Text>
-          </View>
-        ) : null}
       </SafeAreaView>
     </GestureHandlerRootView>
   );

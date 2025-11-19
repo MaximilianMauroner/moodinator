@@ -78,70 +78,65 @@ export const DisplayMoodItem = React.memo(
         onSwipeableOpen={handleSwipeableOpen}
       >
         <Pressable onLongPress={() => onLongPress?.(mood)}>
-          <Animated.View className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 flex-row justify-between items-center">
-            <View className="flex-1 pr-3">
-              <View className="flex-row items-center mb-1">
-                <View
-                  className={`px-2 py-0.5 rounded-full mr-2 ${moodData.bg}`}
+          <Animated.View className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+            <View className="flex-row justify-between items-start mb-2">
+              <View className="flex-row items-center flex-1 mr-2">
+                 <View
+                  className={`w-10 h-10 rounded-full mr-3 items-center justify-center ${moodData.bg}`}
                 >
-                  <Text className={`text-xs font-semibold ${moodColor}`}>
-                    {moodData.label}
+                  <Text className={`text-lg font-extrabold ${moodColor}`}>
+                    {mood.mood}
                   </Text>
                 </View>
-                <Text className={`text-lg font-extrabold ${moodColor}`}>
-                  {mood.mood}
+                <Text className={`text-base font-bold ${moodColor} flex-1`} numberOfLines={1}>
+                    {moodData.label}
                 </Text>
               </View>
-              {mood.note ? (
-                <Text
-                  className="text-sm text-slate-700 dark:text-slate-300"
-                  numberOfLines={2}
-                >
-                  “{mood.note}”
+               <Text className="text-xs text-gray-400 dark:text-slate-500 font-medium mt-1">
+                    {new Date(mood.timestamp).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' })}
                 </Text>
-              ) : null}
-              {mood.emotions && mood.emotions.length > 0 ? (
-                <View className="flex-row flex-wrap gap-2 mt-2">
-                  {mood.emotions.map((emotion) => (
-                    <View
-                      key={`${mood.id}-${emotion}`}
-                      className="bg-blue-50 dark:bg-slate-800 px-2 py-0.5 rounded-full border border-blue-100 dark:border-slate-700"
-                    >
-                      <Text className="text-xs font-medium text-blue-700 dark:text-slate-100">
-                        {emotion}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              ) : null}
-              {mood.contextTags && mood.contextTags.length > 0 ? (
-                <View className="flex-row flex-wrap gap-2 mt-2">
-                  {mood.contextTags.map((context) => (
-                    <View
-                      key={`${mood.id}-${context}`}
-                      className="bg-emerald-50 dark:bg-slate-800 px-2 py-0.5 rounded-full border border-emerald-100 dark:border-slate-700"
-                    >
-                      <Text className="text-xs font-medium text-emerald-700 dark:text-emerald-200">
-                        {context}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              ) : null}
-              {typeof mood.energy === "number" ? (
-                <View className="mt-2 flex-row items-center space-x-2">
-                  <Text className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">
-                    Energy
-                  </Text>
-                  <Text className="text-sm font-semibold text-orange-600 dark:text-orange-300">
-                    {mood.energy}/10
-                  </Text>
-                </View>
-              ) : null}
-              <Text className="text-xs text-gray-500 dark:text-slate-400 mt-1">
-                {new Date(mood.timestamp).toLocaleString()}
-              </Text>
             </View>
+
+            {mood.note ? (
+              <Text
+                className="text-sm text-slate-600 dark:text-slate-300 mb-3 leading-5"
+                numberOfLines={3}
+              >
+                {mood.note}
+              </Text>
+            ) : null}
+
+            {(mood.emotions?.length > 0 || mood.contextTags?.length > 0 || typeof mood.energy === "number") && (
+              <View className="flex-row flex-wrap gap-2">
+                {typeof mood.energy === "number" && (
+                    <View className="bg-orange-50 dark:bg-orange-900/20 px-2 py-0.5 rounded-md border border-orange-100 dark:border-orange-800">
+                    <Text className="text-[10px] font-bold text-orange-600 dark:text-orange-300 uppercase tracking-wide">
+                        Energy: {mood.energy}/10
+                    </Text>
+                    </View>
+                )}
+                {mood.emotions?.map((emotion) => (
+                  <View
+                    key={`${mood.id}-${emotion}`}
+                    className="bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md"
+                  >
+                    <Text className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                      {emotion}
+                    </Text>
+                  </View>
+                ))}
+                {mood.contextTags?.map((context) => (
+                  <View
+                    key={`${mood.id}-${context}`}
+                    className="bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md"
+                  >
+                    <Text className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                      #{context}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
           </Animated.View>
         </Pressable>
       </Swipeable>

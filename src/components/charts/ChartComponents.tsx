@@ -14,21 +14,22 @@ import {
 } from "date-fns";
 import type { MoodEntry } from "@db/types";
 import { moodScale } from "@/constants/moodScale";
+import { Ionicons } from "@expo/vector-icons";
 
 // Shared Tailwind->hex color map
 export const colorMap: Record<string, string> = {
   "text-sky-500": "#03a9f4",
   "text-cyan-500": "#00bcd4",
   "text-teal-500": "#009688",
-  "text-emerald-500": "#4caf50",
-  "text-green-500": "#4caf50",
-  "text-gray-500": "#9e9e9e",
-  "text-lime-500": "#cddc39",
-  "text-yellow-500": "#ffeb3b",
-  "text-amber-500": "#ffc107",
-  "text-orange-600": "#fb8c00",
-  "text-red-500": "#f44336",
-  "text-red-700": "#d32f2f",
+  "text-emerald-500": "#10b981",
+  "text-green-500": "#22c55e",
+  "text-gray-500": "#64748b",
+  "text-lime-500": "#84cc16",
+  "text-yellow-500": "#eab308",
+  "text-amber-500": "#f59e0b",
+  "text-orange-600": "#ea580c",
+  "text-red-500": "#ef4444",
+  "text-red-700": "#b91c1c",
 };
 
 export const getColorFromTailwind = (cls: string) => colorMap[cls] || "#FFD700";
@@ -36,13 +37,13 @@ export const getColorFromTailwind = (cls: string) => colorMap[cls] || "#FFD700";
 // Helper function to get mood scale colors for a given mood value
 export const getMoodScaleColor = (moodValue: number) => {
   const mood = moodScale.find((m) => m.value === Math.round(moodValue));
-  return mood ? mood.color : "text-gray-500";
+  return mood ? mood.color : "text-slate-500";
 };
 
 // Helper function to get mood scale background color for a given mood value
 export const getMoodScaleBg = (moodValue: number) => {
   const mood = moodScale.find((m) => m.value === Math.round(moodValue));
-  return mood ? mood.bg : "bg-gray-100";
+  return mood ? mood.bg : "bg-slate-100";
 };
 
 // Shared chart configuration with proper y-axis range (0-10)
@@ -52,8 +53,10 @@ export const getBaseChartConfig = (
   isDark?: boolean
 ) => ({
   backgroundColor: isDark ? "#0f172a" : "#ffffff",
-  backgroundGradientFrom: isDark ? "#0f172a" : gradientFrom,
-  backgroundGradientTo: isDark ? "#0b1220" : gradientTo,
+  backgroundGradientFrom: isDark ? "#0f172a" : "#ffffff",
+  backgroundGradientTo: isDark ? "#0f172a" : "#ffffff",
+  fillShadowGradient: gradientFrom,
+  fillShadowGradientOpacity: 0.1,
   decimalPlaces: 1,
   color: (opacity = 1) =>
     isDark
@@ -61,13 +64,18 @@ export const getBaseChartConfig = (
       : `rgba(59, 130, 246, ${opacity})`,
   labelColor: (opacity = 1) =>
     isDark
-      ? `rgba(226, 232, 240, ${opacity})`
+      ? `rgba(148, 163, 184, ${opacity})`
       : `rgba(100, 116, 139, ${opacity})`,
   style: { borderRadius: 16 },
-  propsForDots: { r: "6", strokeWidth: "2" },
+  propsForDots: { r: "4", strokeWidth: "2", stroke: "#fff" },
   yAxisMin: 0,
   yAxisMax: 10,
   yAxisInterval: 1,
+  propsForBackgroundLines: {
+      strokeDasharray: "6, 6",
+      stroke: isDark ? "#1e293b" : "#e2e8f0",
+      strokeWidth: 1,
+  }
 });
 
 // Helper function to get days in range
@@ -146,7 +154,7 @@ export const processMoodDataForDailyChart = (
 
   const finalAggregates = initialAggregates.map((aggregate, index) => {
     if (aggregate.avg !== undefined) {
-      return { ...aggregate, finalAvg: aggregate.avg, isInterpolated: false };
+      return { ...aggregate, finalAvg: aggregate.avg, hasRealData: true, isInterpolated: false };
     }
 
     let prevIndex = -1;
@@ -193,7 +201,7 @@ export const processMoodDataForDailyChart = (
       const neutralMood = moodScale.find((s) => s.label === "Neutral");
       interpolatedAvg = neutralMood ? neutralMood.value : 5;
     }
-    return { ...aggregate, finalAvg: interpolatedAvg, isInterpolated: true };
+    return { ...aggregate, finalAvg: interpolatedAvg, hasRealData: false, isInterpolated: true };
   });
 
   const labels = finalAggregates.map((agg) => format(agg.date, "d"));
@@ -306,29 +314,40 @@ export const MiniWeeklyChart = ({ weeklyData }: { weeklyData: any[] }) => {
     ],
   };
 
-  // Custom chart config with visible labels and dynamic y-axis
   const chartConfig = {
     backgroundColor: isDark ? "#0f172a" : "#ffffff",
-    backgroundGradientFrom: isDark ? "#0f172a" : "#f8fafc",
-    backgroundGradientTo: isDark ? "#0b1220" : "#e2e8f0",
+    backgroundGradientFrom: isDark ? "#0f172a" : "#ffffff",
+    backgroundGradientTo: isDark ? "#0f172a" : "#ffffff",
+    fillShadowGradient: "#3b82f6",
+    fillShadowGradientOpacity: 0.1,
     decimalPlaces: 1,
     color: (opacity = 1) => `rgba(59, 130, 246, ${opacity})`,
     labelColor: (opacity = 1) =>
       isDark
-        ? `rgba(203, 213, 225, ${opacity})`
-        : `rgba(55, 65, 81, ${opacity})`,
+        ? `rgba(148, 163, 184, ${opacity})`
+        : `rgba(100, 116, 139, ${opacity})`,
     style: { borderRadius: 16 },
-    propsForDots: { r: "6", strokeWidth: "2" },
+    propsForDots: { r: "4", strokeWidth: "2", stroke: "#fff" },
     yAxisMin: yMin,
     yAxisMax: yMax,
     yAxisInterval: yInterval,
+    propsForBackgroundLines: {
+        strokeDasharray: "6, 6",
+        stroke: isDark ? "#1e293b" : "#e2e8f0",
+        strokeWidth: 1,
+    }
   };
 
   return (
-    <View className="mx-4 mb-6 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-2xl shadow-lg">
-      <Text className="text-lg font-semibold text-center mb-3 text-gray-800 dark:text-slate-200">
-        📅 Last 4 Weeks Trend
-      </Text>
+    <View className="mx-4 mb-6 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-2xl shadow-sm overflow-hidden">
+      <View className="flex-row justify-between items-center mb-4 px-2">
+            <Text className="text-lg font-bold text-slate-800 dark:text-slate-200">
+                Overview
+            </Text>
+            <View className="bg-blue-50 dark:bg-blue-900/20 p-1.5 rounded-lg">
+                <Ionicons name="bar-chart-outline" size={16} color="#3b82f6" />
+            </View>
+      </View>
       <LineChart
         data={chartData}
         width={Dimensions.get("window").width - 64}
@@ -336,7 +355,7 @@ export const MiniWeeklyChart = ({ weeklyData }: { weeklyData: any[] }) => {
         chartConfig={chartConfig}
         style={{ borderRadius: 16 }}
         bezier
-        segments={10}
+        segments={5}
       />
     </View>
   );
@@ -404,40 +423,40 @@ export const getTrendInterpretation = (trend: number) => {
   if (trend < -0.5)
     return {
       color: "green",
-      text: "Great improvement!",
+      text: "Trending Better",
       emoji: "🎉",
-      textClass: "text-cyan-500",
-      bgClass: "bg-cyan-50",
+      textClass: "text-emerald-600",
+      bgClass: "bg-emerald-100 dark:bg-emerald-900/30",
     };
   if (trend < 0)
     return {
       color: "blue",
-      text: "Slight improvement",
+      text: "Improving",
       emoji: "📈",
-      textClass: "text-green-500",
-      bgClass: "bg-green-50",
+      textClass: "text-blue-600",
+      bgClass: "bg-blue-100 dark:bg-blue-900/30",
     };
   if (trend > 0.5)
     return {
       color: "red",
-      text: "Needs attention",
-      emoji: "💙",
-      textClass: "text-red-500",
-      bgClass: "bg-red-50",
+      text: "Declining",
+      emoji: "📉",
+      textClass: "text-red-600",
+      bgClass: "bg-red-100 dark:bg-red-900/30",
     };
   if (trend > 0)
     return {
       color: "orange",
-      text: "Slight decline",
+      text: "Slight Dip",
       emoji: "📊",
-      textClass: "text-orange-500",
-      bgClass: "bg-orange-50",
+      textClass: "text-amber-600",
+      bgClass: "bg-amber-100 dark:bg-amber-900/30",
     };
   return {
     color: "gray",
-    text: "Steady as she goes",
-    emoji: "📊",
-    textClass: "text-gray-400",
-    bgClass: "bg-gray-50",
+    text: "Steady",
+    emoji: "➡️",
+    textClass: "text-slate-600",
+    bgClass: "bg-slate-100 dark:bg-slate-800",
   };
 };

@@ -29,20 +29,20 @@ export const MoodButtonsCompact: React.FC<MoodButtonsCompactProps> = ({
 
   return (
     <View className="flex-row flex-wrap justify-between mb-2">
-      <View className="w-full flex-row justify-between mb-2">
+      <View className="w-full flex-row justify-between mb-3">
         {/* Include 0 button with the first row in compact mode */}
         <HapticTab
           key={firstMood.value}
-          className={`items-center justify-center h-16 rounded-lg shadow-sm ${firstMood.bg}`}
+          className={`items-center justify-center h-20 rounded-2xl shadow-sm ${firstMood.bg} border border-black/5 dark:border-white/10`}
           style={{ width: "23%" }}
           onPress={() => onMoodPress(firstMood.value)}
           onLongPress={() => onLongPress(firstMood.value)}
           delayLongPress={500}
         >
-          <Text className={`text-lg font-bold ${firstMood.color}`}>
+          <Text className={`text-2xl font-extrabold ${firstMood.color}`}>
             {firstMood.value}
           </Text>
-          <Text className={`text-xs ${firstMood.color}`}>
+          <Text className={`text-[10px] font-bold uppercase tracking-wider ${firstMood.color} text-center`} numberOfLines={2}>
             {firstMood.label}
           </Text>
         </HapticTab>
@@ -50,34 +50,36 @@ export const MoodButtonsCompact: React.FC<MoodButtonsCompactProps> = ({
         {secondRowMoods.map((mood) => (
           <HapticTab
             key={mood.value}
-            className={`items-center justify-center h-16 rounded-lg shadow-sm ${mood.bg}`}
+            className={`items-center justify-center h-20 rounded-2xl shadow-sm ${mood.bg} border border-black/5 dark:border-white/10`}
             style={{ width: "23%" }}
             onPress={() => onMoodPress(mood.value)}
             onLongPress={() => onLongPress(mood.value)}
             delayLongPress={500}
           >
-            <Text className={`text-lg font-bold ${mood.color}`}>
+            <Text className={`text-2xl font-extrabold ${mood.color}`}>
               {mood.value}
             </Text>
-            <Text className={`text-xs ${mood.color}`}>{mood.label}</Text>
+            <Text className={`text-[10px] font-bold uppercase tracking-wider ${mood.color} text-center`} numberOfLines={2}>
+                {mood.label}
+            </Text>
           </HapticTab>
         ))}
       </View>
 
-      <View className="w-full flex-row justify-between mb-2">
+      <View className="w-full flex-row justify-between mb-3">
         {thirdRowMoods.map((mood) => (
           <HapticTab
             key={mood.value}
-            className={`items-center justify-center h-16 rounded-lg shadow-sm ${mood.bg}`}
+            className={`items-center justify-center h-20 rounded-2xl shadow-sm ${mood.bg} border border-black/5 dark:border-white/10`}
             style={{ width: "23%" }}
             onPress={() => onMoodPress(mood.value)}
             onLongPress={() => onLongPress(mood.value)}
             delayLongPress={500}
           >
-            <Text className={`text-lg font-bold ${mood.color}`}>
+            <Text className={`text-2xl font-extrabold ${mood.color}`}>
               {mood.value}
             </Text>
-            <Text className={`text-xs ${mood.color}`}>{mood.label}</Text>
+            <Text className={`text-[10px] font-bold uppercase tracking-wider ${mood.color} text-center`} numberOfLines={2}>{mood.label}</Text>
           </HapticTab>
         ))}
       </View>
@@ -86,16 +88,16 @@ export const MoodButtonsCompact: React.FC<MoodButtonsCompactProps> = ({
         {fourthRowMoods.map((mood) => (
           <HapticTab
             key={mood.value}
-            className={`items-center justify-center h-16 rounded-lg shadow-sm ${mood.bg}`}
+            className={`items-center justify-center h-20 rounded-2xl shadow-sm ${mood.bg} border border-black/5 dark:border-white/10`}
             style={{ width: "23%" }}
             onPress={() => onMoodPress(mood.value)}
             onLongPress={() => onLongPress(mood.value)}
             delayLongPress={500}
           >
-            <Text className={`text-lg font-bold ${mood.color}`}>
+            <Text className={`text-2xl font-extrabold ${mood.color}`}>
               {mood.value}
             </Text>
-            <Text className={`text-xs ${mood.color}`}>{mood.label}</Text>
+            <Text className={`text-[10px] font-bold uppercase tracking-wider ${mood.color} text-center`} numberOfLines={2}>{mood.label}</Text>
           </HapticTab>
         ))}
       </View>
