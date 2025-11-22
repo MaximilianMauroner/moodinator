@@ -5,7 +5,13 @@ import React, {
   useRef,
   useMemo,
 } from "react";
-import { View, Text, TouchableOpacity, ActivityIndicator } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  ActivityIndicator,
+  StyleSheet,
+} from "react-native";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import type { MoodEntry } from "@db/types";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -35,22 +41,6 @@ const tabs: {
   { id: "raw", label: "Data", icon: "list" },
 ];
 
-const TAB_SELECTOR_SHADOW = {
-  shadowColor: "#0f172a",
-  shadowOpacity: 0.08,
-  shadowRadius: 18,
-  shadowOffset: { width: 0, height: 10 },
-  elevation: 8,
-} as const;
-
-const ACTIVE_TAB_SHADOW = {
-  shadowColor: "#0f172a",
-  shadowOpacity: 0.12,
-  shadowRadius: 12,
-  shadowOffset: { width: 0, height: 6 },
-  elevation: 4,
-} as const;
-
 const MemoOverviewTab = React.memo(OverviewTab);
 const MemoWeeklyTab = React.memo(WeeklyTab);
 const MemoDailyTab = React.memo(DailyTab);
@@ -65,10 +55,7 @@ const TabSelector = React.memo(
     onTabPress: (id: TabType) => void;
   }) => {
     return (
-      <View
-        className="mx-4 mb-4 bg-slate-100 dark:bg-slate-900 rounded-xl p-1 flex-row"
-        style={TAB_SELECTOR_SHADOW}
-      >
+      <View className="mx-4 mb-4 bg-slate-100 dark:bg-slate-900 rounded-xl p-1 flex-row">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
 
@@ -79,7 +66,6 @@ const TabSelector = React.memo(
               className={`flex-1 flex-row items-center justify-center py-2 rounded-lg transition-all ${
                 isActive ? "bg-white dark:bg-slate-800" : ""
               }`}
-              style={isActive ? ACTIVE_TAB_SHADOW : undefined}
               activeOpacity={0.8}
             >
               <Ionicons

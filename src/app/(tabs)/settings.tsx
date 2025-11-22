@@ -12,18 +12,19 @@ import {
   Platform,
   TouchableOpacity,
 } from "react-native";
-import { Link } from "expo-router";
+import { Link, useFocusEffect } from "expo-router";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import * as Clipboard from "expo-clipboard";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { exportMoods, importMoods, clearMoods, seedMoods } from "@db/db";
 import {
-  exportMoods,
-  importMoods,
-  clearMoods,
-  seedMoodsFromFile,
-} from "@db/db";
+  createBackup,
+  getBackupInfo,
+  getBackupFolder,
+  setBackupFolder,
+} from "@db/backup";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   DEFAULT_CONTEXTS,
@@ -235,10 +236,6 @@ export default function SettingsScreen() {
   >(null);
   const [showDetailedLabels, setShowDetailedLabels] = useState(false);
   const [devOptionsEnabled, setDevOptionsEnabled] = useState(false);
-  const [lastSeedResult, setLastSeedResult] = useState<{
-    count: number;
-    source: "file" | "random";
-  } | null>(null);
 
   const [emotions, setEmotions] = useState<string[]>(DEFAULT_EMOTIONS);
   const [contexts, setContexts] = useState<string[]>(DEFAULT_CONTEXTS);
@@ -259,6 +256,11 @@ export default function SettingsScreen() {
   const [customEndDate, setCustomEndDate] = useState(() => new Date());
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+  const [backupInfo, setBackupInfo] = useState<{
+    count: number;
+    latestBackup: number | null;
+  } | null>(null);
+  const [backupFolderUri, setBackupFolderUri] = useState<string | null>(null);
   useNotifications();
 
   useEffect(() => {
@@ -267,7 +269,100 @@ export default function SettingsScreen() {
     loadEmotionPresets();
     loadContextTags();
     loadQuickEntryPrefs();
+    loadBackupInfo();
   }, []);
+
+  // Refresh backup info when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      loadBackupInfo();
+    }, [])
+  );
+
+  const loadBackupInfo = async () => {
+    const info = await getBackupInfo();
+    setBackupInfo({
+      count: info.count,
+      latestBackup: info.latestBackup,
+    });
+
+    // Load backup folder URI
+    const folderUri = await getBackupFolder();
+    setBackupFolderUri(folderUri);
+  };
+
+  const formatBackupDate = (timestamp: number | null): string => {
+    if (!timestamp) return "Never";
+    const date = new Date(timestamp);
+    return date.toLocaleDateString();
+  };
+
+  const handleManualBackup = async () => {
+    try {
+      setLoading("export");
+      const backupUri = await createBackup();
+      if (backupUri) {
+        await loadBackupInfo();
+        Alert.alert("Backup Created", "Weekly backup created successfully.");
+      } else {
+        Alert.alert("Backup Failed", "Could not create backup.");
+      }
+    } catch (error) {
+      Alert.alert("Backup Error", "Failed to create backup.");
+      console.error(error);
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleSelectBackupFolder = async () => {
+    try {
+      if (Platform.OS === "android") {
+        // On Android, use StorageAccessFramework to request directory access
+        const permissions =
+          await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+        if (permissions.granted) {
+          const folderUri = permissions.directoryUri;
+          await setBackupFolder(folderUri);
+          await loadBackupInfo();
+          Alert.alert(
+            "Backup Folder Selected",
+            "Backups will now be saved to the selected folder."
+          );
+        } else {
+          Alert.alert(
+            "Permission Denied",
+            "Please grant folder access to enable backup functionality."
+          );
+        }
+      } else {
+        // On iOS, use documentDirectory (accessible via Files app)
+        // For iOS, we'll use the default location which is accessible via Files app
+        Alert.alert(
+          "Backup Location",
+          "On iOS, backups are saved to the app's Documents folder, which is accessible via the Files app. No folder selection needed."
+        );
+      }
+    } catch (error) {
+      console.error("Error selecting backup folder:", error);
+      Alert.alert("Error", "Failed to select backup folder.");
+    }
+  };
+
+  const formatBackupFolderPath = (uri: string | null): string => {
+    if (!uri) return "Default location";
+    // Extract readable path from URI
+    if (uri.includes("documentDirectory")) {
+      return "App Documents (accessible via Files app)";
+    }
+    // For Android SAF URIs, show a simplified path
+    if (uri.startsWith("content://")) {
+      const parts = uri.split("/");
+      const lastPart = parts[parts.length - 1];
+      return lastPart || "Selected folder";
+    }
+    return uri.length > 50 ? `${uri.substring(0, 50)}...` : uri;
+  };
 
   const loadShowLabelsPreference = async () => {
     try {
@@ -424,22 +519,6 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleExportCopy = async () => {
-    const rangePayload = resolveExportRange();
-    if (!rangePayload) return;
-    try {
-      setLoading("export");
-      const jsonData = await exportMoods(rangePayload);
-      await Clipboard.setStringAsync(jsonData);
-      Alert.alert("Copied", "Mood data copied to clipboard.");
-      setExportModalVisible(false);
-    } catch (error) {
-      Alert.alert("Export Error", "Failed to copy mood data");
-    } finally {
-      setLoading(null);
-    }
-  };
-
   const handleToggleLabels = async (value: boolean) => {
     setShowDetailedLabels(value);
     try {
@@ -501,11 +580,10 @@ export default function SettingsScreen() {
   const handleSeedMoods = async () => {
     try {
       setLoading("seed");
-      const result = await seedMoodsFromFile();
-      setLastSeedResult(result);
+      const result = await seedMoods();
       Alert.alert(
         "Sample Data Added",
-        `Successfully added ${result.count} sample mood entries.`
+        `Successfully added ${result} sample mood entries.`
       );
     } catch (error) {
       Alert.alert("Error", "Failed to add sample data");
@@ -541,7 +619,6 @@ export default function SettingsScreen() {
             try {
               setLoading("clear");
               await clearMoods();
-              setLastSeedResult(null);
               Alert.alert("Success", "All mood data has been cleared.");
             } catch (error) {
               Alert.alert("Error", "Failed to clear mood data");
@@ -663,7 +740,6 @@ export default function SettingsScreen() {
             label="Therapy Export"
             subLabel="Create a report for your therapist"
             icon="document-text-outline"
-            isLast
             action={
               <Link href="/therapy-export" asChild>
                 <TouchableOpacity>
@@ -676,6 +752,80 @@ export default function SettingsScreen() {
               </Link>
             }
           />
+          {Platform.OS === "android" ? (
+            <>
+              <SettingRow
+                label="Backup Folder"
+                subLabel={
+                  backupFolderUri !== null
+                    ? `Location: ${formatBackupFolderPath(backupFolderUri)}`
+                    : "Select a folder for automatic backups"
+                }
+                icon="folder-outline"
+                onPress={handleSelectBackupFolder}
+                isLast={!backupFolderUri}
+              />
+              {backupFolderUri ? (
+                <SettingRow
+                  label="Automatic Backups"
+                  subLabel={
+                    backupInfo
+                      ? `${backupInfo.count} backup(s), last: ${formatBackupDate(
+                          backupInfo.latestBackup
+                        )}`
+                      : "Checking backup status..."
+                  }
+                  icon="cloud-done-outline"
+                  action={
+                    <TouchableOpacity
+                      onPress={handleManualBackup}
+                      disabled={loading === "export"}
+                    >
+                      <View className="bg-green-100 dark:bg-green-900/30 px-3 py-1 rounded-full">
+                        {loading === "export" ? (
+                          <ActivityIndicator size="small" color="#16a34a" />
+                        ) : (
+                          <Text className="text-green-600 dark:text-green-400 font-medium text-sm">
+                            Backup Now
+                          </Text>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  }
+                  isLast
+                />
+              ) : null}
+            </>
+          ) : (
+            <SettingRow
+              label="Automatic Backups"
+              subLabel={
+                backupInfo
+                  ? `${backupInfo.count} backup(s), last: ${formatBackupDate(
+                      backupInfo.latestBackup
+                    )}`
+                  : "Checking backup status..."
+              }
+              icon="cloud-done-outline"
+              action={
+                <TouchableOpacity
+                  onPress={handleManualBackup}
+                  disabled={loading === "export"}
+                >
+                  <View className="bg-green-100 dark:bg-green-900/30 px-3 py-1 rounded-full">
+                    {loading === "export" ? (
+                      <ActivityIndicator size="small" color="#16a34a" />
+                    ) : (
+                      <Text className="text-green-600 dark:text-green-400 font-medium text-sm">
+                        Backup Now
+                      </Text>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              }
+              isLast
+            />
+          )}
         </SettingCard>
 
         {/* Developer Options */}

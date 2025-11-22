@@ -1,5 +1,6 @@
 import * as SQLite from "expo-sqlite";
 import type { MoodEntry, MoodEntryInput } from "./types";
+import { DEFAULT_EMOTIONS, DEFAULT_CONTEXTS } from "../src/lib/entrySettings";
 
 let db: SQLite.SQLiteDatabase | null = null;
 /**
@@ -348,62 +349,290 @@ export async function deleteMood(id: number) {
 
 /**
  * Seeds the database with random mood entries (DEV only)
+ * Note: Mood scale is 0-10 where 0-2 are positive, 5 is neutral, 6-10 are negative
+ * Generates thousands of entries over multiple years using batch inserts
  */
 export async function seedMoods() {
   const db = await getDb();
-  const days = 60;
+  // Generate 3 years of data to create thousands of entries
+  const days = 1095; // 3 years
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - days);
   let totalEntries = 0;
 
+  // Expanded sample notes for variety
+  const sampleNotes = [
+    "Feeling good today",
+    "Had a nice walk",
+    "Busy day at work",
+    "Feeling a bit tired",
+    "Great conversation with a friend",
+    "Struggling with motivation",
+    "Feeling overwhelmed",
+    "Had a good meal",
+    "Need to take a break",
+    "Feeling anxious about tomorrow",
+    "Enjoyed some quiet time",
+    "Feeling stressed",
+    "Had a productive morning",
+    "Feeling down",
+    "Good workout today",
+    "Woke up feeling refreshed",
+    "Had a difficult conversation",
+    "Feeling grateful",
+    "Not sleeping well lately",
+    "Made progress on a project",
+    "Feeling lonely",
+    "Had fun with family",
+    "Work is getting to me",
+    "Feeling hopeful",
+    "Need more rest",
+    "Had a good therapy session",
+    "Feeling disconnected",
+    "Enjoyed the weather today",
+    "Struggling with anxiety",
+    "Feeling proud of myself",
+    "Had a rough day",
+    "Feeling more balanced",
+    "Worried about the future",
+    "Appreciating the small things",
+    "Feeling stuck",
+    "Had a breakthrough moment",
+    "Feeling drained",
+    "Grateful for support",
+    "Feeling uncertain",
+    "Had a peaceful moment",
+    "Struggling to focus",
+    "Feeling accomplished",
+    "Need to slow down",
+    "Feeling inspired",
+    "Having a hard time",
+    "Feeling content",
+    "Dealing with stress",
+    "Feeling optimistic",
+    "Need some self-care",
+    "Feeling supported",
+    "Having mixed feelings",
+  ];
+
+  // Prepare all entries first
+  const entries: Array<{
+    mood: number;
+    note: string | null;
+    timestamp: number;
+    emotions: string;
+    contextTags: string;
+    energy: number;
+  }> = [];
+
   for (let i = 0; i < days; i++) {
-    // Random number of entries per day (0-3, more realistic)
-    const entriesCount = Math.floor(Math.random() * 4);
+    // Realistic entry frequency: 1-2 entries most common, occasionally 0, 3, or 4
+    let entriesCount: number;
+    const freqRand = Math.random();
+    if (freqRand < 0.03) {
+      // 3% chance for 0 entries (missed day)
+      entriesCount = 0;
+    } else if (freqRand < 0.6) {
+      // 57% chance for 1 entry
+      entriesCount = 1;
+    } else if (freqRand < 0.9) {
+      // 30% chance for 2 entries
+      entriesCount = 2;
+    } else if (freqRand < 0.98) {
+      // 8% chance for 3 entries
+      entriesCount = 3;
+    } else {
+      // 2% chance for 4 entries
+      entriesCount = 4;
+    }
 
     for (let j = 0; j < entriesCount; j++) {
       const currentDate = new Date(startDate);
       currentDate.setDate(startDate.getDate() + i);
 
-      // Random time during the day
-      currentDate.setHours(Math.floor(Math.random() * 24));
+      // More realistic time distribution: waking hours (7am-11pm)
+      // Peak times: morning (7-9am), midday (11am-2pm), evening (5-9pm)
+      const hourRand = Math.random();
+      let hour: number;
+      if (hourRand < 0.25) {
+        // 25% morning (7-9am)
+        hour = Math.floor(Math.random() * 3) + 7;
+      } else if (hourRand < 0.5) {
+        // 25% midday (11am-2pm)
+        hour = Math.floor(Math.random() * 4) + 11;
+      } else if (hourRand < 0.75) {
+        // 25% evening (5-9pm)
+        hour = Math.floor(Math.random() * 5) + 17;
+      } else {
+        // 25% other waking hours (9am-11am, 2pm-5pm, 9pm-11pm)
+        const otherHours = [
+          ...Array.from({ length: 3 }, (_, i) => i + 9), // 9-11am
+          ...Array.from({ length: 4 }, (_, i) => i + 14), // 2-5pm
+          ...Array.from({ length: 3 }, (_, i) => i + 21), // 9-11pm
+        ];
+        hour = otherHours[Math.floor(Math.random() * otherHours.length)];
+      }
+      currentDate.setHours(hour);
       currentDate.setMinutes(Math.floor(Math.random() * 60));
 
-      // More realistic mood distribution (3-8 most common, with occasional extremes)
+      // Accurate mood distribution based on actual scale:
+      // 0-2 = Positive (Elated, Very Happy, Good)
+      // 3-4 = Positive/Neutral (Positive, Okay)
+      // 5 = Neutral
+      // 6-10 = Negative (Low, Struggling, Overwhelmed, Crisis, Emergency)
       let mood: number;
-      const rand = Math.random();
-      if (rand < 0.7) {
-        // 70% chance for moderate moods (4-6)
-        mood = Math.floor(Math.random() * 3) + 4;
-      } else if (rand < 0.9) {
-        // 20% chance for good moods (7-8)
-        mood = Math.floor(Math.random() * 2) + 7;
-      } else if (rand < 0.95) {
-        // 5% chance for low moods (2-3)
-        mood = Math.floor(Math.random() * 2) + 2;
+      const moodRand = Math.random();
+      if (moodRand < 0.15) {
+        // 15% chance for positive moods (0-2)
+        mood = Math.floor(Math.random() * 3);
+      } else if (moodRand < 0.35) {
+        // 20% chance for positive/neutral (3-4)
+        mood = Math.floor(Math.random() * 2) + 3;
+      } else if (moodRand < 0.5) {
+        // 15% chance for neutral (5)
+        mood = 5;
+      } else if (moodRand < 0.85) {
+        // 35% chance for low/struggling (6-7)
+        mood = Math.floor(Math.random() * 2) + 6;
+      } else if (moodRand < 0.97) {
+        // 12% chance for overwhelmed (8)
+        mood = 8;
       } else {
-        // 5% chance for extreme moods (0-1, 9-10)
-        mood =
-          Math.random() < 0.5
-            ? Math.floor(Math.random() * 2)
-            : Math.floor(Math.random() * 2) + 9;
+        // 3% chance for crisis/emergency (9-10)
+        mood = Math.floor(Math.random() * 2) + 9;
       }
 
-      // Occasionally add notes (10% chance)
-      const note = Math.random() < 0.1 ? "Random seed entry" : null;
+      // Energy correlates with mood: better mood (lower number) = higher energy
+      // Mood 0-2: energy 7-10, Mood 3-4: energy 5-8, Mood 5: energy 4-7,
+      // Mood 6-7: energy 3-6, Mood 8: energy 2-5, Mood 9-10: energy 0-3
+      let energy: number;
+      if (mood <= 2) {
+        energy = Math.floor(Math.random() * 4) + 7; // 7-10
+      } else if (mood <= 4) {
+        energy = Math.floor(Math.random() * 4) + 5; // 5-8
+      } else if (mood === 5) {
+        energy = Math.floor(Math.random() * 4) + 4; // 4-7
+      } else if (mood <= 7) {
+        energy = Math.floor(Math.random() * 4) + 3; // 3-6
+      } else if (mood === 8) {
+        energy = Math.floor(Math.random() * 4) + 2; // 2-5
+      } else {
+        energy = Math.floor(Math.random() * 4); // 0-3
+      }
 
-      await db.runAsync(
-        "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy) VALUES (?, ?, ?, ?, ?, ?);",
+      // Add emotions frequently (75% chance, 1-4 emotions)
+      let emotions: string[] = [];
+      if (Math.random() < 0.75) {
+        const emotionRand = Math.random();
+        let numEmotions: number;
+        if (emotionRand < 0.3) {
+          // 30% chance for 1 emotion
+          numEmotions = 1;
+        } else if (emotionRand < 0.65) {
+          // 35% chance for 2 emotions
+          numEmotions = 2;
+        } else if (emotionRand < 0.9) {
+          // 25% chance for 3 emotions
+          numEmotions = 3;
+        } else {
+          // 10% chance for 4 emotions
+          numEmotions = 4;
+        }
+        const shuffled = [...DEFAULT_EMOTIONS].sort(() => Math.random() - 0.5);
+        emotions = shuffled.slice(
+          0,
+          Math.min(numEmotions, DEFAULT_EMOTIONS.length)
+        );
+      }
+
+      // Add context tags frequently (75% chance, 1-3 contexts)
+      let contextTags: string[] = [];
+      if (Math.random() < 0.75) {
+        const contextRand = Math.random();
+        let numContexts: number;
+        if (contextRand < 0.4) {
+          // 40% chance for 1 context
+          numContexts = 1;
+        } else if (contextRand < 0.8) {
+          // 40% chance for 2 contexts
+          numContexts = 2;
+        } else {
+          // 20% chance for 3 contexts
+          numContexts = 3;
+        }
+        const shuffled = [...DEFAULT_CONTEXTS].sort(() => Math.random() - 0.5);
+        contextTags = shuffled.slice(
+          0,
+          Math.min(numContexts, DEFAULT_CONTEXTS.length)
+        );
+      }
+
+      // Add notes frequently (60% chance)
+      const note =
+        Math.random() < 0.6
+          ? sampleNotes[Math.floor(Math.random() * sampleNotes.length)]
+          : null;
+
+      entries.push({
         mood,
         note,
-        currentDate.getTime(),
-        serializeArray([]),
-        serializeArray([]),
-        Math.floor(Math.random() * 11)
-      );
+        timestamp: currentDate.getTime(),
+        emotions: serializeArray(emotions),
+        contextTags: serializeArray(contextTags),
+        energy,
+      });
       totalEntries++;
     }
   }
-  return totalEntries;
+
+  console.log(
+    `Prepared ${totalEntries} entries to insert (${entries.length} in array)`
+  );
+
+  // Insert entries in batches to avoid transaction timeouts
+  const BATCH_SIZE = 1000;
+  let insertedCount = 0;
+
+  try {
+    for (let i = 0; i < entries.length; i += BATCH_SIZE) {
+      const batch = entries.slice(i, i + BATCH_SIZE);
+      await db.withTransactionAsync(async () => {
+        for (const entry of batch) {
+          await db.runAsync(
+            "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy) VALUES (?, ?, ?, ?, ?, ?);",
+            entry.mood,
+            entry.note,
+            entry.timestamp,
+            entry.emotions,
+            entry.contextTags,
+            entry.energy
+          );
+          insertedCount++;
+        }
+      });
+      // Log progress for large batches
+      if (entries.length > 1000 && (i + BATCH_SIZE) % (BATCH_SIZE * 5) === 0) {
+        console.log(
+          `Seeding progress: ${insertedCount}/${totalEntries} entries`
+        );
+      }
+    }
+  } catch (error) {
+    console.error("Error seeding moods:", error);
+    console.error(
+      `Inserted ${insertedCount} out of ${totalEntries} entries before error`
+    );
+    throw error;
+  }
+
+  if (insertedCount !== totalEntries) {
+    console.warn(
+      `Warning: Expected to insert ${totalEntries} entries but only inserted ${insertedCount}`
+    );
+  }
+
+  console.log(`Successfully seeded ${insertedCount} mood entries`);
+  return insertedCount;
 }
 
 /**
