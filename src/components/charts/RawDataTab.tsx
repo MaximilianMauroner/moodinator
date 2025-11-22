@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
   getColorFromTailwind,
   getBaseChartConfig,
   getMoodInterpretation,
+  sampleDataPoints,
 } from "./ChartComponents";
 import { moodScale } from "@/constants/moodScale";
 import { useColorScheme } from "@/hooks/useColorScheme";
@@ -45,89 +46,196 @@ export const RawDataTab = ({
   }, [onRefresh]);
 
   // Sort moods by timestamp for chronological display
-  const sortedMoods = [...moods].sort(
-    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-  );
+  const sortedMoods = useMemo(() => {
+    return [...moods].sort(
+      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    );
+  }, [moods]);
 
-  // Raw data statistics
-  const rawStats = {
-    totalEntries: moods.length,
-    averageMood: moods.reduce((sum, mood) => sum + mood.mood, 0) / moods.length,
-    bestMood: Math.min(...moods.map((m) => m.mood)),
-    worstMood: Math.max(...moods.map((m) => m.mood)),
-    entriesWithNotes: moods.filter((m) => m.note && m.note.trim().length > 0)
-      .length,
-    moodDistribution: moodScale
-      .map((scale) => ({
-        ...scale,
-        count: moods.filter((mood) => mood.mood === scale.value).length,
-        percentage:
-          (moods.filter((mood) => mood.mood === scale.value).length /
-            moods.length) *
-          100,
-      }))
-      .filter((item) => item.count > 0),
-  };
-
-  const emotionCounts = moods.reduce<Record<string, number>>((acc, mood) => {
-    if (Array.isArray(mood.emotions)) {
-      mood.emotions.forEach((emotion) => {
-        if (!emotion) return;
-        acc[emotion] = (acc[emotion] || 0) + 1;
-      });
+  // Raw data statistics (memoized for performance)
+  const rawStats = useMemo(() => {
+    const totalEntries = moods.length;
+    if (totalEntries === 0) {
+      return {
+        totalEntries: 0,
+        averageMood: 0,
+        bestMood: 0,
+        worstMood: 0,
+        entriesWithNotes: 0,
+        moodDistribution: [],
+      };
     }
-    return acc;
-  }, {});
 
-  const contextCounts = moods.reduce<Record<string, number>>(
-    (acc, mood) => {
-      if (Array.isArray(mood.contextTags)) {
-        mood.contextTags.forEach((context) => {
-          if (!context) return;
-          acc[context] = (acc[context] || 0) + 1;
+    let sum = 0;
+    let min = 10;
+    let max = 0;
+    let notesCount = 0;
+    const moodCounts = new Map<number, number>();
+
+    moods.forEach((mood) => {
+      sum += mood.mood;
+      min = Math.min(min, mood.mood);
+      max = Math.max(max, mood.mood);
+      if (mood.note && mood.note.trim().length > 0) {
+        notesCount++;
+      }
+      moodCounts.set(mood.mood, (moodCounts.get(mood.mood) || 0) + 1);
+    });
+
+    const moodDistribution = moodScale
+      .map((scale) => {
+        const count = moodCounts.get(scale.value) || 0;
+        return {
+          ...scale,
+          count,
+          percentage: (count / totalEntries) * 100,
+        };
+      })
+      .filter((item) => item.count > 0);
+
+    return {
+      totalEntries,
+      averageMood: sum / totalEntries,
+      bestMood: min,
+      worstMood: max,
+      entriesWithNotes: notesCount,
+      moodDistribution,
+    };
+  }, [moods]);
+
+  const emotionCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    moods.forEach((mood) => {
+      if (Array.isArray(mood.emotions)) {
+        mood.emotions.forEach((emotion) => {
+          if (emotion) {
+            counts[emotion] = (counts[emotion] || 0) + 1;
+          }
         });
       }
-      return acc;
-    },
-    {}
+    });
+    return counts;
+  }, [moods]);
+
+  const contextCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    moods.forEach((mood) => {
+      if (Array.isArray(mood.contextTags)) {
+        mood.contextTags.forEach((context) => {
+          if (context) {
+            counts[context] = (counts[context] || 0) + 1;
+          }
+        });
+      }
+    });
+    return counts;
+  }, [moods]);
+
+  const topEmotions = useMemo(
+    () =>
+      Object.entries(emotionCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3),
+    [emotionCounts]
   );
 
-  const topEmotions = Object.entries(emotionCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3);
+  const topContexts = useMemo(
+    () =>
+      Object.entries(contextCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3),
+    [contextCounts]
+  );
 
-  const topContexts = Object.entries(contextCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3);
-
-  const energyValues = moods
-    .map((m) => (typeof m.energy === "number" ? m.energy : null))
-    .filter((value): value is number => value !== null);
-  const avgEnergy =
-    energyValues.length > 0
+  const avgEnergy = useMemo(() => {
+    const energyValues = moods
+      .map((m) => (typeof m.energy === "number" ? m.energy : null))
+      .filter((value): value is number => value !== null);
+    return energyValues.length > 0
       ? energyValues.reduce((sum, val) => sum + val, 0) / energyValues.length
       : null;
+  }, [moods]);
 
-  const chartData = {
-    labels: sortedMoods.map((m) => format(new Date(m.timestamp), "HH:mm")),
-    datasets: [
-      {
-        data: sortedMoods.map((m) => m.mood),
-        strokeWidth: 3,
-        dotColor: sortedMoods.map((m) =>
-          getColorFromTailwind(moodScale[m.mood].color)
-        ),
-      },
-      {
-        data: [0], // Min value for y-axis
-        withDots: false,
-      },
-      {
-        data: [10], // Max value for y-axis
-        withDots: false,
-      },
-    ],
-  };
+  // Sample chart data to max 200 points for performance
+  const sampledMoods = useMemo(() => {
+    return sampleDataPoints(sortedMoods, 200);
+  }, [sortedMoods]);
+
+  const chartData = useMemo(
+    () => ({
+      labels: sampledMoods.map((m) => format(new Date(m.timestamp), "HH:mm")),
+      datasets: [
+        {
+          data: sampledMoods.map((m) => m.mood),
+          strokeWidth: 3,
+          dotColor: sampledMoods.map((m) =>
+            getColorFromTailwind(moodScale[m.mood]?.color || "text-gray-500")
+          ),
+        },
+        {
+          data: [0], // Min value for y-axis
+          withDots: false,
+        },
+        {
+          data: [10], // Max value for y-axis
+          withDots: false,
+        },
+      ],
+    }),
+    [sampledMoods]
+  );
+
+  const recentEntries = useMemo(
+    () =>
+      sortedMoods
+        .slice(-10)
+        .reverse()
+        .map((mood) => {
+          const interpretation = getMoodInterpretation(mood.mood);
+          return (
+            <View
+              key={mood.id}
+              className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-xl mb-3 shadow-sm"
+            >
+              <View className="flex-row justify-between items-start">
+                <View className="flex-1">
+                  <Text className="font-semibold text-gray-800 dark:text-slate-200">
+                    {format(
+                      new Date(mood.timestamp),
+                      "EEEE, MMM dd 'at' HH:mm"
+                    )}
+                  </Text>
+                  {mood.note && (
+                    <Text className="text-sm text-gray-600 dark:text-slate-300 mt-1 italic">
+                      "{mood.note}"
+                    </Text>
+                  )}
+                  <Text className="text-xs text-gray-400 dark:text-slate-500 mt-1">
+                    {moodScale[mood.mood]?.description}
+                  </Text>
+                </View>
+                <View className="items-end ml-4">
+                  <Text
+                    className={`text-2xl font-bold ${interpretation.textClass}`}
+                  >
+                    {mood.mood}
+                  </Text>
+                  <View
+                    className={`px-2 py-1 rounded mt-1 ${interpretation.bgClass}`}
+                  >
+                    <Text
+                      className={`text-xs font-medium ${interpretation.textClass}`}
+                    >
+                      {moodScale[mood.mood]?.label}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+          );
+        }),
+    [sortedMoods]
+  );
 
   return (
     <ScrollView
@@ -267,53 +375,7 @@ export const RawDataTab = ({
         <Text className="text-lg font-semibold mb-3 text-gray-800 dark:text-slate-200">
           Recent Entries
         </Text>
-        {sortedMoods
-          .slice(-10)
-          .reverse()
-          .map((mood, index) => {
-            const interpretation = getMoodInterpretation(mood.mood);
-            return (
-              <View
-                key={mood.id}
-                className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-xl mb-3 shadow-sm"
-              >
-                <View className="flex-row justify-between items-start">
-                  <View className="flex-1">
-                    <Text className="font-semibold text-gray-800 dark:text-slate-200">
-                      {format(
-                        new Date(mood.timestamp),
-                        "EEEE, MMM dd 'at' HH:mm"
-                      )}
-                    </Text>
-                    {mood.note && (
-                      <Text className="text-sm text-gray-600 dark:text-slate-300 mt-1 italic">
-                        "{mood.note}"
-                      </Text>
-                    )}
-                    <Text className="text-xs text-gray-400 dark:text-slate-500 mt-1">
-                      {moodScale[mood.mood]?.description}
-                    </Text>
-                  </View>
-                  <View className="items-end ml-4">
-                    <Text
-                      className={`text-2xl font-bold ${interpretation.textClass}`}
-                    >
-                      {mood.mood}
-                    </Text>
-                    <View
-                      className={`px-2 py-1 rounded mt-1 ${interpretation.bgClass}`}
-                    >
-                      <Text
-                        className={`text-xs font-medium ${interpretation.textClass}`}
-                      >
-                        {moodScale[mood.mood]?.label}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-            );
-          })}
+        {recentEntries}
       </View>
 
       {/* Raw Data Chart */}

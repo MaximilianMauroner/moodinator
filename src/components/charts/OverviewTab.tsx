@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { View, Text, ScrollView, RefreshControl } from "react-native";
 import { endOfWeek, format } from "date-fns";
 import type { MoodEntry } from "@db/types";
@@ -18,19 +18,34 @@ export const OverviewTab = ({
   moods: MoodEntry[];
   onRefresh: () => void;
 }) => {
-  const weeklyData = processWeeklyMoodData(moods);
-  const recentWeeks = weeklyData.weeklyAggregates.slice(0, 4); // Last 4 weeks
+  const weeklyData = useMemo(() => processWeeklyMoodData(moods, 52), [moods]);
+  const recentWeeks = useMemo(
+    () => weeklyData.weeklyAggregates.slice(0, 4), // Last 4 weeks
+    [weeklyData]
+  );
 
   const currentWeekAvg = recentWeeks[0]?.avg || 0;
   const lastWeekAvg = recentWeeks[1]?.avg || 0;
   // Remember: lower number = improvement (since higher numbers are worse)
   const weeklyTrend = currentWeekAvg - lastWeekAvg;
 
-  const overallAvg =
-    moods.reduce((sum, mood) => sum + mood.mood, 0) / moods.length;
-  const currentInterpretation = getMoodInterpretation(currentWeekAvg);
-  const lastInterpretation = getMoodInterpretation(lastWeekAvg);
-  const trendInterpretation = getTrendInterpretation(weeklyTrend);
+  const overallAvg = useMemo(() => {
+    if (moods.length === 0) return 0;
+    return moods.reduce((sum, mood) => sum + mood.mood, 0) / moods.length;
+  }, [moods]);
+
+  const currentInterpretation = useMemo(
+    () => getMoodInterpretation(currentWeekAvg),
+    [currentWeekAvg]
+  );
+  const lastInterpretation = useMemo(
+    () => getMoodInterpretation(lastWeekAvg),
+    [lastWeekAvg]
+  );
+  const trendInterpretation = useMemo(
+    () => getTrendInterpretation(weeklyTrend),
+    [weeklyTrend]
+  );
 
   return (
     <ScrollView
