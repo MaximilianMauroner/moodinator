@@ -90,6 +90,43 @@ export const getDaysInRange = (start: Date, end: Date): Date[] => {
   return days;
 };
 
+// Data sampling utility to limit chart data points for performance
+// When data exceeds maxPoints, samples evenly to reduce rendering load
+export const sampleDataPoints = <T extends { timestamp: number }>(
+  data: T[],
+  maxPoints: number = 200
+): T[] => {
+  if (data.length <= maxPoints) {
+    return data;
+  }
+
+  // Sort by timestamp if not already sorted
+  const sorted = [...data].sort(
+    (a, b) => a.timestamp - b.timestamp
+  );
+
+  // Sample evenly across the dataset
+  const step = sorted.length / maxPoints;
+  const sampled: T[] = [];
+  
+  // Always include first and last points
+  sampled.push(sorted[0]);
+  
+  for (let i = 1; i < maxPoints - 1; i++) {
+    const index = Math.round(i * step);
+    if (index < sorted.length) {
+      sampled.push(sorted[index]);
+    }
+  }
+  
+  // Always include last point
+  if (sorted.length > 1) {
+    sampled.push(sorted[sorted.length - 1]);
+  }
+
+  return sampled;
+};
+
 // Process daily mood data
 export const processMoodDataForDailyChart = (
   allMoods: MoodEntry[],
@@ -99,21 +136,35 @@ export const processMoodDataForDailyChart = (
     return { labels: [], dailyAggregates: [] };
   }
 
+  // Limit to last 90 days for performance (or use numDays if provided)
+  const maxDays = numDays || 90;
   const sortedMoods = [...allMoods].sort(
     (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
   );
-
-  const latestDate = startOfDay(
+  
+  // If we have too many days, limit to recent data
+  if (sortedMoods.length === 0) {
+    return { labels: [], dailyAggregates: [] };
+  }
+  
+  const mostRecentDate = startOfDay(
     new Date(sortedMoods[sortedMoods.length - 1].timestamp)
   );
-  const earliestDate = numDays
-    ? startOfDay(subDays(latestDate, numDays - 1))
-    : startOfDay(new Date(sortedMoods[0].timestamp));
-
+  const cutoffDate = startOfDay(subDays(mostRecentDate, maxDays - 1));
+  
   const filteredMoods = sortedMoods.filter((mood) => {
     const moodDate = startOfDay(new Date(mood.timestamp));
-    return moodDate >= earliestDate && moodDate <= latestDate;
+    return moodDate >= cutoffDate;
   });
+
+  if (filteredMoods.length === 0) {
+    return { labels: [], dailyAggregates: [] };
+  }
+
+  const latestDate = startOfDay(
+    new Date(filteredMoods[filteredMoods.length - 1].timestamp)
+  );
+  const earliestDate = startOfDay(new Date(filteredMoods[0].timestamp));
 
   const allDatesInRange = getDaysInRange(earliestDate, latestDate);
 
@@ -209,7 +260,7 @@ export const processMoodDataForDailyChart = (
 };
 
 // Process weekly mood data
-export const processWeeklyMoodData = (allMoods: MoodEntry[]) => {
+export const processWeeklyMoodData = (allMoods: MoodEntry[], maxWeeks: number = 52) => {
   if (!allMoods || allMoods.length === 0) {
     return { labels: [], weeklyAggregates: [] };
   }
@@ -217,9 +268,15 @@ export const processWeeklyMoodData = (allMoods: MoodEntry[]) => {
   const sortedMoods = [...allMoods].sort(
     (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
   );
+  
+  // Limit to recent weeks for performance
+  const cutoffDate = subDays(new Date(), maxWeeks * 7);
+  const filteredMoods = sortedMoods.filter(
+    (mood) => new Date(mood.timestamp) >= cutoffDate
+  );
 
   const moodsByWeek: Record<string, number[]> = {};
-  sortedMoods.forEach((mood) => {
+  filteredMoods.forEach((mood) => {
     const date = new Date(mood.timestamp);
     const weekStart = startOfWeek(date, { weekStartsOn: 1 }); // 1 = Monday
     const weekKey = format(weekStart, "yyyy-MM-dd");

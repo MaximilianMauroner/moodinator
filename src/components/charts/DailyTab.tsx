@@ -19,6 +19,7 @@ import {
   getBaseChartConfig,
   getColorFromTailwind,
   getMoodInterpretation,
+  sampleDataPoints,
 } from "./ChartComponents";
 import { moodScale } from "@/constants/moodScale";
 import type { MoodScale } from "@/types/mood";
@@ -151,7 +152,7 @@ export const DailyTab = ({
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
 
   const processedData = useMemo(() => {
-    return processMoodDataForDailyChart(moods);
+    return processMoodDataForDailyChart(moods, 30); // Limit to last 30 days
   }, [moods]);
 
   const { dailyAggregates, labels } = processedData;
@@ -160,6 +161,21 @@ export const DailyTab = ({
     () => [...dailyAggregates].reverse(),
     [dailyAggregates]
   );
+
+  // Sample chart data if too many points
+  const sampledAggregates = useMemo(() => {
+    if (reversedAggregates.length <= 200) {
+      return reversedAggregates;
+    }
+    // Sample to max 200 points for chart performance
+    return sampleDataPoints(
+      reversedAggregates.map(agg => ({ ...agg, timestamp: agg.date.getTime() })),
+      200
+    ).map(item => ({
+      ...item,
+      date: new Date(item.timestamp),
+    }));
+  }, [reversedAggregates]);
 
   const recentDaysAggregates = useMemo(
     () => reversedAggregates.slice(0, 7),
@@ -200,18 +216,18 @@ export const DailyTab = ({
   }, [dailyAggregates, toggleDayExpansion]);
 
   const dotColors = useMemo(() => {
-    return reversedAggregates.map((agg) => {
+    return sampledAggregates.map((agg) => {
       const idx = Math.round(agg.finalAvg);
       return getColorFromTailwind(moodScale[idx]?.color);
     });
-  }, [reversedAggregates]);
+  }, [sampledAggregates]);
 
   const chartData = useMemo(
     () => ({
-      labels: [...labels].reverse(),
+      labels: sampledAggregates.map((agg) => format(agg.date, "d")),
       datasets: [
         {
-          data: reversedAggregates.map((agg) => agg.finalAvg),
+          data: sampledAggregates.map((agg) => agg.finalAvg),
           dotColor: dotColors,
           strokeWidth: 2,
           color: (o = 1) => `rgba(255,255,255,${o})`,
@@ -220,7 +236,7 @@ export const DailyTab = ({
         { data: [10], withDots: false },
       ],
     }),
-    [labels, reversedAggregates, dotColors]
+    [sampledAggregates, dotColors]
   );
 
   return (
@@ -267,10 +283,8 @@ export const DailyTab = ({
             segments={5}
             renderDotContent={({ x, y, index }) => {
               // Custom dot rendering logic remains
-              const agg = reversedAggregates[index];
-              const startY = 176; // Adjusted for new height
-              const endY = 10;
-              const split = Math.abs(startY - endY) / 10;
+              const agg = sampledAggregates[index];
+              if (!agg) return null;
               
               // Just render simple main dot to keep it clean, or keep complex logic if needed
               return (

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -8,7 +8,7 @@ import {
   RefreshControl,
 } from "react-native";
 import { LineChart } from "react-native-chart-kit";
-import { format, endOfWeek, isWithinInterval } from "date-fns";
+import { format, endOfWeek, startOfWeek } from "date-fns";
 import type { MoodEntry } from "@db/types";
 import { moodScale } from "@/constants/moodScale";
 import type { MoodScale } from "@/types/mood";
@@ -28,24 +28,39 @@ export const WeeklyTab = ({
   moods: MoodEntry[];
   onRefresh: () => void;
 }) => {
-  const weeklyData = processWeeklyMoodData(moods);
+  const weeklyData = useMemo(() => processWeeklyMoodData(moods, 52), [moods]); // Limit to last 52 weeks
   const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set());
   const scheme = useColorScheme();
   const isDark = scheme === "dark";
 
-  // Helper function to get mood entries for a specific week
-  const getMoodEntriesForWeek = (weekStart: Date): MoodEntry[] => {
-    const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
-    return moods
-      .filter((mood) => {
-        const moodDate = new Date(mood.timestamp);
-        return isWithinInterval(moodDate, { start: weekStart, end: weekEnd });
-      })
-      .sort(
+  // Helper function to get mood entries for a specific week (memoized)
+  const getMoodEntriesForWeek = useMemo(() => {
+    // Pre-compute mood entries by week for faster lookups
+    // Use same key format as processWeeklyMoodData: "yyyy-MM-dd"
+    const moodsByWeek = new Map<string, MoodEntry[]>();
+    moods.forEach((mood) => {
+      const moodDate = new Date(mood.timestamp);
+      const weekStart = startOfWeek(moodDate, { weekStartsOn: 1 });
+      const weekKey = format(weekStart, "yyyy-MM-dd");
+      if (!moodsByWeek.has(weekKey)) {
+        moodsByWeek.set(weekKey, []);
+      }
+      moodsByWeek.get(weekKey)!.push(mood);
+    });
+    
+    // Sort entries in each week
+    moodsByWeek.forEach((entries) => {
+      entries.sort(
         (a, b) =>
           new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
       );
-  };
+    });
+    
+    return (weekStart: Date): MoodEntry[] => {
+      const weekKey = format(weekStart, "yyyy-MM-dd");
+      return moodsByWeek.get(weekKey) || [];
+    };
+  }, [moods]);
 
   const toggleWeekExpansion = (weekKey: string) => {
     const newExpandedWeeks = new Set(expandedWeeks);
@@ -67,18 +82,22 @@ export const WeeklyTab = ({
     );
   }
 
-  const chartData = {
-    labels: weeklyData.labels,
-    datasets: [
-      {
-        data: weeklyData.weeklyAggregates.map((week) => week.avg),
-        strokeWidth: 3,
-        color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-      },
-      { data: [0], withDots: false }, // Min y
-      { data: [10], withDots: false }, // Max y
-    ],
-  };
+  const chartData = useMemo(() => {
+    // Limit displayed weeks to last 52 for performance
+    const displayWeeks = weeklyData.weeklyAggregates.slice(0, 52);
+    return {
+      labels: displayWeeks.map((week) => format(week.weekStart, "'W'w MMM")),
+      datasets: [
+        {
+          data: displayWeeks.map((week) => week.avg),
+          strokeWidth: 3,
+          color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+        },
+        { data: [0], withDots: false }, // Min y
+        { data: [10], withDots: false }, // Max y
+      ],
+    };
+  }, [weeklyData]);
 
   return (
     <ScrollView
