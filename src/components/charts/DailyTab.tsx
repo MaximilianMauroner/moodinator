@@ -13,7 +13,7 @@ import {
   startOfDay,
 } from "date-fns";
 import type { MoodEntry } from "@db/types";
-import { Circle, Line } from "react-native-svg";
+import { Circle } from "react-native-svg";
 import {
   processMoodDataForDailyChart,
   getBaseChartConfig,

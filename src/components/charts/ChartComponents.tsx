@@ -1,8 +1,7 @@
 import React from "react";
-import { View, Text, ScrollView, Dimensions } from "react-native";
+import { View, Text, Dimensions } from "react-native";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { LineChart } from "react-native-chart-kit";
-import { Circle, Line } from "react-native-svg";
 import {
   format,
   startOfDay,
