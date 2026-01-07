@@ -10,10 +10,11 @@ import {
 } from "react-native";
 import { moodScale } from "@/constants/moodScale";
 import { HapticTab } from "./HapticTab";
+import type { Emotion } from "../../db/types";
 
 export type MoodEntryFormValues = {
     mood: number;
-    emotions: string[];
+    emotions: Emotion[];
     contextTags: string[];
     energy: number | null;
     note: string;
@@ -30,7 +31,7 @@ type MoodEntryModalProps = {
     visible: boolean;
     title: string;
     initialMood: number;
-    emotionOptions: string[];
+    emotionOptions: Emotion[];
     contextOptions: string[];
     fieldConfig: MoodEntryFieldConfig;
     onClose: () => void;
@@ -54,7 +55,7 @@ export const MoodEntryModal: React.FC<MoodEntryModalProps> = ({
     showMoodSelector = true,
 }) => {
     const [mood, setMood] = useState(initialMood);
-    const [emotions, setEmotions] = useState<string[]>([]);
+    const [emotions, setEmotions] = useState<Emotion[]>([]);
     const [contextTags, setContextTags] = useState<string[]>([]);
     const [energy, setEnergy] = useState<number | null>(null);
     const [note, setNote] = useState("");
@@ -103,15 +104,16 @@ export const MoodEntryModal: React.FC<MoodEntryModalProps> = ({
         }));
     }, []);
 
-    const toggleEmotion = (value: string) => {
+    const toggleEmotion = (emotion: Emotion) => {
         setEmotions((prev) => {
-            if (prev.includes(value)) {
-                return prev.filter((item) => item !== value);
+            const exists = prev.some((item) => item.name === emotion.name);
+            if (exists) {
+                return prev.filter((item) => item.name !== emotion.name);
             }
             if (prev.length >= 3) {
                 return prev;
             }
-            return [...prev, value];
+            return [...prev, emotion];
         });
     };
 
@@ -208,28 +210,57 @@ export const MoodEntryModal: React.FC<MoodEntryModalProps> = ({
                                     Choose up to three emotions that best describe how you feel.
                                 </Text>
                                 <View className="flex-row flex-wrap gap-2">
-                                    {emotionOptions.map((emotion) => {
-                                        const isSelected = emotions.includes(emotion);
+                                    {emotionOptions
+                                        .slice()
+                                        .sort((a, b) => a.name.localeCompare(b.name))
+                                        .map((emotion) => {
+                                        const isSelected = emotions.some((e) => e.name === emotion.name);
                                         const disabled = !isSelected && emotions.length >= 3;
+
+                                        const getCategoryColors = (category: string) => {
+                                            switch (category) {
+                                                case "positive":
+                                                    return {
+                                                        selected: "bg-green-600 border-green-600",
+                                                        unselected: "bg-green-50 dark:bg-green-950 border-green-300 dark:border-green-700"
+                                                    };
+                                                case "negative":
+                                                    return {
+                                                        selected: "bg-red-600 border-red-600",
+                                                        unselected: "bg-red-50 dark:bg-red-950 border-red-300 dark:border-red-700"
+                                                    };
+                                                case "neutral":
+                                                default:
+                                                    return {
+                                                        selected: "bg-slate-600 border-slate-600",
+                                                        unselected: "bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700"
+                                                    };
+                                            }
+                                        };
+
+                                        const colors = getCategoryColors(emotion.category);
+
                                         return (
                                             <Pressable
-                                                key={emotion}
+                                                key={emotion.name}
                                                 onPress={() => toggleEmotion(emotion)}
                                                 disabled={disabled}
                                                 className={`px-3 py-1 rounded-full border ${
-                                                    isSelected
-                                                        ? "bg-blue-600 border-blue-600"
-                                                        : "bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700"
+                                                    isSelected ? colors.selected : colors.unselected
                                                 } ${disabled ? "opacity-50" : ""}`}
                                             >
                                                 <Text
                                                     className={`text-sm ${
                                                         isSelected
                                                             ? "text-white"
-                                                            : "text-slate-800 dark:text-slate-200"
+                                                            : emotion.category === "positive"
+                                                            ? "text-green-700 dark:text-green-300"
+                                                            : emotion.category === "negative"
+                                                            ? "text-red-700 dark:text-red-300"
+                                                            : "text-slate-700 dark:text-slate-300"
                                                     }`}
                                                 >
-                                                    {emotion}
+                                                    {emotion.name}
                                                 </Text>
                                             </Pressable>
                                         );

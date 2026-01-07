@@ -1,4 +1,12 @@
 /**
+ * Represents an emotion with its category.
+ */
+export type Emotion = {
+    name: string;
+    category: 'positive' | 'negative' | 'neutral';
+};
+
+/**
  * Represents a single mood entry in the database.
  */
 export type MoodEntry = {
@@ -6,7 +14,7 @@ export type MoodEntry = {
     mood: number; // 0-10
     note: string | null;
     timestamp: number; // milliseconds since epoch
-    emotions: string[];
+    emotions: Emotion[];
     contextTags: string[];
     energy: number | null;
 };
@@ -25,7 +33,7 @@ export type MoodEntryInput = {
     mood: number;
     note?: string | null;
     timestamp?: number;
-    emotions?: string[];
+    emotions?: Emotion[];
     contextTags?: string[];
     energy?: number | null;
 };

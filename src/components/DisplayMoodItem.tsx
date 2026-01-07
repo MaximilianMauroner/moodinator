@@ -115,16 +115,44 @@ export const DisplayMoodItem = React.memo(
                     </Text>
                     </View>
                 )}
-                {mood.emotions?.map((emotion) => (
-                  <View
-                    key={`${mood.id}-${emotion}`}
-                    className="bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md"
-                  >
-                    <Text className="text-xs font-medium text-slate-600 dark:text-slate-300">
-                      {emotion}
-                    </Text>
-                  </View>
-                ))}
+                {mood.emotions
+                  ?.slice()
+                  .sort((a, b) => a.name.localeCompare(b.name))
+                  .map((emotion) => {
+                    const getCategoryColors = (category: string) => {
+                      switch (category) {
+                        case "positive":
+                          return {
+                            bg: "bg-green-100 dark:bg-green-900/30",
+                            text: "text-green-700 dark:text-green-300"
+                          };
+                        case "negative":
+                          return {
+                            bg: "bg-red-100 dark:bg-red-900/30",
+                            text: "text-red-700 dark:text-red-300"
+                          };
+                        case "neutral":
+                        default:
+                          return {
+                            bg: "bg-slate-100 dark:bg-slate-800",
+                            text: "text-slate-600 dark:text-slate-300"
+                          };
+                      }
+                    };
+
+                    const colors = getCategoryColors(emotion.category);
+
+                    return (
+                      <View
+                        key={`${mood.id}-${emotion.name}`}
+                        className={`px-2 py-0.5 rounded-md ${colors.bg}`}
+                      >
+                        <Text className={`text-xs font-medium ${colors.text}`}>
+                          {emotion.name}
+                        </Text>
+                      </View>
+                    );
+                  })}
                 {mood.contextTags?.map((context) => (
                   <View
                     key={`${mood.id}-${context}`}

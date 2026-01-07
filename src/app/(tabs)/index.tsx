@@ -14,7 +14,7 @@ import { DateTimePickerModal } from "@/components/DateTimePickerModal";
 import { MoodButtonsDetailed } from "@/components/MoodButtonsDetailed";
 import { MoodButtonsCompact } from "@/components/MoodButtonsCompact";
 import { SwipeDirection } from "@/types/mood";
-import { MoodEntry } from "@db/types";
+import { MoodEntry, Emotion } from "@db/types";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 import ToastManager, { Toast } from "toastify-react-native";
@@ -89,7 +89,7 @@ export default function HomeScreen() {
   const [pendingMood, setPendingMood] = useState(5);
   const [editingEntry, setEditingEntry] = useState<MoodEntry | null>(null);
   const [emotionOptions, setEmotionOptions] =
-    useState<string[]>(DEFAULT_EMOTIONS);
+    useState<Emotion[]>(DEFAULT_EMOTIONS);
   const [contextOptions, setContextOptions] =
     useState<string[]>(DEFAULT_CONTEXTS);
   const [quickEntryPrefs, setQuickEntryPrefs] = useState<QuickEntryPrefs>(
