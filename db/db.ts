@@ -1,5 +1,5 @@
 import * as SQLite from "expo-sqlite";
-import type { MoodEntry, MoodEntryInput } from "./types";
+import type { MoodEntry, MoodEntryInput, Emotion } from "./types";
 import { DEFAULT_EMOTIONS, DEFAULT_CONTEXTS } from "../src/lib/entrySettings";
 
 let db: SQLite.SQLiteDatabase | null = null;
@@ -82,6 +82,43 @@ function deserializeArray(value: unknown): string[] {
   }
 }
 
+function serializeEmotions(value?: Emotion[]): string {
+  if (!value || value.length === 0) {
+    return "[]";
+  }
+  return JSON.stringify(value.slice(0, 50));
+}
+
+function deserializeEmotions(value: unknown): Emotion[] {
+  if (typeof value !== "string" || value.length === 0) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    // Support both old format (strings) and new format (objects)
+    return parsed.map((item): Emotion | null => {
+      if (typeof item === "string" && item.trim().length > 0) {
+        // Migrate old string format to object format with neutral category
+        return { name: item, category: "neutral" };
+      } else if (
+        typeof item === "object" &&
+        item !== null &&
+        typeof item.name === "string" &&
+        item.name.trim().length > 0 &&
+        (item.category === "positive" || item.category === "negative" || item.category === "neutral")
+      ) {
+        return { name: item.name, category: item.category };
+      }
+      return null;
+    }).filter((item): item is Emotion => item !== null);
+  } catch {
+    return [];
+  }
+}
+
 function parseTimestamp(value: unknown): number {
   if (value instanceof Date) {
     return value.getTime();
@@ -108,7 +145,7 @@ function toMoodEntry(row: any): MoodEntry {
     mood: row.mood,
     note: row.note ?? null,
     timestamp: parseTimestamp(row.timestamp),
-    emotions: deserializeArray(row.emotions),
+    emotions: deserializeEmotions(row.emotions),
     contextTags: deserializeArray(row.context_tags),
     energy:
       row.energy === null || row.energy === undefined
@@ -136,6 +173,33 @@ function sanitizeImportedArray(value: unknown): string[] {
   }
   return value
     .filter((item): item is string => typeof item === "string")
+    .slice(0, 50);
+}
+
+function sanitizeImportedEmotions(value: unknown): Emotion[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((item): Emotion | null => {
+      if (typeof item === "string" && item.trim().length > 0) {
+        // Support old string format - default to neutral
+        return { name: item, category: "neutral" };
+      } else if (
+        typeof item === "object" &&
+        item !== null &&
+        typeof (item as any).name === "string" &&
+        (item as any).name.trim().length > 0 &&
+        ((item as any).category === "positive" ||
+         (item as any).category === "negative" ||
+         (item as any).category === "neutral")
+      ) {
+        // New object format
+        return { name: (item as any).name, category: (item as any).category };
+      }
+      return null;
+    })
+    .filter((item): item is Emotion => item !== null)
     .slice(0, 50);
 }
 
@@ -168,7 +232,7 @@ export async function insertMood(
     mood,
     normalized.note,
     normalized.timestamp,
-    serializeArray(normalized.emotions),
+    serializeEmotions(normalized.emotions),
     serializeArray(normalized.contextTags),
     normalized.energy
   );
@@ -194,7 +258,7 @@ export async function insertMoodEntry(
     entry.mood,
     normalized.note,
     normalized.timestamp,
-    serializeArray(normalized.emotions),
+    serializeEmotions(normalized.emotions),
     serializeArray(normalized.contextTags),
     normalized.energy
   );
@@ -289,7 +353,7 @@ export async function updateMoodEntry(
   }
   if (updates.emotions !== undefined) {
     fields.push("emotions = ?");
-    params.push(serializeArray(updates.emotions));
+    params.push(serializeEmotions(updates.emotions));
   }
   if (updates.contextTags !== undefined) {
     fields.push("context_tags = ?");
@@ -521,7 +585,7 @@ export async function seedMoods() {
       }
 
       // Add emotions frequently (75% chance, 1-4 emotions)
-      let emotions: string[] = [];
+      let emotions: Emotion[] = [];
       if (Math.random() < 0.75) {
         const emotionRand = Math.random();
         let numEmotions: number;
@@ -577,7 +641,7 @@ export async function seedMoods() {
         mood,
         note,
         timestamp: currentDate.getTime(),
-        emotions: serializeArray(emotions),
+        emotions: serializeEmotions(emotions),
         contextTags: serializeArray(contextTags),
         energy,
       });
@@ -743,7 +807,7 @@ export async function importMoods(jsonData: string): Promise<number> {
     for (const mood of moods) {
       const note = (mood as any)?.notes ?? (mood as any)?.note ?? null;
       const timestamp = parseTimestamp((mood as any)?.timestamp);
-      const emotions = sanitizeImportedArray((mood as any)?.emotions);
+      const emotions = sanitizeImportedEmotions((mood as any)?.emotions);
       const contextSource =
         (mood as any)?.contextTags ?? (mood as any)?.context ?? [];
       const contextTags = sanitizeImportedArray(contextSource);
@@ -753,7 +817,7 @@ export async function importMoods(jsonData: string): Promise<number> {
         mood.mood,
         note,
         timestamp,
-        serializeArray(emotions),
+        serializeEmotions(emotions),
         serializeArray(contextTags),
         energy
       );
@@ -785,7 +849,7 @@ export async function seedMoodsFromFile(): Promise<{
 
         for (const mood of jsonData) {
           const note = (mood as any)?.notes ?? (mood as any)?.note ?? null;
-          const emotions = sanitizeImportedArray((mood as any)?.emotions);
+          const emotions = sanitizeImportedEmotions((mood as any)?.emotions);
           const contextSource =
             (mood as any)?.contextTags ?? (mood as any)?.context ?? [];
           const contextTags = sanitizeImportedArray(contextSource);
@@ -796,7 +860,7 @@ export async function seedMoodsFromFile(): Promise<{
             mood.mood,
             note,
             timestamp,
-            serializeArray(emotions),
+            serializeEmotions(emotions),
             serializeArray(contextTags),
             energy
           );

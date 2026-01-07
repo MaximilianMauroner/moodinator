@@ -38,6 +38,7 @@ import {
   saveEmotionPresets,
   saveQuickEntryPrefs,
 } from "@/lib/entrySettings";
+import type { Emotion } from "@db/types";
 import * as Notifications from "expo-notifications";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -154,6 +155,177 @@ const ToggleRow = memo(function ToggleRow({
   );
 });
 
+const EmotionListEditor = memo(function EmotionListEditor({
+  title,
+  description,
+  placeholder,
+  items,
+  newValue,
+  newCategory,
+  onChangeNewValue,
+  onChangeCategory,
+  onAdd,
+  onRemove,
+  isLast,
+}: {
+  title: string;
+  description: string;
+  placeholder: string;
+  items: Emotion[];
+  newValue: string;
+  newCategory: "positive" | "negative" | "neutral";
+  onChangeNewValue: (value: string) => void;
+  onChangeCategory: (category: "positive" | "negative" | "neutral") => void;
+  onAdd: () => void;
+  onRemove: (emotion: Emotion) => void;
+  isLast?: boolean;
+}) {
+  const getCategoryColors = (category: string) => {
+    switch (category) {
+      case "positive":
+        return {
+          bg: "bg-green-100 dark:bg-green-900/30",
+          border: "border-green-200 dark:border-green-700",
+          text: "text-green-700 dark:text-green-300"
+        };
+      case "negative":
+        return {
+          bg: "bg-red-100 dark:bg-red-900/30",
+          border: "border-red-200 dark:border-red-700",
+          text: "text-red-700 dark:text-red-300"
+        };
+      case "neutral":
+      default:
+        return {
+          bg: "bg-slate-100 dark:bg-slate-800",
+          border: "border-slate-200 dark:border-slate-700",
+          text: "text-slate-700 dark:text-slate-300"
+        };
+    }
+  };
+
+  const sortedItems = [...items].sort((a, b) => a.name.localeCompare(b.name));
+
+  return (
+    <View
+      className={`p-4 ${
+        !isLast ? "border-b border-slate-100 dark:border-slate-800" : ""
+      }`}
+    >
+      <Text className="text-base font-medium text-slate-900 dark:text-slate-100 mb-1">
+        {title}
+      </Text>
+      <Text className="text-sm text-slate-500 dark:text-slate-400 mb-3">
+        {description}
+      </Text>
+
+      <View className="mb-3">
+        <Text className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+          Category
+        </Text>
+        <View className="flex-row gap-2 mb-3">
+          <TouchableOpacity
+            onPress={() => onChangeCategory("positive")}
+            className={`flex-1 py-2 px-3 rounded-lg border ${
+              newCategory === "positive"
+                ? "bg-green-600 border-green-600"
+                : "bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700"
+            }`}
+          >
+            <Text
+              className={`text-sm font-medium text-center ${
+                newCategory === "positive"
+                  ? "text-white"
+                  : "text-slate-700 dark:text-slate-300"
+              }`}
+            >
+              Positive
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => onChangeCategory("negative")}
+            className={`flex-1 py-2 px-3 rounded-lg border ${
+              newCategory === "negative"
+                ? "bg-red-600 border-red-600"
+                : "bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700"
+            }`}
+          >
+            <Text
+              className={`text-sm font-medium text-center ${
+                newCategory === "negative"
+                  ? "text-white"
+                  : "text-slate-700 dark:text-slate-300"
+              }`}
+            >
+              Negative
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => onChangeCategory("neutral")}
+            className={`flex-1 py-2 px-3 rounded-lg border ${
+              newCategory === "neutral"
+                ? "bg-slate-600 border-slate-600"
+                : "bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700"
+            }`}
+          >
+            <Text
+              className={`text-sm font-medium text-center ${
+                newCategory === "neutral"
+                  ? "text-white"
+                  : "text-slate-700 dark:text-slate-300"
+              }`}
+            >
+              Neutral
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View className="flex-row gap-2 mb-4">
+        <TextInput
+          value={newValue}
+          onChangeText={onChangeNewValue}
+          placeholder={placeholder}
+          placeholderTextColor="#94a3b8"
+          className="flex-1 bg-slate-100 dark:bg-slate-800 rounded-xl px-4 py-2.5 text-slate-900 dark:text-slate-100 border border-transparent focus:border-blue-500 transition-colors"
+          blurOnSubmit={false}
+          returnKeyType="done"
+          onSubmitEditing={onAdd}
+        />
+        <TouchableOpacity
+          onPress={onAdd}
+          className="bg-blue-600 w-12 h-12 rounded-xl items-center justify-center active:bg-blue-700"
+        >
+          <Ionicons name="add" size={24} color="white" />
+        </TouchableOpacity>
+      </View>
+
+      <View className="flex-row flex-wrap gap-2">
+        {sortedItems.map((emotion) => {
+          const colors = getCategoryColors(emotion.category);
+          return (
+            <TouchableOpacity
+              key={emotion.name}
+              onPress={() => onRemove(emotion)}
+              className={`flex-row items-center ${colors.bg} border ${colors.border} rounded-full pl-3 pr-2 py-1.5`}
+            >
+              <Text className={`text-sm font-medium ${colors.text} mr-1`}>
+                {emotion.name}
+              </Text>
+              <Ionicons name="close-circle" size={16} color="#94a3b8" />
+            </TouchableOpacity>
+          );
+        })}
+        {items.length === 0 && (
+          <Text className="text-sm text-slate-400 italic p-1">
+            No emotions added yet.
+          </Text>
+        )}
+      </View>
+    </View>
+  );
+});
+
 const ListEditor = memo(function ListEditor({
   title,
   description,
@@ -237,12 +409,13 @@ export default function SettingsScreen() {
   const [showDetailedLabels, setShowDetailedLabels] = useState(false);
   const [devOptionsEnabled, setDevOptionsEnabled] = useState(false);
 
-  const [emotions, setEmotions] = useState<string[]>(DEFAULT_EMOTIONS);
+  const [emotions, setEmotions] = useState<Emotion[]>(DEFAULT_EMOTIONS);
   const [contexts, setContexts] = useState<string[]>(DEFAULT_CONTEXTS);
   const [quickEntryPrefs, setQuickEntryPrefs] = useState<QuickEntryPrefs>(
     DEFAULT_QUICK_ENTRY_PREFS
   );
   const [newEmotion, setNewEmotion] = useState("");
+  const [newEmotionCategory, setNewEmotionCategory] = useState<"positive" | "negative" | "neutral">("neutral");
   const [newContext, setNewContext] = useState("");
   const [exportModalVisible, setExportModalVisible] = useState(false);
   const [exportRange, setExportRange] = useState<"week" | "month" | "custom">(
@@ -400,19 +573,21 @@ export default function SettingsScreen() {
   const handleAddEmotion = useCallback(async () => {
     const trimmed = newEmotion.trim();
     if (!trimmed) return;
-    if (emotions.includes(trimmed)) {
+    if (emotions.some((e) => e.name === trimmed)) {
       Alert.alert("Duplicate Emotion", "This emotion is already in the list.");
       return;
     }
-    const updated = [...emotions, trimmed];
+    const newEmotionObj: Emotion = { name: trimmed, category: newEmotionCategory };
+    const updated = [...emotions, newEmotionObj];
     setEmotions(updated);
     setNewEmotion("");
+    setNewEmotionCategory("neutral");
     await saveEmotionPresets(updated);
-  }, [newEmotion, emotions]);
+  }, [newEmotion, newEmotionCategory, emotions]);
 
-  const handleRemoveEmotion = useCallback(async (value: string) => {
+  const handleRemoveEmotion = useCallback(async (emotion: Emotion) => {
     setEmotions((prev) => {
-      const updated = prev.filter((item) => item !== value);
+      const updated = prev.filter((item) => item.name !== emotion.name);
       const finalList = updated.length > 0 ? updated : DEFAULT_EMOTIONS;
       saveEmotionPresets(finalList);
       return finalList;
@@ -698,13 +873,15 @@ export default function SettingsScreen() {
             value={quickEntryPrefs.showNotes}
             onChange={(v) => handleQuickEntryToggle("showNotes", v)}
           />
-          <ListEditor
+          <EmotionListEditor
             title="Emotions"
-            description="Custom emotions for entries"
+            description="Custom emotions for entries (sorted alphabetically)"
             placeholder="Add emotion..."
             items={emotions}
             newValue={newEmotion}
+            newCategory={newEmotionCategory}
             onChangeNewValue={setNewEmotion}
+            onChangeCategory={setNewEmotionCategory}
             onAdd={handleAddEmotion}
             onRemove={handleRemoveEmotion}
           />
