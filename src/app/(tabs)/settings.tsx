@@ -43,6 +43,7 @@ import * as Notifications from "expo-notifications";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useNotifications } from "@/hooks/useNotifications";
 import { Ionicons } from "@expo/vector-icons";
+import { getCategoryColors, getCategoryIconColor } from "@/lib/emotionColors";
 
 const SHOW_LABELS_KEY = "showLabelsPreference";
 const DEV_OPTIONS_KEY = "devOptionsEnabled";
@@ -180,30 +181,6 @@ const EmotionListEditor = memo(function EmotionListEditor({
   onRemove: (emotion: Emotion) => void;
   isLast?: boolean;
 }) {
-  const getCategoryColors = (category: string) => {
-    switch (category) {
-      case "positive":
-        return {
-          bg: "bg-green-100 dark:bg-green-900/30",
-          border: "border-green-200 dark:border-green-700",
-          text: "text-green-700 dark:text-green-300"
-        };
-      case "negative":
-        return {
-          bg: "bg-red-100 dark:bg-red-900/30",
-          border: "border-red-200 dark:border-red-700",
-          text: "text-red-700 dark:text-red-300"
-        };
-      case "neutral":
-      default:
-        return {
-          bg: "bg-slate-100 dark:bg-slate-800",
-          border: "border-slate-200 dark:border-slate-700",
-          text: "text-slate-700 dark:text-slate-300"
-        };
-    }
-  };
-
   const sortedItems = [...items].sort((a, b) => a.name.localeCompare(b.name));
 
   return (
@@ -303,6 +280,7 @@ const EmotionListEditor = memo(function EmotionListEditor({
       <View className="flex-row flex-wrap gap-2">
         {sortedItems.map((emotion) => {
           const colors = getCategoryColors(emotion.category);
+          const iconColor = getCategoryIconColor(emotion.category);
           return (
             <TouchableOpacity
               key={emotion.name}
@@ -312,7 +290,7 @@ const EmotionListEditor = memo(function EmotionListEditor({
               <Text className={`text-sm font-medium ${colors.text} mr-1`}>
                 {emotion.name}
               </Text>
-              <Ionicons name="close-circle" size={16} color="#94a3b8" />
+              <Ionicons name="close-circle" size={16} color={iconColor} />
             </TouchableOpacity>
           );
         })}
@@ -573,7 +551,8 @@ export default function SettingsScreen() {
   const handleAddEmotion = useCallback(async () => {
     const trimmed = newEmotion.trim();
     if (!trimmed) return;
-    if (emotions.some((e) => e.name === trimmed)) {
+    const trimmedLower = trimmed.toLowerCase();
+    if (emotions.some((e) => e.name.trim().toLowerCase() === trimmedLower)) {
       Alert.alert("Duplicate Emotion", "This emotion is already in the list.");
       return;
     }
