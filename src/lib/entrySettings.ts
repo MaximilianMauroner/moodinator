@@ -80,7 +80,7 @@ async function loadEmotionList(key: string, fallback: Emotion[]): Promise<Emotio
                 const emotions = parsed.map((item): Emotion | null => {
                     if (typeof item === "string" && item.trim().length > 0) {
                         // Migrate old string format to object format
-                        return { name: item, category: "neutral" };
+                        return { name: item.trim(), category: "neutral" };
                     } else if (
                         typeof item === "object" &&
                         item !== null &&
@@ -88,7 +88,7 @@ async function loadEmotionList(key: string, fallback: Emotion[]): Promise<Emotio
                         item.name.trim().length > 0 &&
                         (item.category === "positive" || item.category === "negative" || item.category === "neutral")
                     ) {
-                        return { name: item.name, category: item.category };
+                        return { name: item.name.trim(), category: item.category };
                     }
                     return null;
                 }).filter((item): item is Emotion => item !== null);

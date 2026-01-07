@@ -102,7 +102,7 @@ function deserializeEmotions(value: unknown): Emotion[] {
     return parsed.map((item): Emotion | null => {
       if (typeof item === "string" && item.trim().length > 0) {
         // Migrate old string format to object format with neutral category
-        return { name: item, category: "neutral" };
+        return { name: item.trim(), category: "neutral" };
       } else if (
         typeof item === "object" &&
         item !== null &&
@@ -110,7 +110,7 @@ function deserializeEmotions(value: unknown): Emotion[] {
         item.name.trim().length > 0 &&
         (item.category === "positive" || item.category === "negative" || item.category === "neutral")
       ) {
-        return { name: item.name, category: item.category };
+        return { name: item.name.trim(), category: item.category };
       }
       return null;
     }).filter((item): item is Emotion => item !== null);
@@ -184,7 +184,7 @@ function sanitizeImportedEmotions(value: unknown): Emotion[] {
     .map((item): Emotion | null => {
       if (typeof item === "string" && item.trim().length > 0) {
         // Support old string format - default to neutral
-        return { name: item, category: "neutral" };
+        return { name: item.trim(), category: "neutral" };
       } else if (
         typeof item === "object" &&
         item !== null &&
@@ -195,7 +195,7 @@ function sanitizeImportedEmotions(value: unknown): Emotion[] {
          (item as any).category === "neutral")
       ) {
         // New object format
-        return { name: (item as any).name, category: (item as any).category };
+        return { name: (item as any).name.trim(), category: (item as any).category };
       }
       return null;
     })

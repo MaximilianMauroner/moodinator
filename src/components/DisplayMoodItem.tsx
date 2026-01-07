@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useRef, useMemo } from "react";
 import { View, Text, Pressable } from "react-native";
 import Animated, {
   FadeInRight,
@@ -11,6 +11,7 @@ import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 import { SwipeDirection } from "../types/mood";
 import { MoodEntry } from "@db/types";
 import { moodScale } from "@/constants/moodScale";
+import { getCategoryColors } from "@/lib/emotionColors";
 
 interface Props {
   mood: MoodEntry;
@@ -48,6 +49,13 @@ export const DisplayMoodItem = React.memo(
         bg: moodInfo?.bg ?? "bg-blue-50",
       };
     }, [mood.mood]);
+
+    // Memoize sorted emotions to avoid re-sorting on every render
+    const sortedEmotions = useMemo(() => {
+      return mood.emotions
+        ? [...mood.emotions].sort((a, b) => a.name.localeCompare(b.name))
+        : [];
+    }, [mood.emotions]);
 
     const moodColor = moodData.color;
 
@@ -115,31 +123,7 @@ export const DisplayMoodItem = React.memo(
                     </Text>
                     </View>
                 )}
-                {mood.emotions
-                  ?.slice()
-                  .sort((a, b) => a.name.localeCompare(b.name))
-                  .map((emotion) => {
-                    const getCategoryColors = (category: string) => {
-                      switch (category) {
-                        case "positive":
-                          return {
-                            bg: "bg-green-100 dark:bg-green-900/30",
-                            text: "text-green-700 dark:text-green-300"
-                          };
-                        case "negative":
-                          return {
-                            bg: "bg-red-100 dark:bg-red-900/30",
-                            text: "text-red-700 dark:text-red-300"
-                          };
-                        case "neutral":
-                        default:
-                          return {
-                            bg: "bg-slate-100 dark:bg-slate-800",
-                            text: "text-slate-600 dark:text-slate-300"
-                          };
-                      }
-                    };
-
+                {sortedEmotions.map((emotion) => {
                     const colors = getCategoryColors(emotion.category);
 
                     return (
