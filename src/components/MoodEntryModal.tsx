@@ -11,6 +11,7 @@ import {
 import { moodScale } from "@/constants/moodScale";
 import { HapticTab } from "./HapticTab";
 import type { Emotion } from "../../db/types";
+import { getCategoryColors } from "@/lib/emotionColors";
 
 export type MoodEntryFormValues = {
     mood: number;
@@ -103,6 +104,11 @@ export const MoodEntryModal: React.FC<MoodEntryModalProps> = ({
             description: item.description,
         }));
     }, []);
+
+    // Memoize sorted emotions to avoid re-sorting on every render
+    const sortedEmotionOptions = useMemo(() => {
+        return [...emotionOptions].sort((a, b) => a.name.localeCompare(b.name));
+    }, [emotionOptions]);
 
     const toggleEmotion = (emotion: Emotion) => {
         setEmotions((prev) => {
@@ -210,35 +216,11 @@ export const MoodEntryModal: React.FC<MoodEntryModalProps> = ({
                                     Choose up to three emotions that best describe how you feel.
                                 </Text>
                                 <View className="flex-row flex-wrap gap-2">
-                                    {emotionOptions
-                                        .slice()
-                                        .sort((a, b) => a.name.localeCompare(b.name))
-                                        .map((emotion) => {
+                                    {sortedEmotionOptions.map((emotion) => {
                                         const isSelected = emotions.some((e) => e.name === emotion.name);
                                         const disabled = !isSelected && emotions.length >= 3;
 
-                                        const getCategoryColors = (category: string) => {
-                                            switch (category) {
-                                                case "positive":
-                                                    return {
-                                                        selected: "bg-green-600 border-green-600",
-                                                        unselected: "bg-green-50 dark:bg-green-950 border-green-300 dark:border-green-700"
-                                                    };
-                                                case "negative":
-                                                    return {
-                                                        selected: "bg-red-600 border-red-600",
-                                                        unselected: "bg-red-50 dark:bg-red-950 border-red-300 dark:border-red-700"
-                                                    };
-                                                case "neutral":
-                                                default:
-                                                    return {
-                                                        selected: "bg-slate-600 border-slate-600",
-                                                        unselected: "bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700"
-                                                    };
-                                            }
-                                        };
-
-                                        const colors = getCategoryColors(emotion.category);
+                                        const colors = getCategoryColors(emotion.category, "button");
 
                                         return (
                                             <Pressable
