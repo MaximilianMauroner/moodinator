@@ -5,6 +5,7 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { getAllMoods } from "@db/db";
 import { MoodEntry } from "@db/types";
@@ -21,9 +22,10 @@ interface MonthData {
   days: (DayData | null)[];
 }
 
-export function CalendarTab() {
+export function CalendarTab({ onRefresh }: { onRefresh?: () => void }) {
   const [moods, setMoods] = useState<MoodEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [selectedDay, setSelectedDay] = useState<DayData | null>(null);
 
   useEffect(() => {
@@ -42,6 +44,21 @@ export function CalendarTab() {
     }
   };
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadMoods();
+    onRefresh?.();
+    setRefreshing(false);
+  };
+
+  // Helper to format a date in local timezone as YYYY-MM-DD
+  const formatLocalDate = (d: Date): string => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
   const monthsData = useMemo(() => {
     if (moods.length === 0) return [];
 
@@ -50,7 +67,7 @@ export function CalendarTab() {
     for (const mood of moods) {
       const date = new Date(mood.timestamp);
       date.setHours(0, 0, 0, 0);
-      const dateKey = date.toISOString().split("T")[0];
+      const dateKey = formatLocalDate(date);
       if (!moodsByDate[dateKey]) {
         moodsByDate[dateKey] = [];
       }
@@ -94,7 +111,7 @@ export function CalendarTab() {
       // Add days of the month
       for (let day = 1; day <= daysInMonth; day++) {
         const date = new Date(year, month, day);
-        const dateKey = date.toISOString().split("T")[0];
+        const dateKey = formatLocalDate(date);
         const dayMoods = moodsByDate[dateKey] || [];
         const avgMood =
           dayMoods.length > 0
@@ -114,7 +131,8 @@ export function CalendarTab() {
       monthsToShow--;
     }
 
-    return months;
+    // Return months in chronological order (earliest to latest)
+    return months.reverse();
   }, [moods]);
 
   const getMoodColor = (avgMood: number | null) => {
@@ -122,12 +140,12 @@ export function CalendarTab() {
       return "bg-slate-100 dark:bg-slate-800";
     }
 
-    // Mood scale: 0-2 positive, 3-4 okay, 5 neutral, 6-10 negative
+    // Mood scale (with neutral band): 0-2 positive, 2-4.5 okay, 4.5-5.5 neutral, 5.5-7 low, 7-10 negative
     if (avgMood <= 2) {
       return "bg-indigo-500 dark:bg-indigo-600";
-    } else if (avgMood <= 4) {
+    } else if (avgMood < 4.5) {
       return "bg-cyan-400 dark:bg-cyan-500";
-    } else if (avgMood === 5) {
+    } else if (avgMood >= 4.5 && avgMood <= 5.5) {
       return "bg-slate-400 dark:bg-slate-500";
     } else if (avgMood <= 7) {
       return "bg-yellow-500 dark:bg-yellow-600";
@@ -179,7 +197,12 @@ export function CalendarTab() {
   }
 
   return (
-    <ScrollView className="flex-1 bg-slate-50 dark:bg-slate-950">
+    <ScrollView 
+      className="flex-1 bg-slate-50 dark:bg-slate-950"
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+      }
+    >
       <View className="p-4 space-y-4">
         {/* Legend */}
         <View className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800">
@@ -196,19 +219,19 @@ export function CalendarTab() {
             <View className="flex-row items-center">
               <View className="w-4 h-4 rounded bg-cyan-400 dark:bg-cyan-500 mr-2" />
               <Text className="text-xs text-slate-600 dark:text-slate-400">
-                Good (3-4)
+                Good (2-4.5)
               </Text>
             </View>
             <View className="flex-row items-center">
               <View className="w-4 h-4 rounded bg-slate-400 dark:bg-slate-500 mr-2" />
               <Text className="text-xs text-slate-600 dark:text-slate-400">
-                Neutral (5)
+                Neutral (4.5-5.5)
               </Text>
             </View>
             <View className="flex-row items-center">
               <View className="w-4 h-4 rounded bg-yellow-500 dark:bg-yellow-600 mr-2" />
               <Text className="text-xs text-slate-600 dark:text-slate-400">
-                Low (6-7)
+                Low (5.5-7)
               </Text>
             </View>
             <View className="flex-row items-center">

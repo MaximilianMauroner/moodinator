@@ -53,6 +53,16 @@ export default function CustomizeMoodLabelsScreen() {
       return;
     }
 
+    // Validate label length (max 20 characters recommended for UI layout)
+    const hasTooLong = labels.some((item) => item.label.trim().length > 20);
+    if (hasTooLong) {
+      Alert.alert(
+        "Labels too long",
+        "Please keep mood labels under 20 characters for better display."
+      );
+      return;
+    }
+
     try {
       await saveCustomMoodLabels(labels);
       Alert.alert("Success", "Mood labels saved successfully!");
@@ -164,6 +174,7 @@ export default function CustomizeMoodLabelsScreen() {
                   placeholder={`Label for mood ${item.value}`}
                   placeholderTextColor="#94a3b8"
                   maxLength={30}
+                  accessibilityLabel={`Label for mood ${item.value}`}
                 />
               </View>
             ))}
@@ -174,6 +185,8 @@ export default function CustomizeMoodLabelsScreen() {
             <Pressable
               onPress={handleSave}
               className="rounded-3xl py-4 items-center bg-blue-600"
+              accessibilityRole="button"
+              accessibilityLabel="Save custom mood labels"
             >
               <Text className="text-white font-semibold text-base">
                 Save Custom Labels
@@ -183,6 +196,8 @@ export default function CustomizeMoodLabelsScreen() {
             <Pressable
               onPress={handleReset}
               className="rounded-3xl py-4 items-center bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700"
+              accessibilityRole="button"
+              accessibilityLabel="Reset mood labels to defaults"
             >
               <Text className="text-slate-700 dark:text-slate-200 font-semibold text-base">
                 Reset to Defaults

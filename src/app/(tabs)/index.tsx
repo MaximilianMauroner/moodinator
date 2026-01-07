@@ -381,7 +381,7 @@ export default function HomeScreen() {
                 </Text>
                 {currentStreak > 0 && (
                   <View className="flex-row items-center mt-2">
-                    <View className="bg-gradient-to-r from-orange-500 to-amber-500 bg-orange-500 px-3 py-1.5 rounded-full border border-orange-400 dark:border-orange-600 shadow-sm">
+                    <View className="bg-orange-500 px-3 py-1.5 rounded-full border border-orange-400 dark:border-orange-600 shadow-sm">
                       <Text className="text-white font-bold text-sm">
                         🔥 {currentStreak} day{currentStreak !== 1 ? 's' : ''} streak!
                       </Text>
