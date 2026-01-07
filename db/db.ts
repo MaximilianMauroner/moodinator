@@ -879,3 +879,87 @@ export async function seedMoodsFromFile(): Promise<{
   const totalEntries = await seedMoods();
   return { source: "random", count: totalEntries };
 }
+
+/**
+ * Migrates emotions from old string format to new object format with categories
+ * This runs once and updates all existing mood entries in the database
+ */
+export async function migrateEmotionsToCategories(): Promise<{
+  migrated: number;
+  skipped: number;
+}> {
+  const db = await getDb();
+  let migrated = 0;
+  let skipped = 0;
+
+  try {
+    // Get all mood entries from database
+    const rows = await db.getAllAsync("SELECT id, emotions FROM moods;");
+
+    for (const row: any of rows) {
+      const rawEmotions = row.emotions;
+
+      // Skip if no emotions
+      if (!rawEmotions || rawEmotions === "[]") {
+        skipped++;
+        continue;
+      }
+
+      try {
+        const parsed = JSON.parse(rawEmotions);
+
+        // Check if migration is needed (if any item is a string or missing category)
+        const needsMigration = parsed.some((item: any) => {
+          return typeof item === "string" ||
+                 (typeof item === "object" && !item.category);
+        });
+
+        if (!needsMigration) {
+          skipped++;
+          continue;
+        }
+
+        // Migrate emotions to new format
+        const migratedEmotions: Emotion[] = parsed.map((item: any): Emotion => {
+          if (typeof item === "string") {
+            // Assign category based on emotion name
+            const name = item;
+            let category: "positive" | "negative" | "neutral" = "neutral";
+
+            // Check against default emotions for category
+            const defaultEmotion = DEFAULT_EMOTIONS.find(e => e.name === name);
+            if (defaultEmotion) {
+              category = defaultEmotion.category;
+            }
+
+            return { name, category };
+          } else if (typeof item === "object" && item.name) {
+            // Already an object but might be missing category
+            const category = item.category || "neutral";
+            return { name: item.name, category };
+          }
+          // Fallback
+          return { name: String(item), category: "neutral" };
+        });
+
+        // Update the database entry
+        await db.runAsync(
+          "UPDATE moods SET emotions = ? WHERE id = ?;",
+          serializeEmotions(migratedEmotions),
+          row.id
+        );
+
+        migrated++;
+      } catch (error) {
+        console.error(`Failed to migrate emotions for mood ${row.id}:`, error);
+        skipped++;
+      }
+    }
+
+    console.log(`Emotion migration complete: ${migrated} migrated, ${skipped} skipped`);
+    return { migrated, skipped };
+  } catch (error) {
+    console.error("Error during emotion migration:", error);
+    throw error;
+  }
+}

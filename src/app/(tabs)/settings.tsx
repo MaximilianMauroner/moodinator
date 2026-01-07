@@ -167,6 +167,7 @@ const EmotionListEditor = memo(function EmotionListEditor({
   onChangeCategory,
   onAdd,
   onRemove,
+  onEdit,
   isLast,
 }: {
   title: string;
@@ -179,9 +180,29 @@ const EmotionListEditor = memo(function EmotionListEditor({
   onChangeCategory: (category: "positive" | "negative" | "neutral") => void;
   onAdd: () => void;
   onRemove: (emotion: Emotion) => void;
+  onEdit: (oldEmotion: Emotion, newCategory: "positive" | "negative" | "neutral") => void;
   isLast?: boolean;
 }) {
+  const [editingEmotion, setEditingEmotion] = useState<Emotion | null>(null);
+  const [editCategory, setEditCategory] = useState<"positive" | "negative" | "neutral">("neutral");
+
   const sortedItems = [...items].sort((a, b) => a.name.localeCompare(b.name));
+
+  const handleEditStart = (emotion: Emotion) => {
+    setEditingEmotion(emotion);
+    setEditCategory(emotion.category);
+  };
+
+  const handleEditSave = () => {
+    if (editingEmotion) {
+      onEdit(editingEmotion, editCategory);
+      setEditingEmotion(null);
+    }
+  };
+
+  const handleEditCancel = () => {
+    setEditingEmotion(null);
+  };
 
   return (
     <View
@@ -282,16 +303,26 @@ const EmotionListEditor = memo(function EmotionListEditor({
           const colors = getCategoryColors(emotion.category);
           const iconColor = getCategoryIconColor(emotion.category);
           return (
-            <TouchableOpacity
+            <View
               key={emotion.name}
-              onPress={() => onRemove(emotion)}
-              className={`flex-row items-center ${colors.bg} border ${colors.border} rounded-full pl-3 pr-2 py-1.5`}
+              className={`flex-row items-center ${colors.bg} border ${colors.border} rounded-full pl-3 pr-1 py-1.5 gap-1`}
             >
-              <Text className={`text-sm font-medium ${colors.text} mr-1`}>
+              <Text className={`text-sm font-medium ${colors.text}`}>
                 {emotion.name}
               </Text>
-              <Ionicons name="close-circle" size={16} color={iconColor} />
-            </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => handleEditStart(emotion)}
+                className="p-0.5"
+              >
+                <Ionicons name="create-outline" size={16} color="#64748b" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => onRemove(emotion)}
+                className="p-0.5"
+              >
+                <Ionicons name="close-circle" size={16} color={iconColor} />
+              </TouchableOpacity>
+            </View>
           );
         })}
         {items.length === 0 && (
@@ -300,6 +331,105 @@ const EmotionListEditor = memo(function EmotionListEditor({
           </Text>
         )}
       </View>
+
+      {/* Edit Modal */}
+      <Modal
+        visible={editingEmotion !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={handleEditCancel}
+      >
+        <View className="flex-1 bg-black/50 justify-center items-center p-4">
+          <View className="bg-white dark:bg-slate-900 rounded-2xl p-6 w-full max-w-md">
+            <Text className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">
+              Edit Emotion Category
+            </Text>
+
+            <Text className="text-lg font-medium text-slate-700 dark:text-slate-300 mb-4">
+              {editingEmotion?.name}
+            </Text>
+
+            <Text className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Select Category
+            </Text>
+            <View className="flex-row gap-2 mb-6">
+              <TouchableOpacity
+                onPress={() => setEditCategory("positive")}
+                className={`flex-1 py-3 px-3 rounded-lg border ${
+                  editCategory === "positive"
+                    ? "bg-green-600 border-green-600"
+                    : "bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700"
+                }`}
+              >
+                <Text
+                  className={`text-sm font-medium text-center ${
+                    editCategory === "positive"
+                      ? "text-white"
+                      : "text-slate-700 dark:text-slate-300"
+                  }`}
+                >
+                  Positive
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setEditCategory("negative")}
+                className={`flex-1 py-3 px-3 rounded-lg border ${
+                  editCategory === "negative"
+                    ? "bg-red-600 border-red-600"
+                    : "bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700"
+                }`}
+              >
+                <Text
+                  className={`text-sm font-medium text-center ${
+                    editCategory === "negative"
+                      ? "text-white"
+                      : "text-slate-700 dark:text-slate-300"
+                  }`}
+                >
+                  Negative
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setEditCategory("neutral")}
+                className={`flex-1 py-3 px-3 rounded-lg border ${
+                  editCategory === "neutral"
+                    ? "bg-slate-600 border-slate-600"
+                    : "bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700"
+                }`}
+              >
+                <Text
+                  className={`text-sm font-medium text-center ${
+                    editCategory === "neutral"
+                      ? "text-white"
+                      : "text-slate-700 dark:text-slate-300"
+                  }`}
+                >
+                  Neutral
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <View className="flex-row gap-3">
+              <TouchableOpacity
+                onPress={handleEditCancel}
+                className="flex-1 bg-slate-200 dark:bg-slate-700 py-3 rounded-xl"
+              >
+                <Text className="text-center text-slate-800 dark:text-slate-200 font-medium">
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleEditSave}
+                className="flex-1 bg-blue-600 py-3 rounded-xl"
+              >
+                <Text className="text-center text-white font-medium">
+                  Save
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 });
@@ -570,6 +700,18 @@ export default function SettingsScreen() {
       const finalList = updated.length > 0 ? updated : DEFAULT_EMOTIONS;
       saveEmotionPresets(finalList);
       return finalList;
+    });
+  }, []);
+
+  const handleEditEmotion = useCallback(async (oldEmotion: Emotion, newCategory: "positive" | "negative" | "neutral") => {
+    setEmotions((prev) => {
+      const updated = prev.map((item) =>
+        item.name === oldEmotion.name
+          ? { ...item, category: newCategory }
+          : item
+      );
+      saveEmotionPresets(updated);
+      return updated;
     });
   }, []);
 
@@ -863,6 +1005,7 @@ export default function SettingsScreen() {
             onChangeCategory={setNewEmotionCategory}
             onAdd={handleAddEmotion}
             onRemove={handleRemoveEmotion}
+            onEdit={handleEditEmotion}
           />
           <ListEditor
             title="Contexts"

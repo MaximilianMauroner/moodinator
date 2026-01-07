@@ -8,6 +8,7 @@ import {
   insertMoodEntry,
   updateMoodTimestamp,
   updateMoodEntry,
+  migrateEmotionsToCategories,
 } from "@db/db";
 import { DisplayMoodItem } from "@/components/DisplayMoodItem";
 import { DateTimePickerModal } from "@/components/DateTimePickerModal";
@@ -272,9 +273,28 @@ export default function HomeScreen() {
     }
   }, []);
 
+  const runEmotionMigration = useCallback(async () => {
+    try {
+      const MIGRATION_KEY = "emotionCategoryMigrationCompleted";
+      const migrationCompleted = await AsyncStorage.getItem(MIGRATION_KEY);
+
+      if (!migrationCompleted) {
+        console.log("Running emotion category migration...");
+        const result = await migrateEmotionsToCategories();
+        console.log(`Migration complete: ${result.migrated} entries migrated, ${result.skipped} skipped`);
+        await AsyncStorage.setItem(MIGRATION_KEY, "true");
+        // Reload moods after migration
+        await loadMoods();
+      }
+    } catch (error) {
+      console.error("Failed to run emotion migration:", error);
+    }
+  }, []);
+
   useEffect(() => {
     loadShowLabelsPreference();
-  }, [loadShowLabelsPreference]);
+    runEmotionMigration();
+  }, [loadShowLabelsPreference, runEmotionMigration]);
 
   useFocusEffect(
     useCallback(() => {
