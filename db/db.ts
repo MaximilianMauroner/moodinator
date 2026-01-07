@@ -2,6 +2,23 @@ import * as SQLite from "expo-sqlite";
 import type { MoodEntry, MoodEntryInput } from "./types";
 import { DEFAULT_EMOTIONS, DEFAULT_CONTEXTS } from "../src/lib/entrySettings";
 
+// Pattern insight thresholds
+const EMOTION_CORRELATION_THRESHOLD = 1.5;
+const TIME_OF_DAY_DIFFERENCE_THRESHOLD = 1;
+const DAY_OF_WEEK_DIFFERENCE_THRESHOLD = 1;
+const HIGH_CONFIDENCE_THRESHOLD = 2.5;
+const MEDIUM_CONFIDENCE_THRESHOLD = 2;
+
+/**
+ * Helper to format a date in local timezone as YYYY-MM-DD
+ */
+function formatLocalDate(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 let db: SQLite.SQLiteDatabase | null = null;
 /**
  * Opens the database if not already open.
@@ -823,14 +840,6 @@ export async function seedMoodsFromFile(): Promise<{
 export async function getCurrentStreak(): Promise<number> {
   const db = await getDb();
 
-  // Helper to format a date in local timezone as YYYY-MM-DD
-  const formatLocalDate = (d: Date): string => {
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  };
-
   // Get all entries ordered by date
   const rows = await db.getAllAsync(
     "SELECT timestamp FROM moods ORDER BY timestamp DESC;"
@@ -897,14 +906,6 @@ export async function getStreakStats(): Promise<{
   totalDaysLogged: number;
 }> {
   const db = await getDb();
-
-  // Helper to format a date in local timezone as YYYY-MM-DD
-  const formatLocalDate = (d: Date): string => {
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  };
 
   // Get all entries ordered by date
   const rows = await db.getAllAsync(
@@ -1012,12 +1013,12 @@ export async function getPatternInsights(): Promise<PatternInsight[]> {
     }
   }
 
-  if (bestDay !== -1 && worstDay !== -1 && bestDay !== worstDay && Math.abs(bestAvg - worstAvg) >= 1) {
+  if (bestDay !== -1 && worstDay !== -1 && bestDay !== worstDay && Math.abs(bestAvg - worstAvg) >= DAY_OF_WEEK_DIFFERENCE_THRESHOLD) {
     insights.push({
       type: 'day_of_week',
       title: `${dayNames[bestDay]}s are your best days`,
       description: `You tend to feel better on ${dayNames[bestDay]}s compared to other days of the week.`,
-      confidence: Math.abs(bestAvg - worstAvg) >= 2 ? 'high' : 'medium',
+      confidence: Math.abs(bestAvg - worstAvg) >= MEDIUM_CONFIDENCE_THRESHOLD ? 'high' : 'medium',
     });
   }
 
@@ -1039,19 +1040,19 @@ export async function getPatternInsights(): Promise<PatternInsight[]> {
       const avg = moodList.reduce((sum, m) => sum + m, 0) / moodList.length;
       const diff = avg - overallAvg;
 
-      if (diff <= -1.5) {
+      if (diff <= -EMOTION_CORRELATION_THRESHOLD) {
         insights.push({
           type: 'context',
           title: `${context} improves your mood`,
           description: `Your mood is typically better when you're ${context.toLowerCase()}.`,
-          confidence: Math.abs(diff) >= 2.5 ? 'high' : 'medium',
+          confidence: Math.abs(diff) >= HIGH_CONFIDENCE_THRESHOLD ? 'high' : 'medium',
         });
-      } else if (diff >= 1.5) {
+      } else if (diff >= EMOTION_CORRELATION_THRESHOLD) {
         insights.push({
           type: 'context',
           title: `${context} correlates with lower mood`,
           description: `You tend to feel worse when ${context.toLowerCase()}.`,
-          confidence: Math.abs(diff) >= 2.5 ? 'high' : 'medium',
+          confidence: Math.abs(diff) >= HIGH_CONFIDENCE_THRESHOLD ? 'high' : 'medium',
         });
       }
     }
@@ -1073,12 +1074,12 @@ export async function getPatternInsights(): Promise<PatternInsight[]> {
       const avg = moodList.reduce((sum, m) => sum + m, 0) / moodList.length;
       const diff = avg - overallAvg;
 
-      if (diff >= 1.5) {
+      if (diff >= EMOTION_CORRELATION_THRESHOLD) {
         insights.push({
           type: 'emotion',
           title: `${emotion} occurs with worse moods`,
           description: `When you feel ${emotion.toLowerCase()}, your overall mood tends to be lower.`,
-          confidence: Math.abs(diff) >= 2.5 ? 'high' : 'medium',
+          confidence: Math.abs(diff) >= HIGH_CONFIDENCE_THRESHOLD ? 'high' : 'medium',
         });
       }
     }
@@ -1132,12 +1133,12 @@ export async function getPatternInsights(): Promise<PatternInsight[]> {
     }
   }
 
-  if (bestTime && worstTime && bestTime !== worstTime && Math.abs(lowestTimeAvg - highestTimeAvg) >= 1) {
+  if (bestTime && worstTime && bestTime !== worstTime && Math.abs(lowestTimeAvg - highestTimeAvg) >= TIME_OF_DAY_DIFFERENCE_THRESHOLD) {
     insights.push({
       type: 'time_of_day',
       title: `You feel better in the ${bestTime}`,
       description: `Your mood is typically higher during ${bestTime} compared to other times of day.`,
-      confidence: Math.abs(lowestTimeAvg - highestTimeAvg) >= 2 ? 'high' : 'medium',
+      confidence: Math.abs(lowestTimeAvg - highestTimeAvg) >= MEDIUM_CONFIDENCE_THRESHOLD ? 'high' : 'medium',
     });
   }
 
