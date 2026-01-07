@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, ScrollView, ActivityIndicator } from "react-native";
+import { View, Text, ScrollView, ActivityIndicator, RefreshControl } from "react-native";
 import { getPatternInsights, getStreakStats, PatternInsight } from "@db/db";
 
-export function InsightsTab() {
+export function InsightsTab({ onRefresh }: { onRefresh?: () => void }) {
   const [insights, setInsights] = useState<PatternInsight[]>([]);
   const [streakStats, setStreakStats] = useState<{
     currentStreak: number;
@@ -10,6 +10,7 @@ export function InsightsTab() {
     totalDaysLogged: number;
   } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     loadInsights();
@@ -29,6 +30,13 @@ export function InsightsTab() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadInsights();
+    onRefresh?.();
+    setRefreshing(false);
   };
 
   const getConfidenceColor = (confidence: string) => {
@@ -84,7 +92,12 @@ export function InsightsTab() {
   }
 
   return (
-    <ScrollView className="flex-1 bg-slate-50 dark:bg-slate-950">
+    <ScrollView 
+      className="flex-1 bg-slate-50 dark:bg-slate-950"
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+      }
+    >
       <View className="p-4 space-y-4">
         {/* Streak Stats Card */}
         {streakStats && (

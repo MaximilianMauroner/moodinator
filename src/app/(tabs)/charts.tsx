@@ -214,10 +214,10 @@ export default function ChartsScreen() {
                 <MemoOverviewTab moods={moods} onRefresh={onRefresh} />
               </View>
               <View key="insights" className="flex-1">
-                <MemoInsightsTab />
+                <MemoInsightsTab onRefresh={onRefresh} />
               </View>
               <View key="calendar" className="flex-1">
-                <MemoCalendarTab />
+                <MemoCalendarTab onRefresh={onRefresh} />
               </View>
               <View key="weekly" className="flex-1">
                 <MemoWeeklyTab moods={moods} onRefresh={onRefresh} />

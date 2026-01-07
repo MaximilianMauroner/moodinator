@@ -823,6 +823,14 @@ export async function seedMoodsFromFile(): Promise<{
 export async function getCurrentStreak(): Promise<number> {
   const db = await getDb();
 
+  // Helper to format a date in local timezone as YYYY-MM-DD
+  const formatLocalDate = (d: Date): string => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
   // Get all entries ordered by date
   const rows = await db.getAllAsync(
     "SELECT timestamp FROM moods ORDER BY timestamp DESC;"
@@ -838,7 +846,7 @@ export async function getCurrentStreak(): Promise<number> {
     const timestamp = parseTimestamp((row as any).timestamp);
     const date = new Date(timestamp);
     date.setHours(0, 0, 0, 0);
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = formatLocalDate(date);
     dates.add(dateStr);
   }
 
@@ -847,12 +855,12 @@ export async function getCurrentStreak(): Promise<number> {
   // Check if today has an entry
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const todayStr = today.toISOString().split('T')[0];
+  const todayStr = formatLocalDate(today);
 
   // Check if yesterday has an entry (to allow for flexibility)
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayStr = yesterday.toISOString().split('T')[0];
+  const yesterdayStr = formatLocalDate(yesterday);
 
   // Streak starts from today or yesterday
   let currentDate: Date;
@@ -867,7 +875,7 @@ export async function getCurrentStreak(): Promise<number> {
 
   let streak = 0;
   for (const dateStr of sortedDates) {
-    const expectedDateStr = currentDate.toISOString().split('T')[0];
+    const expectedDateStr = formatLocalDate(currentDate);
     if (dateStr === expectedDateStr) {
       streak++;
       currentDate.setDate(currentDate.getDate() - 1);
@@ -890,6 +898,14 @@ export async function getStreakStats(): Promise<{
 }> {
   const db = await getDb();
 
+  // Helper to format a date in local timezone as YYYY-MM-DD
+  const formatLocalDate = (d: Date): string => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
   // Get all entries ordered by date
   const rows = await db.getAllAsync(
     "SELECT timestamp FROM moods ORDER BY timestamp ASC;"
@@ -909,7 +925,7 @@ export async function getStreakStats(): Promise<{
     const timestamp = parseTimestamp((row as any).timestamp);
     const date = new Date(timestamp);
     date.setHours(0, 0, 0, 0);
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = formatLocalDate(date);
     dates.add(dateStr);
   }
 
@@ -979,17 +995,17 @@ export async function getPatternInsights(): Promise<PatternInsight[]> {
   // Find best and worst days
   let bestDay = -1;
   let worstDay = -1;
-  let bestAvg = -1;
-  let worstAvg = 11;
+  let bestAvg = Infinity; // Use Infinity to find minimum
+  let worstAvg = -Infinity; // Use -Infinity to find maximum
 
   for (const [day, moodList] of Object.entries(dayOfWeekMoods)) {
     if (moodList.length >= 3) { // At least 3 entries for a day
       const avg = moodList.reduce((sum, m) => sum + m, 0) / moodList.length;
-      if (avg < bestAvg || bestAvg === -1) {
+      if (avg < bestAvg) {
         bestAvg = avg;
         bestDay = Number(day);
       }
-      if (avg > worstAvg || worstAvg === 11) {
+      if (avg > worstAvg) {
         worstAvg = avg;
         worstDay = Number(day);
       }
@@ -1057,7 +1073,7 @@ export async function getPatternInsights(): Promise<PatternInsight[]> {
       const avg = moodList.reduce((sum, m) => sum + m, 0) / moodList.length;
       const diff = avg - overallAvg;
 
-      if (diff >= 1.5 && emotion.toLowerCase() !== 'anxious' && emotion.toLowerCase() !== 'sad') {
+      if (diff >= 1.5) {
         insights.push({
           type: 'emotion',
           title: `${emotion} occurs with worse moods`,
@@ -1072,6 +1088,7 @@ export async function getPatternInsights(): Promise<PatternInsight[]> {
   const morningMoods: number[] = []; // 6am - 12pm
   const afternoonMoods: number[] = []; // 12pm - 6pm
   const eveningMoods: number[] = []; // 6pm - 12am
+  const nightMoods: number[] = []; // 12am - 6am
 
   for (const entry of moods) {
     const date = new Date(entry.timestamp);
@@ -1083,6 +1100,9 @@ export async function getPatternInsights(): Promise<PatternInsight[]> {
       afternoonMoods.push(entry.mood);
     } else if (hour >= 18 && hour < 24) {
       eveningMoods.push(entry.mood);
+    } else {
+      // hour >= 0 && hour < 6
+      nightMoods.push(entry.mood);
     }
   }
 
@@ -1090,33 +1110,34 @@ export async function getPatternInsights(): Promise<PatternInsight[]> {
     { name: 'morning', moods: morningMoods, label: 'mornings' },
     { name: 'afternoon', moods: afternoonMoods, label: 'afternoons' },
     { name: 'evening', moods: eveningMoods, label: 'evenings' },
+    { name: 'night', moods: nightMoods, label: 'late night/early morning' },
   ];
 
   let bestTime = '';
-  let bestTimeAvg = 11;
+  let lowestTimeAvg = Infinity; // Lowest avg mood (best mood)
   let worstTime = '';
-  let worstTimeAvg = -1;
+  let highestTimeAvg = -Infinity; // Highest avg mood (worst mood)
 
   for (const slot of timeSlots) {
     if (slot.moods.length >= 5) {
       const avg = slot.moods.reduce((sum, m) => sum + m, 0) / slot.moods.length;
-      if (avg < bestTimeAvg) {
-        bestTimeAvg = avg;
+      if (avg < lowestTimeAvg) {
+        lowestTimeAvg = avg;
         bestTime = slot.label;
       }
-      if (avg > worstTimeAvg) {
-        worstTimeAvg = avg;
+      if (avg > highestTimeAvg) {
+        highestTimeAvg = avg;
         worstTime = slot.label;
       }
     }
   }
 
-  if (bestTime && worstTime && bestTime !== worstTime && Math.abs(bestTimeAvg - worstTimeAvg) >= 1) {
+  if (bestTime && worstTime && bestTime !== worstTime && Math.abs(lowestTimeAvg - highestTimeAvg) >= 1) {
     insights.push({
       type: 'time_of_day',
       title: `You feel better in the ${bestTime}`,
       description: `Your mood is typically higher during ${bestTime} compared to other times of day.`,
-      confidence: Math.abs(bestTimeAvg - worstTimeAvg) >= 2 ? 'high' : 'medium',
+      confidence: Math.abs(lowestTimeAvg - highestTimeAvg) >= 2 ? 'high' : 'medium',
     });
   }
 

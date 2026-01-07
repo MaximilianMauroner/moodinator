@@ -168,16 +168,27 @@ export async function getCustomMoodLabels(): Promise<CustomMoodLabel[]> {
         if (value) {
             const parsed = JSON.parse(value);
             if (Array.isArray(parsed) && parsed.length === 11) {
-                // Validate that we have all 11 labels (0-10)
+                // Validate that we have all 11 labels (0-10), each exactly once
+                const seenValues = new Set<number>();
                 const valid = parsed.every(
-                    (item) =>
-                        typeof item === "object" &&
-                        typeof item.value === "number" &&
-                        typeof item.label === "string" &&
-                        item.value >= 0 &&
-                        item.value <= 10
+                    (item) => {
+                        if (
+                            !item ||
+                            typeof item !== "object" ||
+                            typeof item.value !== "number" ||
+                            !Number.isInteger(item.value) ||
+                            typeof item.label !== "string" ||
+                            item.value < 0 ||
+                            item.value > 10 ||
+                            seenValues.has(item.value)
+                        ) {
+                            return false;
+                        }
+                        seenValues.add(item.value);
+                        return true;
+                    }
                 );
-                if (valid) {
+                if (valid && seenValues.size === 11) {
                     return parsed;
                 }
             }
