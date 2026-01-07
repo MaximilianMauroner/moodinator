@@ -4,6 +4,7 @@ export const EMOTION_PRESETS_KEY = "emotionPresets";
 export const CONTEXT_TAGS_KEY = "contextTags";
 export const QUICK_ENTRY_PREFS_KEY = "quickEntryPrefs";
 export const THERAPY_EXPORT_PREFS_KEY = "therapyExportPrefs";
+export const CUSTOM_MOOD_LABELS_KEY = "customMoodLabels";
 
 export const DEFAULT_EMOTIONS = [
     "Happy",
@@ -140,5 +141,58 @@ export async function getEntrySettings() {
         getQuickEntryPrefs(),
     ]);
     return { emotionPresets, contextTags, quickEntryPrefs };
+}
+
+export type CustomMoodLabel = {
+    value: number;
+    label: string;
+};
+
+export const DEFAULT_MOOD_LABELS: CustomMoodLabel[] = [
+    { value: 0, label: "Elated" },
+    { value: 1, label: "Very Happy" },
+    { value: 2, label: "Good" },
+    { value: 3, label: "Positive" },
+    { value: 4, label: "Okay" },
+    { value: 5, label: "Neutral" },
+    { value: 6, label: "Low" },
+    { value: 7, label: "Struggling" },
+    { value: 8, label: "Overwhelmed" },
+    { value: 9, label: "Crisis" },
+    { value: 10, label: "Emergency" },
+];
+
+export async function getCustomMoodLabels(): Promise<CustomMoodLabel[]> {
+    try {
+        const value = await AsyncStorage.getItem(CUSTOM_MOOD_LABELS_KEY);
+        if (value) {
+            const parsed = JSON.parse(value);
+            if (Array.isArray(parsed) && parsed.length === 11) {
+                // Validate that we have all 11 labels (0-10)
+                const valid = parsed.every(
+                    (item) =>
+                        typeof item === "object" &&
+                        typeof item.value === "number" &&
+                        typeof item.label === "string" &&
+                        item.value >= 0 &&
+                        item.value <= 10
+                );
+                if (valid) {
+                    return parsed;
+                }
+            }
+        }
+    } catch (error) {
+        console.error("Failed to load custom mood labels:", error);
+    }
+    return DEFAULT_MOOD_LABELS;
+}
+
+export async function saveCustomMoodLabels(labels: CustomMoodLabel[]) {
+    await AsyncStorage.setItem(CUSTOM_MOOD_LABELS_KEY, JSON.stringify(labels));
+}
+
+export async function resetMoodLabels() {
+    await AsyncStorage.removeItem(CUSTOM_MOOD_LABELS_KEY);
 }
 

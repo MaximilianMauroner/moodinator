@@ -26,9 +26,11 @@ import {
   RawDataTab,
   WeeklyTab,
 } from "@/components/charts";
+import { InsightsTab } from "@/components/charts/InsightsTab";
+import { CalendarTab } from "@/components/charts/CalendarTab";
 import { Ionicons } from "@expo/vector-icons";
 
-type TabType = "overview" | "weekly" | "daily" | "raw";
+type TabType = "overview" | "weekly" | "daily" | "raw" | "insights" | "calendar";
 
 const tabs: {
   id: TabType;
@@ -36,12 +38,16 @@ const tabs: {
   icon: keyof typeof Ionicons.glyphMap;
 }[] = [
   { id: "overview", label: "Overview", icon: "stats-chart" },
+  { id: "insights", label: "Patterns", icon: "bulb" },
+  { id: "calendar", label: "Calendar", icon: "calendar-outline" },
   { id: "weekly", label: "Weekly", icon: "calendar" },
   { id: "daily", label: "Daily", icon: "today" },
   { id: "raw", label: "Data", icon: "list" },
 ];
 
 const MemoOverviewTab = React.memo(OverviewTab);
+const MemoInsightsTab = React.memo(InsightsTab);
+const MemoCalendarTab = React.memo(CalendarTab);
 const MemoWeeklyTab = React.memo(WeeklyTab);
 const MemoDailyTab = React.memo(DailyTab);
 const MemoRawDataTab = React.memo(RawDataTab);
@@ -206,6 +212,12 @@ export default function ChartsScreen() {
             >
               <View key="overview" className="flex-1">
                 <MemoOverviewTab moods={moods} onRefresh={onRefresh} />
+              </View>
+              <View key="insights" className="flex-1">
+                <MemoInsightsTab />
+              </View>
+              <View key="calendar" className="flex-1">
+                <MemoCalendarTab />
               </View>
               <View key="weekly" className="flex-1">
                 <MemoWeeklyTab moods={moods} onRefresh={onRefresh} />

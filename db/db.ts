@@ -815,3 +815,310 @@ export async function seedMoodsFromFile(): Promise<{
   const totalEntries = await seedMoods();
   return { source: "random", count: totalEntries };
 }
+
+/**
+ * Calculates the current logging streak (consecutive days with at least one entry)
+ * @returns Promise resolving to the current streak count in days
+ */
+export async function getCurrentStreak(): Promise<number> {
+  const db = await getDb();
+
+  // Get all entries ordered by date
+  const rows = await db.getAllAsync(
+    "SELECT timestamp FROM moods ORDER BY timestamp DESC;"
+  );
+
+  if (rows.length === 0) {
+    return 0;
+  }
+
+  // Convert timestamps to date strings (YYYY-MM-DD) to check consecutive days
+  const dates = new Set<string>();
+  for (const row of rows) {
+    const timestamp = parseTimestamp((row as any).timestamp);
+    const date = new Date(timestamp);
+    date.setHours(0, 0, 0, 0);
+    const dateStr = date.toISOString().split('T')[0];
+    dates.add(dateStr);
+  }
+
+  const sortedDates = Array.from(dates).sort().reverse();
+
+  // Check if today has an entry
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayStr = today.toISOString().split('T')[0];
+
+  // Check if yesterday has an entry (to allow for flexibility)
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+  // Streak starts from today or yesterday
+  let currentDate: Date;
+  if (sortedDates[0] === todayStr) {
+    currentDate = today;
+  } else if (sortedDates[0] === yesterdayStr) {
+    currentDate = yesterday;
+  } else {
+    // No entry today or yesterday, streak is broken
+    return 0;
+  }
+
+  let streak = 0;
+  for (const dateStr of sortedDates) {
+    const expectedDateStr = currentDate.toISOString().split('T')[0];
+    if (dateStr === expectedDateStr) {
+      streak++;
+      currentDate.setDate(currentDate.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+
+  return streak;
+}
+
+/**
+ * Gets streak statistics including current streak, longest streak, and total days logged
+ * @returns Promise resolving to streak statistics
+ */
+export async function getStreakStats(): Promise<{
+  currentStreak: number;
+  longestStreak: number;
+  totalDaysLogged: number;
+}> {
+  const db = await getDb();
+
+  // Get all entries ordered by date
+  const rows = await db.getAllAsync(
+    "SELECT timestamp FROM moods ORDER BY timestamp ASC;"
+  );
+
+  if (rows.length === 0) {
+    return {
+      currentStreak: 0,
+      longestStreak: 0,
+      totalDaysLogged: 0,
+    };
+  }
+
+  // Convert timestamps to date strings (YYYY-MM-DD)
+  const dates = new Set<string>();
+  for (const row of rows) {
+    const timestamp = parseTimestamp((row as any).timestamp);
+    const date = new Date(timestamp);
+    date.setHours(0, 0, 0, 0);
+    const dateStr = date.toISOString().split('T')[0];
+    dates.add(dateStr);
+  }
+
+  const sortedDates = Array.from(dates).sort();
+  const totalDaysLogged = sortedDates.length;
+
+  // Calculate longest streak
+  let longestStreak = 1;
+  let tempStreak = 1;
+
+  for (let i = 1; i < sortedDates.length; i++) {
+    const prevDate = new Date(sortedDates[i - 1]);
+    const currDate = new Date(sortedDates[i]);
+    const diffDays = Math.floor(
+      (currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    if (diffDays === 1) {
+      tempStreak++;
+      longestStreak = Math.max(longestStreak, tempStreak);
+    } else {
+      tempStreak = 1;
+    }
+  }
+
+  const currentStreak = await getCurrentStreak();
+
+  return {
+    currentStreak,
+    longestStreak,
+    totalDaysLogged,
+  };
+}
+
+export interface PatternInsight {
+  type: 'day_of_week' | 'context' | 'emotion' | 'time_of_day';
+  title: string;
+  description: string;
+  confidence: 'high' | 'medium' | 'low';
+}
+
+/**
+ * Analyzes mood patterns and returns insights
+ * @returns Promise resolving to an array of pattern insights
+ */
+export async function getPatternInsights(): Promise<PatternInsight[]> {
+  const moods = await getAllMoods();
+  const insights: PatternInsight[] = [];
+
+  if (moods.length < 10) {
+    return insights; // Need at least 10 entries for meaningful patterns
+  }
+
+  // Analyze day of week patterns
+  const dayOfWeekMoods: { [key: number]: number[] } = {};
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+  for (const entry of moods) {
+    const date = new Date(entry.timestamp);
+    const dayOfWeek = date.getDay();
+    if (!dayOfWeekMoods[dayOfWeek]) {
+      dayOfWeekMoods[dayOfWeek] = [];
+    }
+    dayOfWeekMoods[dayOfWeek].push(entry.mood);
+  }
+
+  // Find best and worst days
+  let bestDay = -1;
+  let worstDay = -1;
+  let bestAvg = -1;
+  let worstAvg = 11;
+
+  for (const [day, moodList] of Object.entries(dayOfWeekMoods)) {
+    if (moodList.length >= 3) { // At least 3 entries for a day
+      const avg = moodList.reduce((sum, m) => sum + m, 0) / moodList.length;
+      if (avg < bestAvg || bestAvg === -1) {
+        bestAvg = avg;
+        bestDay = Number(day);
+      }
+      if (avg > worstAvg || worstAvg === 11) {
+        worstAvg = avg;
+        worstDay = Number(day);
+      }
+    }
+  }
+
+  if (bestDay !== -1 && worstDay !== -1 && bestDay !== worstDay && Math.abs(bestAvg - worstAvg) >= 1) {
+    insights.push({
+      type: 'day_of_week',
+      title: `${dayNames[bestDay]}s are your best days`,
+      description: `You tend to feel better on ${dayNames[bestDay]}s compared to other days of the week.`,
+      confidence: Math.abs(bestAvg - worstAvg) >= 2 ? 'high' : 'medium',
+    });
+  }
+
+  // Analyze context patterns
+  const contextMoods: { [key: string]: number[] } = {};
+  for (const entry of moods) {
+    for (const context of entry.contextTags) {
+      if (!contextMoods[context]) {
+        contextMoods[context] = [];
+      }
+      contextMoods[context].push(entry.mood);
+    }
+  }
+
+  const overallAvg = moods.reduce((sum, m) => sum + m.mood, 0) / moods.length;
+
+  for (const [context, moodList] of Object.entries(contextMoods)) {
+    if (moodList.length >= 5) { // At least 5 entries
+      const avg = moodList.reduce((sum, m) => sum + m, 0) / moodList.length;
+      const diff = avg - overallAvg;
+
+      if (diff <= -1.5) {
+        insights.push({
+          type: 'context',
+          title: `${context} improves your mood`,
+          description: `Your mood is typically better when you're ${context.toLowerCase()}.`,
+          confidence: Math.abs(diff) >= 2.5 ? 'high' : 'medium',
+        });
+      } else if (diff >= 1.5) {
+        insights.push({
+          type: 'context',
+          title: `${context} correlates with lower mood`,
+          description: `You tend to feel worse when ${context.toLowerCase()}.`,
+          confidence: Math.abs(diff) >= 2.5 ? 'high' : 'medium',
+        });
+      }
+    }
+  }
+
+  // Analyze emotion patterns
+  const emotionMoods: { [key: string]: number[] } = {};
+  for (const entry of moods) {
+    for (const emotion of entry.emotions) {
+      if (!emotionMoods[emotion]) {
+        emotionMoods[emotion] = [];
+      }
+      emotionMoods[emotion].push(entry.mood);
+    }
+  }
+
+  for (const [emotion, moodList] of Object.entries(emotionMoods)) {
+    if (moodList.length >= 5) {
+      const avg = moodList.reduce((sum, m) => sum + m, 0) / moodList.length;
+      const diff = avg - overallAvg;
+
+      if (diff >= 1.5 && emotion.toLowerCase() !== 'anxious' && emotion.toLowerCase() !== 'sad') {
+        insights.push({
+          type: 'emotion',
+          title: `${emotion} occurs with worse moods`,
+          description: `When you feel ${emotion.toLowerCase()}, your overall mood tends to be lower.`,
+          confidence: Math.abs(diff) >= 2.5 ? 'high' : 'medium',
+        });
+      }
+    }
+  }
+
+  // Analyze time of day patterns
+  const morningMoods: number[] = []; // 6am - 12pm
+  const afternoonMoods: number[] = []; // 12pm - 6pm
+  const eveningMoods: number[] = []; // 6pm - 12am
+
+  for (const entry of moods) {
+    const date = new Date(entry.timestamp);
+    const hour = date.getHours();
+
+    if (hour >= 6 && hour < 12) {
+      morningMoods.push(entry.mood);
+    } else if (hour >= 12 && hour < 18) {
+      afternoonMoods.push(entry.mood);
+    } else if (hour >= 18 && hour < 24) {
+      eveningMoods.push(entry.mood);
+    }
+  }
+
+  const timeSlots = [
+    { name: 'morning', moods: morningMoods, label: 'mornings' },
+    { name: 'afternoon', moods: afternoonMoods, label: 'afternoons' },
+    { name: 'evening', moods: eveningMoods, label: 'evenings' },
+  ];
+
+  let bestTime = '';
+  let bestTimeAvg = 11;
+  let worstTime = '';
+  let worstTimeAvg = -1;
+
+  for (const slot of timeSlots) {
+    if (slot.moods.length >= 5) {
+      const avg = slot.moods.reduce((sum, m) => sum + m, 0) / slot.moods.length;
+      if (avg < bestTimeAvg) {
+        bestTimeAvg = avg;
+        bestTime = slot.label;
+      }
+      if (avg > worstTimeAvg) {
+        worstTimeAvg = avg;
+        worstTime = slot.label;
+      }
+    }
+  }
+
+  if (bestTime && worstTime && bestTime !== worstTime && Math.abs(bestTimeAvg - worstTimeAvg) >= 1) {
+    insights.push({
+      type: 'time_of_day',
+      title: `You feel better in the ${bestTime}`,
+      description: `Your mood is typically higher during ${bestTime} compared to other times of day.`,
+      confidence: Math.abs(bestTimeAvg - worstTimeAvg) >= 2 ? 'high' : 'medium',
+    });
+  }
+
+  return insights;
+}

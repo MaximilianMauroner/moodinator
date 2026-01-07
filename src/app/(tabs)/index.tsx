@@ -8,6 +8,7 @@ import {
   insertMoodEntry,
   updateMoodTimestamp,
   updateMoodEntry,
+  getCurrentStreak,
 } from "@db/db";
 import { DisplayMoodItem } from "@/components/DisplayMoodItem";
 import { DateTimePickerModal } from "@/components/DateTimePickerModal";
@@ -81,6 +82,7 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [lastTracked, setLastTracked] = useState<Date | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [currentStreak, setCurrentStreak] = useState(0);
   const [showDetailedLabels, setShowDetailedLabels] = useState(false);
   const [showDateModal, setShowDateModal] = useState(false);
   const [selectedMood, setSelectedMood] = useState<MoodEntry | null>(null);
@@ -119,8 +121,12 @@ export default function HomeScreen() {
   const fetchMoods = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await getAllMoods();
+      const [data, streak] = await Promise.all([
+        getAllMoods(),
+        getCurrentStreak(),
+      ]);
       setMoods(data);
+      setCurrentStreak(streak);
       if (data.length > 0) {
         setLastTracked(new Date(data[0].timestamp));
       }
@@ -132,8 +138,12 @@ export default function HomeScreen() {
 
   const refreshMoods = useCallback(async () => {
     try {
-      const data = await getAllMoods();
+      const [data, streak] = await Promise.all([
+        getAllMoods(),
+        getCurrentStreak(),
+      ]);
       setMoods(data);
+      setCurrentStreak(streak);
       if (data.length > 0) {
         setLastTracked(new Date(data[0].timestamp));
       }
@@ -362,13 +372,22 @@ export default function HomeScreen() {
         <SafeAreaView className="flex-1 bg-slate-50 dark:bg-slate-950">
           <View className="flex-1 px-4 pt-4">
             <View className="flex-row justify-between items-end mb-6">
-              <View>
+              <View className="flex-1">
                 <Text className="text-3xl font-bold text-slate-900 dark:text-white">
                   Moodinator
                 </Text>
                 <Text className="text-sm text-slate-500 dark:text-slate-400 font-medium">
                   How are you feeling right now?
                 </Text>
+                {currentStreak > 0 && (
+                  <View className="flex-row items-center mt-2">
+                    <View className="bg-gradient-to-r from-orange-500 to-amber-500 bg-orange-500 px-3 py-1.5 rounded-full border border-orange-400 dark:border-orange-600 shadow-sm">
+                      <Text className="text-white font-bold text-sm">
+                        🔥 {currentStreak} day{currentStreak !== 1 ? 's' : ''} streak!
+                      </Text>
+                    </View>
+                  </View>
+                )}
               </View>
               {lastTracked && (
                 <View className="bg-white dark:bg-slate-800 px-3 py-1 rounded-full border border-slate-200 dark:border-slate-700">

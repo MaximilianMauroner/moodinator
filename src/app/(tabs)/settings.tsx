@@ -657,6 +657,22 @@ export default function SettingsScreen() {
             onChange={handleToggleLabels}
           />
           <SettingRow
+            label="Custom Mood Labels"
+            subLabel="Personalize mood scale names"
+            icon="create-outline"
+            action={
+              <Link href="/customize-mood-labels" asChild>
+                <TouchableOpacity>
+                  <View className="bg-purple-100 dark:bg-purple-900/30 px-3 py-1 rounded-full">
+                    <Text className="text-purple-600 dark:text-purple-400 font-medium text-sm">
+                      Customize
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </Link>
+            }
+          />
+          <SettingRow
             label="Notifications"
             subLabel="Manage reminders"
             icon="notifications-outline"
