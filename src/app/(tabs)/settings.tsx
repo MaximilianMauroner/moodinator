@@ -495,6 +495,31 @@ export default function SettingsScreen() {
         : exportRange === "full"
         ? `moodinator-export-full-${formatDateSlug(new Date())}.json`
         : `moodinator-export-${exportRange}-${formatDateSlug(new Date())}.json`;
+
+    if (Platform.OS === "android") {
+      const permissions =
+        await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+      if (!permissions.granted) {
+        Alert.alert(
+          "Permission Denied",
+          "Please grant folder access to save the export."
+        );
+        return;
+      }
+
+      const fileUri =
+        await FileSystem.StorageAccessFramework.createFileAsync(
+          permissions.directoryUri,
+          fileName,
+          "application/json"
+        );
+      await FileSystem.writeAsStringAsync(fileUri, jsonData, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+      Alert.alert("Export Saved", "Your export was saved to the selected folder.");
+      return;
+    }
+
     const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
     await FileSystem.writeAsStringAsync(fileUri, jsonData, {
       encoding: FileSystem.EncodingType.UTF8,
