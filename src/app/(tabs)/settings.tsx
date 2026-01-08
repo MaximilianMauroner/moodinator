@@ -29,7 +29,8 @@ import {
   updateEmotion,
   deleteEmotion,
   ensureDefaultEmotions,
-  migrateEmotionsToTable
+  migrateEmotionsToTable,
+  hasEmotionTableMigrated
 } from "@db/db";
 import {
   createBackup,
@@ -524,7 +525,7 @@ const ListEditor = memo(function ListEditor({
 
 export default function SettingsScreen() {
   const [loading, setLoading] = useState<
-    "export" | "import" | "seed" | "clear" | null
+    "export" | "import" | "import-old" | "seed" | "clear" | null
   >(null);
   const [showDetailedLabels, setShowDetailedLabels] = useState(false);
   const [devOptionsEnabled, setDevOptionsEnabled] = useState(false);
@@ -558,9 +559,12 @@ export default function SettingsScreen() {
 
   useEffect(() => {
     const init = async () => {
-      // Run migration if needed (will be skipped if already migrated)
+      // Run migration only if it hasn't been completed yet
       try {
-        await migrateEmotionsToTable();
+        const alreadyMigrated = await hasEmotionTableMigrated();
+        if (!alreadyMigrated) {
+          await migrateEmotionsToTable();
+        }
       } catch (error) {
         console.error("Error during emotion migration:", error);
       }
@@ -687,27 +691,14 @@ export default function SettingsScreen() {
   };
 
   const loadEmotionPresets = async () => {
-    // First ensure default emotions are in the database
+    // Ensure default emotions (and any required migrations) are applied to the database
     await ensureDefaultEmotions();
-    
-    // Load emotions from database
+
+    // Load emotions from database as the single source of truth
     const list = await getAllEmotions();
-    
-    // If database is empty, load from AsyncStorage (backward compatibility)
-    if (list.length === 0) {
-      const asyncStorageList = await getEmotionPresets();
-      if (asyncStorageList.length > 0) {
-        // Migrate from AsyncStorage to database
-        for (const emotion of asyncStorageList) {
-          await addEmotion(emotion);
-        }
-        setEmotions(asyncStorageList);
-      } else {
-        setEmotions(DEFAULT_EMOTIONS);
-      }
-    } else {
-      setEmotions(list);
-    }
+
+    // As a defensive fallback, if the list is unexpectedly empty, use DEFAULT_EMOTIONS
+    setEmotions(list.length > 0 ? list : DEFAULT_EMOTIONS);
   };
 
   const loadContextTags = async () => {
