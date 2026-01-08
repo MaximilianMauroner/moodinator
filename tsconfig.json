@@ -11,14 +11,24 @@
       ],
       "@db/*": [
         "./db/*"
+      ],
+      "toastify-react-native": [
+        "./src/types/toastify-react-native"
       ]
     }
   },
   "include": [
-    "**/*.ts",
-    "**/*.tsx",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "db/**/*.ts",
+    "db/**/*.tsx",
     "expo-env.d.ts",
     "nativewind-env.d.ts",
     ".expo/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "android",
+    "ios"
   ]
 }

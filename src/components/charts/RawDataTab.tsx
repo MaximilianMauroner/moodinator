@@ -28,21 +28,15 @@ export const RawDataTab = ({
 }) => {
   const scheme = useColorScheme();
   const isDark = scheme === "dark";
-  if (!moods.length) {
-    return (
-      <View className="flex-1 justify-center items-center p-8">
-        <Text className="text-gray-500 dark:text-slate-400 text-center text-lg">
-          No mood data available yet
-        </Text>
-      </View>
-    );
-  }
 
   const [refreshing, setRefreshing] = React.useState(false);
-  const handleRefresh = React.useCallback(() => {
+  const handleRefresh = React.useCallback(async () => {
     setRefreshing(true);
-    onRefresh();
-    setRefreshing(false);
+    try {
+      await Promise.resolve(onRefresh());
+    } finally {
+      setRefreshing(false);
+    }
   }, [onRefresh]);
 
   // Sort moods by timestamp for chronological display
@@ -237,11 +231,21 @@ export const RawDataTab = ({
     [sortedMoods]
   );
 
+  if (!moods.length) {
+    return (
+      <View className="flex-1 justify-center items-center p-8">
+        <Text className="text-gray-500 dark:text-slate-400 text-center text-lg">
+          No mood data available yet
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <ScrollView
       className="flex-1 bg-transparent"
       refreshControl={
-        <RefreshControl refreshing={false} onRefresh={onRefresh} />
+        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
       }
     >
       <Text className="text-xl font-semibold text-center mb-4 text-purple-600 dark:text-purple-400 mx-4">
