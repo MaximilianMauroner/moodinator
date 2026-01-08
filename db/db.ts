@@ -17,6 +17,36 @@ async function getDb(): Promise<SQLite.SQLiteDatabase> {
 }
 
 /**
+ * Creates the 'emotions' table if it does not exist.
+ */
+export async function createEmotionsTable() {
+  const db = await getDb();
+  await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS emotions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            category TEXT NOT NULL CHECK(category IN ('positive', 'negative', 'neutral'))
+        );
+    `);
+}
+
+/**
+ * Creates the 'mood_emotions' junction table if it does not exist.
+ */
+export async function createMoodEmotionsTable() {
+  const db = await getDb();
+  await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS mood_emotions (
+            mood_id INTEGER NOT NULL,
+            emotion_id INTEGER NOT NULL,
+            PRIMARY KEY (mood_id, emotion_id),
+            FOREIGN KEY (mood_id) REFERENCES moods(id) ON DELETE CASCADE,
+            FOREIGN KEY (emotion_id) REFERENCES emotions(id) ON DELETE CASCADE
+        );
+    `);
+}
+
+/**
  * Creates the 'moods' table if it does not exist.
  */
 export async function createMoodTable() {
@@ -33,6 +63,8 @@ export async function createMoodTable() {
         );
     `);
   await ensureMoodTableColumns(db);
+  await createEmotionsTable();
+  await createMoodEmotionsTable();
 }
 
 async function ensureMoodTableColumns(database: SQLite.SQLiteDatabase) {
@@ -236,6 +268,12 @@ export async function insertMood(
     serializeArray(normalized.contextTags),
     normalized.energy
   );
+  
+  // Also store emotions in junction table
+  if (normalized.emotions && normalized.emotions.length > 0) {
+    await linkEmotionsToMood(db, result.lastInsertRowId, normalized.emotions);
+  }
+  
   const inserted = await db.getFirstAsync(
     "SELECT * FROM moods WHERE id = ?;",
     result.lastInsertRowId
@@ -262,6 +300,12 @@ export async function insertMoodEntry(
     serializeArray(normalized.contextTags),
     normalized.energy
   );
+  
+  // Also store emotions in junction table
+  if (normalized.emotions && normalized.emotions.length > 0) {
+    await linkEmotionsToMood(db, result.lastInsertRowId, normalized.emotions);
+  }
+  
   const inserted = await db.getFirstAsync(
     "SELECT * FROM moods WHERE id = ?;",
     result.lastInsertRowId
@@ -354,6 +398,8 @@ export async function updateMoodEntry(
   if (updates.emotions !== undefined) {
     fields.push("emotions = ?");
     params.push(serializeEmotions(updates.emotions));
+    // Also update junction table
+    await linkEmotionsToMood(db, id, updates.emotions);
   }
   if (updates.contextTags !== undefined) {
     fields.push("context_tags = ?");
@@ -485,6 +531,7 @@ export async function seedMoods() {
     note: string | null;
     timestamp: number;
     emotions: string;
+    emotionsArray: Emotion[];
     contextTags: string;
     energy: number;
   }> = [];
@@ -642,6 +689,7 @@ export async function seedMoods() {
         note,
         timestamp: currentDate.getTime(),
         emotions: serializeEmotions(emotions),
+        emotionsArray: emotions,
         contextTags: serializeArray(contextTags),
         energy,
       });
@@ -662,7 +710,7 @@ export async function seedMoods() {
       const batch = entries.slice(i, i + BATCH_SIZE);
       await db.withTransactionAsync(async () => {
         for (const entry of batch) {
-          await db.runAsync(
+          const result = await db.runAsync(
             "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy) VALUES (?, ?, ?, ?, ?, ?);",
             entry.mood,
             entry.note,
@@ -671,6 +719,12 @@ export async function seedMoods() {
             entry.contextTags,
             entry.energy
           );
+          
+          // Also store emotions in junction table
+          if (entry.emotionsArray && entry.emotionsArray.length > 0) {
+            await linkEmotionsToMood(db, result.lastInsertRowId, entry.emotionsArray);
+          }
+          
           insertedCount++;
         }
       });
@@ -700,12 +754,255 @@ export async function seedMoods() {
 }
 
 /**
+ * Gets all emotions from the emotions table
+ */
+export async function getAllEmotions(): Promise<Emotion[]> {
+  const db = await getDb();
+  const rows = await db.getAllAsync("SELECT name, category FROM emotions ORDER BY name ASC;");
+  return rows.map((row: any) => ({
+    name: row.name,
+    category: row.category as "positive" | "negative" | "neutral"
+  }));
+}
+
+/**
+ * Adds a new emotion to the emotions table
+ */
+export async function addEmotion(emotion: Emotion): Promise<void> {
+  const db = await getDb();
+  await db.runAsync(
+    "INSERT OR REPLACE INTO emotions (name, category) VALUES (?, ?);",
+    emotion.name,
+    emotion.category
+  );
+}
+
+/**
+ * Updates an existing emotion in the emotions table
+ */
+export async function updateEmotion(oldName: string, newEmotion: Emotion): Promise<void> {
+  const db = await getDb();
+  
+  // If name changed, need to handle it carefully
+  if (oldName !== newEmotion.name) {
+    // Check if new name already exists
+    const existing = await db.getFirstAsync(
+      "SELECT id FROM emotions WHERE name = ?;",
+      newEmotion.name
+    );
+    if (existing) {
+      throw new Error("An emotion with this name already exists");
+    }
+  }
+  
+  await db.runAsync(
+    "UPDATE emotions SET name = ?, category = ? WHERE name = ?;",
+    newEmotion.name,
+    newEmotion.category,
+    oldName
+  );
+}
+
+/**
+ * Deletes an emotion from the emotions table
+ */
+export async function deleteEmotion(name: string): Promise<void> {
+  const db = await getDb();
+  await db.runAsync("DELETE FROM emotions WHERE name = ?;", name);
+}
+
+/**
+ * Gets emotion ID by name, creating it if it doesn't exist
+ */
+async function getOrCreateEmotionId(db: SQLite.SQLiteDatabase, emotion: Emotion): Promise<number> {
+  // Try to get existing emotion
+  const existing = await db.getFirstAsync(
+    "SELECT id FROM emotions WHERE name = ?;",
+    emotion.name
+  );
+  
+  if (existing) {
+    return (existing as any).id;
+  }
+  
+  // Create new emotion
+  const result = await db.runAsync(
+    "INSERT INTO emotions (name, category) VALUES (?, ?);",
+    emotion.name,
+    emotion.category
+  );
+  
+  return result.lastInsertRowId;
+}
+
+/**
+ * Links emotions to a mood entry in the junction table
+ */
+async function linkEmotionsToMood(db: SQLite.SQLiteDatabase, moodId: number, emotions: Emotion[]): Promise<void> {
+  // First, remove existing links
+  await db.runAsync("DELETE FROM mood_emotions WHERE mood_id = ?;", moodId);
+  
+  // Then add new links
+  for (const emotion of emotions) {
+    const emotionId = await getOrCreateEmotionId(db, emotion);
+    await db.runAsync(
+      "INSERT OR IGNORE INTO mood_emotions (mood_id, emotion_id) VALUES (?, ?);",
+      moodId,
+      emotionId
+    );
+  }
+}
+
+/**
+ * Gets emotions for a mood entry from the junction table
+ */
+async function getEmotionsForMood(db: SQLite.SQLiteDatabase, moodId: number): Promise<Emotion[]> {
+  const rows = await db.getAllAsync(`
+    SELECT e.name, e.category
+    FROM emotions e
+    INNER JOIN mood_emotions me ON e.id = me.emotion_id
+    WHERE me.mood_id = ?
+    ORDER BY e.name ASC;
+  `, moodId);
+  
+  return rows.map((row: any) => ({
+    name: row.name,
+    category: row.category as "positive" | "negative" | "neutral"
+  }));
+}
+
+/**
+ * Migrates emotions from the old format (stored in moods.emotions column) 
+ * to the new format (emotions table + junction table)
+ */
+export async function migrateEmotionsToTable(): Promise<{
+  migrated: number;
+  emotionsCreated: number;
+}> {
+  const db = await getDb();
+  let migrated = 0;
+  let emotionsCreated = 0;
+  const emotionIds = new Map<string, number>();
+
+  try {
+    // Get all mood entries from database
+    const rows = await db.getAllAsync("SELECT id, emotions FROM moods;");
+
+    for (const row: any of rows) {
+      const rawEmotions = row.emotions;
+
+      // Skip if no emotions
+      if (!rawEmotions || rawEmotions === "[]") {
+        continue;
+      }
+
+      try {
+        const parsed = JSON.parse(rawEmotions);
+        if (!Array.isArray(parsed) || parsed.length === 0) {
+          continue;
+        }
+
+        // Extract emotions from the old format
+        const emotions: Emotion[] = parsed.map((item: any): Emotion | null => {
+          if (typeof item === "string") {
+            // Old string format
+            const name = item.trim();
+            const defaultEmotion = DEFAULT_EMOTIONS.find(e => e.name === name);
+            return { 
+              name, 
+              category: defaultEmotion ? defaultEmotion.category : "neutral" 
+            };
+          } else if (typeof item === "object" && item !== null && item.name) {
+            // New object format
+            return {
+              name: item.name.trim(),
+              category: item.category || "neutral"
+            };
+          }
+          return null;
+        }).filter((e): e is Emotion => e !== null);
+
+        // Add emotions to emotions table and link to mood
+        for (const emotion of emotions) {
+          let emotionId: number;
+          
+          // Check cache first
+          if (emotionIds.has(emotion.name)) {
+            emotionId = emotionIds.get(emotion.name)!;
+          } else {
+            // Get or create emotion
+            emotionId = await getOrCreateEmotionId(db, emotion);
+            emotionIds.set(emotion.name, emotionId);
+            
+            // Count newly created emotions
+            const wasNew = !emotionIds.has(emotion.name);
+            if (wasNew) {
+              emotionsCreated++;
+            }
+          }
+          
+          // Link emotion to mood
+          await db.runAsync(
+            "INSERT OR IGNORE INTO mood_emotions (mood_id, emotion_id) VALUES (?, ?);",
+            row.id,
+            emotionId
+          );
+        }
+
+        migrated++;
+      } catch (error) {
+        console.error(`Failed to migrate emotions for mood ${row.id}:`, error);
+      }
+    }
+
+    console.log(`Emotion migration complete: ${migrated} moods migrated, ${emotionIds.size} unique emotions in table`);
+    return { migrated, emotionsCreated: emotionIds.size };
+  } catch (error) {
+    console.error("Error during emotion table migration:", error);
+    throw error;
+  }
+}
+
+/**
+ * Checks if emotions have been migrated to the new table format
+ */
+export async function hasEmotionTableMigrated(): Promise<boolean> {
+  const db = await getDb();
+  
+  // Check if emotions table has any data
+  const emotionCount = await db.getFirstAsync("SELECT COUNT(*) as count FROM emotions;");
+  const hasEmotions = (emotionCount as any)?.count > 0;
+  
+  // Check if junction table has any data
+  const linkCount = await db.getFirstAsync("SELECT COUNT(*) as count FROM mood_emotions;");
+  const hasLinks = (linkCount as any)?.count > 0;
+  
+  return hasEmotions || hasLinks;
+}
+
+/**
+ * Ensures default emotions are in the emotions table
+ */
+export async function ensureDefaultEmotions(): Promise<void> {
+  const db = await getDb();
+  
+  for (const emotion of DEFAULT_EMOTIONS) {
+    await db.runAsync(
+      "INSERT OR IGNORE INTO emotions (name, category) VALUES (?, ?);",
+      emotion.name,
+      emotion.category
+    );
+  }
+}
+
+/**
  * Clears all mood entries from the database (DEV only)
  */
 export async function clearMoods() {
   if (!__DEV__) return;
   const db = await getDb();
   await db.runAsync("DELETE FROM moods;");
+  await db.runAsync("DELETE FROM mood_emotions;");
 }
 
 // Ensure the moods table exists as soon as this module is loaded
@@ -812,7 +1109,7 @@ export async function importMoods(jsonData: string): Promise<number> {
         (mood as any)?.contextTags ?? (mood as any)?.context ?? [];
       const contextTags = sanitizeImportedArray(contextSource);
       const energy = sanitizeEnergy((mood as any)?.energy);
-      await db.runAsync(
+      const result = await db.runAsync(
         "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy) VALUES (?, ?, ?, ?, ?, ?);",
         mood.mood,
         note,
@@ -821,11 +1118,82 @@ export async function importMoods(jsonData: string): Promise<number> {
         serializeArray(contextTags),
         energy
       );
+      
+      // Also store emotions in junction table
+      if (emotions && emotions.length > 0) {
+        await linkEmotionsToMood(db, result.lastInsertRowId, emotions);
+      }
     }
     return moods.length;
   } catch (error) {
     console.error("Error importing moods:", error);
     throw new Error("Invalid mood data format");
+  }
+}
+
+/**
+ * Imports mood entries from old backup format (pre-emotions-table)
+ * This is for dev/testing purposes to import backups created before emotions table was introduced
+ * @param jsonData - JSON string containing mood entries in old format
+ * @returns Promise resolving to the number of imported entries
+ */
+export async function importOldBackup(jsonData: string): Promise<number> {
+  try {
+    const moods = JSON.parse(jsonData) as any[];
+    const db = await getDb();
+
+    for (const mood of moods) {
+      const note = mood?.notes ?? mood?.note ?? null;
+      const timestamp = parseTimestamp(mood?.timestamp);
+      
+      // Handle old emotion format (could be strings or objects without proper structure)
+      let emotions: Emotion[] = [];
+      if (mood?.emotions) {
+        if (Array.isArray(mood.emotions)) {
+          emotions = mood.emotions.map((item: any): Emotion | null => {
+            if (typeof item === "string" && item.trim().length > 0) {
+              // Old string format - assign category based on default emotions
+              const name = item.trim();
+              const defaultEmotion = DEFAULT_EMOTIONS.find(e => e.name === name);
+              return { 
+                name, 
+                category: defaultEmotion ? defaultEmotion.category : "neutral" 
+              };
+            } else if (typeof item === "object" && item !== null && item.name) {
+              // Object format
+              return {
+                name: item.name.trim(),
+                category: item.category || "neutral"
+              };
+            }
+            return null;
+          }).filter((e): e is Emotion => e !== null);
+        }
+      }
+      
+      const contextSource = mood?.contextTags ?? mood?.context ?? [];
+      const contextTags = sanitizeImportedArray(contextSource);
+      const energy = sanitizeEnergy(mood?.energy);
+      
+      const result = await db.runAsync(
+        "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy) VALUES (?, ?, ?, ?, ?, ?);",
+        mood.mood,
+        note,
+        timestamp,
+        serializeEmotions(emotions),
+        serializeArray(contextTags),
+        energy
+      );
+      
+      // Also store emotions in junction table
+      if (emotions && emotions.length > 0) {
+        await linkEmotionsToMood(db, result.lastInsertRowId, emotions);
+      }
+    }
+    return moods.length;
+  } catch (error) {
+    console.error("Error importing old backup:", error);
+    throw new Error("Invalid backup data format");
   }
 }
 
@@ -855,7 +1223,7 @@ export async function seedMoodsFromFile(): Promise<{
           const contextTags = sanitizeImportedArray(contextSource);
           const energy = sanitizeEnergy((mood as any)?.energy);
           const timestamp = parseTimestamp((mood as any)?.timestamp);
-          await db.runAsync(
+          const result = await db.runAsync(
             "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy) VALUES (?, ?, ?, ?, ?, ?);",
             mood.mood,
             note,
@@ -864,6 +1232,11 @@ export async function seedMoodsFromFile(): Promise<{
             serializeArray(contextTags),
             energy
           );
+          
+          // Also store emotions in junction table
+          if (emotions && emotions.length > 0) {
+            await linkEmotionsToMood(db, result.lastInsertRowId, emotions);
+          }
         }
 
         return { source: "file", count: jsonData.length };
