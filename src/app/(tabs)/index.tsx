@@ -1,5 +1,11 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { View, Text, SafeAreaView, RefreshControl, FlatList } from "react-native";
+import {
+  View,
+  Text,
+  SafeAreaView,
+  RefreshControl,
+  FlatList,
+} from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import {
   insertMood,
@@ -162,7 +168,6 @@ export default function HomeScreen() {
     setDetailedEntryVisible(true);
   }, []);
 
-
   const handleDeleteMood = useCallback(async (mood: MoodEntry) => {
     await deleteMood(mood.id);
     setMoods((prev) => prev.filter((m) => m.id !== mood.id));
@@ -303,18 +308,15 @@ export default function HomeScreen() {
     }, [loadShowLabelsPreference, loadEntrySettings])
   );
 
-  const handleEntrySave = useCallback(
-    async (values: MoodEntryFormValues) => {
-      const newMood = await insertMood(values.mood, values.note || undefined, {
-        emotions: values.emotions,
-        contextTags: values.contextTags,
-        energy: values.energy,
-      });
-      setMoods((prev) => [newMood, ...prev]);
-      setLastTracked(new Date(newMood.timestamp ?? Date.now()));
-    },
-    []
-  );
+  const handleEntrySave = useCallback(async (values: MoodEntryFormValues) => {
+    const newMood = await insertMood(values.mood, values.note || undefined, {
+      emotions: values.emotions,
+      contextTags: values.contextTags,
+      energy: values.energy,
+    });
+    setMoods((prev) => [newMood, ...prev]);
+    setLastTracked(new Date(newMood.timestamp ?? Date.now()));
+  }, []);
 
   const handleEditEntrySave = useCallback(
     async (values: MoodEntryFormValues) => {
@@ -393,62 +395,66 @@ export default function HomeScreen() {
               {lastTracked && (
                 <View className="bg-white dark:bg-slate-800 px-3 py-1 rounded-full border border-slate-200 dark:border-slate-700">
                   <Text className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                    Latest: {lastTracked.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    Latest:{" "}
+                    {lastTracked.toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
                   </Text>
                 </View>
               )}
             </View>
 
             <View>
-                {showDetailedLabels ? (
-                  <MoodButtonsDetailed
-                    onMoodPress={handleMoodPress}
-                    onLongPress={handleLongPress}
-                  />
-                ) : (
-                  <MoodButtonsCompact
-                    onMoodPress={handleMoodPress}
-                    onLongPress={handleLongPress}
-                  />
-                )}
+              {showDetailedLabels ? (
+                <MoodButtonsDetailed
+                  onMoodPress={handleMoodPress}
+                  onLongPress={handleLongPress}
+                />
+              ) : (
+                <MoodButtonsCompact
+                  onMoodPress={handleMoodPress}
+                  onLongPress={handleLongPress}
+                />
+              )}
             </View>
 
             <View className="flex-1 mt-6">
-                <View className="flex-row justify-between items-center mb-3 px-1">
-                  <Text className="font-bold text-lg text-slate-800 dark:text-slate-200">
-                    Recent History
+              <View className="flex-row justify-between items-center mb-3 px-1">
+                <Text className="font-bold text-lg text-slate-800 dark:text-slate-200">
+                  Recent History
+                </Text>
+                {moods.length > 0 && (
+                  <Text className="text-xs text-slate-400 dark:text-slate-500 font-medium bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md">
+                    {moods.length} entries
                   </Text>
-                  {moods.length > 0 && (
-                      <Text className="text-xs text-slate-400 dark:text-slate-500 font-medium bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md">
-                        {moods.length} entries
-                      </Text>
-                  )}
-                </View>
-                <FlatList
-                  data={moods}
-                  initialNumToRender={10}
-                  contentContainerStyle={{
-                    paddingBottom: 100,
-                  }}
-                  renderItem={renderMoodItem}
-                  keyExtractor={(item) => item.id.toString()}
-                  refreshControl={
-                    <RefreshControl
-                      refreshing={refreshing}
-                      onRefresh={onRefresh}
-                      colors={["#3b82f6"]}
-                      tintColor="#3b82f6"
-                    />
-                  }
-                  showsVerticalScrollIndicator={false}
-                  removeClippedSubviews={true}
-                  windowSize={7}
-                  maxToRenderPerBatch={10}
-                  updateCellsBatchingPeriod={50}
-                  extraData={moods}
-                  style={{ flex: 1 }}
-                  ListEmptyComponent={renderEmptyComponent}
-                />
+                )}
+              </View>
+              <FlatList
+                data={moods}
+                initialNumToRender={10}
+                contentContainerStyle={{
+                  paddingBottom: 100,
+                }}
+                renderItem={renderMoodItem}
+                keyExtractor={(item) => item.id.toString()}
+                refreshControl={
+                  <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={onRefresh}
+                    colors={["#3b82f6"]}
+                    tintColor="#3b82f6"
+                  />
+                }
+                showsVerticalScrollIndicator={false}
+                removeClippedSubviews={true}
+                windowSize={7}
+                maxToRenderPerBatch={10}
+                updateCellsBatchingPeriod={50}
+                extraData={moods}
+                style={{ flex: 1 }}
+                ListEmptyComponent={renderEmptyComponent}
+              />
             </View>
           </View>
         </SafeAreaView>
