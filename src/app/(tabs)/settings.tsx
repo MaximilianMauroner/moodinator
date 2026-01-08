@@ -11,8 +11,9 @@ import {
   Modal,
   Platform,
   TouchableOpacity,
+  StyleSheet,
 } from "react-native";
-import { Link, useFocusEffect } from "expo-router";
+import { Link } from "expo-router";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
@@ -46,6 +47,25 @@ import { Ionicons } from "@expo/vector-icons";
 const SHOW_LABELS_KEY = "showLabelsPreference";
 const DEV_OPTIONS_KEY = "devOptionsEnabled";
 
+const styles = StyleSheet.create({
+  cardShadow: {
+    // Android
+    elevation: 2,
+    // iOS
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  segmentShadow: {
+    elevation: 1,
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+  },
+});
+
 const SectionHeader = ({ title, icon }: { title: string; icon?: string }) => (
   <View className="flex-row items-center mb-3 mt-6 px-1">
     {icon && <Text className="mr-2 text-lg">{icon}</Text>}
@@ -56,7 +76,10 @@ const SectionHeader = ({ title, icon }: { title: string; icon?: string }) => (
 );
 
 const SettingCard = ({ children }: { children: React.ReactNode }) => (
-  <View className="bg-white dark:bg-slate-900 rounded-2xl overflow-hidden shadow-sm border border-slate-100 dark:border-slate-800">
+  <View
+    className="bg-white dark:bg-slate-900 rounded-2xl overflow-hidden border border-slate-100 dark:border-slate-800"
+    style={styles.cardShadow}
+  >
     {children}
   </View>
 );
@@ -245,9 +268,9 @@ export default function SettingsScreen() {
   const [newEmotion, setNewEmotion] = useState("");
   const [newContext, setNewContext] = useState("");
   const [exportModalVisible, setExportModalVisible] = useState(false);
-  const [exportRange, setExportRange] = useState<"week" | "month" | "custom">(
-    "week"
-  );
+  const [exportRange, setExportRange] = useState<
+    "week" | "month" | "custom" | "full"
+  >("week");
   const [customStartDate, setCustomStartDate] = useState(() => {
     const date = new Date();
     date.setDate(date.getDate() - 6);
@@ -271,13 +294,6 @@ export default function SettingsScreen() {
     loadQuickEntryPrefs();
     loadBackupInfo();
   }, []);
-
-  // Refresh backup info when screen is focused
-  useFocusEffect(
-    useCallback(() => {
-      loadBackupInfo();
-    }, [])
-  );
 
   const loadBackupInfo = async () => {
     const info = await getBackupInfo();
@@ -451,6 +467,9 @@ export default function SettingsScreen() {
   };
 
   const resolveExportRange = () => {
+    if (exportRange === "full") {
+      return undefined;
+    }
     if (exportRange === "week" || exportRange === "month") {
       return { preset: exportRange };
     }
@@ -473,6 +492,8 @@ export default function SettingsScreen() {
         ? `moodinator-export-${formatDateSlug(
             customStartDate
           )}-to-${formatDateSlug(customEndDate)}.json`
+        : exportRange === "full"
+        ? `moodinator-export-full-${formatDateSlug(new Date())}.json`
         : `moodinator-export-${exportRange}-${formatDateSlug(new Date())}.json`;
     const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
     await FileSystem.writeAsStringAsync(fileUri, jsonData, {
@@ -505,7 +526,7 @@ export default function SettingsScreen() {
 
   const handleExportShare = async () => {
     const rangePayload = resolveExportRange();
-    if (!rangePayload) return;
+    if (rangePayload === null) return;
     try {
       setLoading("export");
       const jsonData = await exportMoods(rangePayload);
@@ -770,7 +791,9 @@ export default function SettingsScreen() {
                   label="Automatic Backups"
                   subLabel={
                     backupInfo
-                      ? `${backupInfo.count} backup(s), last: ${formatBackupDate(
+                      ? `${
+                          backupInfo.count
+                        } backup(s), last: ${formatBackupDate(
                           backupInfo.latestBackup
                         )}`
                       : "Checking backup status..."
@@ -885,15 +908,14 @@ export default function SettingsScreen() {
             </View>
 
             <View className="flex-row bg-slate-100 dark:bg-slate-800 p-1 rounded-xl mb-6">
-              {(["week", "month", "custom"] as const).map((opt) => (
+              {(["week", "month", "custom", "full"] as const).map((opt) => (
                 <Pressable
                   key={opt}
                   onPress={() => setExportRange(opt)}
                   className={`flex-1 py-2 rounded-lg ${
-                    exportRange === opt
-                      ? "bg-white dark:bg-slate-700 shadow-sm"
-                      : ""
+                    exportRange === opt ? "bg-white dark:bg-slate-700" : ""
                   }`}
+                  style={exportRange === opt ? styles.segmentShadow : undefined}
                 >
                   <Text
                     className={`text-center font-medium capitalize ${
@@ -906,7 +928,9 @@ export default function SettingsScreen() {
                       ? "7 Days"
                       : opt === "month"
                       ? "30 Days"
-                      : "Custom"}
+                      : opt === "custom"
+                      ? "Custom"
+                      : "Full Backup"}
                   </Text>
                 </Pressable>
               ))}

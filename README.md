@@ -43,6 +43,18 @@ npm start
 - `/types` - TypeScript type definitions
 - `/utils` - Utility functions
 
+## Notes / Known Issues
+
+### NativeWind shadows + Expo Router
+
+On Expo SDK 53 / `expo-router` 5, we’ve hit an intermittent React Navigation warning:
+
+> "Couldn't find a navigation context. Have you wrapped your app with 'NavigationContainer'?"
+
+This app uses **Expo Router**, so adding a `NavigationContainer` is **not** the fix.
+
+The issue was triggered by toggling NativeWind `shadow-*` utilities during state updates (notably in the Settings export modal segmented control). Workaround: avoid `shadow-*` classes in those hot paths and use inline `style` (iOS shadow props + Android `elevation`) instead.
+
 ## TODO List
 
 - [ ] Implement chart visualization for mood trends
