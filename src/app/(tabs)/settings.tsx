@@ -19,7 +19,20 @@ import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import * as Clipboard from "expo-clipboard";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { exportMoods, importMoods, clearMoods, seedMoods } from "@db/db";
+import { 
+  exportMoods, 
+  importMoods, 
+  clearMoods, 
+  seedMoods, 
+  importOldBackup,
+  getAllEmotions,
+  addEmotion,
+  updateEmotion,
+  deleteEmotion,
+  ensureDefaultEmotions,
+  migrateEmotionsToTable,
+  hasEmotionTableMigrated
+} from "@db/db";
 import {
   createBackup,
   getBackupInfo,
@@ -535,7 +548,7 @@ const ListEditor = memo(function ListEditor({
 
 export default function SettingsScreen() {
   const [loading, setLoading] = useState<
-    "export" | "import" | "seed" | "clear" | null
+    "export" | "import" | "import-old" | "seed" | "clear" | null
   >(null);
   const [showDetailedLabels, setShowDetailedLabels] = useState(false);
   const [devOptionsEnabled, setDevOptionsEnabled] = useState(false);
@@ -568,12 +581,26 @@ export default function SettingsScreen() {
   useNotifications();
 
   useEffect(() => {
-    loadShowLabelsPreference();
-    loadDevOptionsPreference();
-    loadEmotionPresets();
-    loadContextTags();
-    loadQuickEntryPrefs();
-    loadBackupInfo();
+    const init = async () => {
+      // Run migration only if it hasn't been completed yet
+      try {
+        const alreadyMigrated = await hasEmotionTableMigrated();
+        if (!alreadyMigrated) {
+          await migrateEmotionsToTable();
+        }
+      } catch (error) {
+        console.error("Error during emotion migration:", error);
+      }
+      
+      loadShowLabelsPreference();
+      loadDevOptionsPreference();
+      loadEmotionPresets();
+      loadContextTags();
+      loadQuickEntryPrefs();
+      loadBackupInfo();
+    };
+    
+    init();
   }, []);
 
   const loadBackupInfo = async () => {
@@ -680,8 +707,14 @@ export default function SettingsScreen() {
   };
 
   const loadEmotionPresets = async () => {
-    const list = await getEmotionPresets();
-    setEmotions(list);
+    // Ensure default emotions (and any required migrations) are applied to the database
+    await ensureDefaultEmotions();
+
+    // Load emotions from database as the single source of truth
+    const list = await getAllEmotions();
+
+    // As a defensive fallback, if the list is unexpectedly empty, use DEFAULT_EMOTIONS
+    setEmotions(list.length > 0 ? list : DEFAULT_EMOTIONS);
   };
 
   const loadContextTags = async () => {
@@ -703,14 +736,23 @@ export default function SettingsScreen() {
       return;
     }
     const newEmotionObj: Emotion = { name: trimmed, category: newEmotionCategory };
+    
+    // Add to database
+    await addEmotion(newEmotionObj);
+    
     const updated = [...emotions, newEmotionObj];
     setEmotions(updated);
     setNewEmotion("");
     setNewEmotionCategory("neutral");
+    
+    // Also save to AsyncStorage for backward compatibility
     await saveEmotionPresets(updated);
   }, [newEmotion, newEmotionCategory, emotions]);
 
   const handleRemoveEmotion = useCallback(async (emotion: Emotion) => {
+    // Delete from database
+    await deleteEmotion(emotion.name);
+    
     setEmotions((prev) => {
       const updated = prev.filter((item) => item.name !== emotion.name);
       const finalList = updated.length > 0 ? updated : DEFAULT_EMOTIONS;
@@ -720,6 +762,11 @@ export default function SettingsScreen() {
   }, []);
 
   const handleEditEmotion = useCallback(async (oldEmotion: Emotion, newCategory: "positive" | "negative" | "neutral") => {
+    const newEmotion = { name: oldEmotion.name, category: newCategory };
+    
+    // Update in database
+    await updateEmotion(oldEmotion.name, newEmotion);
+    
     setEmotions((prev) => {
       const updated = prev.map((item) =>
         item.name === oldEmotion.name
@@ -913,6 +960,31 @@ export default function SettingsScreen() {
       );
     } catch (error) {
       Alert.alert("Import Error", "Failed to import mood data.");
+      console.error(error);
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleImportOldBackup = async () => {
+    try {
+      setLoading("import-old");
+      const result = await DocumentPicker.getDocumentAsync({
+        type: "application/json",
+      });
+
+      if (result.canceled) return;
+
+      const fileContent = await FileSystem.readAsStringAsync(
+        result.assets[0].uri
+      );
+      const importedCount = await importOldBackup(fileContent);
+      Alert.alert(
+        "Import Successful",
+        `Successfully imported ${importedCount} mood entries from old backup format.`
+      );
+    } catch (error) {
+      Alert.alert("Import Error", "Failed to import old backup data.");
       console.error(error);
     } finally {
       setLoading(null);
@@ -1191,6 +1263,12 @@ export default function SettingsScreen() {
                 subLabel="Generate test entries"
                 icon="flask-outline"
                 onPress={handleSeedMoods}
+              />
+              <SettingRow
+                label="Import Old Backup"
+                subLabel="Import pre-emotions-table backup"
+                icon="cloud-upload-outline"
+                onPress={handleImportOldBackup}
               />
               <SettingRow
                 label="Test Notification"
