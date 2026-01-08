@@ -382,6 +382,8 @@ export async function updateMoodEntry(
   const db = await getDb();
   const fields: string[] = [];
   const params: any[] = [];
+  let updateEmotions = false;
+  let emotionsToUpdate: Emotion[] = [];
 
   if (typeof updates.mood === "number") {
     fields.push("mood = ?");
@@ -398,8 +400,8 @@ export async function updateMoodEntry(
   if (updates.emotions !== undefined) {
     fields.push("emotions = ?");
     params.push(serializeEmotions(updates.emotions));
-    // Also update junction table
-    await linkEmotionsToMood(db, id, updates.emotions);
+    updateEmotions = true;
+    emotionsToUpdate = updates.emotions;
   }
   if (updates.contextTags !== undefined) {
     fields.push("context_tags = ?");
@@ -422,11 +424,26 @@ export async function updateMoodEntry(
     return current ? toMoodEntry(current) : undefined;
   }
 
-  await db.runAsync(
-    `UPDATE moods SET ${fields.join(", ")} WHERE id = ?;`,
-    ...params,
-    id
-  );
+  // Wrap updates in a transaction to ensure consistency
+  await db.execAsync("BEGIN TRANSACTION;");
+  try {
+    await db.runAsync(
+      `UPDATE moods SET ${fields.join(", ")} WHERE id = ?;`,
+      ...params,
+      id
+    );
+    
+    // Update junction table if emotions were updated
+    if (updateEmotions) {
+      await linkEmotionsToMood(db, id, emotionsToUpdate);
+    }
+    
+    await db.execAsync("COMMIT;");
+  } catch (error) {
+    await db.execAsync("ROLLBACK;");
+    throw error;
+  }
+  
   const updated = await db.getFirstAsync(
     "SELECT * FROM moods WHERE id = ?;",
     id
@@ -812,49 +829,57 @@ export async function deleteEmotion(name: string): Promise<void> {
 }
 
 /**
- * Gets emotion ID by name, creating it if it doesn't exist
+ * Gets emotion ID by name, creating it if it doesn't exist.
+ * If the emotion exists with a different category, the category is updated.
  */
 async function getOrCreateEmotionId(db: SQLite.SQLiteDatabase, emotion: Emotion): Promise<number> {
-  // Try to get existing emotion
-  const existing = await db.getFirstAsync(
-    "SELECT id FROM emotions WHERE name = ?;",
-    emotion.name
-  );
-  
-  if (existing) {
-    return (existing as any).id;
-  }
-  
-  // Create new emotion
+  // Use INSERT OR REPLACE to create or update the emotion
   const result = await db.runAsync(
-    "INSERT INTO emotions (name, category) VALUES (?, ?);",
+    "INSERT OR REPLACE INTO emotions (name, category) VALUES (?, ?);",
     emotion.name,
     emotion.category
   );
   
-  return result.lastInsertRowId;
+  // Get the ID (either newly inserted or existing)
+  const row = await db.getFirstAsync(
+    "SELECT id FROM emotions WHERE name = ?;",
+    emotion.name
+  );
+  
+  return (row as any).id;
 }
 
 /**
  * Links emotions to a mood entry in the junction table
  */
 async function linkEmotionsToMood(db: SQLite.SQLiteDatabase, moodId: number, emotions: Emotion[]): Promise<void> {
-  // First, remove existing links
-  await db.runAsync("DELETE FROM mood_emotions WHERE mood_id = ?;", moodId);
-  
-  // Then add new links
-  for (const emotion of emotions) {
-    const emotionId = await getOrCreateEmotionId(db, emotion);
-    await db.runAsync(
-      "INSERT OR IGNORE INTO mood_emotions (mood_id, emotion_id) VALUES (?, ?);",
-      moodId,
-      emotionId
-    );
+  // Wrap all operations in a single transaction to avoid per-emotion transaction overhead
+  await db.execAsync("BEGIN TRANSACTION;");
+  try {
+    // First, remove existing links
+    await db.runAsync("DELETE FROM mood_emotions WHERE mood_id = ?;", moodId);
+    
+    // Then add new links
+    for (const emotion of emotions) {
+      const emotionId = await getOrCreateEmotionId(db, emotion);
+      await db.runAsync(
+        "INSERT OR IGNORE INTO mood_emotions (mood_id, emotion_id) VALUES (?, ?);",
+        moodId,
+        emotionId
+      );
+    }
+
+    await db.execAsync("COMMIT;");
+  } catch (error) {
+    await db.execAsync("ROLLBACK;");
+    throw error;
   }
 }
 
 /**
- * Gets emotions for a mood entry from the junction table
+ * Gets emotions for a mood entry from the junction table.
+ * Note: Currently unused as emotions are still being read from the TEXT column for backward compatibility.
+ * This function is reserved for future use when fully migrating to junction table reads.
  */
 async function getEmotionsForMood(db: SQLite.SQLiteDatabase, moodId: number): Promise<Emotion[]> {
   const rows = await db.getAllAsync(`
@@ -869,6 +894,29 @@ async function getEmotionsForMood(db: SQLite.SQLiteDatabase, moodId: number): Pr
     name: row.name,
     category: row.category as "positive" | "negative" | "neutral"
   }));
+}
+
+/**
+ * Parses an emotion item (string or object) and assigns it a category.
+ * Attempts to match against DEFAULT_EMOTIONS for category, defaulting to "neutral".
+ */
+function parseEmotionItem(item: any): Emotion | null {
+  if (typeof item === "string" && item.trim().length > 0) {
+    // Old string format - assign category based on default emotions
+    const name = item.trim();
+    const defaultEmotion = DEFAULT_EMOTIONS.find(e => e.name === name);
+    return { 
+      name, 
+      category: defaultEmotion ? defaultEmotion.category : "neutral" 
+    };
+  } else if (typeof item === "object" && item !== null && item.name) {
+    // Object format
+    return {
+      name: item.name.trim(),
+      category: item.category || "neutral"
+    };
+  }
+  return null;
 }
 
 /**
@@ -902,25 +950,10 @@ export async function migrateEmotionsToTable(): Promise<{
           continue;
         }
 
-        // Extract emotions from the old format
-        const emotions: Emotion[] = parsed.map((item: any): Emotion | null => {
-          if (typeof item === "string") {
-            // Old string format
-            const name = item.trim();
-            const defaultEmotion = DEFAULT_EMOTIONS.find(e => e.name === name);
-            return { 
-              name, 
-              category: defaultEmotion ? defaultEmotion.category : "neutral" 
-            };
-          } else if (typeof item === "object" && item !== null && item.name) {
-            // New object format
-            return {
-              name: item.name.trim(),
-              category: item.category || "neutral"
-            };
-          }
-          return null;
-        }).filter((e): e is Emotion => e !== null);
+        // Extract emotions from the old format using shared helper
+        const emotions: Emotion[] = parsed
+          .map(parseEmotionItem)
+          .filter((e): e is Emotion => e !== null);
 
         // Add emotions to emotions table and link to mood
         for (const emotion of emotions) {
@@ -933,12 +966,6 @@ export async function migrateEmotionsToTable(): Promise<{
             // Get or create emotion
             emotionId = await getOrCreateEmotionId(db, emotion);
             emotionIds.set(emotion.name, emotionId);
-            
-            // Count newly created emotions
-            const wasNew = !emotionIds.has(emotion.name);
-            if (wasNew) {
-              emotionsCreated++;
-            }
           }
           
           // Link emotion to mood
@@ -986,13 +1013,21 @@ export async function hasEmotionTableMigrated(): Promise<boolean> {
 export async function ensureDefaultEmotions(): Promise<void> {
   const db = await getDb();
   
-  for (const emotion of DEFAULT_EMOTIONS) {
-    await db.runAsync(
-      "INSERT OR IGNORE INTO emotions (name, category) VALUES (?, ?);",
-      emotion.name,
-      emotion.category
-    );
+  if (!DEFAULT_EMOTIONS.length) {
+    return;
   }
+
+  const placeholders = DEFAULT_EMOTIONS.map(() => "(?, ?)").join(", ");
+  const values: (string)[] = [];
+
+  for (const emotion of DEFAULT_EMOTIONS) {
+    values.push(emotion.name, emotion.category);
+  }
+
+  await db.runAsync(
+    `INSERT OR IGNORE INTO emotions (name, category) VALUES ${placeholders};`,
+    ...values
+  );
 }
 
 /**
@@ -1001,8 +1036,9 @@ export async function ensureDefaultEmotions(): Promise<void> {
 export async function clearMoods() {
   if (!__DEV__) return;
   const db = await getDb();
-  await db.runAsync("DELETE FROM moods;");
   await db.runAsync("DELETE FROM mood_emotions;");
+  await db.runAsync("DELETE FROM moods;");
+  await db.runAsync("DELETE FROM emotions;");
 }
 
 // Ensure the moods table exists as soon as this module is loaded
@@ -1132,9 +1168,9 @@ export async function importMoods(jsonData: string): Promise<number> {
 }
 
 /**
- * Imports mood entries from old backup format (pre-emotions-table)
- * This is for dev/testing purposes to import backups created before emotions table was introduced
- * @param jsonData - JSON string containing mood entries in old format
+ * Imports mood entries from the old backup format (pre-emotions-table).
+ * This is a user-facing migration feature to import backups created before the emotions table was introduced.
+ * @param jsonData - JSON string containing mood entries in the old backup format
  * @returns Promise resolving to the number of imported entries
  */
 export async function importOldBackup(jsonData: string): Promise<number> {
@@ -1146,29 +1182,12 @@ export async function importOldBackup(jsonData: string): Promise<number> {
       const note = mood?.notes ?? mood?.note ?? null;
       const timestamp = parseTimestamp(mood?.timestamp);
       
-      // Handle old emotion format (could be strings or objects without proper structure)
+      // Handle old emotion format using shared helper
       let emotions: Emotion[] = [];
-      if (mood?.emotions) {
-        if (Array.isArray(mood.emotions)) {
-          emotions = mood.emotions.map((item: any): Emotion | null => {
-            if (typeof item === "string" && item.trim().length > 0) {
-              // Old string format - assign category based on default emotions
-              const name = item.trim();
-              const defaultEmotion = DEFAULT_EMOTIONS.find(e => e.name === name);
-              return { 
-                name, 
-                category: defaultEmotion ? defaultEmotion.category : "neutral" 
-              };
-            } else if (typeof item === "object" && item !== null && item.name) {
-              // Object format
-              return {
-                name: item.name.trim(),
-                category: item.category || "neutral"
-              };
-            }
-            return null;
-          }).filter((e): e is Emotion => e !== null);
-        }
+      if (mood?.emotions && Array.isArray(mood.emotions)) {
+        emotions = mood.emotions
+          .map(parseEmotionItem)
+          .filter((e): e is Emotion => e !== null);
       }
       
       const contextSource = mood?.contextTags ?? mood?.context ?? [];
