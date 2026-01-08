@@ -72,16 +72,6 @@ export const WeeklyTab = ({
     setExpandedWeeks(newExpandedWeeks);
   };
 
-  if (!weeklyData.weeklyAggregates.length) {
-    return (
-      <View className="flex-1 justify-center items-center p-8">
-        <Text className="text-slate-500 text-center text-lg font-medium">
-          No weekly data available yet
-        </Text>
-      </View>
-    );
-  }
-
   const chartData = useMemo(() => {
     // Limit displayed weeks to last 52 for performance
     const displayWeeks = weeklyData.weeklyAggregates.slice(0, 52);
@@ -98,6 +88,16 @@ export const WeeklyTab = ({
       ],
     };
   }, [weeklyData]);
+
+  if (!weeklyData.weeklyAggregates.length) {
+    return (
+      <View className="flex-1 justify-center items-center p-8">
+        <Text className="text-slate-500 text-center text-lg font-medium">
+          No weekly data available yet
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView
