@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useMemo } from "react";
 import type { QuickEntryPrefs } from "@/lib/entrySettings";
+import type { Emotion } from "@db/types";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingCard } from "../components/SettingCard";
 import { ToggleRow } from "../components/ToggleRow";
@@ -21,7 +22,7 @@ export function EntryCustomizationSection({
 }: {
   quickEntryPrefs: QuickEntryPrefs;
   onQuickEntryToggle: (key: keyof QuickEntryPrefs, value: boolean) => void;
-  emotions: string[];
+  emotions: Emotion[];
   contexts: string[];
   newEmotion: string;
   setNewEmotion: (value: string) => void;
@@ -32,6 +33,11 @@ export function EntryCustomizationSection({
   onAddContext: () => void;
   onRemoveContext: (value: string) => void;
 }) {
+  const emotionNames = useMemo(
+    () => emotions.map((emotion) => emotion.name),
+    [emotions]
+  );
+
   return (
     <>
       <SectionHeader title="Entry Customization" icon="✨" />
@@ -60,7 +66,7 @@ export function EntryCustomizationSection({
           title="Emotions"
           description="Custom emotions for entries"
           placeholder="Add emotion..."
-          items={emotions}
+          items={emotionNames}
           newValue={newEmotion}
           onChangeNewValue={setNewEmotion}
           onAdd={onAddEmotion}
@@ -81,4 +87,3 @@ export function EntryCustomizationSection({
     </>
   );
 }
-

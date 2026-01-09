@@ -126,7 +126,7 @@ function buildCsv(
         case "mood":
           return csvEscape(entry.mood);
         case "emotions":
-          return csvEscape(entry.emotions.join("; "));
+          return csvEscape(entry.emotions.map((emotion) => emotion.name).join("; "));
         case "context":
           return csvEscape(entry.contextTags.join("; "));
         case "energy":

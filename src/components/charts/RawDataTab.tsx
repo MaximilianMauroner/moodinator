@@ -102,8 +102,8 @@ export const RawDataTab = ({
     moods.forEach((mood) => {
       if (Array.isArray(mood.emotions)) {
         mood.emotions.forEach((emotion) => {
-          if (emotion) {
-            counts[emotion] = (counts[emotion] || 0) + 1;
+          if (emotion && emotion.name) {
+            counts[emotion.name] = (counts[emotion.name] || 0) + 1;
           }
         });
       }

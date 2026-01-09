@@ -5,6 +5,7 @@ export async function clearMoods() {
     return;
   }
   const db = await getDb();
+  await db.runAsync("DELETE FROM mood_emotions;");
   await db.runAsync("DELETE FROM moods;");
+  await db.runAsync("DELETE FROM emotions;");
 }
-

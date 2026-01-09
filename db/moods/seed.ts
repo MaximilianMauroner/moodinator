@@ -1,7 +1,16 @@
+import type { Emotion } from "../types";
 import { getDb } from "../client";
 import { DEFAULT_CONTEXTS, DEFAULT_EMOTIONS } from "../../src/lib/entrySettings";
-import { serializeArray, parseTimestamp, sanitizeEnergy, sanitizeImportedArray } from "./serialization";
+import {
+  serializeArray,
+  serializeEmotions,
+  parseTimestamp,
+  sanitizeEnergy,
+  sanitizeImportedArray,
+  sanitizeImportedEmotions,
+} from "./serialization";
 import { clearMoods } from "./seedUtils";
+import { linkEmotionsToMood } from "./emotions";
 
 export { clearMoods } from "./seedUtils";
 
@@ -70,8 +79,8 @@ export async function seedMoods() {
     mood: number;
     note: string | null;
     timestamp: number;
-    emotions: string;
-    contextTags: string;
+    emotions: Emotion[];
+    contextTags: string[];
     energy: number;
   }> = [];
 
@@ -121,7 +130,7 @@ export async function seedMoods() {
       else if (mood === 8) energy = Math.floor(Math.random() * 4) + 2;
       else energy = Math.floor(Math.random() * 4);
 
-      let emotions: string[] = [];
+      let emotions: Emotion[] = [];
       if (Math.random() < 0.75) {
         const emotionRand = Math.random();
         let numEmotions: number;
@@ -141,7 +150,10 @@ export async function seedMoods() {
         else if (contextRand < 0.8) numContexts = 2;
         else numContexts = 3;
         const shuffled = [...DEFAULT_CONTEXTS].sort(() => Math.random() - 0.5);
-        contextTags = shuffled.slice(0, Math.min(numContexts, DEFAULT_CONTEXTS.length));
+        contextTags = shuffled.slice(
+          0,
+          Math.min(numContexts, DEFAULT_CONTEXTS.length)
+        );
       }
 
       const note =
@@ -153,8 +165,8 @@ export async function seedMoods() {
         mood,
         note,
         timestamp: currentDate.getTime(),
-        emotions: serializeArray(emotions),
-        contextTags: serializeArray(contextTags),
+        emotions,
+        contextTags,
         energy,
       });
       totalEntries++;
@@ -169,15 +181,20 @@ export async function seedMoods() {
       const batch = entries.slice(i, i + BATCH_SIZE);
       await db.withTransactionAsync(async () => {
         for (const entry of batch) {
-          await db.runAsync(
+          const result = await db.runAsync(
             "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy) VALUES (?, ?, ?, ?, ?, ?);",
             entry.mood,
             entry.note,
             entry.timestamp,
-            entry.emotions,
-            entry.contextTags,
+            serializeEmotions(entry.emotions),
+            serializeArray(entry.contextTags),
             entry.energy
           );
+
+          if (entry.emotions.length > 0) {
+            await linkEmotionsToMood(db, result.lastInsertRowId, entry.emotions);
+          }
+
           insertedCount++;
         }
       });
@@ -208,21 +225,25 @@ export async function seedMoodsFromFile(): Promise<{
 
         for (const mood of jsonData) {
           const note = (mood as any)?.notes ?? (mood as any)?.note ?? null;
-          const emotions = sanitizeImportedArray((mood as any)?.emotions);
+          const emotions = sanitizeImportedEmotions((mood as any)?.emotions);
           const contextSource =
             (mood as any)?.contextTags ?? (mood as any)?.context ?? [];
           const contextTags = sanitizeImportedArray(contextSource);
           const energy = sanitizeEnergy((mood as any)?.energy);
           const timestamp = parseTimestamp((mood as any)?.timestamp);
-          await db.runAsync(
+          const result = await db.runAsync(
             "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy) VALUES (?, ?, ?, ?, ?, ?);",
             mood.mood,
             note,
             timestamp,
-            serializeArray(emotions),
+            serializeEmotions(emotions),
             serializeArray(contextTags),
             energy
           );
+
+          if (emotions.length > 0) {
+            await linkEmotionsToMood(db, result.lastInsertRowId, emotions);
+          }
         }
 
         return { source: "file", count: jsonData.length };
@@ -237,4 +258,3 @@ export async function seedMoodsFromFile(): Promise<{
   const totalEntries = await seedMoods();
   return { source: "random", count: totalEntries };
 }
-
