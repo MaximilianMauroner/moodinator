@@ -737,45 +737,60 @@ export default function SettingsScreen() {
     }
     const newEmotionObj: Emotion = { name: trimmed, category: newEmotionCategory };
     
-    // Add to database
-    await addEmotion(newEmotionObj);
-    
-    const updated = [...emotions, newEmotionObj];
-    setEmotions(updated);
-    setNewEmotion("");
-    setNewEmotionCategory("neutral");
-    
-    // Also save to AsyncStorage for backward compatibility
-    await saveEmotionPresets(updated);
+    try {
+      // Add to database
+      await addEmotion(newEmotionObj);
+      
+      const updated = [...emotions, newEmotionObj];
+      setEmotions(updated);
+      setNewEmotion("");
+      setNewEmotionCategory("neutral");
+      
+      // Also save to AsyncStorage for backward compatibility
+      await saveEmotionPresets(updated);
+    } catch (error) {
+      console.error("Failed to add emotion:", error);
+      Alert.alert("Error", "Failed to add emotion. Please try again.");
+    }
   }, [newEmotion, newEmotionCategory, emotions]);
 
   const handleRemoveEmotion = useCallback(async (emotion: Emotion) => {
-    // Delete from database
-    await deleteEmotion(emotion.name);
-    
-    setEmotions((prev) => {
-      const updated = prev.filter((item) => item.name !== emotion.name);
-      const finalList = updated.length > 0 ? updated : DEFAULT_EMOTIONS;
-      saveEmotionPresets(finalList);
-      return finalList;
-    });
+    try {
+      // Delete from database
+      await deleteEmotion(emotion.name);
+      
+      setEmotions((prev) => {
+        const updated = prev.filter((item) => item.name !== emotion.name);
+        const finalList = updated.length > 0 ? updated : DEFAULT_EMOTIONS;
+        saveEmotionPresets(finalList);
+        return finalList;
+      });
+    } catch (error) {
+      console.error("Failed to remove emotion:", error);
+      Alert.alert("Error", "Failed to remove emotion. Please try again.");
+    }
   }, []);
 
   const handleEditEmotion = useCallback(async (oldEmotion: Emotion, newCategory: "positive" | "negative" | "neutral") => {
     const newEmotion = { name: oldEmotion.name, category: newCategory };
     
-    // Update in database
-    await updateEmotion(oldEmotion.name, newEmotion);
-    
-    setEmotions((prev) => {
-      const updated = prev.map((item) =>
-        item.name === oldEmotion.name
-          ? { ...item, category: newCategory }
-          : item
-      );
-      saveEmotionPresets(updated);
-      return updated;
-    });
+    try {
+      // Update in database
+      await updateEmotion(oldEmotion.name, newEmotion);
+      
+      setEmotions((prev) => {
+        const updated = prev.map((item) =>
+          item.name === oldEmotion.name
+            ? { ...item, category: newCategory }
+            : item
+        );
+        saveEmotionPresets(updated);
+        return updated;
+      });
+    } catch (error) {
+      console.error("Failed to edit emotion:", error);
+      Alert.alert("Error", "Failed to edit emotion. Please try again.");
+    }
   }, []);
 
   const handleAddContext = useCallback(async () => {

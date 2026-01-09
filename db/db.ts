@@ -24,7 +24,7 @@ export async function createEmotionsTable() {
   await db.execAsync(`
         CREATE TABLE IF NOT EXISTS emotions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL UNIQUE,
+            name TEXT NOT NULL UNIQUE COLLATE NOCASE,
             category TEXT NOT NULL CHECK(category IN ('positive', 'negative', 'neutral'))
         );
     `);
@@ -259,26 +259,36 @@ export async function insertMood(
     note: note ?? null,
     ...metadata,
   });
-  const result = await db.runAsync(
-    "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy) VALUES (?, ?, ?, ?, ?, ?);",
-    mood,
-    normalized.note,
-    normalized.timestamp,
-    serializeEmotions(normalized.emotions),
-    serializeArray(normalized.contextTags),
-    normalized.energy
-  );
   
-  // Also store emotions in junction table
-  if (normalized.emotions && normalized.emotions.length > 0) {
-    await linkEmotionsToMood(db, result.lastInsertRowId, normalized.emotions);
+  // Wrap in transaction to ensure consistency
+  await db.execAsync("BEGIN TRANSACTION;");
+  try {
+    const result = await db.runAsync(
+      "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy) VALUES (?, ?, ?, ?, ?, ?);",
+      mood,
+      normalized.note,
+      normalized.timestamp,
+      serializeEmotions(normalized.emotions),
+      serializeArray(normalized.contextTags),
+      normalized.energy
+    );
+    
+    // Also store emotions in junction table
+    if (normalized.emotions && normalized.emotions.length > 0) {
+      await linkEmotionsToMood(db, result.lastInsertRowId, normalized.emotions);
+    }
+    
+    await db.execAsync("COMMIT;");
+    
+    const inserted = await db.getFirstAsync(
+      "SELECT * FROM moods WHERE id = ?;",
+      result.lastInsertRowId
+    );
+    return toMoodEntry(inserted);
+  } catch (error) {
+    await db.execAsync("ROLLBACK;");
+    throw error;
   }
-  
-  const inserted = await db.getFirstAsync(
-    "SELECT * FROM moods WHERE id = ?;",
-    result.lastInsertRowId
-  );
-  return toMoodEntry(inserted);
 }
 
 /**
@@ -291,26 +301,36 @@ export async function insertMoodEntry(
 ): Promise<MoodEntry> {
   const db = await getDb();
   const normalized = normalizeInput(entry);
-  const result = await db.runAsync(
-    "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy) VALUES (?, ?, ?, ?, ?, ?);",
-    entry.mood,
-    normalized.note,
-    normalized.timestamp,
-    serializeEmotions(normalized.emotions),
-    serializeArray(normalized.contextTags),
-    normalized.energy
-  );
   
-  // Also store emotions in junction table
-  if (normalized.emotions && normalized.emotions.length > 0) {
-    await linkEmotionsToMood(db, result.lastInsertRowId, normalized.emotions);
+  // Wrap in transaction to ensure consistency
+  await db.execAsync("BEGIN TRANSACTION;");
+  try {
+    const result = await db.runAsync(
+      "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy) VALUES (?, ?, ?, ?, ?, ?);",
+      entry.mood,
+      normalized.note,
+      normalized.timestamp,
+      serializeEmotions(normalized.emotions),
+      serializeArray(normalized.contextTags),
+      normalized.energy
+    );
+    
+    // Also store emotions in junction table
+    if (normalized.emotions && normalized.emotions.length > 0) {
+      await linkEmotionsToMood(db, result.lastInsertRowId, normalized.emotions);
+    }
+    
+    await db.execAsync("COMMIT;");
+    
+    const inserted = await db.getFirstAsync(
+      "SELECT * FROM moods WHERE id = ?;",
+      result.lastInsertRowId
+    );
+    return toMoodEntry(inserted);
+  } catch (error) {
+    await db.execAsync("ROLLBACK;");
+    throw error;
   }
-  
-  const inserted = await db.getFirstAsync(
-    "SELECT * FROM moods WHERE id = ?;",
-    result.lastInsertRowId
-  );
-  return toMoodEntry(inserted);
 }
 
 /**
@@ -787,11 +807,16 @@ export async function getAllEmotions(): Promise<Emotion[]> {
  */
 export async function addEmotion(emotion: Emotion): Promise<void> {
   const db = await getDb();
-  await db.runAsync(
-    "INSERT OR REPLACE INTO emotions (name, category) VALUES (?, ?);",
+  const result = await db.runAsync(
+    "INSERT OR IGNORE INTO emotions (name, category) VALUES (?, ?);",
     emotion.name,
     emotion.category
   );
+
+  // If no row was inserted, an emotion with this name already exists
+  if ((result as any).changes === 0) {
+    throw new Error("An emotion with this name already exists");
+  }
 }
 
 /**
@@ -834,7 +859,7 @@ export async function deleteEmotion(name: string): Promise<void> {
  */
 async function getOrCreateEmotionId(db: SQLite.SQLiteDatabase, emotion: Emotion): Promise<number> {
   // Use INSERT OR REPLACE to create or update the emotion
-  const result = await db.runAsync(
+  await db.runAsync(
     "INSERT OR REPLACE INTO emotions (name, category) VALUES (?, ?);",
     emotion.name,
     emotion.category
@@ -851,49 +876,22 @@ async function getOrCreateEmotionId(db: SQLite.SQLiteDatabase, emotion: Emotion)
 
 /**
  * Links emotions to a mood entry in the junction table
+ * NOTE: This function does NOT start its own transaction. Caller must ensure
+ * it's called within a transaction if atomicity is required.
  */
 async function linkEmotionsToMood(db: SQLite.SQLiteDatabase, moodId: number, emotions: Emotion[]): Promise<void> {
-  // Wrap all operations in a single transaction to avoid per-emotion transaction overhead
-  await db.execAsync("BEGIN TRANSACTION;");
-  try {
-    // First, remove existing links
-    await db.runAsync("DELETE FROM mood_emotions WHERE mood_id = ?;", moodId);
-    
-    // Then add new links
-    for (const emotion of emotions) {
-      const emotionId = await getOrCreateEmotionId(db, emotion);
-      await db.runAsync(
-        "INSERT OR IGNORE INTO mood_emotions (mood_id, emotion_id) VALUES (?, ?);",
-        moodId,
-        emotionId
-      );
-    }
-
-    await db.execAsync("COMMIT;");
-  } catch (error) {
-    await db.execAsync("ROLLBACK;");
-    throw error;
-  }
-}
-
-/**
- * Gets emotions for a mood entry from the junction table.
- * Note: Currently unused as emotions are still being read from the TEXT column for backward compatibility.
- * This function is reserved for future use when fully migrating to junction table reads.
- */
-async function getEmotionsForMood(db: SQLite.SQLiteDatabase, moodId: number): Promise<Emotion[]> {
-  const rows = await db.getAllAsync(`
-    SELECT e.name, e.category
-    FROM emotions e
-    INNER JOIN mood_emotions me ON e.id = me.emotion_id
-    WHERE me.mood_id = ?
-    ORDER BY e.name ASC;
-  `, moodId);
+  // First, remove existing links
+  await db.runAsync("DELETE FROM mood_emotions WHERE mood_id = ?;", moodId);
   
-  return rows.map((row: any) => ({
-    name: row.name,
-    category: row.category as "positive" | "negative" | "neutral"
-  }));
+  // Then add new links
+  for (const emotion of emotions) {
+    const emotionId = await getOrCreateEmotionId(db, emotion);
+    await db.runAsync(
+      "INSERT OR IGNORE INTO mood_emotions (mood_id, emotion_id) VALUES (?, ?);",
+      moodId,
+      emotionId
+    );
+  }
 }
 
 /**
@@ -925,13 +923,13 @@ function parseEmotionItem(item: any): Emotion | null {
  */
 export async function migrateEmotionsToTable(): Promise<{
   migrated: number;
-  emotionsCreated: number;
 }> {
   const db = await getDb();
   let migrated = 0;
-  let emotionsCreated = 0;
   const emotionIds = new Map<string, number>();
 
+  // Wrap entire migration in a transaction for atomicity
+  await db.execAsync("BEGIN TRANSACTION;");
   try {
     // Get all mood entries from database
     const rows = await db.getAllAsync("SELECT id, emotions FROM moods;");
@@ -979,12 +977,15 @@ export async function migrateEmotionsToTable(): Promise<{
         migrated++;
       } catch (error) {
         console.error(`Failed to migrate emotions for mood ${row.id}:`, error);
+        // Continue with other moods instead of failing entire migration
       }
     }
 
+    await db.execAsync("COMMIT;");
     console.log(`Emotion migration complete: ${migrated} moods migrated, ${emotionIds.size} unique emotions in table`);
-    return { migrated, emotionsCreated: emotionIds.size };
+    return { migrated };
   } catch (error) {
+    await db.execAsync("ROLLBACK;");
     console.error("Error during emotion table migration:", error);
     throw error;
   }
@@ -1174,9 +1175,12 @@ export async function importMoods(jsonData: string): Promise<number> {
  * @returns Promise resolving to the number of imported entries
  */
 export async function importOldBackup(jsonData: string): Promise<number> {
+  const db = await getDb();
+  
+  // Wrap entire import in a transaction for atomicity
+  await db.execAsync("BEGIN TRANSACTION;");
   try {
     const moods = JSON.parse(jsonData) as any[];
-    const db = await getDb();
 
     for (const mood of moods) {
       const note = mood?.notes ?? mood?.note ?? null;
@@ -1209,8 +1213,11 @@ export async function importOldBackup(jsonData: string): Promise<number> {
         await linkEmotionsToMood(db, result.lastInsertRowId, emotions);
       }
     }
+    
+    await db.execAsync("COMMIT;");
     return moods.length;
   } catch (error) {
+    await db.execAsync("ROLLBACK;");
     console.error("Error importing old backup:", error);
     throw new Error("Invalid backup data format");
   }
@@ -1284,6 +1291,8 @@ export async function migrateEmotionsToCategories(): Promise<{
   let migrated = 0;
   let skipped = 0;
 
+  // Wrap entire migration in a transaction for atomicity
+  await db.execAsync("BEGIN TRANSACTION;");
   try {
     // Get all mood entries from database
     const rows = await db.getAllAsync("SELECT id, emotions FROM moods;");
@@ -1348,9 +1357,11 @@ export async function migrateEmotionsToCategories(): Promise<{
       }
     }
 
+    await db.execAsync("COMMIT;");
     console.log(`Emotion migration complete: ${migrated} migrated, ${skipped} skipped`);
     return { migrated, skipped };
   } catch (error) {
+    await db.execAsync("ROLLBACK;");
     console.error("Error during emotion migration:", error);
     throw error;
   }

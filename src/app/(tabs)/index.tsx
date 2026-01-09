@@ -279,20 +279,48 @@ export default function HomeScreen() {
   }, []);
 
   const runEmotionMigration = useCallback(async () => {
-    try {
-      const MIGRATION_KEY = "emotionCategoryMigrationCompleted";
-      const migrationCompleted = await AsyncStorage.getItem(MIGRATION_KEY);
+    const MIGRATION_KEY = "emotionCategoryMigrationCompleted";
+    const MIGRATION_RETRY_KEY = "emotionCategoryMigrationRetries";
+    const MAX_MIGRATION_RETRIES = 3;
 
-      if (!migrationCompleted) {
-        console.log("Running emotion category migration...");
-        const result = await migrateEmotionsToCategories();
-        console.log(`Migration complete: ${result.migrated} entries migrated, ${result.skipped} skipped`);
-        await AsyncStorage.setItem(MIGRATION_KEY, "true");
-        // Reload moods after migration
-        await loadMoods();
+    try {
+      const migrationStatus = await AsyncStorage.getItem(MIGRATION_KEY);
+
+      // If migration has already succeeded or been marked as failed, do not retry
+      if (migrationStatus === "true" || migrationStatus === "failed") {
+        return;
       }
+
+      console.log("Running emotion category migration...");
+      const result = await migrateEmotionsToCategories();
+      console.log(`Migration complete: ${result.migrated} entries migrated, ${result.skipped} skipped`);
+      await AsyncStorage.setItem(MIGRATION_KEY, "true");
+      // Reload moods after migration
+      await loadMoods();
     } catch (error) {
       console.error("Failed to run emotion migration:", error);
+
+      // Track retry attempts and, after several failures, stop retrying and notify the user
+      try {
+        const currentRetriesRaw = await AsyncStorage.getItem(MIGRATION_RETRY_KEY);
+        const currentRetries = currentRetriesRaw ? parseInt(currentRetriesRaw, 10) || 0 : 0;
+        const nextRetries = currentRetries + 1;
+
+        await AsyncStorage.setItem(MIGRATION_RETRY_KEY, String(nextRetries));
+
+        if (nextRetries >= MAX_MIGRATION_RETRIES) {
+          // Mark migration as failed so it is not retried on every app launch
+          await AsyncStorage.setItem(MIGRATION_KEY, "failed");
+
+          // Provide a user-facing message so the user is aware of the issue
+          Toast.show(
+            "We couldn't finish updating some past mood entries. New entries will still work.",
+            { type: "error" }
+          );
+        }
+      } catch (storageError) {
+        console.error("Failed to update migration retry state:", storageError);
+      }
     }
   }, []);
 
