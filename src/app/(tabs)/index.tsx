@@ -279,11 +279,11 @@ export default function HomeScreen() {
   }, []);
 
   const runEmotionMigration = useCallback(async () => {
-    try {
-      const MIGRATION_KEY = "emotionCategoryMigrationCompleted";
-      const MIGRATION_RETRY_KEY = "emotionCategoryMigrationRetries";
-      const MAX_MIGRATION_RETRIES = 3;
+    const MIGRATION_KEY = "emotionCategoryMigrationCompleted";
+    const MIGRATION_RETRY_KEY = "emotionCategoryMigrationRetries";
+    const MAX_MIGRATION_RETRIES = 3;
 
+    try {
       const migrationStatus = await AsyncStorage.getItem(MIGRATION_KEY);
 
       // If migration has already succeeded or been marked as failed, do not retry
@@ -302,8 +302,6 @@ export default function HomeScreen() {
 
       // Track retry attempts and, after several failures, stop retrying and notify the user
       try {
-        const MIGRATION_RETRY_KEY = "emotionCategoryMigrationRetries";
-        const MAX_MIGRATION_RETRIES = 3;
         const currentRetriesRaw = await AsyncStorage.getItem(MIGRATION_RETRY_KEY);
         const currentRetries = currentRetriesRaw ? parseInt(currentRetriesRaw, 10) || 0 : 0;
         const nextRetries = currentRetries + 1;
@@ -311,7 +309,6 @@ export default function HomeScreen() {
         await AsyncStorage.setItem(MIGRATION_RETRY_KEY, String(nextRetries));
 
         if (nextRetries >= MAX_MIGRATION_RETRIES) {
-          const MIGRATION_KEY = "emotionCategoryMigrationCompleted";
           // Mark migration as failed so it is not retried on every app launch
           await AsyncStorage.setItem(MIGRATION_KEY, "failed");
 
