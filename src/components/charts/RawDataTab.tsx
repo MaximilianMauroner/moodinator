@@ -33,7 +33,7 @@ export const RawDataTab = ({
   const handleRefresh = React.useCallback(async () => {
     setRefreshing(true);
     try {
-      await Promise.resolve(onRefresh());
+      await onRefresh();
     } finally {
       setRefreshing(false);
     }
