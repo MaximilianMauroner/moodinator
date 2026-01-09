@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { QuickEntryPrefs } from "@/lib/entrySettings";
+import type { Emotion } from "@db/types";
 import {
   DEFAULT_CONTEXTS,
   DEFAULT_EMOTIONS,
@@ -20,7 +21,7 @@ type SettingsStore = {
   showDetailedLabels: boolean;
   devOptionsEnabled: boolean;
 
-  emotions: string[];
+  emotions: Emotion[];
   contexts: string[];
   quickEntryPrefs: QuickEntryPrefs;
 
@@ -28,7 +29,7 @@ type SettingsStore = {
   setShowDetailedLabels: (value: boolean) => Promise<void>;
   setDevOptionsEnabled: (value: boolean) => Promise<void>;
 
-  setEmotions: (values: string[]) => Promise<void>;
+  setEmotions: (values: Emotion[]) => Promise<void>;
   setContexts: (values: string[]) => Promise<void>;
   setQuickEntryPrefs: (prefs: QuickEntryPrefs) => Promise<void>;
 };
@@ -88,4 +89,3 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
     set({ quickEntryPrefs: prefs });
   },
 }));
-

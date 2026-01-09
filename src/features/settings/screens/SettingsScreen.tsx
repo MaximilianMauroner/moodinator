@@ -18,6 +18,7 @@ import {
   DEFAULT_EMOTIONS,
   type QuickEntryPrefs,
 } from "@/lib/entrySettings";
+import type { Emotion } from "@db/types";
 import { PreferencesSection } from "../sections/PreferencesSection";
 import { EntryCustomizationSection } from "../sections/EntryCustomizationSection";
 import { DataSection } from "../sections/DataSection";
@@ -119,18 +120,22 @@ export function SettingsScreen() {
     if (!trimmed) {
       return;
     }
-    if (emotions.includes(trimmed)) {
+    const trimmedLower = trimmed.toLowerCase();
+    if (emotions.some((emotion) => emotion.name.toLowerCase() === trimmedLower)) {
       Alert.alert("Duplicate Emotion", "This emotion is already in the list.");
       return;
     }
-    const updated = [...emotions, trimmed];
+    const updated = [
+      ...emotions,
+      { name: trimmed, category: "neutral" } as Emotion,
+    ];
     await setEmotions(updated);
     setNewEmotion("");
   }, [emotions, newEmotion, setEmotions]);
 
   const handleRemoveEmotion = useCallback(
     async (value: string) => {
-      const updated = emotions.filter((item) => item !== value);
+      const updated = emotions.filter((item) => item.name !== value);
       const finalList = updated.length > 0 ? updated : DEFAULT_EMOTIONS;
       await setEmotions(finalList);
     },

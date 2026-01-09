@@ -1,5 +1,6 @@
 import type * as SQLite from "expo-sqlite";
 import { getDb } from "../client";
+import { createEmotionsTable, createMoodEmotionsTable } from "./emotions";
 
 export async function createMoodTable() {
   const db = await getDb();
@@ -15,6 +16,8 @@ export async function createMoodTable() {
         );
     `);
   await ensureMoodTableColumns(db);
+  await createEmotionsTable();
+  await createMoodEmotionsTable();
 }
 
 async function ensureMoodTableColumns(database: SQLite.SQLiteDatabase) {
@@ -42,4 +45,3 @@ async function ensureMoodTableColumns(database: SQLite.SQLiteDatabase) {
     }
   }
 }
-

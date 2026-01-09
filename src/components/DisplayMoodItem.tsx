@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useRef, useMemo } from "react";
 import { View, Text, Pressable } from "react-native";
 import Animated, {
   FadeInRight,
@@ -11,6 +11,7 @@ import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 import { SwipeDirection } from "../types/mood";
 import { MoodEntry } from "@db/types";
 import { moodScale } from "@/constants/moodScale";
+import { getCategoryColors } from "@/lib/emotionColors";
 
 interface Props {
   mood: MoodEntry;
@@ -48,6 +49,13 @@ export const DisplayMoodItem = React.memo(
         bg: moodInfo?.bg ?? "bg-blue-50",
       };
     }, [mood.mood]);
+
+    // Memoize sorted emotions to avoid re-sorting on every render
+    const sortedEmotions = useMemo(() => {
+      return mood.emotions
+        ? [...mood.emotions].sort((a, b) => a.name.localeCompare(b.name))
+        : [];
+    }, [mood.emotions]);
 
     const moodColor = moodData.color;
 
@@ -115,16 +123,20 @@ export const DisplayMoodItem = React.memo(
                     </Text>
                     </View>
                 )}
-                {mood.emotions?.map((emotion) => (
-                  <View
-                    key={`${mood.id}-${emotion}`}
-                    className="bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md"
-                  >
-                    <Text className="text-xs font-medium text-slate-600 dark:text-slate-300">
-                      {emotion}
-                    </Text>
-                  </View>
-                ))}
+                {sortedEmotions.map((emotion) => {
+                    const colors = getCategoryColors(emotion.category);
+
+                    return (
+                      <View
+                        key={`${mood.id}-${emotion.name}`}
+                        className={`px-2 py-0.5 rounded-md ${colors.bg}`}
+                      >
+                        <Text className={`text-xs font-medium ${colors.text}`}>
+                          {emotion.name}
+                        </Text>
+                      </View>
+                    );
+                  })}
                 {mood.contextTags?.map((context) => (
                   <View
                     key={`${mood.id}-${context}`}

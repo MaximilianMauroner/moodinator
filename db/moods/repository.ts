@@ -1,7 +1,13 @@
-import type { MoodEntry, MoodEntryInput } from "../types";
+import type { Emotion, MoodEntry, MoodEntryInput } from "../types";
 import { getDb } from "../client";
 import { resolveDateRange, type MoodDateRange } from "./range";
-import { normalizeInput, serializeArray, toMoodEntry } from "./serialization";
+import {
+  normalizeInput,
+  serializeArray,
+  serializeEmotions,
+  toMoodEntry,
+} from "./serialization";
+import { linkEmotionsToMood } from "./emotions";
 
 export async function insertMood(
   mood: number,
@@ -14,39 +20,67 @@ export async function insertMood(
     note: note ?? null,
     ...metadata,
   });
-  const result = await db.runAsync(
-    "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy) VALUES (?, ?, ?, ?, ?, ?);",
-    mood,
-    normalized.note,
-    normalized.timestamp,
-    serializeArray(normalized.emotions),
-    serializeArray(normalized.contextTags),
-    normalized.energy
-  );
-  const inserted = await db.getFirstAsync(
-    "SELECT * FROM moods WHERE id = ?;",
-    result.lastInsertRowId
-  );
-  return toMoodEntry(inserted);
+
+  await db.execAsync("BEGIN TRANSACTION;");
+  try {
+    const result = await db.runAsync(
+      "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy) VALUES (?, ?, ?, ?, ?, ?);",
+      mood,
+      normalized.note,
+      normalized.timestamp,
+      serializeEmotions(normalized.emotions),
+      serializeArray(normalized.contextTags),
+      normalized.energy
+    );
+
+    if (normalized.emotions && normalized.emotions.length > 0) {
+      await linkEmotionsToMood(db, result.lastInsertRowId, normalized.emotions);
+    }
+
+    await db.execAsync("COMMIT;");
+
+    const inserted = await db.getFirstAsync(
+      "SELECT * FROM moods WHERE id = ?;",
+      result.lastInsertRowId
+    );
+    return toMoodEntry(inserted);
+  } catch (error) {
+    await db.execAsync("ROLLBACK;");
+    throw error;
+  }
 }
 
 export async function insertMoodEntry(entry: MoodEntryInput): Promise<MoodEntry> {
   const db = await getDb();
   const normalized = normalizeInput(entry);
-  const result = await db.runAsync(
-    "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy) VALUES (?, ?, ?, ?, ?, ?);",
-    entry.mood,
-    normalized.note,
-    normalized.timestamp,
-    serializeArray(normalized.emotions),
-    serializeArray(normalized.contextTags),
-    normalized.energy
-  );
-  const inserted = await db.getFirstAsync(
-    "SELECT * FROM moods WHERE id = ?;",
-    result.lastInsertRowId
-  );
-  return toMoodEntry(inserted);
+
+  await db.execAsync("BEGIN TRANSACTION;");
+  try {
+    const result = await db.runAsync(
+      "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy) VALUES (?, ?, ?, ?, ?, ?);",
+      entry.mood,
+      normalized.note,
+      normalized.timestamp,
+      serializeEmotions(normalized.emotions),
+      serializeArray(normalized.contextTags),
+      normalized.energy
+    );
+
+    if (normalized.emotions && normalized.emotions.length > 0) {
+      await linkEmotionsToMood(db, result.lastInsertRowId, normalized.emotions);
+    }
+
+    await db.execAsync("COMMIT;");
+
+    const inserted = await db.getFirstAsync(
+      "SELECT * FROM moods WHERE id = ?;",
+      result.lastInsertRowId
+    );
+    return toMoodEntry(inserted);
+  } catch (error) {
+    await db.execAsync("ROLLBACK;");
+    throw error;
+  }
 }
 
 export async function hasMoodBeenLoggedToday(): Promise<boolean> {
@@ -98,6 +132,8 @@ export async function updateMoodEntry(
   const db = await getDb();
   const fields: string[] = [];
   const params: any[] = [];
+  let updateEmotions = false;
+  let emotionsToUpdate: Emotion[] = [];
 
   if (typeof updates.mood === "number") {
     fields.push("mood = ?");
@@ -113,7 +149,9 @@ export async function updateMoodEntry(
   }
   if (updates.emotions !== undefined) {
     fields.push("emotions = ?");
-    params.push(serializeArray(updates.emotions));
+    params.push(serializeEmotions(updates.emotions));
+    updateEmotions = true;
+    emotionsToUpdate = updates.emotions;
   }
   if (updates.contextTags !== undefined) {
     fields.push("context_tags = ?");
@@ -133,7 +171,24 @@ export async function updateMoodEntry(
     return current ? toMoodEntry(current) : undefined;
   }
 
-  await db.runAsync(`UPDATE moods SET ${fields.join(", ")} WHERE id = ?;`, ...params, id);
+  await db.execAsync("BEGIN TRANSACTION;");
+  try {
+    await db.runAsync(
+      `UPDATE moods SET ${fields.join(", ")} WHERE id = ?;`,
+      ...params,
+      id
+    );
+
+    if (updateEmotions) {
+      await linkEmotionsToMood(db, id, emotionsToUpdate);
+    }
+
+    await db.execAsync("COMMIT;");
+  } catch (error) {
+    await db.execAsync("ROLLBACK;");
+    throw error;
+  }
+
   const updated = await db.getFirstAsync(
     "SELECT * FROM moods WHERE id = ?;",
     id
@@ -183,4 +238,3 @@ export async function getMoodsWithinRange(
   );
   return rows.map(toMoodEntry);
 }
-

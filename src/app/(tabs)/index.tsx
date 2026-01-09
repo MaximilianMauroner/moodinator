@@ -14,13 +14,14 @@ import {
   insertMoodEntry,
   updateMoodTimestamp,
   updateMoodEntry,
+  migrateEmotionsToCategories,
 } from "@db/db";
 import { DisplayMoodItem } from "@/components/DisplayMoodItem";
 import { DateTimePickerModal } from "@/components/DateTimePickerModal";
 import { MoodButtonsDetailed } from "@/components/MoodButtonsDetailed";
 import { MoodButtonsCompact } from "@/components/MoodButtonsCompact";
 import { SwipeDirection } from "@/types/mood";
-import { MoodEntry } from "@db/types";
+import { MoodEntry, Emotion } from "@db/types";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 import ToastManager, { Toast } from "toastify-react-native";
@@ -95,7 +96,7 @@ export default function HomeScreen() {
   const [pendingMood, setPendingMood] = useState(5);
   const [editingEntry, setEditingEntry] = useState<MoodEntry | null>(null);
   const [emotionOptions, setEmotionOptions] =
-    useState<string[]>(DEFAULT_EMOTIONS);
+    useState<Emotion[]>(DEFAULT_EMOTIONS);
   const [contextOptions, setContextOptions] =
     useState<string[]>(DEFAULT_CONTEXTS);
   const [quickEntryPrefs, setQuickEntryPrefs] = useState<QuickEntryPrefs>(
@@ -277,9 +278,56 @@ export default function HomeScreen() {
     }
   }, []);
 
+  const runEmotionMigration = useCallback(async () => {
+    const MIGRATION_KEY = "emotionCategoryMigrationCompleted";
+    const MIGRATION_RETRY_KEY = "emotionCategoryMigrationRetries";
+    const MAX_MIGRATION_RETRIES = 3;
+
+    try {
+      const migrationStatus = await AsyncStorage.getItem(MIGRATION_KEY);
+
+      // If migration has already succeeded or been marked as failed, do not retry
+      if (migrationStatus === "true" || migrationStatus === "failed") {
+        return;
+      }
+
+      console.log("Running emotion category migration...");
+      const result = await migrateEmotionsToCategories();
+      console.log(`Migration complete: ${result.migrated} entries migrated, ${result.skipped} skipped`);
+      await AsyncStorage.setItem(MIGRATION_KEY, "true");
+      // Reload moods after migration
+      await loadMoods();
+    } catch (error) {
+      console.error("Failed to run emotion migration:", error);
+
+      // Track retry attempts and, after several failures, stop retrying and notify the user
+      try {
+        const currentRetriesRaw = await AsyncStorage.getItem(MIGRATION_RETRY_KEY);
+        const currentRetries = currentRetriesRaw ? parseInt(currentRetriesRaw, 10) || 0 : 0;
+        const nextRetries = currentRetries + 1;
+
+        await AsyncStorage.setItem(MIGRATION_RETRY_KEY, String(nextRetries));
+
+        if (nextRetries >= MAX_MIGRATION_RETRIES) {
+          // Mark migration as failed so it is not retried on every app launch
+          await AsyncStorage.setItem(MIGRATION_KEY, "failed");
+
+          // Provide a user-facing message so the user is aware of the issue
+          Toast.show(
+            "We couldn't finish updating some past mood entries. New entries will still work.",
+            { type: "error" }
+          );
+        }
+      } catch (storageError) {
+        console.error("Failed to update migration retry state:", storageError);
+      }
+    }
+  }, []);
+
   useEffect(() => {
     loadShowLabelsPreference();
-  }, [loadShowLabelsPreference]);
+    runEmotionMigration();
+  }, [loadShowLabelsPreference, runEmotionMigration]);
 
   useFocusEffect(
     useCallback(() => {

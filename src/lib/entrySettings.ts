@@ -1,17 +1,18 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import type { Emotion } from "../../db/types";
 
 export const EMOTION_PRESETS_KEY = "emotionPresets";
 export const CONTEXT_TAGS_KEY = "contextTags";
 export const QUICK_ENTRY_PREFS_KEY = "quickEntryPrefs";
 export const THERAPY_EXPORT_PREFS_KEY = "therapyExportPrefs";
 
-export const DEFAULT_EMOTIONS = [
-    "Happy",
-    "Calm",
-    "Excited",
-    "Anxious",
-    "Sad",
-    "Stressed",
+export const DEFAULT_EMOTIONS: Emotion[] = [
+    { name: "Happy", category: "positive" },
+    { name: "Calm", category: "positive" },
+    { name: "Excited", category: "positive" },
+    { name: "Anxious", category: "negative" },
+    { name: "Sad", category: "negative" },
+    { name: "Stressed", category: "negative" },
 ];
 
 export const DEFAULT_CONTEXTS = [
@@ -69,15 +70,49 @@ async function loadList(key: string, fallback: string[]): Promise<string[]> {
     return fallback;
 }
 
-export async function getEmotionPresets(): Promise<string[]> {
-    return loadList(EMOTION_PRESETS_KEY, DEFAULT_EMOTIONS);
+async function loadEmotionList(key: string, fallback: Emotion[]): Promise<Emotion[]> {
+    try {
+        const value = await AsyncStorage.getItem(key);
+        if (value) {
+            const parsed = JSON.parse(value);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                // Support both old format (strings) and new format (objects)
+                const emotions = parsed.map((item): Emotion | null => {
+                    if (typeof item === "string" && item.trim().length > 0) {
+                        // Migrate old string format to object format
+                        return { name: item.trim(), category: "neutral" };
+                    } else if (
+                        typeof item === "object" &&
+                        item !== null &&
+                        typeof item.name === "string" &&
+                        item.name.trim().length > 0 &&
+                        (item.category === "positive" || item.category === "negative" || item.category === "neutral")
+                    ) {
+                        return { name: item.name.trim(), category: item.category };
+                    }
+                    return null;
+                }).filter((item): item is Emotion => item !== null);
+
+                if (emotions.length > 0) {
+                    return emotions;
+                }
+            }
+        }
+    } catch (error) {
+        console.error(`Failed to load emotion list for ${key}:`, error);
+    }
+    return fallback;
+}
+
+export async function getEmotionPresets(): Promise<Emotion[]> {
+    return loadEmotionList(EMOTION_PRESETS_KEY, DEFAULT_EMOTIONS);
 }
 
 export async function getContextTags(): Promise<string[]> {
     return loadList(CONTEXT_TAGS_KEY, DEFAULT_CONTEXTS);
 }
 
-export async function saveEmotionPresets(values: string[]) {
+export async function saveEmotionPresets(values: Emotion[]) {
     await AsyncStorage.setItem(EMOTION_PRESETS_KEY, JSON.stringify(values));
 }
 

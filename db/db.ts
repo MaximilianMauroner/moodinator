@@ -12,8 +12,20 @@ export {
   updateMoodNote,
   updateMoodTimestamp,
 } from "./moods/repository";
-export { exportMoods, importMoods } from "./moods/importExport";
+export { exportMoods, importMoods, importOldBackup } from "./moods/importExport";
 export { clearMoods, seedMoods, seedMoodsFromFile } from "./moods/seed";
+export { migrateEmotionsToCategories } from "./moods/migrations";
+export {
+  createEmotionsTable,
+  createMoodEmotionsTable,
+  getAllEmotions,
+  addEmotion,
+  updateEmotion,
+  deleteEmotion,
+  ensureDefaultEmotions,
+  migrateEmotionsToTable,
+  hasEmotionTableMigrated,
+} from "./moods/emotions";
 
 import { createMoodTable } from "./moods/schema";
 void createMoodTable();
