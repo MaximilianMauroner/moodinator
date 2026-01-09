@@ -329,10 +329,12 @@ export const processWeeklyMoodData = (allMoods: MoodEntry[], maxWeeks: number = 
 
 // Mini Weekly Chart Component for Overview
 export const MiniWeeklyChart = ({ weeklyData }: { weeklyData: any[] }) => {
-  if (!weeklyData.length) return null;
-
   const scheme = useColorScheme();
   const isDark = scheme === "dark";
+
+  if (!weeklyData.length) {
+    return null;
+  }
 
   const weeklyAverages = weeklyData.map((week) => week.avg);
   const minValue = Math.min(...weeklyAverages);
