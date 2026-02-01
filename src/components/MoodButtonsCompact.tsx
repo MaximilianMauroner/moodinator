@@ -2,7 +2,7 @@ import React from "react";
 import { View, Text } from "react-native";
 import { HapticTab } from "./HapticTab";
 import { moodScale } from "@/constants/moodScale";
-import { useColorScheme } from "@/hooks/useColorScheme";
+import { useThemeColors, colors } from "@/constants/colors";
 import { getMoodButtonLabel, getMoodButtonHint } from "@/constants/accessibility";
 
 interface MoodButtonsCompactProps {
@@ -14,8 +14,7 @@ export const MoodButtonsCompact: React.FC<MoodButtonsCompactProps> = ({
   onMoodPress,
   onLongPress,
 }) => {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
+  const { isDark, get } = useThemeColors();
 
   const moodData = React.useMemo(() => {
     return moodScale.map((mood) => ({
@@ -38,8 +37,8 @@ export const MoodButtonsCompact: React.FC<MoodButtonsCompactProps> = ({
       key={mood.value}
       className="flex-1 items-center justify-center py-3.5 mx-1 rounded-2xl"
       style={{
-        backgroundColor: mood.bgHex || (isDark ? "#2A2520" : "#F5F1E8"),
-        shadowColor: isDark ? "#000" : mood.textHex || "#9D8660",
+        backgroundColor: mood.bgHex || get("surfaceAlt"),
+        shadowColor: isDark ? "#000" : mood.textHex || colors.sand.text.light,
         shadowOffset: { width: 0, height: isDark ? 2 : 4 },
         shadowOpacity: isDark ? 0.3 : 0.12,
         shadowRadius: isDark ? 4 : 8,
@@ -55,7 +54,7 @@ export const MoodButtonsCompact: React.FC<MoodButtonsCompactProps> = ({
       <Text
         className="text-2xl font-bold mb-0.5"
         style={{
-          color: mood.textHex || (isDark ? "#D4C4A0" : "#9D8660"),
+          color: mood.textHex || (isDark ? colors.sand.text.dark : colors.sand.text.light),
           fontVariant: ["tabular-nums"],
         }}
       >
@@ -63,7 +62,7 @@ export const MoodButtonsCompact: React.FC<MoodButtonsCompactProps> = ({
       </Text>
       <Text
         className="text-[9px] font-semibold text-center tracking-wide"
-        style={{ color: mood.textHex || (isDark ? "#D4C4A0" : "#9D8660"), opacity: 0.85 }}
+        style={{ color: mood.textHex || (isDark ? colors.sand.text.dark : colors.sand.text.light), opacity: 0.85 }}
         numberOfLines={1}
       >
         {mood.label}
@@ -77,21 +76,17 @@ export const MoodButtonsCompact: React.FC<MoodButtonsCompactProps> = ({
       <View className="flex-row items-center justify-center mb-4">
         <View
           className="h-px flex-1"
-          style={{
-            backgroundColor: isDark ? "#3D352A" : "#E5D9BF",
-          }}
+          style={{ backgroundColor: get("border") }}
         />
         <Text
           className="text-xs font-medium mx-4 tracking-wide"
-          style={{ color: isDark ? "#BDA77D" : "#9D8660" }}
+          style={{ color: isDark ? colors.sand.textMuted.dark : colors.sand.text.light }}
         >
           How are you feeling?
         </Text>
         <View
           className="h-px flex-1"
-          style={{
-            backgroundColor: isDark ? "#3D352A" : "#E5D9BF",
-          }}
+          style={{ backgroundColor: get("border") }}
         />
       </View>
 
@@ -112,29 +107,22 @@ export const MoodButtonsCompact: React.FC<MoodButtonsCompactProps> = ({
       <View className="mt-4 mx-2">
         <View
           className="flex-row h-1 rounded-full overflow-hidden"
-          style={{ backgroundColor: isDark ? "#2A2520" : "#F5F1E8" }}
+          style={{ backgroundColor: get("surfaceAlt") }}
         >
-          <View className="flex-1" style={{ backgroundColor: "#5B8A5B" }} />
-          <View className="flex-1" style={{ backgroundColor: "#7BA87B" }} />
-          <View className="flex-1" style={{ backgroundColor: "#A8C5A8" }} />
-          <View className="flex-1" style={{ backgroundColor: "#847596" }} />
-          <View className="flex-1" style={{ backgroundColor: "#A396B3" }} />
-          <View className="flex-1" style={{ backgroundColor: "#BDA77D" }} />
-          <View className="flex-1" style={{ backgroundColor: "#D4A574" }} />
-          <View className="flex-1" style={{ backgroundColor: "#E08B5A" }} />
-          <View className="flex-1" style={{ backgroundColor: "#E06B55" }} />
-          <View className="flex-1" style={{ backgroundColor: "#C75441" }} />
+          {colors.moodGradient.map((color, index) => (
+            <View key={index} className="flex-1" style={{ backgroundColor: color }} />
+          ))}
         </View>
         <View className="flex-row justify-between mt-2 px-0.5">
           <Text
             className="text-[10px] font-medium"
-            style={{ color: isDark ? "#7BA87B" : "#5B8A5B" }}
+            style={{ color: isDark ? colors.primaryMuted.dark : colors.primary.light }}
           >
             Great
           </Text>
           <Text
             className="text-[10px] font-medium"
-            style={{ color: isDark ? "#ED8370" : "#C75441" }}
+            style={{ color: isDark ? colors.negative.text.dark : colors.negative.text.light }}
           >
             Need support
           </Text>

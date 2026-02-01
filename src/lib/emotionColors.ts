@@ -1,6 +1,10 @@
 /**
  * Shared utility functions for emotion category colors
+ * These functions provide Tailwind class names for styling.
+ * For hex color values, use the colors from @/constants/colors instead.
  */
+
+import { colors } from "@/constants/colors";
 
 export type EmotionColorScheme = {
   bg: string;
@@ -11,8 +15,9 @@ export type EmotionColorScheme = {
 };
 
 /**
- * Returns the color scheme for a given emotion category.
- * Used across multiple components for consistent color-coding.
+ * Returns the Tailwind class scheme for a given emotion category.
+ * Used across multiple components for consistent color-coding with Tailwind classes.
+ * For hex values, use useThemeColors().getCategoryColors() instead.
  */
 export function getCategoryColors(
   category: string,
@@ -24,30 +29,30 @@ export function getCategoryColors(
         return {
           bg: "",
           text: "",
-          selected: "bg-green-600 border-green-600",
+          selected: "bg-sage-500 border-sage-500",
           unselected:
-            "bg-green-50 dark:bg-green-950 border-green-300 dark:border-green-700",
+            "bg-sage-50 dark:bg-sage-600/20 border-sage-300 dark:border-sage-700",
         };
       }
       return {
-        bg: "bg-green-100 dark:bg-green-900/30",
-        border: "border-green-200 dark:border-green-700",
-        text: "text-green-700 dark:text-green-300",
+        bg: "bg-sage-100 dark:bg-sage-600/20",
+        border: "border-sage-200 dark:border-sage-700",
+        text: "text-sage-600 dark:text-sage-300",
       };
     case "negative":
       if (variant === "button") {
         return {
           bg: "",
           text: "",
-          selected: "bg-red-600 border-red-600",
+          selected: "bg-coral-500 border-coral-500",
           unselected:
-            "bg-red-50 dark:bg-red-950 border-red-300 dark:border-red-700",
+            "bg-coral-50 dark:bg-coral-600/20 border-coral-300 dark:border-coral-700",
         };
       }
       return {
-        bg: "bg-red-100 dark:bg-red-900/30",
-        border: "border-red-200 dark:border-red-700",
-        text: "text-red-700 dark:text-red-300",
+        bg: "bg-coral-100 dark:bg-coral-600/20",
+        border: "border-coral-200 dark:border-coral-700",
+        text: "text-coral-600 dark:text-coral-300",
       };
     case "neutral":
     default:
@@ -55,31 +60,31 @@ export function getCategoryColors(
         return {
           bg: "",
           text: "",
-          selected: "bg-slate-600 border-slate-600",
+          selected: "bg-dusk-500 border-dusk-500",
           unselected:
-            "bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700",
+            "bg-dusk-50 dark:bg-dusk-700 border-dusk-300 dark:border-dusk-600",
         };
       }
       return {
-        bg: "bg-slate-100 dark:bg-slate-800",
-        border: "border-slate-200 dark:border-slate-700",
-        text: "text-slate-700 dark:text-slate-300",
+        bg: "bg-dusk-100 dark:bg-dusk-800",
+        border: "border-dusk-200 dark:border-dusk-700",
+        text: "text-dusk-600 dark:text-dusk-300",
       };
   }
 }
 
 /**
- * Returns the icon color for a given emotion category.
+ * Returns the icon color (hex) for a given emotion category.
  * Used for consistent icon colors matching the category theme.
  */
-export function getCategoryIconColor(category: string): string {
+export function getCategoryIconColor(category: string, isDark: boolean = false): string {
   switch (category) {
     case "positive":
-      return "#22c55e"; // green-500
+      return isDark ? colors.positive.text.dark : colors.positive.text.light;
     case "negative":
-      return "#ef4444"; // red-500
+      return isDark ? colors.negative.text.dark : colors.negative.text.light;
     case "neutral":
     default:
-      return "#94a3b8"; // slate-400
+      return isDark ? colors.neutral.text.dark : colors.neutral.text.light;
   }
 }

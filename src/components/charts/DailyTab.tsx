@@ -20,6 +20,7 @@ import {
   getColorFromTailwind,
   getMoodInterpretation,
   sampleDataPoints,
+  type DailyDataPoint,
 } from "./ChartComponents";
 import { moodScale } from "@/constants/moodScale";
 import type { MoodScale } from "@/types/mood";
@@ -34,7 +35,7 @@ const DayItem = React.memo(
     isExpanded,
     onToggle,
   }: {
-    day: any;
+    day: DailyDataPoint;
     dayMoodEntries: MoodEntry[];
     isExpanded: boolean;
     onToggle: () => void;

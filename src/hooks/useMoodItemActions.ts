@@ -3,6 +3,7 @@ import { deleteMood, insertMoodEntry } from "@db/db";
 import { Toast } from "toastify-react-native";
 import type { MoodEntry } from "@db/types";
 import type { SwipeDirection } from "@/types/mood";
+import { haptics } from "@/lib/haptics";
 
 interface UseMoodItemActionsParams {
   setMoods: React.Dispatch<React.SetStateAction<MoodEntry[]>>;
@@ -22,6 +23,7 @@ export function useMoodItemActions({
 
   const handleDeleteMood = useCallback(
     async (mood: MoodEntry) => {
+      haptics.warning(); // Haptic feedback for delete action
       await deleteMood(mood.id);
       setMoods((prev) => prev.filter((m) => m.id !== mood.id));
       Toast.show({
@@ -33,6 +35,7 @@ export function useMoodItemActions({
         progressBarColor: "#A78BFA",
         onPress: async () => {
           if (mood) {
+            haptics.success(); // Haptic feedback for undo/restore
             const crmood = await insertMoodEntry({
               mood: mood.mood,
               note: mood.note,

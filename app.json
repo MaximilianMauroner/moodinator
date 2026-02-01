@@ -15,6 +15,8 @@
         "NSCameraUsageDescription": "We use the camera to capture your daily picture for your note.",
         "NSPhotoLibraryUsageDescription": "We need access to your photo library so you can pick a picture for your note.",
         "NSPhotoLibraryAddUsageDescription": "We save the processed photo to your library when needed.",
+        "NSLocationWhenInUseUsageDescription": "We use your location to tag your mood entries with where you were.",
+        "NSMicrophoneUsageDescription": "We use the microphone to record voice memos for your mood entries.",
         "UIFileSharingEnabled": true,
         "LSSupportsOpeningDocumentsInPlace": true
       }
@@ -24,7 +26,12 @@
         "foregroundImage": "./assets/images/icon-no-text.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.lab4code.moodinator"
+      "package": "com.lab4code.moodinator",
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -85,7 +92,14 @@
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-location",
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone to record voice memos."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

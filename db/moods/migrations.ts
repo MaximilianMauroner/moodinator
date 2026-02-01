@@ -1,5 +1,6 @@
 import { getDb } from "../client";
 import type { Emotion } from "../types";
+import type { MoodRow, RawEmotionItem } from "../types/rows";
 import { DEFAULT_EMOTIONS } from "../../src/lib/entrySettings";
 import { serializeEmotions } from "./serialization";
 
@@ -13,9 +14,11 @@ export async function migrateEmotionsToCategories(): Promise<{
 
   await db.execAsync("BEGIN TRANSACTION;");
   try {
-    const rows = await db.getAllAsync("SELECT id, emotions FROM moods;");
+    const rows = await db.getAllAsync<Pick<MoodRow, "id" | "emotions">>(
+      "SELECT id, emotions FROM moods;"
+    );
 
-    for (const row of rows as any[]) {
+    for (const row of rows) {
       const rawEmotions = row.emotions;
 
       if (!rawEmotions || rawEmotions === "[]") {
@@ -24,16 +27,16 @@ export async function migrateEmotionsToCategories(): Promise<{
       }
 
       try {
-        const parsed = JSON.parse(rawEmotions);
+        const parsed = JSON.parse(rawEmotions) as RawEmotionItem[];
         if (!Array.isArray(parsed)) {
           skipped++;
           continue;
         }
 
-        const needsMigration = parsed.some((item: any) => {
+        const needsMigration = parsed.some((item) => {
           return (
             typeof item === "string" ||
-            (typeof item === "object" && item && !item.category)
+            (typeof item === "object" && item && !("category" in item))
           );
         });
 
@@ -42,7 +45,7 @@ export async function migrateEmotionsToCategories(): Promise<{
           continue;
         }
 
-        const migratedEmotions: Emotion[] = parsed.map((item: any): Emotion => {
+        const migratedEmotions: Emotion[] = parsed.map((item): Emotion => {
           if (typeof item === "string") {
             const name = item;
             let category: "positive" | "negative" | "neutral" = "neutral";
@@ -52,7 +55,7 @@ export async function migrateEmotionsToCategories(): Promise<{
             }
             return { name, category };
           }
-          if (typeof item === "object" && item && item.name) {
+          if (typeof item === "object" && item && "name" in item) {
             const category = item.category || "neutral";
             return { name: item.name, category };
           }

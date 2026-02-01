@@ -1,10 +1,12 @@
 import type { Emotion, MoodEntry, MoodEntryInput } from "../types";
+import type { MoodRow, CountResult, QueryParam } from "../types/rows";
 import { getDb } from "../client";
 import { resolveDateRange, type MoodDateRange } from "./range";
 import {
   normalizeInput,
   serializeArray,
   serializeEmotions,
+  serializeLocation,
   toMoodEntry,
 } from "./serialization";
 import {
@@ -29,13 +31,17 @@ export async function insertMood(
   await db.execAsync("BEGIN TRANSACTION;");
   try {
     const result = await db.runAsync(
-      "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy) VALUES (?, ?, ?, ?, ?, ?);",
+      "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy, photos_json, location_json, voice_memos_json, based_on_entry_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
       mood,
       normalized.note,
       normalized.timestamp,
       serializeEmotions(normalized.emotions),
       serializeArray(normalized.contextTags),
-      normalized.energy
+      normalized.energy,
+      serializeArray(normalized.photos),
+      serializeLocation(normalized.location),
+      serializeArray(normalized.voiceMemos),
+      normalized.basedOnEntryId
     );
 
     if (normalized.emotions && normalized.emotions.length > 0) {
@@ -44,11 +50,11 @@ export async function insertMood(
 
     await db.execAsync("COMMIT;");
 
-    const inserted = await db.getFirstAsync(
+    const inserted = await db.getFirstAsync<MoodRow>(
       "SELECT * FROM moods WHERE id = ?;",
       result.lastInsertRowId
     );
-    return toMoodEntry(inserted);
+    return toMoodEntry(inserted!);
   } catch (error) {
     await db.execAsync("ROLLBACK;");
     throw error;
@@ -62,13 +68,17 @@ export async function insertMoodEntry(entry: MoodEntryInput): Promise<MoodEntry>
   await db.execAsync("BEGIN TRANSACTION;");
   try {
     const result = await db.runAsync(
-      "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy) VALUES (?, ?, ?, ?, ?, ?);",
+      "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy, photos_json, location_json, voice_memos_json, based_on_entry_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
       entry.mood,
       normalized.note,
       normalized.timestamp,
       serializeEmotions(normalized.emotions),
       serializeArray(normalized.contextTags),
-      normalized.energy
+      normalized.energy,
+      serializeArray(normalized.photos),
+      serializeLocation(normalized.location),
+      serializeArray(normalized.voiceMemos),
+      normalized.basedOnEntryId
     );
 
     if (normalized.emotions && normalized.emotions.length > 0) {
@@ -77,11 +87,11 @@ export async function insertMoodEntry(entry: MoodEntryInput): Promise<MoodEntry>
 
     await db.execAsync("COMMIT;");
 
-    const inserted = await db.getFirstAsync(
+    const inserted = await db.getFirstAsync<MoodRow>(
       "SELECT * FROM moods WHERE id = ?;",
       result.lastInsertRowId
     );
-    return toMoodEntry(inserted);
+    return toMoodEntry(inserted!);
   } catch (error) {
     await db.execAsync("ROLLBACK;");
     throw error;
@@ -95,13 +105,13 @@ export async function hasMoodBeenLoggedToday(): Promise<boolean> {
   const todayEnd = new Date();
   todayEnd.setHours(23, 59, 59, 999);
 
-  const result = await db.getFirstAsync(
+  const result = await db.getFirstAsync<CountResult>(
     "SELECT COUNT(*) as count FROM moods WHERE timestamp >= ? AND timestamp <= ?;",
     todayStart.getTime(),
     todayEnd.getTime()
   );
 
-  return (result as any).count > 0;
+  return (result?.count ?? 0) > 0;
 }
 
 export async function updateMoodNote(
@@ -110,7 +120,7 @@ export async function updateMoodNote(
 ): Promise<MoodEntry | undefined> {
   const db = await getDb();
   await db.runAsync("UPDATE moods SET note = ? WHERE id = ?;", note, id);
-  const updated = await db.getFirstAsync(
+  const updated = await db.getFirstAsync<MoodRow>(
     "SELECT * FROM moods WHERE id = ?;",
     id
   );
@@ -123,7 +133,7 @@ export async function updateMoodTimestamp(
 ): Promise<MoodEntry | undefined> {
   const db = await getDb();
   await db.runAsync("UPDATE moods SET timestamp = ? WHERE id = ?;", timestamp, id);
-  const updated = await db.getFirstAsync(
+  const updated = await db.getFirstAsync<MoodRow>(
     "SELECT * FROM moods WHERE id = ?;",
     id
   );
@@ -136,7 +146,7 @@ export async function updateMoodEntry(
 ): Promise<MoodEntry | undefined> {
   const db = await getDb();
   const fields: string[] = [];
-  const params: any[] = [];
+  const params: QueryParam[] = [];
   let updateEmotions = false;
   let emotionsToUpdate: Emotion[] = [];
 
@@ -170,9 +180,25 @@ export async function updateMoodEntry(
         : Math.min(10, Math.max(0, Math.round(updates.energy)))
     );
   }
+  if (updates.photos !== undefined) {
+    fields.push("photos_json = ?");
+    params.push(serializeArray(updates.photos));
+  }
+  if (updates.location !== undefined) {
+    fields.push("location_json = ?");
+    params.push(serializeLocation(updates.location));
+  }
+  if (updates.voiceMemos !== undefined) {
+    fields.push("voice_memos_json = ?");
+    params.push(serializeArray(updates.voiceMemos));
+  }
+  if (updates.basedOnEntryId !== undefined) {
+    fields.push("based_on_entry_id = ?");
+    params.push(updates.basedOnEntryId);
+  }
 
   if (!fields.length) {
-    const current = await db.getFirstAsync("SELECT * FROM moods WHERE id = ?;", id);
+    const current = await db.getFirstAsync<MoodRow>("SELECT * FROM moods WHERE id = ?;", id);
     return current ? toMoodEntry(current) : undefined;
   }
 
@@ -194,7 +220,7 @@ export async function updateMoodEntry(
     throw error;
   }
 
-  const updated = await db.getFirstAsync(
+  const updated = await db.getFirstAsync<MoodRow>(
     "SELECT * FROM moods WHERE id = ?;",
     id
   );
@@ -203,7 +229,7 @@ export async function updateMoodEntry(
 
 export async function getAllMoods(): Promise<MoodEntry[]> {
   const db = await getDb();
-  const rows = await db.getAllAsync("SELECT * FROM moods ORDER BY timestamp DESC;");
+  const rows = await db.getAllAsync<MoodRow>("SELECT * FROM moods ORDER BY timestamp DESC;");
   return rows.map(toMoodEntry);
 }
 
@@ -214,9 +240,8 @@ export async function deleteMood(id: number) {
 
 export async function getMoodCount(): Promise<number> {
   const db = await getDb();
-  const result = await db.getFirstAsync("SELECT COUNT(*) as count FROM moods");
-  const count = (result as any)?.count || 0;
-  return count;
+  const result = await db.getFirstAsync<CountResult>("SELECT COUNT(*) as count FROM moods");
+  return result?.count ?? 0;
 }
 
 export async function updateEmotionCategoryInMoods(
@@ -229,9 +254,11 @@ export async function updateEmotionCategoryInMoods(
 
   await db.execAsync("BEGIN TRANSACTION;");
   try {
-    const rows = await db.getAllAsync("SELECT id, emotions FROM moods;");
+    const rows = await db.getAllAsync<Pick<MoodRow, "id" | "emotions">>(
+      "SELECT id, emotions FROM moods;"
+    );
 
-    for (const row of rows as any[]) {
+    for (const row of rows) {
       const rawEmotions = row.emotions;
       if (!rawEmotions || rawEmotions === "[]") {
         continue;
@@ -293,9 +320,11 @@ export async function removeEmotionFromMoods(
 
   await db.execAsync("BEGIN TRANSACTION;");
   try {
-    const rows = await db.getAllAsync("SELECT id, emotions FROM moods;");
+    const rows = await db.getAllAsync<Pick<MoodRow, "id" | "emotions">>(
+      "SELECT id, emotions FROM moods;"
+    );
 
-    for (const row of rows as any[]) {
+    for (const row of rows) {
       const rawEmotions = row.emotions;
       if (!rawEmotions || rawEmotions === "[]") {
         continue;
@@ -344,10 +373,12 @@ export async function removeEmotionFromMoods(
 
 export async function getEmotionNamesFromMoods(): Promise<string[]> {
   const db = await getDb();
-  const rows = await db.getAllAsync("SELECT emotions FROM moods;");
+  const rows = await db.getAllAsync<Pick<MoodRow, "emotions">>(
+    "SELECT emotions FROM moods;"
+  );
   const seen = new Map<string, string>();
 
-  for (const row of rows as any[]) {
+  for (const row of rows) {
     const rawEmotions = row.emotions;
     if (!rawEmotions || rawEmotions === "[]") {
       continue;
@@ -386,7 +417,7 @@ export async function getMoodsWithinRange(
   const db = await getDb();
   const { startDate, endDate } = resolveDateRange(range);
   const conditions: string[] = [];
-  const params: any[] = [];
+  const params: QueryParam[] = [];
 
   if (typeof startDate === "number") {
     conditions.push("timestamp >= ?");
@@ -398,9 +429,27 @@ export async function getMoodsWithinRange(
   }
 
   const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
-  const rows = await db.getAllAsync(
+  const rows = await db.getAllAsync<MoodRow>(
     `SELECT * FROM moods ${whereClause} ORDER BY timestamp DESC;`,
     ...params
+  );
+  return rows.map(toMoodEntry);
+}
+
+/**
+ * Get moods in a specific timestamp range (optimized for index usage)
+ * @param startDate - Start timestamp in milliseconds
+ * @param endDate - End timestamp in milliseconds
+ */
+export async function getMoodsInRange(
+  startDate: number,
+  endDate: number
+): Promise<MoodEntry[]> {
+  const db = await getDb();
+  const rows = await db.getAllAsync<MoodRow>(
+    "SELECT * FROM moods WHERE timestamp >= ? AND timestamp <= ? ORDER BY timestamp DESC;",
+    startDate,
+    endDate
   );
   return rows.map(toMoodEntry);
 }

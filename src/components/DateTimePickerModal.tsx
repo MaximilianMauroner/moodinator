@@ -4,6 +4,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { MoodEntry } from "@db/types";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { moodScale } from "@/constants/moodScale";
+import { haptics } from "@/lib/haptics";
 
 interface Props {
   visible: boolean;
@@ -50,9 +51,15 @@ export const DateTimePickerModal: React.FC<Props> = ({
   };
 
   const handleSave = () => {
+    haptics.light();
     if (mood) {
       onSave(mood.id, selectedDate.getTime());
     }
+    onClose();
+  };
+
+  const handleCancel = () => {
+    haptics.light();
     onClose();
   };
 
@@ -110,7 +117,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
 
             <View className="flex-row justify-between">
               <Pressable
-                onPress={onClose}
+                onPress={handleCancel}
                 className="flex-1 mr-2 py-3 bg-gray-200 dark:bg-slate-800 rounded-lg"
               >
                 <Text className="text-center font-medium text-slate-800 dark:text-slate-200">

@@ -15,6 +15,37 @@ import type { MoodEntry } from "@db/types";
 import { moodScale } from "@/constants/moodScale";
 import { Ionicons } from "@expo/vector-icons";
 
+/**
+ * Daily aggregate data point for charts
+ */
+export interface DailyDataPoint {
+  date: Date;
+  moods: number[] | null;
+  avg?: number;
+  min?: number;
+  max?: number;
+  finalAvg: number;
+  hasRealData: boolean;
+  isInterpolated: boolean;
+}
+
+/**
+ * Weekly aggregate data point for charts
+ */
+export interface WeeklyDataPoint {
+  weekStart: Date;
+  moods: number[];
+  q1: number;
+  q2: number; // median
+  q3: number;
+  min: number;
+  max: number;
+  outliers: number[];
+  avg: number;
+  finalAvg: number;
+  isInterpolated: boolean;
+}
+
 // Shared Tailwind->hex color map
 export const colorMap: Record<string, string> = {
   "text-sky-500": "#03a9f4",
@@ -327,8 +358,8 @@ export const processWeeklyMoodData = (allMoods: MoodEntry[], maxWeeks: number = 
   };
 };
 
-// Mini Weekly Chart Component for Overview
-export const MiniWeeklyChart = ({ weeklyData }: { weeklyData: any[] }) => {
+// Mini Weekly Chart Component for Overview (memoized for performance)
+export const MiniWeeklyChart = React.memo(({ weeklyData }: { weeklyData: WeeklyDataPoint[] }) => {
   const scheme = useColorScheme();
   const isDark = scheme === "dark";
 
@@ -417,7 +448,7 @@ export const MiniWeeklyChart = ({ weeklyData }: { weeklyData: any[] }) => {
       />
     </View>
   );
-};
+});
 
 // Mood interpretation helper that uses actual mood scale colors and labels
 export const getMoodInterpretation = (average: number) => {
