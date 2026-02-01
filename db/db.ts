@@ -5,6 +5,7 @@ export {
   getAllMoods,
   getMoodCount,
   getMoodsWithinRange,
+  getMoodsInRange,
   hasMoodBeenLoggedToday,
   insertMood,
   insertMoodEntry,

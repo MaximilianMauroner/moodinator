@@ -1,4 +1,5 @@
-import type { Emotion, MoodEntry, MoodEntryInput } from "../types";
+import type { Emotion, MoodEntry, MoodEntryInput, Location } from "../types";
+import type { MoodRow, RawEmotionItem } from "../types/rows";
 
 export function serializeArray(value?: string[]): string {
   if (!value || value.length === 0) {
@@ -12,6 +13,13 @@ export function serializeEmotions(value?: Emotion[]): string {
     return "[]";
   }
   return JSON.stringify(value.slice(0, 50));
+}
+
+export function serializeLocation(value?: Location | null): string | null {
+  if (!value) {
+    return null;
+  }
+  return JSON.stringify(value);
 }
 
 function deserializeArray(value: unknown): string[] {
@@ -28,12 +36,26 @@ function deserializeArray(value: unknown): string[] {
   }
 }
 
+function isValidEmotionObject(
+  item: unknown
+): item is { name: string; category: "positive" | "negative" | "neutral" } {
+  return (
+    typeof item === "object" &&
+    item !== null &&
+    typeof (item as Record<string, unknown>).name === "string" &&
+    ((item as Record<string, unknown>).name as string).trim().length > 0 &&
+    ((item as Record<string, unknown>).category === "positive" ||
+      (item as Record<string, unknown>).category === "negative" ||
+      (item as Record<string, unknown>).category === "neutral")
+  );
+}
+
 function deserializeEmotions(value: unknown): Emotion[] {
   if (typeof value !== "string" || value.length === 0) {
     return [];
   }
   try {
-    const parsed = JSON.parse(value);
+    const parsed = JSON.parse(value) as RawEmotionItem[];
     if (!Array.isArray(parsed)) {
       return [];
     }
@@ -42,18 +64,10 @@ function deserializeEmotions(value: unknown): Emotion[] {
         if (typeof item === "string" && item.trim().length > 0) {
           return { name: item.trim(), category: "neutral" };
         }
-        if (
-          typeof item === "object" &&
-          item !== null &&
-          typeof (item as any).name === "string" &&
-          (item as any).name.trim().length > 0 &&
-          ((item as any).category === "positive" ||
-            (item as any).category === "negative" ||
-            (item as any).category === "neutral")
-        ) {
+        if (isValidEmotionObject(item)) {
           return {
-            name: (item as any).name.trim(),
-            category: (item as any).category,
+            name: item.name.trim(),
+            category: item.category,
           };
         }
         return null;
@@ -61,6 +75,34 @@ function deserializeEmotions(value: unknown): Emotion[] {
       .filter((item): item is Emotion => item !== null);
   } catch {
     return [];
+  }
+}
+
+function isValidLocation(value: unknown): value is Location {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as Record<string, unknown>).latitude === "number" &&
+    typeof (value as Record<string, unknown>).longitude === "number"
+  );
+}
+
+function deserializeLocation(value: unknown): Location | null {
+  if (typeof value !== "string" || value.length === 0) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(value);
+    if (isValidLocation(parsed)) {
+      return {
+        latitude: parsed.latitude,
+        longitude: parsed.longitude,
+        name: typeof parsed.name === "string" ? parsed.name : undefined,
+      };
+    }
+    return null;
+  } catch {
+    return null;
   }
 }
 
@@ -84,7 +126,7 @@ export function parseTimestamp(value: unknown): number {
   return Date.now();
 }
 
-export function toMoodEntry(row: any): MoodEntry {
+export function toMoodEntry(row: MoodRow): MoodEntry {
   return {
     id: row.id,
     mood: row.mood,
@@ -96,6 +138,10 @@ export function toMoodEntry(row: any): MoodEntry {
       row.energy === null || row.energy === undefined
         ? null
         : Number(row.energy),
+    photos: deserializeArray(row.photos_json),
+    location: deserializeLocation(row.location_json),
+    voiceMemos: deserializeArray(row.voice_memos_json),
+    basedOnEntryId: row.based_on_entry_id ?? null,
   };
 }
 
@@ -109,6 +155,10 @@ export function normalizeInput(entry: MoodEntryInput) {
         ? null
         : Math.min(10, Math.max(0, Math.round(entry.energy))),
     timestamp: entry.timestamp ?? Date.now(),
+    photos: entry.photos ? entry.photos.slice(0, 10) : [],
+    location: entry.location ?? null,
+    voiceMemos: entry.voiceMemos ? entry.voiceMemos.slice(0, 5) : [],
+    basedOnEntryId: entry.basedOnEntryId ?? null,
   };
 }
 
@@ -125,23 +175,15 @@ export function sanitizeImportedEmotions(value: unknown): Emotion[] {
   if (!Array.isArray(value)) {
     return [];
   }
-  return value
+  return (value as RawEmotionItem[])
     .map((item): Emotion | null => {
       if (typeof item === "string" && item.trim().length > 0) {
         return { name: item.trim(), category: "neutral" };
       }
-      if (
-        typeof item === "object" &&
-        item !== null &&
-        typeof (item as any).name === "string" &&
-        (item as any).name.trim().length > 0 &&
-        ((item as any).category === "positive" ||
-          (item as any).category === "negative" ||
-          (item as any).category === "neutral")
-      ) {
+      if (isValidEmotionObject(item)) {
         return {
-          name: (item as any).name.trim(),
-          category: (item as any).category,
+          name: item.name.trim(),
+          category: item.category,
         };
       }
       return null;

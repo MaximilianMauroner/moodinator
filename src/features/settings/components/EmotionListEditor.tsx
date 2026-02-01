@@ -1,56 +1,16 @@
 import React, { memo, useState } from "react";
 import { View, Text, TextInput, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useColorScheme } from "nativewind";
 import type { Emotion } from "@db/types";
-import { BUTTON_HINTS, EMOTION_CATEGORY_LABELS } from "@/constants/accessibility";
+import { BUTTON_HINTS } from "@/constants/accessibility";
+import { useThemeColors, colors } from "@/constants/colors";
+import { haptics } from "@/lib/haptics";
 
 const CATEGORY_OPTIONS: { value: Emotion["category"]; label: string }[] = [
   { value: "positive", label: "Positive" },
   { value: "neutral", label: "Neutral" },
   { value: "negative", label: "Negative" },
 ];
-
-function getCategoryStyles(isDark: boolean) {
-  return {
-    positive: {
-      active: {
-        backgroundColor: isDark ? "#2D3D2D" : "#E8EFE8",
-        borderColor: isDark ? "#3D4D3D" : "#C8DBC8",
-      },
-      activeText: isDark ? "#A8C5A8" : "#476D47",
-      inactive: {
-        backgroundColor: isDark ? "#2A2520" : "#F5F1E8",
-        borderColor: isDark ? "#3D352A" : "#E5D9BF",
-      },
-      inactiveText: isDark ? "#6B5C4A" : "#BDA77D",
-    },
-    neutral: {
-      active: {
-        backgroundColor: isDark ? "#3D352A" : "#FDF8EF",
-        borderColor: isDark ? "#4D453A" : "#E5D9BF",
-      },
-      activeText: isDark ? "#D4C5A8" : "#9D8660",
-      inactive: {
-        backgroundColor: isDark ? "#2A2520" : "#F5F1E8",
-        borderColor: isDark ? "#3D352A" : "#E5D9BF",
-      },
-      inactiveText: isDark ? "#6B5C4A" : "#BDA77D",
-    },
-    negative: {
-      active: {
-        backgroundColor: isDark ? "#3D2822" : "#FDE8E4",
-        borderColor: isDark ? "#4D3832" : "#F5C4BC",
-      },
-      activeText: isDark ? "#F5A899" : "#C75441",
-      inactive: {
-        backgroundColor: isDark ? "#2A2520" : "#F5F1E8",
-        borderColor: isDark ? "#3D352A" : "#E5D9BF",
-      },
-      inactiveText: isDark ? "#6B5C4A" : "#BDA77D",
-    },
-  };
-}
 
 export const EmotionListEditor = memo(function EmotionListEditor({
   title,
@@ -79,13 +39,32 @@ export const EmotionListEditor = memo(function EmotionListEditor({
   onUpdateCategory: (name: string, category: Emotion["category"]) => void;
   isLast?: boolean;
 }) {
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === "dark";
+  const { isDark, get, getCategoryStyles } = useThemeColors();
   const [expandedName, setExpandedName] = useState<string | null>(null);
-  const categoryStyles = getCategoryStyles(isDark);
+  const categoryStyles = getCategoryStyles();
 
   const categoryLabel = (category: Emotion["category"]) =>
     CATEGORY_OPTIONS.find((option) => option.value === category)?.label ?? "Neutral";
+
+  const handleAdd = () => {
+    haptics.light();
+    onAdd();
+  };
+
+  const handleRemove = (name: string) => {
+    haptics.light();
+    onRemove(name);
+  };
+
+  const handleCategoryChange = (category: Emotion["category"]) => {
+    haptics.light();
+    onChangeNewCategory(category);
+  };
+
+  const handleUpdateCategory = (name: string, category: Emotion["category"]) => {
+    haptics.light();
+    onUpdateCategory(name, category);
+  };
 
   return (
     <View className={`p-4 ${!isLast ? "border-b border-paper-200 dark:border-paper-800" : ""}`}>
@@ -101,16 +80,16 @@ export const EmotionListEditor = memo(function EmotionListEditor({
           value={newValue}
           onChangeText={onChangeNewValue}
           placeholder={placeholder}
-          placeholderTextColor={isDark ? "#6B5C4A" : "#BDA77D"}
+          placeholderTextColor={get("textMuted")}
           className="flex-1 rounded-xl px-4 py-2.5 bg-paper-200 dark:bg-paper-800 text-paper-800 dark:text-paper-200 border border-sand-300 dark:border-sand-800"
           blurOnSubmit={false}
           returnKeyType="done"
-          onSubmitEditing={onAdd}
+          onSubmitEditing={handleAdd}
           accessibilityLabel="Add new emotion"
           accessibilityHint="Enter a new emotion name and press add"
         />
         <TouchableOpacity
-          onPress={onAdd}
+          onPress={handleAdd}
           className="w-12 h-12 rounded-xl items-center justify-center bg-sage-500 dark:bg-sage-600"
           accessibilityRole="button"
           accessibilityLabel="Add emotion"
@@ -127,7 +106,7 @@ export const EmotionListEditor = memo(function EmotionListEditor({
           return (
             <TouchableOpacity
               key={option.value}
-              onPress={() => onChangeNewCategory(option.value)}
+              onPress={() => handleCategoryChange(option.value)}
               className="rounded-full px-3 py-1"
               style={{
                 ...(isSelected ? styles.active : styles.inactive),
@@ -157,16 +136,16 @@ export const EmotionListEditor = memo(function EmotionListEditor({
               key={emotion.name}
               className="rounded-2xl px-3 py-2"
               style={{
-                backgroundColor: isDark ? "#2A2520" : "#F5F1E8",
+                backgroundColor: get("surfaceAlt"),
                 borderWidth: 1,
-                borderColor: isDark ? "#3D352A" : "#E5D9BF",
+                borderColor: get("border"),
               }}
             >
               <View className="flex-row items-center justify-between">
                 <View className="flex-row items-center flex-1 mr-3">
                   <Text
                     className="text-sm font-medium"
-                    style={{ color: isDark ? "#D4C5A8" : "#5C4D3D" }}
+                    style={{ color: get("textSubtle") }}
                     numberOfLines={1}
                   >
                     {emotion.name}
@@ -194,16 +173,16 @@ export const EmotionListEditor = memo(function EmotionListEditor({
                     <Ionicons
                       name={expandedName === emotion.name ? "chevron-up" : "chevron-down"}
                       size={12}
-                      color={isDark ? "#6B5C4A" : "#BDA77D"}
+                      color={get("textMuted")}
                     />
                   </TouchableOpacity>
                   <TouchableOpacity
-                    onPress={() => onRemove(emotion.name)}
+                    onPress={() => handleRemove(emotion.name)}
                     accessibilityRole="button"
                     accessibilityLabel={`Remove ${emotion.name}`}
                     accessibilityHint="Tap to remove this emotion"
                   >
-                    <Ionicons name="close-circle" size={18} color={isDark ? "#6B5C4A" : "#BDA77D"} />
+                    <Ionicons name="close-circle" size={18} color={get("textMuted")} />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -215,7 +194,7 @@ export const EmotionListEditor = memo(function EmotionListEditor({
                     return (
                       <TouchableOpacity
                         key={`${emotion.name}-${option.value}`}
-                        onPress={() => onUpdateCategory(emotion.name, option.value)}
+                        onPress={() => handleUpdateCategory(emotion.name, option.value)}
                         className="rounded-full px-2 py-1"
                         style={{
                           ...(isSelected ? optStyles.active : optStyles.inactive),

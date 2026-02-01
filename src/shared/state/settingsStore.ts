@@ -15,7 +15,7 @@ import {
 import { DEV_OPTIONS_KEY, SHOW_LABELS_KEY } from "@/shared/storage/keys";
 import { getBoolean, setBoolean } from "@/shared/storage/asyncStorage";
 
-type SettingsStore = {
+export type SettingsStore = {
   hydrated: boolean;
 
   showDetailedLabels: boolean;

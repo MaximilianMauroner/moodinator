@@ -128,6 +128,10 @@ describe("toMoodEntry", () => {
       emotions: '[{"name":"Happy","category":"positive"}]',
       context_tags: '["work"]',
       energy: 8,
+      photos_json: null,
+      location_json: null,
+      voice_memos_json: null,
+      based_on_entry_id: null,
     };
 
     const result = toMoodEntry(row);
@@ -140,6 +144,10 @@ describe("toMoodEntry", () => {
       emotions: [{ name: "Happy", category: "positive" }],
       contextTags: ["work"],
       energy: 8,
+      photos: [],
+      location: null,
+      voiceMemos: [],
+      basedOnEntryId: null,
     });
   });
 
@@ -152,6 +160,10 @@ describe("toMoodEntry", () => {
       emotions: "[]",
       context_tags: "[]",
       energy: null,
+      photos_json: null,
+      location_json: null,
+      voice_memos_json: null,
+      based_on_entry_id: null,
     };
 
     const result = toMoodEntry(row);
@@ -167,9 +179,13 @@ describe("toMoodEntry", () => {
       emotions: "[]",
       context_tags: "[]",
       energy: null,
+      photos_json: null,
+      location_json: null,
+      voice_memos_json: null,
+      based_on_entry_id: null,
     };
 
-    const result = toMoodEntry(row);
+    const result = toMoodEntry(row as any);
     expect(result.note).toBeNull();
   });
 
@@ -182,6 +198,10 @@ describe("toMoodEntry", () => {
       emotions: "[]",
       context_tags: "[]",
       energy: null,
+      photos_json: null,
+      location_json: null,
+      voice_memos_json: null,
+      based_on_entry_id: null,
     };
 
     const result = toMoodEntry(row);
@@ -197,9 +217,13 @@ describe("toMoodEntry", () => {
       emotions: "[]",
       context_tags: "[]",
       energy: undefined,
+      photos_json: null,
+      location_json: null,
+      voice_memos_json: null,
+      based_on_entry_id: null,
     };
 
-    const result = toMoodEntry(row);
+    const result = toMoodEntry(row as any);
     expect(result.energy).toBeNull();
   });
 
@@ -212,6 +236,10 @@ describe("toMoodEntry", () => {
       emotions: '["Happy","Sad"]',
       context_tags: "[]",
       energy: null,
+      photos_json: null,
+      location_json: null,
+      voice_memos_json: null,
+      based_on_entry_id: null,
     };
 
     const result = toMoodEntry(row);
@@ -230,6 +258,10 @@ describe("toMoodEntry", () => {
       emotions: "",
       context_tags: "[]",
       energy: null,
+      photos_json: null,
+      location_json: null,
+      voice_memos_json: null,
+      based_on_entry_id: null,
     };
 
     const result = toMoodEntry(row);
@@ -245,10 +277,36 @@ describe("toMoodEntry", () => {
       emotions: "not valid json",
       context_tags: "[]",
       energy: null,
+      photos_json: null,
+      location_json: null,
+      voice_memos_json: null,
+      based_on_entry_id: null,
     };
 
     const result = toMoodEntry(row);
     expect(result.emotions).toEqual([]);
+  });
+
+  it("parses photos, location, and voice memos", () => {
+    const row = {
+      id: 1,
+      mood: 7,
+      note: null,
+      timestamp: 1705320000000,
+      emotions: "[]",
+      context_tags: "[]",
+      energy: null,
+      photos_json: '["file://photo1.jpg","file://photo2.jpg"]',
+      location_json: '{"latitude":40.7128,"longitude":-74.006,"name":"New York"}',
+      voice_memos_json: '["file://memo1.m4a"]',
+      based_on_entry_id: 5,
+    };
+
+    const result = toMoodEntry(row);
+    expect(result.photos).toEqual(["file://photo1.jpg", "file://photo2.jpg"]);
+    expect(result.location).toEqual({ latitude: 40.7128, longitude: -74.006, name: "New York" });
+    expect(result.voiceMemos).toEqual(["file://memo1.m4a"]);
+    expect(result.basedOnEntryId).toBe(5);
   });
 });
 

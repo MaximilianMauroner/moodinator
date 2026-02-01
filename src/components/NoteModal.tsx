@@ -9,6 +9,7 @@ import {
   Animated,
 } from "react-native";
 import { IconSymbol } from "@/components/ui/IconSymbol";
+import { haptics } from "@/lib/haptics";
 
 interface Props {
   visible: boolean;
@@ -28,6 +29,16 @@ export const NoteModal: React.FC<Props> = ({
   const [isFocused, setIsFocused] = useState(false);
 
   const slideAnim = useRef(new Animated.Value(300)).current;
+
+  const handleCancel = () => {
+    haptics.light();
+    onCancel();
+  };
+
+  const handleSave = () => {
+    haptics.light();
+    onSave();
+  };
 
   useEffect(() => {
     if (visible) {
@@ -60,7 +71,7 @@ export const NoteModal: React.FC<Props> = ({
                   Add Note
                 </Text>
                 <Pressable
-                  onPress={onCancel}
+                  onPress={handleCancel}
                   className="p-2 rounded-full active:bg-gray-100 dark:active:bg-slate-700"
                 >
                   <IconSymbol name="xmark" size={20} color="#6b7280" />
@@ -102,7 +113,7 @@ export const NoteModal: React.FC<Props> = ({
                     justifyContent: "center",
                   }}
                   className="flex-row items-center bg-gray-100 dark:bg-slate-800 px-4 py-3 rounded-xl active:bg-gray-200 dark:active:bg-slate-700"
-                  onPress={onCancel}
+                  onPress={handleCancel}
                 >
                   <IconSymbol
                     name="xmark"
@@ -117,7 +128,7 @@ export const NoteModal: React.FC<Props> = ({
                 <Pressable
                   style={{ minWidth: 88, justifyContent: "center" }}
                   className="flex-row items-center bg-blue-600 px-4 py-3 rounded-xl active:bg-blue-700"
-                  onPress={onSave}
+                  onPress={handleSave}
                 >
                   <IconSymbol
                     name="checkmark"

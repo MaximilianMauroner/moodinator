@@ -7,8 +7,9 @@ import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 import { SwipeDirection } from "../types/mood";
 import { MoodEntry } from "@db/types";
 import { moodScale } from "@/constants/moodScale";
-import { useColorScheme } from "@/hooks/useColorScheme";
+import { useThemeColors, colors } from "@/constants/colors";
 import { getMoodItemLabel, getMoodItemHint } from "@/constants/accessibility";
+import { haptics } from "@/lib/haptics";
 
 interface Props {
   mood: MoodEntry;
@@ -17,32 +18,10 @@ interface Props {
   swipeThreshold: number;
 }
 
-// Organic category colors
-const getCategoryColors = (category: string | undefined, isDark: boolean) => {
-  switch (category) {
-    case "positive":
-      return {
-        bg: isDark ? "#2D3D2D" : "#E8EFE8",
-        text: isDark ? "#A8C5A8" : "#5B8A5B",
-      };
-    case "negative":
-      return {
-        bg: isDark ? "#3D2822" : "#FDE8E4",
-        text: isDark ? "#F5A899" : "#C75441",
-      };
-    default:
-      return {
-        bg: isDark ? "#302A22" : "#F9F5ED",
-        text: isDark ? "#D4C4A0" : "#9D8660",
-      };
-  }
-};
-
 export const DisplayMoodItem = React.memo(
   ({ mood, onSwipeableWillOpen, onLongPress, swipeThreshold }: Props) => {
-    const swipeableRef = useRef<any>(null);
-    const colorScheme = useColorScheme();
-    const isDark = colorScheme === "dark";
+    const swipeableRef = useRef<typeof Swipeable.prototype | null>(null);
+    const { isDark, get, getCategoryColors } = useThemeColors();
 
     const moodData = useMemo(() => {
       const moodInfo = moodScale.find((m) => m.value === mood.mood);
@@ -67,6 +46,12 @@ export const DisplayMoodItem = React.memo(
     }, [mood.emotions]);
 
     const handleSwipeableOpen = (direction: string) => {
+      // Haptic feedback based on swipe direction
+      if (direction === "right") {
+        haptics.warning(); // Delete action
+      } else {
+        haptics.light(); // Edit action
+      }
       runOnJS(onSwipeableWillOpen)(direction as SwipeDirection, mood);
       setTimeout(() => {
         if (swipeableRef.current) {
@@ -89,11 +74,11 @@ export const DisplayMoodItem = React.memo(
       <Animated.View className="justify-center items-center h-full">
         <View
           className="h-full px-6 justify-center rounded-r-2xl"
-          style={{ backgroundColor: isDark ? "#3D2822" : "#FDE8E4" }}
+          style={{ backgroundColor: isDark ? colors.swipeDelete.bg.dark : colors.swipeDelete.bg.light }}
         >
           <Text
             className="text-sm font-semibold"
-            style={{ color: isDark ? "#F5A899" : "#C75441" }}
+            style={{ color: isDark ? colors.swipeDelete.text.dark : colors.swipeDelete.text.light }}
           >
             Delete
           </Text>
@@ -105,11 +90,11 @@ export const DisplayMoodItem = React.memo(
       <Animated.View className="justify-center items-start h-full">
         <View
           className="h-full px-6 justify-center rounded-l-2xl"
-          style={{ backgroundColor: isDark ? "#2D3D2D" : "#E8EFE8" }}
+          style={{ backgroundColor: isDark ? colors.swipeEdit.bg.dark : colors.swipeEdit.bg.light }}
         >
           <Text
             className="text-sm font-semibold"
-            style={{ color: isDark ? "#A8C5A8" : "#5B8A5B" }}
+            style={{ color: isDark ? colors.swipeEdit.text.dark : colors.swipeEdit.text.light }}
           >
             Edit
           </Text>
@@ -146,8 +131,8 @@ export const DisplayMoodItem = React.memo(
           <View
             className="rounded-2xl p-4"
             style={{
-              backgroundColor: isDark ? "#231F1B" : "#FDFCFA",
-              shadowColor: isDark ? "#000" : "#9D8660",
+              backgroundColor: get("surface"),
+              shadowColor: isDark ? "#000" : colors.sand.text.light,
               shadowOffset: { width: 0, height: isDark ? 2 : 4 },
               shadowOpacity: isDark ? 0.25 : 0.08,
               shadowRadius: isDark ? 4 : 12,
@@ -180,11 +165,11 @@ export const DisplayMoodItem = React.memo(
                 {typeof mood.energy === "number" && (
                   <View
                     className="px-2 py-1 rounded-lg"
-                    style={{ backgroundColor: isDark ? "#352D22" : "#F9F5ED" }}
+                    style={{ backgroundColor: isDark ? colors.sand.bgHover.dark : colors.sand.bg.light }}
                   >
                     <Text
                       className="text-[10px] font-semibold"
-                      style={{ color: isDark ? "#D4C4A0" : "#9D8660" }}
+                      style={{ color: isDark ? colors.sand.text.dark : colors.sand.text.light }}
                     >
                       Energy {mood.energy}/10
                     </Text>
@@ -195,7 +180,7 @@ export const DisplayMoodItem = React.memo(
               {/* Timestamp */}
               <Text
                 className="text-xs"
-                style={{ color: isDark ? "#6B5C4A" : "#BDA77D" }}
+                style={{ color: get("textMuted") }}
               >
                 {formattedDate} · {formattedTime}
               </Text>
@@ -205,11 +190,11 @@ export const DisplayMoodItem = React.memo(
             {mood.note ? (
               <View
                 className="rounded-xl p-3 mb-3"
-                style={{ backgroundColor: isDark ? "#2A2520" : "#F9F5ED" }}
+                style={{ backgroundColor: get("surfaceAlt") }}
               >
                 <Text
                   className="text-sm leading-5"
-                  style={{ color: isDark ? "#D4C4A0" : "#6B5C4A" }}
+                  style={{ color: get("textSubtle") }}
                   numberOfLines={3}
                 >
                   {mood.note}
@@ -221,36 +206,39 @@ export const DisplayMoodItem = React.memo(
             {(sortedEmotions.length > 0 || (mood.contextTags?.length ?? 0) > 0) && (
               <View className="flex-row flex-wrap gap-2">
                 {sortedEmotions.map((emotion) => {
-                  const colors = getCategoryColors(emotion.category, isDark);
+                  const catColors = getCategoryColors(emotion.category);
                   return (
                     <View
                       key={`${mood.id}-${emotion.name}`}
                       className="px-2.5 py-1 rounded-lg"
-                      style={{ backgroundColor: colors.bg }}
+                      style={{ backgroundColor: catColors.bg }}
                     >
                       <Text
                         className="text-xs font-medium"
-                        style={{ color: colors.text }}
+                        style={{ color: catColors.text }}
                       >
                         {emotion.name}
                       </Text>
                     </View>
                   );
                 })}
-                {mood.contextTags?.map((context) => (
-                  <View
-                    key={`${mood.id}-${context}`}
-                    className="px-2.5 py-1 rounded-lg"
-                    style={{ backgroundColor: isDark ? "#2D2A33" : "#EFECF2" }}
-                  >
-                    <Text
-                      className="text-xs font-medium"
-                      style={{ color: isDark ? "#C4BBCF" : "#695C78" }}
+                {mood.contextTags?.map((ctx) => {
+                  const ctxColors = getCategoryColors("neutral");
+                  return (
+                    <View
+                      key={`${mood.id}-${ctx}`}
+                      className="px-2.5 py-1 rounded-lg"
+                      style={{ backgroundColor: ctxColors.bg }}
                     >
-                      #{context}
-                    </Text>
-                  </View>
-                ))}
+                      <Text
+                        className="text-xs font-medium"
+                        style={{ color: ctxColors.text }}
+                      >
+                        #{ctx}
+                      </Text>
+                    </View>
+                  );
+                })}
               </View>
             )}
           </View>

@@ -24,6 +24,7 @@ import { useMoodItemActions } from "@/hooks/useMoodItemActions";
 import { useColorScheme } from "@/hooks/useColorScheme";
 
 import { insertMood, updateMoodTimestamp, updateMoodEntry, migrateEmotionsToCategories } from "@db/db";
+import type { MoodEntry } from "@db/types";
 import { Toast } from "toastify-react-native";
 
 const HomeErrorFallback = createScreenErrorFallback("Home");
@@ -198,7 +199,7 @@ function HomeScreenContent() {
   );
 
   const handleMoodItemLongPress = useCallback(
-    (mood: any) => {
+    (mood: MoodEntry) => {
       modals.openDateModal(mood);
     },
     [modals.openDateModal]

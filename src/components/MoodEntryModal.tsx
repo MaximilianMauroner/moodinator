@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import {
     Modal,
     View,
@@ -10,8 +10,9 @@ import {
 } from "react-native";
 import { moodScale } from "@/constants/moodScale";
 import { HapticTab } from "./HapticTab";
-import { useColorScheme } from "@/hooks/useColorScheme";
-import type { Emotion } from "../../db/types";
+import { useThemeColors, colors } from "@/constants/colors";
+import type { Emotion, Location, MoodEntry } from "../../db/types";
+import { PhotoAttachment, LocationPicker, VoiceMemoRecorder, SameAsYesterdayButton } from "./entry";
 import {
     getMoodButtonLabel,
     getEmotionChipLabel,
@@ -19,6 +20,7 @@ import {
     getEnergyLevelLabel,
     BUTTON_HINTS,
 } from "@/constants/accessibility";
+import { haptics } from "@/lib/haptics";
 
 export type MoodEntryFormValues = {
     mood: number;
@@ -26,6 +28,10 @@ export type MoodEntryFormValues = {
     contextTags: string[];
     energy: number | null;
     note: string;
+    photos: string[];
+    location: Location | null;
+    voiceMemos: string[];
+    basedOnEntryId: number | null;
 };
 
 export type MoodEntryFieldConfig = {
@@ -33,6 +39,9 @@ export type MoodEntryFieldConfig = {
     context: boolean;
     energy: boolean;
     notes: boolean;
+    photos?: boolean;
+    location?: boolean;
+    voiceMemos?: boolean;
 };
 
 type MoodEntryModalProps = {
@@ -50,40 +59,6 @@ type MoodEntryModalProps = {
 
 const energyValues = Array.from({ length: 11 }, (_, idx) => idx);
 
-// Organic category colors
-const getCategoryColors = (category: string | undefined, isSelected: boolean, isDark: boolean) => {
-    if (isSelected) {
-        switch (category) {
-            case "positive":
-                return { bg: isDark ? "#5B8A5B" : "#5B8A5B", text: "#FFFFFF" };
-            case "negative":
-                return { bg: isDark ? "#C75441" : "#E06B55", text: "#FFFFFF" };
-            default:
-                return { bg: isDark ? "#695C78" : "#847596", text: "#FFFFFF" };
-        }
-    }
-    switch (category) {
-        case "positive":
-            return {
-                bg: isDark ? "#2D3D2D" : "#E8EFE8",
-                border: isDark ? "#3D4D3D" : "#D1DFD1",
-                text: isDark ? "#A8C5A8" : "#5B8A5B",
-            };
-        case "negative":
-            return {
-                bg: isDark ? "#3D2822" : "#FDE8E4",
-                border: isDark ? "#4D3832" : "#FACFC7",
-                text: isDark ? "#F5A899" : "#C75441",
-            };
-        default:
-            return {
-                bg: isDark ? "#2D2A33" : "#EFECF2",
-                border: isDark ? "#3D3A43" : "#DDD8E5",
-                text: isDark ? "#C4BBCF" : "#695C78",
-            };
-    }
-};
-
 export const MoodEntryModal: React.FC<MoodEntryModalProps> = ({
     visible,
     title,
@@ -96,14 +71,17 @@ export const MoodEntryModal: React.FC<MoodEntryModalProps> = ({
     initialValues,
     showMoodSelector = true,
 }) => {
-    const colorScheme = useColorScheme();
-    const isDark = colorScheme === "dark";
+    const { isDark, get, getCategoryColors } = useThemeColors();
 
     const [mood, setMood] = useState(initialMood);
     const [emotions, setEmotions] = useState<Emotion[]>([]);
     const [contextTags, setContextTags] = useState<string[]>([]);
     const [energy, setEnergy] = useState<number | null>(null);
     const [note, setNote] = useState("");
+    const [photos, setPhotos] = useState<string[]>([]);
+    const [location, setLocation] = useState<Location | null>(null);
+    const [voiceMemos, setVoiceMemos] = useState<string[]>([]);
+    const [basedOnEntryId, setBasedOnEntryId] = useState<number | null>(null);
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
@@ -117,6 +95,10 @@ export const MoodEntryModal: React.FC<MoodEntryModalProps> = ({
                     : null
             );
             setNote(initialValues?.note ?? "");
+            setPhotos(initialValues?.photos ?? []);
+            setLocation(initialValues?.location ?? null);
+            setVoiceMemos(initialValues?.voiceMemos ?? []);
+            setBasedOnEntryId(initialValues?.basedOnEntryId ?? null);
             setIsSaving(false);
         }
     }, [visible, initialMood, initialValues]);
@@ -156,7 +138,12 @@ export const MoodEntryModal: React.FC<MoodEntryModalProps> = ({
         return [...emotionOptions].sort((a, b) => a.name.localeCompare(b.name));
     }, [emotionOptions]);
 
-    const toggleEmotion = (emotion: Emotion) => {
+    // Use Set for O(1) emotion lookup
+    const selectedEmotionNames = useMemo(() => {
+        return new Set(emotions.map((e) => e.name));
+    }, [emotions]);
+
+    const toggleEmotion = useCallback((emotion: Emotion) => {
         setEmotions((prev) => {
             const exists = prev.some((item) => item.name === emotion.name);
             if (exists) {
@@ -167,15 +154,15 @@ export const MoodEntryModal: React.FC<MoodEntryModalProps> = ({
             }
             return [...prev, emotion];
         });
-    };
+    }, []);
 
-    const toggleContext = (value: string) => {
+    const toggleContext = useCallback((value: string) => {
         setContextTags((prev) =>
             prev.includes(value)
                 ? prev.filter((item) => item !== value)
                 : [...prev, value]
         );
-    };
+    }, []);
 
     const handleSave = async () => {
         if (isSaving) return;
@@ -187,14 +174,34 @@ export const MoodEntryModal: React.FC<MoodEntryModalProps> = ({
                 contextTags: fieldConfig.context ? contextTags : [],
                 energy: fieldConfig.energy ? energy : null,
                 note: fieldConfig.notes ? note.trim() : "",
+                photos: fieldConfig.photos ? photos : [],
+                location: fieldConfig.location ? location : null,
+                voiceMemos: fieldConfig.voiceMemos ? voiceMemos : [],
+                basedOnEntryId,
             });
+            haptics.success(); // Success haptic on save
             onClose();
         } catch (error) {
             console.error("Failed to save mood entry:", error);
+            haptics.error(); // Error haptic on failure
             Alert.alert("Save failed", "Unable to save your entry. Please try again.");
         } finally {
             setIsSaving(false);
         }
+    };
+
+    const handleCancel = () => {
+        haptics.light();
+        onClose();
+    };
+
+    const handleCopyYesterday = (entry: MoodEntry) => {
+        setMood(entry.mood);
+        setEmotions(entry.emotions);
+        setContextTags(entry.contextTags);
+        setEnergy(entry.energy);
+        setNote(entry.note ?? "");
+        setBasedOnEntryId(entry.id);
     };
 
     return (
@@ -206,26 +213,32 @@ export const MoodEntryModal: React.FC<MoodEntryModalProps> = ({
             accessibilityViewIsModal={true}
             accessibilityLabel={`${title} form`}
         >
-            <View className="flex-1 justify-end" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
+            <View className="flex-1 justify-end" style={{ backgroundColor: colors.overlay }}>
                 <View
                     className="rounded-t-3xl max-h-[90%]"
-                    style={{ backgroundColor: isDark ? "#1C1916" : "#FDFCFA" }}
+                    style={{ backgroundColor: get("background") }}
                 >
                     {/* Header */}
                     <View
                         className="p-5"
-                        style={{ borderBottomWidth: 1, borderBottomColor: isDark ? "#2A2520" : "#E5D9BF" }}
+                        style={{ borderBottomWidth: 1, borderBottomColor: get("surfaceAlt") }}
                     >
                         <View
                             className="w-10 h-1 rounded-full self-center mb-4"
-                            style={{ backgroundColor: isDark ? "#3D352A" : "#E5D9BF" }}
+                            style={{ backgroundColor: get("border") }}
                         />
-                        <Text
-                            className="text-xl font-bold text-center"
-                            style={{ color: isDark ? "#F5F1E8" : "#3D352A" }}
-                        >
-                            {title}
-                        </Text>
+                        <View className="flex-row items-center justify-between">
+                            <View style={{ width: 120 }} />
+                            <Text
+                                className="text-xl font-bold text-center flex-1"
+                                style={{ color: get("text") }}
+                            >
+                                {title}
+                            </Text>
+                            <View style={{ width: 120, alignItems: "flex-end" }}>
+                                <SameAsYesterdayButton onCopy={handleCopyYesterday} />
+                            </View>
+                        </View>
                     </View>
 
                     <ScrollView className="p-5" contentContainerStyle={{ paddingBottom: 24 }}>
@@ -233,7 +246,7 @@ export const MoodEntryModal: React.FC<MoodEntryModalProps> = ({
                             <View className="mb-6">
                                 <Text
                                     className="text-sm font-semibold mb-3"
-                                    style={{ color: isDark ? "#D4C4A0" : "#6B5C4A" }}
+                                    style={{ color: get("textSubtle") }}
                                 >
                                     Mood Level
                                 </Text>
@@ -284,17 +297,17 @@ export const MoodEntryModal: React.FC<MoodEntryModalProps> = ({
                                 <View className="flex-row items-center justify-between mb-2">
                                     <Text
                                         className="text-sm font-semibold"
-                                        style={{ color: isDark ? "#D4C4A0" : "#6B5C4A" }}
+                                        style={{ color: get("textSubtle") }}
                                     >
                                         Emotions
                                     </Text>
                                     <View
                                         className="px-2 py-0.5 rounded-full"
-                                        style={{ backgroundColor: isDark ? "#2D3D2D" : "#E8EFE8" }}
+                                        style={{ backgroundColor: isDark ? colors.positive.bg.dark : colors.positive.bg.light }}
                                     >
                                         <Text
                                             className="text-xs font-medium"
-                                            style={{ color: isDark ? "#A8C5A8" : "#5B8A5B" }}
+                                            style={{ color: isDark ? colors.positive.text.dark : colors.positive.text.light }}
                                         >
                                             {emotions.length}/3
                                         </Text>
@@ -302,15 +315,16 @@ export const MoodEntryModal: React.FC<MoodEntryModalProps> = ({
                                 </View>
                                 <Text
                                     className="text-xs mb-3"
-                                    style={{ color: isDark ? "#6B5C4A" : "#BDA77D" }}
+                                    style={{ color: get("textMuted") }}
                                 >
                                     Choose up to three emotions
                                 </Text>
                                 <View className="flex-row flex-wrap gap-2">
                                     {sortedEmotionOptions.map((emotion) => {
-                                        const isSelected = emotions.some((e) => e.name === emotion.name);
+                                        // O(1) lookup using Set instead of O(n) with .some()
+                                        const isSelected = selectedEmotionNames.has(emotion.name);
                                         const disabled = !isSelected && emotions.length >= 3;
-                                        const colors = getCategoryColors(emotion.category, isSelected, isDark);
+                                        const catColors = getCategoryColors(emotion.category, isSelected);
 
                                         return (
                                             <Pressable
@@ -319,9 +333,9 @@ export const MoodEntryModal: React.FC<MoodEntryModalProps> = ({
                                                 disabled={disabled}
                                                 className={`px-3 py-2 rounded-xl ${disabled ? "opacity-40" : ""}`}
                                                 style={{
-                                                    backgroundColor: colors.bg,
+                                                    backgroundColor: catColors.bg,
                                                     borderWidth: isSelected ? 0 : 1,
-                                                    borderColor: colors.border,
+                                                    borderColor: catColors.border,
                                                 }}
                                                 accessibilityRole="button"
                                                 accessibilityLabel={getEmotionChipLabel(emotion.name, emotion.category, isSelected)}
@@ -330,7 +344,7 @@ export const MoodEntryModal: React.FC<MoodEntryModalProps> = ({
                                             >
                                                 <Text
                                                     className="text-sm font-medium"
-                                                    style={{ color: colors.text }}
+                                                    style={{ color: catColors.text }}
                                                 >
                                                     {emotion.name}
                                                 </Text>
@@ -345,45 +359,40 @@ export const MoodEntryModal: React.FC<MoodEntryModalProps> = ({
                             <View className="mb-6">
                                 <Text
                                     className="text-sm font-semibold mb-2"
-                                    style={{ color: isDark ? "#D4C4A0" : "#6B5C4A" }}
+                                    style={{ color: get("textSubtle") }}
                                 >
                                     Context
                                 </Text>
                                 <Text
                                     className="text-xs mb-3"
-                                    style={{ color: isDark ? "#6B5C4A" : "#BDA77D" }}
+                                    style={{ color: get("textMuted") }}
                                 >
                                     What were you doing?
                                 </Text>
                                 <View className="flex-row flex-wrap gap-2">
-                                    {contextOptions.map((context) => {
-                                        const isSelected = contextTags.includes(context);
+                                    {contextOptions.map((ctx) => {
+                                        const isSelected = contextTags.includes(ctx);
+                                        const ctxColors = getCategoryColors("neutral", isSelected);
                                         return (
                                             <Pressable
-                                                key={context}
-                                                onPress={() => toggleContext(context)}
+                                                key={ctx}
+                                                onPress={() => toggleContext(ctx)}
                                                 className="px-3 py-2 rounded-xl"
                                                 style={{
-                                                    backgroundColor: isSelected
-                                                        ? (isDark ? "#695C78" : "#847596")
-                                                        : (isDark ? "#2D2A33" : "#EFECF2"),
+                                                    backgroundColor: ctxColors.bg,
                                                     borderWidth: isSelected ? 0 : 1,
-                                                    borderColor: isDark ? "#3D3A43" : "#DDD8E5",
+                                                    borderColor: ctxColors.border,
                                                 }}
                                                 accessibilityRole="button"
-                                                accessibilityLabel={`Context: ${context}, ${isSelected ? "selected" : "not selected"}`}
+                                                accessibilityLabel={`Context: ${ctx}, ${isSelected ? "selected" : "not selected"}`}
                                                 accessibilityHint={isSelected ? "Tap to deselect" : "Tap to select"}
                                                 accessibilityState={{ selected: isSelected }}
                                             >
                                                 <Text
                                                     className="text-sm font-medium"
-                                                    style={{
-                                                        color: isSelected
-                                                            ? "#FFFFFF"
-                                                            : (isDark ? "#C4BBCF" : "#695C78"),
-                                                    }}
+                                                    style={{ color: ctxColors.text }}
                                                 >
-                                                    {context}
+                                                    {ctx}
                                                 </Text>
                                             </Pressable>
                                         );
@@ -397,18 +406,18 @@ export const MoodEntryModal: React.FC<MoodEntryModalProps> = ({
                                 <View className="flex-row items-center justify-between mb-2">
                                     <Text
                                         className="text-sm font-semibold"
-                                        style={{ color: isDark ? "#D4C4A0" : "#6B5C4A" }}
+                                        style={{ color: get("textSubtle") }}
                                     >
                                         Energy Level
                                     </Text>
                                     {energy !== null && (
                                         <View
                                             className="px-2 py-0.5 rounded-full"
-                                            style={{ backgroundColor: isDark ? "#352D22" : "#F9F5ED" }}
+                                            style={{ backgroundColor: isDark ? colors.sand.bgHover.dark : colors.sand.bg.light }}
                                         >
                                             <Text
                                                 className="text-xs font-medium"
-                                                style={{ color: isDark ? "#D4C4A0" : "#9D8660" }}
+                                                style={{ color: isDark ? colors.sand.text.dark : colors.sand.text.light }}
                                             >
                                                 {energy}/10
                                             </Text>
@@ -425,9 +434,9 @@ export const MoodEntryModal: React.FC<MoodEntryModalProps> = ({
                                                 className="w-10 h-10 rounded-xl items-center justify-center"
                                                 style={{
                                                     backgroundColor: isSelected
-                                                        ? (isDark ? "#BDA77D" : "#9D8660")
-                                                        : (isDark ? "#302A22" : "#F9F5ED"),
-                                                    shadowColor: isSelected ? (isDark ? "#000" : "#9D8660") : "transparent",
+                                                        ? (isDark ? colors.sand.bgSelected.dark : colors.sand.bgSelected.light)
+                                                        : (isDark ? colors.surfaceElevated.dark : colors.sand.bg.light),
+                                                    shadowColor: isSelected ? (isDark ? "#000" : colors.sand.text.light) : "transparent",
                                                     shadowOffset: { width: 0, height: 4 },
                                                     shadowOpacity: 0.2,
                                                     shadowRadius: 8,
@@ -441,8 +450,8 @@ export const MoodEntryModal: React.FC<MoodEntryModalProps> = ({
                                                     className="font-semibold"
                                                     style={{
                                                         color: isSelected
-                                                            ? "#FFFFFF"
-                                                            : (isDark ? "#D4C4A0" : "#9D8660"),
+                                                            ? colors.textInverse.light
+                                                            : (isDark ? colors.sand.text.dark : colors.sand.text.light),
                                                     }}
                                                 >
                                                     {value}
@@ -454,11 +463,11 @@ export const MoodEntryModal: React.FC<MoodEntryModalProps> = ({
                                 <Pressable
                                     onPress={() => setEnergy(null)}
                                     className="mt-3 self-start px-3 py-1.5 rounded-lg"
-                                    style={{ backgroundColor: isDark ? "#2A2520" : "#F5F1E8" }}
+                                    style={{ backgroundColor: get("surfaceAlt") }}
                                 >
                                     <Text
                                         className="text-xs font-medium"
-                                        style={{ color: isDark ? "#BDA77D" : "#9D8660" }}
+                                        style={{ color: isDark ? colors.sand.textMuted.dark : colors.sand.text.light }}
                                     >
                                         Clear
                                     </Text>
@@ -470,7 +479,7 @@ export const MoodEntryModal: React.FC<MoodEntryModalProps> = ({
                             <View className="mb-6">
                                 <Text
                                     className="text-sm font-semibold mb-2"
-                                    style={{ color: isDark ? "#D4C4A0" : "#6B5C4A" }}
+                                    style={{ color: get("textSubtle") }}
                                 >
                                     Notes
                                 </Text>
@@ -480,38 +489,59 @@ export const MoodEntryModal: React.FC<MoodEntryModalProps> = ({
                                     onChangeText={setNote}
                                     placeholder="Add any thoughts..."
                                     className="min-h-[100px] rounded-2xl p-4"
-                                    placeholderTextColor={isDark ? "#6B5C4A" : "#BDA77D"}
+                                    placeholderTextColor={get("textMuted")}
                                     style={{
                                         textAlignVertical: "top",
-                                        backgroundColor: isDark ? "#231F1B" : "#F9F5ED",
+                                        backgroundColor: get("surface"),
                                         borderWidth: 1,
-                                        borderColor: isDark ? "#3D352A" : "#E5D9BF",
-                                        color: isDark ? "#F5F1E8" : "#3D352A",
+                                        borderColor: get("border"),
+                                        color: get("text"),
                                     }}
                                     accessibilityLabel="Notes input"
                                     accessibilityHint="Add any thoughts or notes about your mood"
                                 />
                             </View>
                         )}
+
+                        {fieldConfig.photos && (
+                            <PhotoAttachment
+                                photos={photos}
+                                onChange={setPhotos}
+                            />
+                        )}
+
+                        {fieldConfig.location && (
+                            <LocationPicker
+                                location={location}
+                                onChange={setLocation}
+                            />
+                        )}
+
+                        {fieldConfig.voiceMemos && (
+                            <VoiceMemoRecorder
+                                memos={voiceMemos}
+                                onChange={setVoiceMemos}
+                            />
+                        )}
                     </ScrollView>
 
                     {/* Footer buttons */}
                     <View
                         className="flex-row justify-between p-5"
-                        style={{ borderTopWidth: 1, borderTopColor: isDark ? "#2A2520" : "#E5D9BF" }}
+                        style={{ borderTopWidth: 1, borderTopColor: get("surfaceAlt") }}
                     >
                         <Pressable
-                            onPress={onClose}
+                            onPress={handleCancel}
                             disabled={isSaving}
                             className="flex-1 mr-2 rounded-2xl py-4 items-center"
-                            style={{ backgroundColor: isDark ? "#2A2520" : "#F5F1E8" }}
+                            style={{ backgroundColor: get("surfaceAlt") }}
                             accessibilityRole="button"
                             accessibilityLabel="Cancel"
                             accessibilityHint={BUTTON_HINTS.cancel}
                         >
                             <Text
                                 className="text-base font-semibold"
-                                style={{ color: isDark ? "#BDA77D" : "#6B5C4A" }}
+                                style={{ color: get("textMuted") }}
                             >
                                 Cancel
                             </Text>
@@ -522,9 +552,9 @@ export const MoodEntryModal: React.FC<MoodEntryModalProps> = ({
                             className="flex-1 ml-2 rounded-2xl py-4 items-center"
                             style={{
                                 backgroundColor: isSaving
-                                    ? (isDark ? "#3D5A3D" : "#7BA87B")
-                                    : (isDark ? "#5B8A5B" : "#5B8A5B"),
-                                shadowColor: isDark ? "#000" : "#5B8A5B",
+                                    ? (isDark ? "#3D5A3D" : colors.primaryMuted.light)
+                                    : get("primary"),
+                                shadowColor: isDark ? "#000" : colors.primary.light,
                                 shadowOffset: { width: 0, height: 4 },
                                 shadowOpacity: isDark ? 0.3 : 0.25,
                                 shadowRadius: 8,

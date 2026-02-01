@@ -7,6 +7,15 @@ export type Emotion = {
 };
 
 /**
+ * Represents a location with coordinates and optional name.
+ */
+export type Location = {
+    latitude: number;
+    longitude: number;
+    name?: string;
+};
+
+/**
  * Represents a single mood entry in the database.
  */
 export type MoodEntry = {
@@ -17,6 +26,10 @@ export type MoodEntry = {
     emotions: Emotion[];
     contextTags: string[];
     energy: number | null;
+    photos: string[];              // Array of file URIs
+    location: Location | null;     // Location coordinates
+    voiceMemos: string[];          // Array of audio file URIs
+    basedOnEntryId: number | null; // Reference to copied entry
 };
 
 /**
@@ -36,4 +49,8 @@ export type MoodEntryInput = {
     emotions?: Emotion[];
     contextTags?: string[];
     energy?: number | null;
+    photos?: string[];
+    location?: Location | null;
+    voiceMemos?: string[];
+    basedOnEntryId?: number | null;
 };

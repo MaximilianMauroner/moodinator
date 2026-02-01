@@ -1,6 +1,7 @@
 import type * as SQLite from "expo-sqlite";
 import { getDb } from "../client";
 import type { Emotion } from "../types";
+import type { EmotionRow, MoodRow, CountResult } from "../types/rows";
 import { DEFAULT_EMOTIONS } from "../../src/lib/entrySettings";
 import { parseEmotionItem } from "./emotionUtils";
 
@@ -30,12 +31,12 @@ export async function createMoodEmotionsTable() {
 
 export async function getAllEmotions(): Promise<Emotion[]> {
   const db = await getDb();
-  const rows = await db.getAllAsync(
-    "SELECT name, category FROM emotions ORDER BY name ASC;"
+  const rows = await db.getAllAsync<EmotionRow>(
+    "SELECT id, name, category FROM emotions ORDER BY name ASC;"
   );
-  return rows.map((row: any) => ({
+  return rows.map((row) => ({
     name: row.name,
-    category: row.category as "positive" | "negative" | "neutral",
+    category: row.category,
   }));
 }
 
@@ -47,7 +48,7 @@ export async function addEmotion(emotion: Emotion): Promise<void> {
     emotion.category
   );
 
-  if ((result as any).changes === 0) {
+  if (result.changes === 0) {
     throw new Error("An emotion with this name already exists");
   }
 }
@@ -117,12 +118,12 @@ async function getOrCreateEmotionId(
     emotion.category
   );
 
-  const row = await db.getFirstAsync(
+  const row = await db.getFirstAsync<Pick<EmotionRow, "id">>(
     "SELECT id FROM emotions WHERE name = ?;",
     emotion.name
   );
 
-  return (row as any).id;
+  return row!.id;
 }
 
 export async function linkEmotionsToMood(
@@ -149,9 +150,11 @@ export async function migrateEmotionsToTable(): Promise<{ migrated: number }> {
 
   await db.execAsync("BEGIN TRANSACTION;");
   try {
-    const rows = await db.getAllAsync("SELECT id, emotions FROM moods;");
+    const rows = await db.getAllAsync<Pick<MoodRow, "id" | "emotions">>(
+      "SELECT id, emotions FROM moods;"
+    );
 
-    for (const row of rows as any[]) {
+    for (const row of rows) {
       const rawEmotions = row.emotions;
       if (!rawEmotions || rawEmotions === "[]") {
         continue;
@@ -206,15 +209,15 @@ export async function migrateEmotionsToTable(): Promise<{ migrated: number }> {
 
 export async function hasEmotionTableMigrated(): Promise<boolean> {
   const db = await getDb();
-  const emotionCount = await db.getFirstAsync(
+  const emotionCount = await db.getFirstAsync<CountResult>(
     "SELECT COUNT(*) as count FROM emotions;"
   );
-  const hasEmotions = (emotionCount as any)?.count > 0;
+  const hasEmotions = (emotionCount?.count ?? 0) > 0;
 
-  const linkCount = await db.getFirstAsync(
+  const linkCount = await db.getFirstAsync<CountResult>(
     "SELECT COUNT(*) as count FROM mood_emotions;"
   );
-  const hasLinks = (linkCount as any)?.count > 0;
+  const hasLinks = (linkCount?.count ?? 0) > 0;
 
   return hasEmotions || hasLinks;
 }

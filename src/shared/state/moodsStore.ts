@@ -1,21 +1,19 @@
 import { create } from "zustand";
 import type { MoodEntry, MoodEntryInput } from "@db/types";
-import {
-  deleteMood,
-  getAllMoods,
-  insertMoodEntry,
-  updateMoodEntry,
-} from "@db/db";
+import { moodService } from "@/services/moodService";
 
-type LoadStatus = "idle" | "loading" | "error";
+type LoadStatus = "idle" | "loading" | "error" | "refreshing";
 
 export type MoodsStore = {
   moods: MoodEntry[];
   status: LoadStatus;
   error: string | null;
   lastLoadedAt: number | null;
+  lastTracked: Date | null;
 
+  // Actions
   loadAll: () => Promise<void>;
+  refreshMoods: () => Promise<void>;
   create: (entry: MoodEntryInput) => Promise<MoodEntry>;
   update: (
     id: number,
@@ -24,24 +22,43 @@ export type MoodsStore = {
   remove: (id: number) => Promise<MoodEntry | null>;
   restore: (entry: Omit<MoodEntry, "id">) => Promise<MoodEntry>;
   setLocal: (moods: MoodEntry[]) => void;
+
+  // Selectors
+  getMoodById: (id: number) => MoodEntry | undefined;
+  getMoodCount: () => number;
 };
+
+/**
+ * Compute lastTracked date from moods
+ */
+function computeLastTracked(moods: MoodEntry[]): Date | null {
+  if (moods.length === 0) return null;
+  const sorted = [...moods].sort((a, b) => b.timestamp - a.timestamp);
+  return new Date(sorted[0].timestamp);
+}
 
 export const useMoodsStore = create<MoodsStore>((set, get) => ({
   moods: [],
   status: "idle",
   error: null,
   lastLoadedAt: null,
+  lastTracked: null,
 
-  setLocal: (moods) => set({ moods }),
+  setLocal: (moods) =>
+    set({
+      moods,
+      lastTracked: computeLastTracked(moods),
+    }),
 
   loadAll: async () => {
     set({ status: "loading", error: null });
     try {
-      const moods = await getAllMoods();
+      const moods = await moodService.getAll();
       set({
         moods,
         status: "idle",
         lastLoadedAt: Date.now(),
+        lastTracked: computeLastTracked(moods),
       });
     } catch (error) {
       console.error("[moodsStore] Failed to load moods:", error);
@@ -52,40 +69,76 @@ export const useMoodsStore = create<MoodsStore>((set, get) => ({
     }
   },
 
+  refreshMoods: async () => {
+    set({ status: "refreshing" });
+    try {
+      const moods = await moodService.getAll();
+      set({
+        moods,
+        status: "idle",
+        lastLoadedAt: Date.now(),
+        lastTracked: computeLastTracked(moods),
+      });
+    } catch (error) {
+      console.error("[moodsStore] Failed to refresh moods:", error);
+      set({ status: "idle" }); // Don't overwrite error for refresh failures
+    }
+  },
+
   create: async (entry) => {
-    const created = await insertMoodEntry(entry);
-    set((state) => ({
-      moods: [created, ...state.moods.filter((m) => m.id !== created.id)],
-    }));
+    const created = await moodService.create(entry);
+    set((state) => {
+      const newMoods = [created, ...state.moods.filter((m) => m.id !== created.id)];
+      return {
+        moods: newMoods,
+        lastTracked: computeLastTracked(newMoods),
+      };
+    });
     return created;
   },
 
   update: async (id, updates) => {
-    const updated = await updateMoodEntry(id, updates);
+    const updated = await moodService.update(id, updates);
     if (!updated) {
       return null;
     }
-    set((state) => ({
-      moods: state.moods.map((m) => (m.id === id ? updated : m)),
-    }));
+    set((state) => {
+      const newMoods = state.moods.map((m) => (m.id === id ? updated : m));
+      return {
+        moods: newMoods,
+        lastTracked: computeLastTracked(newMoods),
+      };
+    });
     return updated;
   },
 
   remove: async (id) => {
     const existing = get().moods.find((m) => m.id === id) ?? null;
-    await deleteMood(id);
-    set((state) => ({
-      moods: state.moods.filter((m) => m.id !== id),
-    }));
+    await moodService.delete(id);
+    set((state) => {
+      const newMoods = state.moods.filter((m) => m.id !== id);
+      return {
+        moods: newMoods,
+        lastTracked: computeLastTracked(newMoods),
+      };
+    });
     return existing;
   },
 
   restore: async (entry) => {
-    const restored = await insertMoodEntry(entry);
-    set((state) => ({
-      moods: [restored, ...state.moods.filter((m) => m.id !== restored.id)],
-    }));
+    const restored = await moodService.create(entry);
+    set((state) => {
+      const newMoods = [restored, ...state.moods.filter((m) => m.id !== restored.id)];
+      return {
+        moods: newMoods,
+        lastTracked: computeLastTracked(newMoods),
+      };
+    });
     return restored;
   },
+
+  // Selectors
+  getMoodById: (id) => get().moods.find((m) => m.id === id),
+  getMoodCount: () => get().moods.length,
 }));
 

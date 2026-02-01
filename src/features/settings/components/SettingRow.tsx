@@ -3,6 +3,7 @@ import { View, Text, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useColorScheme } from "nativewind";
 import { BUTTON_HINTS } from "@/constants/accessibility";
+import { haptics } from "@/lib/haptics";
 
 export function SettingRow({
   label,
@@ -24,9 +25,16 @@ export function SettingRow({
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === "dark";
 
+  const handlePress = () => {
+    if (onPress) {
+      haptics.light();
+      onPress();
+    }
+  };
+
   return (
     <Pressable
-      onPress={onPress}
+      onPress={handlePress}
       className={`flex-row items-center justify-between p-4 ${
         !isLast ? "border-b border-paper-200 dark:border-paper-800" : ""
       }`}
