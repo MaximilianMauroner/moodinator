@@ -9,6 +9,9 @@ export {
   insertMood,
   insertMoodEntry,
   updateMoodEntry,
+  updateEmotionCategoryInMoods,
+  removeEmotionFromMoods,
+  getEmotionNamesFromMoods,
   updateMoodNote,
   updateMoodTimestamp,
 } from "./moods/repository";
@@ -22,6 +25,7 @@ export {
   addEmotion,
   updateEmotion,
   deleteEmotion,
+  upsertEmotionCategory,
   ensureDefaultEmotions,
   migrateEmotionsToTable,
   hasEmotionTableMigrated,

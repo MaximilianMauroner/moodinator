@@ -76,19 +76,32 @@ async function loadEmotionList(key: string, fallback: Emotion[]): Promise<Emotio
         if (value) {
             const parsed = JSON.parse(value);
             if (Array.isArray(parsed) && parsed.length > 0) {
+                const resolveCategory = (name: string): Emotion["category"] => {
+                    const matched = DEFAULT_EMOTIONS.find(
+                        (emotion) => emotion.name.toLowerCase() === name.toLowerCase()
+                    );
+                    return matched ? matched.category : "neutral";
+                };
                 // Support both old format (strings) and new format (objects)
                 const emotions = parsed.map((item): Emotion | null => {
                     if (typeof item === "string" && item.trim().length > 0) {
                         // Migrate old string format to object format
-                        return { name: item.trim(), category: "neutral" };
+                        const name = item.trim();
+                        return { name, category: resolveCategory(name) };
                     } else if (
                         typeof item === "object" &&
                         item !== null &&
                         typeof item.name === "string" &&
-                        item.name.trim().length > 0 &&
-                        (item.category === "positive" || item.category === "negative" || item.category === "neutral")
+                        item.name.trim().length > 0
                     ) {
-                        return { name: item.name.trim(), category: item.category };
+                        const name = item.name.trim();
+                        const category =
+                            item.category === "positive" ||
+                            item.category === "negative" ||
+                            item.category === "neutral"
+                                ? item.category
+                                : resolveCategory(name);
+                        return { name, category };
                     }
                     return null;
                 }).filter((item): item is Emotion => item !== null);
@@ -176,4 +189,3 @@ export async function getEntrySettings() {
     ]);
     return { emotionPresets, contextTags, quickEntryPrefs };
 }
-
