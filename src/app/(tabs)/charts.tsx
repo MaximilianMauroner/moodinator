@@ -14,6 +14,8 @@ import {
 import type { MoodEntry } from "@db/types";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { createScreenErrorFallback } from "@/components/ScreenErrorFallback";
 import PagerView, {
   PagerViewOnPageSelectedEvent,
 } from "react-native-pager-view";
@@ -26,6 +28,9 @@ import {
 } from "@/components/charts";
 import { Ionicons } from "@expo/vector-icons";
 import { useColorScheme } from "@/hooks/useColorScheme";
+import { BUTTON_HINTS } from "@/constants/accessibility";
+
+const ChartsErrorFallback = createScreenErrorFallback("Charts");
 
 type TabType = "overview" | "weekly" | "daily" | "raw";
 
@@ -84,6 +89,9 @@ const TabSelector = React.memo(
                 elevation: 3,
               } : {}}
               activeOpacity={0.8}
+              accessibilityRole="tab"
+              accessibilityLabel={`${tab.label} tab`}
+              accessibilityState={{ selected: isActive }}
             >
               <Ionicons
                 name={tab.icon}
@@ -116,7 +124,7 @@ const TabSelector = React.memo(
     prev.isDark === next.isDark
 );
 
-export default function ChartsScreen() {
+function ChartsScreenContent() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
 
@@ -256,6 +264,9 @@ export default function ChartsScreen() {
                 shadowRadius: 8,
                 elevation: 2,
               }}
+              accessibilityRole="button"
+              accessibilityLabel="Refresh insights"
+              accessibilityHint={BUTTON_HINTS.refresh}
             >
               <Ionicons
                 name="refresh"
@@ -326,5 +337,13 @@ export default function ChartsScreen() {
         )}
       </SafeAreaView>
     </GestureHandlerRootView>
+  );
+}
+
+export default function ChartsScreen() {
+  return (
+    <ErrorBoundary FallbackComponent={ChartsErrorFallback}>
+      <ChartsScreenContent />
+    </ErrorBoundary>
   );
 }

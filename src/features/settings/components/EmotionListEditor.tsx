@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useColorScheme } from "nativewind";
 import type { Emotion } from "@db/types";
+import { BUTTON_HINTS, EMOTION_CATEGORY_LABELS } from "@/constants/accessibility";
 
 const CATEGORY_OPTIONS: { value: Emotion["category"]; label: string }[] = [
   { value: "positive", label: "Positive" },
@@ -105,10 +106,15 @@ export const EmotionListEditor = memo(function EmotionListEditor({
           blurOnSubmit={false}
           returnKeyType="done"
           onSubmitEditing={onAdd}
+          accessibilityLabel="Add new emotion"
+          accessibilityHint="Enter a new emotion name and press add"
         />
         <TouchableOpacity
           onPress={onAdd}
           className="w-12 h-12 rounded-xl items-center justify-center bg-sage-500 dark:bg-sage-600"
+          accessibilityRole="button"
+          accessibilityLabel="Add emotion"
+          accessibilityHint={BUTTON_HINTS.add}
         >
           <Ionicons name="add" size={24} color="white" />
         </TouchableOpacity>
@@ -127,6 +133,10 @@ export const EmotionListEditor = memo(function EmotionListEditor({
                 ...(isSelected ? styles.active : styles.inactive),
                 borderWidth: 1,
               }}
+              accessibilityRole="button"
+              accessibilityLabel={`${option.label} category, ${isSelected ? "selected" : "not selected"}`}
+              accessibilityHint={isSelected ? "Currently selected category" : "Tap to select this category"}
+              accessibilityState={{ selected: isSelected }}
             >
               <Text
                 className="text-xs font-semibold"
@@ -187,7 +197,12 @@ export const EmotionListEditor = memo(function EmotionListEditor({
                       color={isDark ? "#6B5C4A" : "#BDA77D"}
                     />
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => onRemove(emotion.name)}>
+                  <TouchableOpacity
+                    onPress={() => onRemove(emotion.name)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Remove ${emotion.name}`}
+                    accessibilityHint="Tap to remove this emotion"
+                  >
                     <Ionicons name="close-circle" size={18} color={isDark ? "#6B5C4A" : "#BDA77D"} />
                   </TouchableOpacity>
                 </View>

@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useColorScheme } from "nativewind";
+import { BUTTON_HINTS } from "@/constants/accessibility";
 
 export function SettingRow({
   label,
@@ -30,6 +31,9 @@ export function SettingRow({
         !isLast ? "border-b border-paper-200 dark:border-paper-800" : ""
       }`}
       style={onPress && { opacity: 1 }}
+      accessibilityRole={onPress ? "button" : undefined}
+      accessibilityLabel={subLabel ? `${label}, ${subLabel}` : label}
+      accessibilityHint={onPress ? "Tap to open" : undefined}
     >
       <View className="flex-row items-center flex-1 mr-4">
         {icon && (
