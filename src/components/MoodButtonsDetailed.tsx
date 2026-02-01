@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text } from "react-native";
 import { HapticTab } from "./HapticTab";
 import { moodScale } from "@/constants/moodScale";
+import { getMoodButtonLabel, getMoodButtonHint } from "@/constants/accessibility";
 
 interface MoodButtonsDetailedProps {
   onMoodPress: (mood: number) => void;
@@ -56,6 +57,9 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
           onPress={() => onMoodPress(firstMood.value)}
           onLongPress={() => onLongPress(firstMood.value)}
           delayLongPress={500}
+          accessibilityRole="button"
+          accessibilityLabel={getMoodButtonLabel(firstMood.value, firstMood.label)}
+          accessibilityHint={getMoodButtonHint()}
         >
           <View className="flex-row items-center px-5">
             <Text
@@ -99,6 +103,9 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
             onPress={() => onMoodPress(mood.value)}
             onLongPress={() => onLongPress(mood.value)}
             delayLongPress={500}
+            accessibilityRole="button"
+            accessibilityLabel={getMoodButtonLabel(mood.value, mood.label)}
+            accessibilityHint={getMoodButtonHint()}
           >
             <Text
               className="text-2xl font-bold mb-1"
@@ -139,6 +146,9 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
             onPress={() => onMoodPress(mood.value)}
             onLongPress={() => onLongPress(mood.value)}
             delayLongPress={500}
+            accessibilityRole="button"
+            accessibilityLabel={getMoodButtonLabel(mood.value, mood.label)}
+            accessibilityHint={getMoodButtonHint()}
           >
             <Text
               className="text-2xl font-bold mb-1"

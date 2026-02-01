@@ -12,6 +12,13 @@ import { moodScale } from "@/constants/moodScale";
 import { HapticTab } from "./HapticTab";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import type { Emotion } from "../../db/types";
+import {
+    getMoodButtonLabel,
+    getEmotionChipLabel,
+    getEmotionChipHint,
+    getEnergyLevelLabel,
+    BUTTON_HINTS,
+} from "@/constants/accessibility";
 
 export type MoodEntryFormValues = {
     mood: number;
@@ -191,7 +198,14 @@ export const MoodEntryModal: React.FC<MoodEntryModalProps> = ({
     };
 
     return (
-        <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+        <Modal
+            visible={visible}
+            transparent
+            animationType="slide"
+            onRequestClose={onClose}
+            accessibilityViewIsModal={true}
+            accessibilityLabel={`${title} form`}
+        >
             <View className="flex-1 justify-end" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
                 <View
                     className="rounded-t-3xl max-h-[90%]"
@@ -242,6 +256,9 @@ export const MoodEntryModal: React.FC<MoodEntryModalProps> = ({
                                                     shadowRadius: isSelected ? 8 : 4,
                                                     elevation: isSelected ? 4 : 2,
                                                 }}
+                                                accessibilityRole="button"
+                                                accessibilityLabel={getMoodButtonLabel(item.value, item.label)}
+                                                accessibilityState={{ selected: isSelected }}
                                             >
                                                 <Text
                                                     className="text-lg font-bold"
@@ -306,6 +323,10 @@ export const MoodEntryModal: React.FC<MoodEntryModalProps> = ({
                                                     borderWidth: isSelected ? 0 : 1,
                                                     borderColor: colors.border,
                                                 }}
+                                                accessibilityRole="button"
+                                                accessibilityLabel={getEmotionChipLabel(emotion.name, emotion.category, isSelected)}
+                                                accessibilityHint={getEmotionChipHint(isSelected)}
+                                                accessibilityState={{ selected: isSelected, disabled }}
                                             >
                                                 <Text
                                                     className="text-sm font-medium"
@@ -349,6 +370,10 @@ export const MoodEntryModal: React.FC<MoodEntryModalProps> = ({
                                                     borderWidth: isSelected ? 0 : 1,
                                                     borderColor: isDark ? "#3D3A43" : "#DDD8E5",
                                                 }}
+                                                accessibilityRole="button"
+                                                accessibilityLabel={`Context: ${context}, ${isSelected ? "selected" : "not selected"}`}
+                                                accessibilityHint={isSelected ? "Tap to deselect" : "Tap to select"}
+                                                accessibilityState={{ selected: isSelected }}
                                             >
                                                 <Text
                                                     className="text-sm font-medium"
@@ -408,6 +433,9 @@ export const MoodEntryModal: React.FC<MoodEntryModalProps> = ({
                                                     shadowRadius: 8,
                                                     elevation: isSelected ? 4 : 0,
                                                 }}
+                                                accessibilityRole="button"
+                                                accessibilityLabel={getEnergyLevelLabel(value, isSelected)}
+                                                accessibilityState={{ selected: isSelected }}
                                             >
                                                 <Text
                                                     className="font-semibold"
@@ -460,6 +488,8 @@ export const MoodEntryModal: React.FC<MoodEntryModalProps> = ({
                                         borderColor: isDark ? "#3D352A" : "#E5D9BF",
                                         color: isDark ? "#F5F1E8" : "#3D352A",
                                     }}
+                                    accessibilityLabel="Notes input"
+                                    accessibilityHint="Add any thoughts or notes about your mood"
                                 />
                             </View>
                         )}
@@ -475,6 +505,9 @@ export const MoodEntryModal: React.FC<MoodEntryModalProps> = ({
                             disabled={isSaving}
                             className="flex-1 mr-2 rounded-2xl py-4 items-center"
                             style={{ backgroundColor: isDark ? "#2A2520" : "#F5F1E8" }}
+                            accessibilityRole="button"
+                            accessibilityLabel="Cancel"
+                            accessibilityHint={BUTTON_HINTS.cancel}
                         >
                             <Text
                                 className="text-base font-semibold"
@@ -497,6 +530,10 @@ export const MoodEntryModal: React.FC<MoodEntryModalProps> = ({
                                 shadowRadius: 8,
                                 elevation: 4,
                             }}
+                            accessibilityRole="button"
+                            accessibilityLabel={isSaving ? "Saving mood entry" : "Save mood entry"}
+                            accessibilityHint={BUTTON_HINTS.save}
+                            accessibilityState={{ disabled: isSaving }}
                         >
                             <Text className="text-base font-semibold text-white">
                                 {isSaving ? "Saving..." : "Save"}

@@ -1,49 +1,34 @@
-import React, { useEffect, useState, useCallback, useMemo } from "react";
-import {
-  View,
-  Text,
-  SafeAreaView,
-  RefreshControl,
-  FlatList,
-} from "react-native";
+import React, { useEffect, useCallback, useMemo } from "react";
+import { View, Text, SafeAreaView } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import {
-  insertMood,
-  getAllMoods,
-  deleteMood,
-  insertMoodEntry,
-  updateMoodTimestamp,
-  updateMoodEntry,
-  migrateEmotionsToCategories,
-} from "@db/db";
-import { DisplayMoodItem } from "@/components/DisplayMoodItem";
-import { DateTimePickerModal } from "@/components/DateTimePickerModal";
-import { MoodButtonsDetailed } from "@/components/MoodButtonsDetailed";
-import { MoodButtonsCompact } from "@/components/MoodButtonsCompact";
-import { SwipeDirection } from "@/types/mood";
-import { MoodEntry, Emotion } from "@db/types";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useFocusEffect } from "@react-navigation/native";
-import ToastManager, { Toast } from "toastify-react-native";
-import { IconSymbol } from "@/components/ui/IconSymbol";
-import { HapticTab } from "@/components/HapticTab";
-import {
-  DEFAULT_CONTEXTS,
-  DEFAULT_EMOTIONS,
-  DEFAULT_QUICK_ENTRY_PREFS,
-  getContextTags,
-  getEmotionPresets,
-  getQuickEntryPrefs,
-  QuickEntryPrefs,
-} from "@/lib/entrySettings";
-import {
-  MoodEntryFormValues,
-  MoodEntryModal,
-} from "@/components/MoodEntryModal";
-import { useColorScheme } from "@/hooks/useColorScheme";
-const SHOW_LABELS_KEY = "showLabelsPreference";
+import ToastManager from "toastify-react-native";
 
-// Toast config will be generated inside component with color scheme access
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { createScreenErrorFallback } from "@/components/ScreenErrorFallback";
+import { DateTimePickerModal } from "@/components/DateTimePickerModal";
+import { MoodEntryModal, MoodEntryFormValues } from "@/components/MoodEntryModal";
+import { HapticTab } from "@/components/HapticTab";
+import { IconSymbol } from "@/components/ui/IconSymbol";
+import {
+  HomeHeader,
+  MoodButtonSelector,
+  HistoryListHeader,
+  MoodHistoryList,
+} from "@/components/home";
+
+import { useMoodData } from "@/hooks/useMoodData";
+import { useEntrySettings } from "@/hooks/useEntrySettings";
+import { useMoodModals } from "@/hooks/useMoodModals";
+import { useMoodItemActions } from "@/hooks/useMoodItemActions";
+import { useColorScheme } from "@/hooks/useColorScheme";
+
+import { insertMood, updateMoodTimestamp, updateMoodEntry, migrateEmotionsToCategories } from "@db/db";
+import { Toast } from "toastify-react-native";
+
+const HomeErrorFallback = createScreenErrorFallback("Home");
+
+// Toast config with theme support
 const createToastConfig = (isDark: boolean) => ({
   success: ({
     text1,
@@ -111,205 +96,22 @@ const createToastConfig = (isDark: boolean) => ({
   ),
 });
 
-export default function HomeScreen() {
+function HomeScreenContent() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const toastConfig = useMemo(() => createToastConfig(isDark), [isDark]);
 
-  const [moods, setMoods] = useState<MoodEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [lastTracked, setLastTracked] = useState<Date | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const [showDetailedLabels, setShowDetailedLabels] = useState(false);
-  const [showDateModal, setShowDateModal] = useState(false);
-  const [selectedMood, setSelectedMood] = useState<MoodEntry | null>(null);
-  const [quickEntryVisible, setQuickEntryVisible] = useState(false);
-  const [detailedEntryVisible, setDetailedEntryVisible] = useState(false);
-  const [pendingMood, setPendingMood] = useState(5);
-  const [editingEntry, setEditingEntry] = useState<MoodEntry | null>(null);
-  const [emotionOptions, setEmotionOptions] =
-    useState<Emotion[]>(DEFAULT_EMOTIONS);
-  const [contextOptions, setContextOptions] =
-    useState<string[]>(DEFAULT_CONTEXTS);
-  const [quickEntryPrefs, setQuickEntryPrefs] = useState<QuickEntryPrefs>(
-    DEFAULT_QUICK_ENTRY_PREFS
-  );
-  const quickEntryFieldConfig = useMemo(
-    () => ({
-      emotions: quickEntryPrefs.showEmotions,
-      context: quickEntryPrefs.showContext,
-      energy: quickEntryPrefs.showEnergy,
-      notes: quickEntryPrefs.showNotes,
-    }),
-    [quickEntryPrefs]
-  );
-  const detailedFieldConfig = useMemo(
-    () => ({
-      emotions: true,
-      context: true,
-      energy: true,
-      notes: true,
-    }),
-    []
-  );
+  // Custom hooks for state management
+  const moodData = useMoodData();
+  const entrySettings = useEntrySettings();
+  const modals = useMoodModals();
+  const itemActions = useMoodItemActions({
+    setMoods: moodData.setMoods,
+    setLastTracked: moodData.setLastTracked,
+    setEditingEntry: modals.setEditingEntry,
+  });
 
-  const SWIPE_THRESHOLD = 100;
-
-  const fetchMoods = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await getAllMoods();
-      setMoods(data);
-      if (data.length > 0) {
-        setLastTracked(new Date(data[0].timestamp));
-      }
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
-
-  const refreshMoods = useCallback(async () => {
-    try {
-      const data = await getAllMoods();
-      setMoods(data);
-      if (data.length > 0) {
-        setLastTracked(new Date(data[0].timestamp));
-      }
-    } finally {
-      setRefreshing(false);
-    }
-  }, []);
-
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    refreshMoods();
-  }, [refreshMoods]);
-
-  useEffect(() => {
-    fetchMoods();
-  }, []);
-
-  const handleMoodPress = useCallback((mood: number) => {
-    setPendingMood(mood);
-    setQuickEntryVisible(true);
-  }, []);
-
-  const handleLongPress = useCallback((mood: number) => {
-    setPendingMood(mood);
-    setDetailedEntryVisible(true);
-  }, []);
-
-  const handleDeleteMood = useCallback(async (mood: MoodEntry) => {
-    await deleteMood(mood.id);
-    setMoods((prev) => prev.filter((m) => m.id !== mood.id));
-    Toast.show({
-      type: "success",
-      text1: "Entry removed",
-      text2: "Tap Undo to restore",
-      autoHide: true,
-      visibilityTime: 3000,
-      progressBarColor: "#A78BFA",
-      onPress: async () => {
-        if (mood) {
-          const crmood = await insertMoodEntry({
-            mood: mood.mood,
-            note: mood.note,
-            timestamp: new Date(mood.timestamp).getTime(),
-            emotions: mood.emotions,
-            contextTags: mood.contextTags,
-            energy: mood.energy,
-          });
-
-          setMoods((prev) => {
-            const updated = [...prev, crmood].sort(
-              (a, b) =>
-                new Date(b.timestamp).getTime() -
-                new Date(a.timestamp).getTime()
-            );
-            return updated;
-          });
-
-          setLastTracked((prevLastTracked) => {
-            if (
-              !prevLastTracked ||
-              new Date(crmood.timestamp) > prevLastTracked
-            ) {
-              return new Date(crmood.timestamp);
-            }
-            return prevLastTracked;
-          });
-          Toast.hide();
-        } else {
-          Toast.error("Failed to restore mood");
-        }
-      },
-    });
-  }, []);
-
-  const onSwipeableWillOpen = useCallback(
-    (direction: SwipeDirection, mood: MoodEntry) => {
-      if (direction === "left") {
-        handleDeleteMood(mood);
-      } else if (direction === "right") {
-        setEditingEntry(mood);
-      }
-    },
-    [handleDeleteMood]
-  );
-
-  const handleMoodItemLongPress = useCallback((mood: MoodEntry) => {
-    setSelectedMood(mood);
-    setShowDateModal(true);
-  }, []);
-
-  const handleDateTimeSave = useCallback(
-    async (moodId: number, newTimestamp: number) => {
-      await updateMoodTimestamp(moodId, newTimestamp);
-      await fetchMoods();
-      setShowDateModal(false);
-    },
-    [fetchMoods]
-  );
-
-  const renderMoodItem = useCallback(
-    ({ item }: { item: MoodEntry }) => (
-      <DisplayMoodItem
-        mood={item}
-        onSwipeableWillOpen={onSwipeableWillOpen}
-        onLongPress={handleMoodItemLongPress}
-        swipeThreshold={SWIPE_THRESHOLD}
-      />
-    ),
-    [onSwipeableWillOpen, handleMoodItemLongPress]
-  );
-
-  const loadShowLabelsPreference = useCallback(async () => {
-    try {
-      const value = await AsyncStorage.getItem(SHOW_LABELS_KEY);
-      if (value !== null) {
-        setShowDetailedLabels(value === "true");
-      }
-    } catch (error) {
-      console.error("Failed to load label preference:", error);
-    }
-  }, []);
-
-  const loadEntrySettings = useCallback(async () => {
-    try {
-      const [emotionList, contextList, prefs] = await Promise.all([
-        getEmotionPresets(),
-        getContextTags(),
-        getQuickEntryPrefs(),
-      ]);
-      setEmotionOptions(emotionList);
-      setContextOptions(contextList);
-      setQuickEntryPrefs(prefs);
-    } catch (error) {
-      console.error("Failed to load entry settings:", error);
-    }
-  }, []);
-
+  // Run emotion migration on mount
   const runEmotionMigration = useCallback(async () => {
     const MIGRATION_KEY = "emotionCategoryMigrationCompleted";
     const MIGRATION_RETRY_KEY = "emotionCategoryMigrationRetries";
@@ -326,7 +128,7 @@ export default function HomeScreen() {
       const result = await migrateEmotionsToCategories();
       console.log(`Migration complete: ${result.migrated} entries migrated, ${result.skipped} skipped`);
       await AsyncStorage.setItem(MIGRATION_KEY, "true");
-      await fetchMoods();
+      await moodData.fetchMoods();
     } catch (error) {
       console.error("Failed to run emotion migration:", error);
 
@@ -350,34 +152,27 @@ export default function HomeScreen() {
         console.error("Failed to update migration retry state:", storageError);
       }
     }
-  }, [fetchMoods]);
+  }, [moodData.fetchMoods]);
 
   useEffect(() => {
-    loadShowLabelsPreference();
     runEmotionMigration();
-  }, [loadShowLabelsPreference, runEmotionMigration]);
+  }, [runEmotionMigration]);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadShowLabelsPreference();
-      loadEntrySettings();
-    }, [loadShowLabelsPreference, loadEntrySettings])
-  );
-
+  // Entry save handlers
   const handleEntrySave = useCallback(async (values: MoodEntryFormValues) => {
     const newMood = await insertMood(values.mood, values.note || undefined, {
       emotions: values.emotions,
       contextTags: values.contextTags,
       energy: values.energy,
     });
-    setMoods((prev) => [newMood, ...prev]);
-    setLastTracked(new Date(newMood.timestamp ?? Date.now()));
-  }, []);
+    moodData.setMoods((prev) => [newMood, ...prev]);
+    moodData.setLastTracked(new Date(newMood.timestamp ?? Date.now()));
+  }, [moodData.setMoods, moodData.setLastTracked]);
 
   const handleEditEntrySave = useCallback(
     async (values: MoodEntryFormValues) => {
-      if (!editingEntry) return;
-      const updatedMood = await updateMoodEntry(editingEntry.id, {
+      if (!modals.editingEntry) return;
+      const updatedMood = await updateMoodEntry(modals.editingEntry.id, {
         mood: values.mood,
         note: values.note ? values.note : null,
         emotions: values.emotions,
@@ -385,74 +180,29 @@ export default function HomeScreen() {
         energy: values.energy,
       });
       if (updatedMood) {
-        setMoods((prev) =>
+        moodData.setMoods((prev) =>
           prev.map((m) => (m.id === updatedMood.id ? updatedMood : m))
         );
       }
     },
-    [editingEntry]
+    [modals.editingEntry, moodData.setMoods]
   );
 
-  const editingInitialValues = useMemo(
-    () =>
-      editingEntry
-        ? {
-            mood: editingEntry.mood,
-            emotions: editingEntry.emotions,
-            contextTags: editingEntry.contextTags,
-            energy: editingEntry.energy,
-            note: editingEntry.note ?? "",
-          }
-        : undefined,
-    [editingEntry]
+  const handleDateTimeSave = useCallback(
+    async (moodId: number, newTimestamp: number) => {
+      await updateMoodTimestamp(moodId, newTimestamp);
+      await moodData.fetchMoods();
+      modals.closeDateModal();
+    },
+    [moodData.fetchMoods, modals.closeDateModal]
   );
 
-  useEffect(() => {
-    loadEntrySettings();
-  }, [loadEntrySettings]);
-
-  const renderEmptyComponent = useCallback(() => {
-    return (
-      <View className="flex-1 items-center justify-center p-8">
-        {loading ? (
-          <Text
-            className="text-center"
-            style={{ color: isDark ? "#BDA77D" : "#9D8660" }}
-          >
-            Loading...
-          </Text>
-        ) : (
-          <View className="items-center">
-            <View
-              className="w-24 h-24 rounded-3xl items-center justify-center mb-5"
-              style={{
-                backgroundColor: isDark ? "#2D3D2D" : "#E8EFE8",
-                shadowColor: isDark ? "#000" : "#5B8A5B",
-                shadowOffset: { width: 0, height: 8 },
-                shadowOpacity: isDark ? 0.3 : 0.15,
-                shadowRadius: 16,
-                elevation: 4,
-              }}
-            >
-              <Text className="text-5xl">🌿</Text>
-            </View>
-            <Text
-              className="text-center font-semibold text-lg mb-1"
-              style={{ color: isDark ? "#F5F1E8" : "#3D352A" }}
-            >
-              Start your journey
-            </Text>
-            <Text
-              className="text-center text-sm max-w-[200px]"
-              style={{ color: isDark ? "#BDA77D" : "#9D8660" }}
-            >
-              Tap a mood above to log how you're feeling right now
-            </Text>
-          </View>
-        )}
-      </View>
-    );
-  }, [loading, isDark]);
+  const handleMoodItemLongPress = useCallback(
+    (mood: any) => {
+      modals.openDateModal(mood);
+    },
+    [modals.openDateModal]
+  );
 
   return (
     <>
@@ -462,162 +212,84 @@ export default function HomeScreen() {
           style={{ backgroundColor: isDark ? "#1C1916" : "#FAF8F4" }}
         >
           <View className="flex-1 px-4 pt-4">
-            {/* Organic header */}
-            <View className="flex-row justify-between items-center mb-6">
-              <View>
-                <Text
-                  className="text-3xl font-bold"
-                  style={{ color: isDark ? "#F5F1E8" : "#3D352A" }}
-                >
-                  Moodinator
-                </Text>
-                <Text
-                  className="text-sm mt-1"
-                  style={{ color: isDark ? "#BDA77D" : "#9D8660" }}
-                >
-                  Track your emotional wellness
-                </Text>
-              </View>
-              {lastTracked && (
-                <View
-                  className="px-3 py-2 rounded-xl"
-                  style={{
-                    backgroundColor: isDark ? "#231F1B" : "#FDFCFA",
-                    shadowColor: isDark ? "#000" : "#9D8660",
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: isDark ? 0.25 : 0.08,
-                    shadowRadius: 8,
-                    elevation: 2,
-                  }}
-                >
-                  <Text
-                    className="text-[10px] font-medium mb-0.5"
-                    style={{ color: isDark ? "#6B5C4A" : "#BDA77D" }}
-                  >
-                    Last entry
-                  </Text>
-                  <Text
-                    className="text-sm font-semibold"
-                    style={{ color: isDark ? "#D4C4A0" : "#6B5C4A" }}
-                  >
-                    {lastTracked.toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </Text>
-                </View>
-              )}
-            </View>
+            {/* Header */}
+            <HomeHeader lastTracked={moodData.lastTracked} />
 
-            {/* Mood buttons */}
-            <View>
-              {showDetailedLabels ? (
-                <MoodButtonsDetailed
-                  onMoodPress={handleMoodPress}
-                  onLongPress={handleLongPress}
-                />
-              ) : (
-                <MoodButtonsCompact
-                  onMoodPress={handleMoodPress}
-                  onLongPress={handleLongPress}
-                />
-              )}
-            </View>
+            {/* Mood Buttons */}
+            <MoodButtonSelector
+              showDetailedLabels={entrySettings.showDetailedLabels}
+              onMoodPress={modals.handleMoodPress}
+              onLongPress={modals.handleLongPress}
+            />
 
-            {/* History section */}
+            {/* History Section */}
             <View className="flex-1 mt-4">
-              <View className="flex-row justify-between items-center mb-3 px-1">
-                <Text
-                  className="font-semibold text-base"
-                  style={{ color: isDark ? "#F5F1E8" : "#3D352A" }}
-                >
-                  Recent entries
-                </Text>
-                {moods.length > 0 && (
-                  <View
-                    className="px-2.5 py-1 rounded-full"
-                    style={{ backgroundColor: isDark ? "#2D3D2D" : "#E8EFE8" }}
-                  >
-                    <Text
-                      className="text-xs font-medium"
-                      style={{ color: isDark ? "#A8C5A8" : "#5B8A5B" }}
-                    >
-                      {moods.length} total
-                    </Text>
-                  </View>
-                )}
-              </View>
-              <FlatList
-                data={moods}
-                initialNumToRender={10}
-                contentContainerStyle={{
-                  paddingBottom: 100,
-                }}
-                renderItem={renderMoodItem}
-                keyExtractor={(item) => item.id.toString()}
-                refreshControl={
-                  <RefreshControl
-                    refreshing={refreshing}
-                    onRefresh={onRefresh}
-                    colors={[isDark ? "#7BA87B" : "#5B8A5B"]}
-                    tintColor={isDark ? "#7BA87B" : "#5B8A5B"}
-                  />
-                }
-                showsVerticalScrollIndicator={false}
-                removeClippedSubviews={true}
-                windowSize={7}
-                maxToRenderPerBatch={10}
-                updateCellsBatchingPeriod={50}
-                extraData={moods}
-                style={{ flex: 1 }}
-                ListEmptyComponent={renderEmptyComponent}
+              <HistoryListHeader moodCount={moodData.moods.length} />
+              <MoodHistoryList
+                moods={moodData.moods}
+                loading={moodData.loading}
+                refreshing={moodData.refreshing}
+                onRefresh={moodData.onRefresh}
+                onSwipeableWillOpen={itemActions.onSwipeableWillOpen}
+                onMoodItemLongPress={handleMoodItemLongPress}
+                swipeThreshold={itemActions.SWIPE_THRESHOLD}
               />
             </View>
           </View>
         </SafeAreaView>
       </GestureHandlerRootView>
-      {showDateModal && (
+
+      {/* Modals */}
+      {modals.showDateModal && (
         <DateTimePickerModal
-          visible={showDateModal}
-          mood={selectedMood}
-          onClose={() => setShowDateModal(false)}
+          visible={modals.showDateModal}
+          mood={modals.selectedMood}
+          onClose={modals.closeDateModal}
           onSave={handleDateTimeSave}
         />
       )}
       <MoodEntryModal
-        visible={quickEntryVisible}
+        visible={modals.quickEntryVisible}
         title="Quick Entry"
-        initialMood={pendingMood}
-        emotionOptions={emotionOptions}
-        contextOptions={contextOptions}
-        fieldConfig={quickEntryFieldConfig}
+        initialMood={modals.pendingMood}
+        emotionOptions={entrySettings.emotionOptions}
+        contextOptions={entrySettings.contextOptions}
+        fieldConfig={entrySettings.quickEntryFieldConfig}
         showMoodSelector={false}
-        onClose={() => setQuickEntryVisible(false)}
+        onClose={modals.closeQuickEntry}
         onSubmit={handleEntrySave}
       />
       <MoodEntryModal
-        visible={detailedEntryVisible}
+        visible={modals.detailedEntryVisible}
         title="Detailed Entry"
-        initialMood={pendingMood}
-        emotionOptions={emotionOptions}
-        contextOptions={contextOptions}
-        fieldConfig={detailedFieldConfig}
+        initialMood={modals.pendingMood}
+        emotionOptions={entrySettings.emotionOptions}
+        contextOptions={entrySettings.contextOptions}
+        fieldConfig={entrySettings.detailedFieldConfig}
         showMoodSelector={false}
-        onClose={() => setDetailedEntryVisible(false)}
+        onClose={modals.closeDetailedEntry}
         onSubmit={handleEntrySave}
       />
       <MoodEntryModal
-        visible={Boolean(editingEntry)}
+        visible={Boolean(modals.editingEntry)}
         title="Edit Entry"
-        initialMood={editingEntry?.mood ?? pendingMood}
-        emotionOptions={emotionOptions}
-        contextOptions={contextOptions}
-        fieldConfig={detailedFieldConfig}
-        initialValues={editingInitialValues}
-        onClose={() => setEditingEntry(null)}
+        initialMood={modals.editingEntry?.mood ?? modals.pendingMood}
+        emotionOptions={entrySettings.emotionOptions}
+        contextOptions={entrySettings.contextOptions}
+        fieldConfig={entrySettings.detailedFieldConfig}
+        initialValues={modals.editingInitialValues}
+        onClose={modals.closeEditEntry}
         onSubmit={handleEditEntrySave}
       />
       <ToastManager config={toastConfig} useModal={false} />
     </>
+  );
+}
+
+export default function HomeScreen() {
+  return (
+    <ErrorBoundary FallbackComponent={HomeErrorFallback}>
+      <HomeScreenContent />
+    </ErrorBoundary>
   );
 }

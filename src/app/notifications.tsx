@@ -17,8 +17,12 @@ import {
   NotificationConfig,
 } from "@/hooks/useNotifications";
 import { IconSymbol } from "@/components/ui/IconSymbol";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { createScreenErrorFallback } from "@/components/ScreenErrorFallback";
 
-export default function NotificationsScreen() {
+const NotificationsErrorFallback = createScreenErrorFallback("Notifications");
+
+function NotificationsScreenContent() {
   const router = useRouter();
   const [notifications, setNotifications] = useState<NotificationConfig[]>([]);
   const [loading, setLoading] = useState(true);
@@ -210,3 +214,10 @@ export default function NotificationsScreen() {
   );
 }
 
+export default function NotificationsScreen() {
+  return (
+    <ErrorBoundary FallbackComponent={NotificationsErrorFallback}>
+      <NotificationsScreenContent />
+    </ErrorBoundary>
+  );
+}

@@ -2,6 +2,7 @@ import React, { memo } from "react";
 import { Switch, Platform } from "react-native";
 import { useColorScheme } from "nativewind";
 import { SettingRow } from "./SettingRow";
+import { SETTINGS_ACCESSIBILITY } from "@/constants/accessibility";
 
 export const ToggleRow = memo(function ToggleRow({
   title,
@@ -34,6 +35,9 @@ export const ToggleRow = memo(function ToggleRow({
           }}
           thumbColor={Platform.OS === "ios" ? undefined : "#fff"}
           ios_backgroundColor={isDark ? "#3D352A" : "#E5D9BF"}
+          accessibilityLabel={SETTINGS_ACCESSIBILITY.toggle(value, title)}
+          accessibilityHint={SETTINGS_ACCESSIBILITY.toggleHint(value)}
+          accessibilityRole="switch"
         />
       }
     />

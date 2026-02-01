@@ -3,6 +3,7 @@ import { View, Text } from "react-native";
 import { HapticTab } from "./HapticTab";
 import { moodScale } from "@/constants/moodScale";
 import { useColorScheme } from "@/hooks/useColorScheme";
+import { getMoodButtonLabel, getMoodButtonHint } from "@/constants/accessibility";
 
 interface MoodButtonsCompactProps {
   onMoodPress: (mood: number) => void;
@@ -47,6 +48,9 @@ export const MoodButtonsCompact: React.FC<MoodButtonsCompactProps> = ({
       onPress={() => onMoodPress(mood.value)}
       onLongPress={() => onLongPress(mood.value)}
       delayLongPress={500}
+      accessibilityRole="button"
+      accessibilityLabel={getMoodButtonLabel(mood.value, mood.label)}
+      accessibilityHint={getMoodButtonHint()}
     >
       <Text
         className="text-2xl font-bold mb-0.5"

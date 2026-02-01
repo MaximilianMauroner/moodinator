@@ -6,6 +6,7 @@ import { HapticTab } from "@/components/HapticTab";
 import { IconSymbol } from "@/components/ui/IconSymbol";
 import TabBarBackground from "@/components/ui/TabBarBackground";
 import { useColorScheme } from "@/hooks/useColorScheme";
+import { TAB_ACCESSIBILITY_LABELS } from "@/constants/accessibility";
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -55,6 +56,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => (
             <IconSymbol size={26} name="house.fill" color={color} />
           ),
+          tabBarAccessibilityLabel: TAB_ACCESSIBILITY_LABELS.home,
         }}
       />
       <Tabs.Screen
@@ -64,6 +66,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => (
             <IconSymbol size={26} name="chart.bar" color={color} />
           ),
+          tabBarAccessibilityLabel: TAB_ACCESSIBILITY_LABELS.insights,
         }}
       />
       <Tabs.Screen
@@ -73,6 +76,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => (
             <IconSymbol size={26} name="gear" color={color} />
           ),
+          tabBarAccessibilityLabel: TAB_ACCESSIBILITY_LABELS.settings,
         }}
       />
     </Tabs>

@@ -8,6 +8,7 @@ import { SwipeDirection } from "../types/mood";
 import { MoodEntry } from "@db/types";
 import { moodScale } from "@/constants/moodScale";
 import { useColorScheme } from "@/hooks/useColorScheme";
+import { getMoodItemLabel, getMoodItemHint } from "@/constants/accessibility";
 
 interface Props {
   mood: MoodEntry;
@@ -116,6 +117,12 @@ export const DisplayMoodItem = React.memo(
       </Animated.View>
     );
 
+    const accessibilityLabel = getMoodItemLabel(
+      mood.mood,
+      moodData.label,
+      new Date(mood.timestamp)
+    );
+
     return (
       <Swipeable
         ref={swipeableRef}
@@ -130,7 +137,12 @@ export const DisplayMoodItem = React.memo(
         leftThreshold={swipeThreshold}
         onSwipeableOpen={handleSwipeableOpen}
       >
-        <Pressable onLongPress={() => onLongPress?.(mood)}>
+        <Pressable
+          onLongPress={() => onLongPress?.(mood)}
+          accessibilityRole="button"
+          accessibilityLabel={accessibilityLabel}
+          accessibilityHint={getMoodItemHint()}
+        >
           <View
             className="rounded-2xl p-4"
             style={{
