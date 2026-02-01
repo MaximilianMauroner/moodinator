@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useColorScheme } from "nativewind";
 
 export function SettingRow({
   label,
@@ -19,26 +20,34 @@ export function SettingRow({
   icon?: keyof typeof Ionicons.glyphMap;
   destructive?: boolean;
 }) {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === "dark";
+
   return (
     <Pressable
       onPress={onPress}
       className={`flex-row items-center justify-between p-4 ${
-        !isLast ? "border-b border-slate-100 dark:border-slate-800" : ""
-      } ${onPress ? "active:bg-slate-50 dark:active:bg-slate-800/50" : ""}`}
+        !isLast ? "border-b border-paper-200 dark:border-paper-800" : ""
+      }`}
+      style={onPress && { opacity: 1 }}
     >
       <View className="flex-row items-center flex-1 mr-4">
         {icon && (
           <View
-            className={`w-8 h-8 rounded-full items-center justify-center mr-3 ${
+            className={`w-9 h-9 rounded-xl items-center justify-center mr-3 ${
               destructive
-                ? "bg-red-100 dark:bg-red-900/20"
-                : "bg-slate-100 dark:bg-slate-800"
+                ? "bg-coral-100 dark:bg-coral-600/20"
+                : "bg-sage-100 dark:bg-sage-600/20"
             }`}
           >
             <Ionicons
               name={icon}
               size={18}
-              color={destructive ? "#ef4444" : "#64748b"}
+              color={
+                destructive
+                  ? isDark ? "#F5A899" : "#C75441"
+                  : isDark ? "#A8C5A8" : "#5B8A5B"
+              }
             />
           </View>
         )}
@@ -46,14 +55,14 @@ export function SettingRow({
           <Text
             className={`text-base font-medium ${
               destructive
-                ? "text-red-600 dark:text-red-400"
-                : "text-slate-900 dark:text-slate-100"
+                ? "text-coral-600 dark:text-coral-300"
+                : "text-paper-800 dark:text-paper-200"
             }`}
           >
             {label}
           </Text>
           {subLabel && (
-            <Text className="text-sm text-slate-500 dark:text-slate-400 mt-0.5 leading-5">
+            <Text className="text-sm mt-0.5 leading-5 text-sand-500 dark:text-sand-800">
               {subLabel}
             </Text>
           )}
@@ -61,9 +70,12 @@ export function SettingRow({
       </View>
       {action && <View>{action}</View>}
       {!action && onPress && (
-        <Ionicons name="chevron-forward" size={20} color="#cbd5e1" />
+        <Ionicons
+          name="chevron-forward"
+          size={20}
+          color={isDark ? "#6B5C4A" : "#BDA77D"}
+        />
       )}
     </Pressable>
   );
 }
-

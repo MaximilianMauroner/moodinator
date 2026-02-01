@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useColorScheme } from "nativewind";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingCard } from "../components/SettingCard";
 import { SettingRow } from "../components/SettingRow";
@@ -29,6 +30,9 @@ export function DataSection({
   onManualBackup: () => void;
   isBusy: boolean;
 }) {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === "dark";
+
   return (
     <>
       <SectionHeader title="Data" icon="💾" />
@@ -52,8 +56,8 @@ export function DataSection({
           action={
             <Link href="/therapy-export" asChild>
               <TouchableOpacity>
-                <View className="bg-purple-100 dark:bg-purple-900/30 px-3 py-1 rounded-full">
-                  <Text className="text-purple-600 dark:text-purple-400 font-medium text-sm">
+                <View className="px-3 py-1.5 rounded-full bg-dusk-100 dark:bg-dusk-700">
+                  <Text className="font-medium text-sm text-dusk-600 dark:text-dusk-300">
                     Create
                   </Text>
                 </View>
@@ -87,11 +91,11 @@ export function DataSection({
                 icon="cloud-done-outline"
                 action={
                   <TouchableOpacity onPress={onManualBackup} disabled={isBusy}>
-                    <View className="bg-green-100 dark:bg-green-900/30 px-3 py-1 rounded-full">
+                    <View className="px-3 py-1.5 rounded-full bg-sage-100 dark:bg-sage-600/30">
                       {isBusy ? (
-                        <ActivityIndicator size="small" color="#16a34a" />
+                        <ActivityIndicator size="small" color={isDark ? "#A8C5A8" : "#5B8A5B"} />
                       ) : (
-                        <Text className="text-green-600 dark:text-green-400 font-medium text-sm">
+                        <Text className="font-medium text-sm text-sage-500 dark:text-sage-300">
                           Backup Now
                         </Text>
                       )}
@@ -115,11 +119,11 @@ export function DataSection({
             icon="cloud-done-outline"
             action={
               <TouchableOpacity onPress={onManualBackup} disabled={isBusy}>
-                <View className="bg-green-100 dark:bg-green-900/30 px-3 py-1 rounded-full">
+                <View className="px-3 py-1.5 rounded-full bg-sage-100 dark:bg-sage-600/30">
                   {isBusy ? (
-                    <ActivityIndicator size="small" color="#16a34a" />
+                    <ActivityIndicator size="small" color={isDark ? "#A8C5A8" : "#5B8A5B"} />
                   ) : (
-                    <Text className="text-green-600 dark:text-green-400 font-medium text-sm">
+                    <Text className="font-medium text-sm text-sage-500 dark:text-sage-300">
                       Backup Now
                     </Text>
                   )}
@@ -133,4 +137,3 @@ export function DataSection({
     </>
   );
 }
-

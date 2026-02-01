@@ -1,5 +1,6 @@
 import React, { memo } from "react";
 import { Switch, Platform } from "react-native";
+import { useColorScheme } from "nativewind";
 import { SettingRow } from "./SettingRow";
 
 export const ToggleRow = memo(function ToggleRow({
@@ -15,6 +16,9 @@ export const ToggleRow = memo(function ToggleRow({
   onChange: (v: boolean) => void;
   isLast?: boolean;
 }) {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === "dark";
+
   return (
     <SettingRow
       label={title}
@@ -24,11 +28,14 @@ export const ToggleRow = memo(function ToggleRow({
         <Switch
           value={value}
           onValueChange={onChange}
-          trackColor={{ false: "#e2e8f0", true: "#3b82f6" }}
+          trackColor={{
+            false: isDark ? "#3D352A" : "#E5D9BF",
+            true: "#5B8A5B",
+          }}
           thumbColor={Platform.OS === "ios" ? undefined : "#fff"}
+          ios_backgroundColor={isDark ? "#3D352A" : "#E5D9BF"}
         />
       }
     />
   );
 });
-

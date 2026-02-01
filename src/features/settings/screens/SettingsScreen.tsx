@@ -31,7 +31,6 @@ import { EntryCustomizationSection } from "../sections/EntryCustomizationSection
 import { DataSection } from "../sections/DataSection";
 import { AdvancedSection } from "../sections/AdvancedSection";
 import { ExportModal } from "../components/ExportModal";
-
 export function SettingsScreen() {
   const [loading, setLoading] = useState<
     "import" | "seed" | "clear" | "backup" | null
@@ -375,11 +374,15 @@ export function SettingsScreen() {
 
   return (
     <SafeAreaView
-      className="flex-1 bg-slate-50 dark:bg-slate-950"
+      className="flex-1 bg-paper-100 dark:bg-paper-900"
       edges={["top"]}
     >
-      <View className="px-6 pt-2 pb-4 bg-white dark:bg-slate-950 border-b border-slate-100 dark:border-slate-800">
-        <Text className="text-3xl font-extrabold text-slate-900 dark:text-white">
+      {/* Header */}
+      <View className="px-6 pt-4 pb-5 bg-paper-100 dark:bg-paper-900">
+        <Text className="text-xs font-medium mb-1 text-sage-500 dark:text-sage-300">
+          Customize your experience
+        </Text>
+        <Text className="text-2xl font-bold text-paper-800 dark:text-paper-200">
           Settings
         </Text>
       </View>
@@ -428,8 +431,13 @@ export function SettingsScreen() {
           onClearMoods={handleClearMoods}
         />
 
+        {/* Version footer */}
         <View className="mt-8 mb-4 items-center">
-          <Text className="text-slate-400 text-xs">Moodinator v1.0.0</Text>
+          <View className="px-5 py-2.5 rounded-full bg-sage-100 dark:bg-sage-600/30">
+            <Text className="text-xs font-medium text-sage-500 dark:text-sage-300">
+              Moodinator v1.0.0
+            </Text>
+          </View>
         </View>
       </ScrollView>
 

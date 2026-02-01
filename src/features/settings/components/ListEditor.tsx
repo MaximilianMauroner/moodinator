@@ -1,6 +1,7 @@
 import React, { memo } from "react";
 import { View, Text, TextInput, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useColorScheme } from "nativewind";
 
 export const ListEditor = memo(function ListEditor({
   title,
@@ -23,16 +24,15 @@ export const ListEditor = memo(function ListEditor({
   onRemove: (value: string) => void;
   isLast?: boolean;
 }) {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === "dark";
+
   return (
-    <View
-      className={`p-4 ${
-        !isLast ? "border-b border-slate-100 dark:border-slate-800" : ""
-      }`}
-    >
-      <Text className="text-base font-medium text-slate-900 dark:text-slate-100 mb-1">
+    <View className={`p-4 ${!isLast ? "border-b border-paper-200 dark:border-paper-800" : ""}`}>
+      <Text className="text-base font-medium mb-1 text-paper-800 dark:text-paper-200">
         {title}
       </Text>
-      <Text className="text-sm text-slate-500 dark:text-slate-400 mb-3">
+      <Text className="text-sm mb-3 text-sand-500 dark:text-sand-800">
         {description}
       </Text>
 
@@ -41,15 +41,15 @@ export const ListEditor = memo(function ListEditor({
           value={newValue}
           onChangeText={onChangeNewValue}
           placeholder={placeholder}
-          placeholderTextColor="#94a3b8"
-          className="flex-1 bg-slate-100 dark:bg-slate-800 rounded-xl px-4 py-2.5 text-slate-900 dark:text-slate-100 border border-transparent focus:border-blue-500 transition-colors"
+          placeholderTextColor={isDark ? "#6B5C4A" : "#BDA77D"}
+          className="flex-1 rounded-xl px-4 py-2.5 bg-paper-200 dark:bg-paper-800 text-paper-800 dark:text-paper-200 border border-sand-300 dark:border-sand-800"
           blurOnSubmit={false}
           returnKeyType="done"
           onSubmitEditing={onAdd}
         />
         <TouchableOpacity
           onPress={onAdd}
-          className="bg-blue-600 w-12 h-12 rounded-xl items-center justify-center active:bg-blue-700"
+          className="w-12 h-12 rounded-xl items-center justify-center bg-sage-500 dark:bg-sage-600"
         >
           <Ionicons name="add" size={24} color="white" />
         </TouchableOpacity>
@@ -60,16 +60,16 @@ export const ListEditor = memo(function ListEditor({
           <TouchableOpacity
             key={item}
             onPress={() => onRemove(item)}
-            className="flex-row items-center bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full pl-3 pr-2 py-1.5"
+            className="flex-row items-center rounded-full pl-3 pr-2 py-1.5 bg-paper-200 dark:bg-paper-800 border border-sand-300 dark:border-sand-800"
           >
-            <Text className="text-sm font-medium text-slate-700 dark:text-slate-300 mr-1">
+            <Text className="text-sm font-medium mr-1 text-sand-600 dark:text-sand-400">
               {item}
             </Text>
-            <Ionicons name="close-circle" size={16} color="#94a3b8" />
+            <Ionicons name="close-circle" size={16} color={isDark ? "#6B5C4A" : "#BDA77D"} />
           </TouchableOpacity>
         ))}
         {items.length === 0 && (
-          <Text className="text-sm text-slate-400 italic p-1">
+          <Text className="text-sm italic p-1 text-sand-500 dark:text-sand-800">
             No items added yet.
           </Text>
         )}
