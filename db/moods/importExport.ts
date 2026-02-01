@@ -77,7 +77,7 @@ export async function importOldBackup(jsonData: string): Promise<number> {
       if (mood?.emotions && Array.isArray(mood.emotions)) {
         emotions = mood.emotions
           .map(parseEmotionItem)
-          .filter((e): e is Emotion => e !== null);
+          .filter((e: Emotion | null): e is Emotion => e !== null);
       }
 
       const contextSource = mood?.contextTags ?? mood?.context ?? [];

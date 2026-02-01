@@ -11,30 +11,40 @@ export default function TabLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
 
+  // Soft Organic palette
+  const colors = {
+    active: isDark ? "#A8C5A8" : "#5B8A5B",
+    inactive: isDark ? "#6B5C4A" : "#BDA77D",
+    background: isDark ? "#1C1916" : "#FAF8F4",
+    border: isDark ? "#2A2520" : "#E5D9BF",
+  };
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarBackground: TabBarBackground,
-        tabBarActiveTintColor: isDark ? "#93C5FD" : "#3B82F6",
-        tabBarInactiveTintColor: isDark ? "#9CA3AF" : "#94A3B8",
+        tabBarActiveTintColor: colors.active,
+        tabBarInactiveTintColor: colors.inactive,
         sceneStyle: {
-          backgroundColor: isDark ? "#0B1220" : "#FFFFFF", // optional
+          backgroundColor: colors.background,
         },
         tabBarStyle: Platform.select({
           ios: {
-            // Use a transparent background on iOS to show the blur effect
             position: "absolute",
             backgroundColor: "transparent",
           },
           default: {
-            backgroundColor: isDark ? "#0B1220" : "#FFFFFF",
-            borderTopColor: isDark ? "#1F2937" : "#E5E7EB",
+            backgroundColor: colors.background,
+            borderTopColor: colors.border,
+            borderTopWidth: 1,
+            elevation: 0,
           },
         }),
         tabBarLabelStyle: {
           fontWeight: "600",
+          fontSize: 11,
         },
       }}
     >
@@ -43,16 +53,16 @@ export default function TabLayout() {
         options={{
           title: "Home",
           tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="house.fill" color={color} />
+            <IconSymbol size={26} name="house.fill" color={color} />
           ),
         }}
       />
       <Tabs.Screen
         name="charts"
         options={{
-          title: "Charts",
+          title: "Insights",
           tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="chart.bar" color={color} />
+            <IconSymbol size={26} name="chart.bar" color={color} />
           ),
         }}
       />
@@ -61,7 +71,7 @@ export default function TabLayout() {
         options={{
           title: "Settings",
           tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="gear" color={color} />
+            <IconSymbol size={26} name="gear" color={color} />
           ),
         }}
       />

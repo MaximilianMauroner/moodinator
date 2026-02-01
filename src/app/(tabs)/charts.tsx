@@ -10,9 +10,7 @@ import {
   Text,
   TouchableOpacity,
   ActivityIndicator,
-  StyleSheet,
 } from "react-native";
-import { useColorScheme } from "@/hooks/useColorScheme";
 import type { MoodEntry } from "@db/types";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -27,6 +25,7 @@ import {
   WeeklyTab,
 } from "@/components/charts";
 import { Ionicons } from "@expo/vector-icons";
+import { useColorScheme } from "@/hooks/useColorScheme";
 
 type TabType = "overview" | "weekly" | "daily" | "raw";
 
@@ -50,12 +49,24 @@ const TabSelector = React.memo(
   ({
     activeTab,
     onTabPress,
+    isDark,
   }: {
     activeTab: TabType;
     onTabPress: (id: TabType) => void;
+    isDark: boolean;
   }) => {
     return (
-      <View className="mx-4 mb-4 bg-slate-100 dark:bg-slate-900 rounded-xl p-1 flex-row">
+      <View
+        className="mx-4 mb-4 rounded-2xl p-1.5 flex-row"
+        style={{
+          backgroundColor: isDark ? "#2A2520" : "#F5F1E8",
+          shadowColor: isDark ? "#000" : "#9D8660",
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: isDark ? 0.2 : 0.08,
+          shadowRadius: 8,
+          elevation: 2,
+        }}
+      >
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
 
@@ -63,23 +74,33 @@ const TabSelector = React.memo(
             <TouchableOpacity
               key={tab.id}
               onPress={() => onTabPress(tab.id)}
-              className={`flex-1 flex-row items-center justify-center py-2 rounded-lg transition-all ${
-                isActive ? "bg-white dark:bg-slate-800" : ""
-              }`}
+              className="flex-1 flex-row items-center justify-center py-2.5 rounded-xl"
+              style={isActive ? {
+                backgroundColor: isDark ? "#1C1916" : "#FDFCFA",
+                shadowColor: isDark ? "#000" : "#9D8660",
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: isDark ? 0.25 : 0.12,
+                shadowRadius: 8,
+                elevation: 3,
+              } : {}}
               activeOpacity={0.8}
             >
               <Ionicons
                 name={tab.icon}
-                size={16}
-                color={isActive ? "#3b82f6" : "#94a3b8"}
-                style={{ marginRight: 6 }}
+                size={14}
+                color={isActive
+                  ? (isDark ? "#A8C5A8" : "#5B8A5B")
+                  : (isDark ? "#6B5C4A" : "#BDA77D")
+                }
+                style={{ marginRight: 4 }}
               />
               <Text
-                className={`text-xs font-bold ${
-                  isActive
-                    ? "text-slate-900 dark:text-white"
-                    : "text-slate-500 dark:text-slate-400"
-                }`}
+                className="text-[10px] font-semibold"
+                style={{
+                  color: isActive
+                    ? (isDark ? "#A8C5A8" : "#5B8A5B")
+                    : (isDark ? "#6B5C4A" : "#BDA77D"),
+                }}
               >
                 {tab.label}
               </Text>
@@ -90,10 +111,15 @@ const TabSelector = React.memo(
     );
   },
   (prev, next) =>
-    prev.activeTab === next.activeTab && prev.onTabPress === next.onTabPress
+    prev.activeTab === next.activeTab &&
+    prev.onTabPress === next.onTabPress &&
+    prev.isDark === next.isDark
 );
 
 export default function ChartsScreen() {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
+
   const [moods, setMoods] = useState<MoodEntry[]>([]);
   const [moodCount, setMoodCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
@@ -159,11 +185,29 @@ export default function ChartsScreen() {
 
   if (loading && !dataLoaded) {
     return (
-      <View className="flex-1 justify-center items-center bg-white dark:bg-slate-950">
-        <ActivityIndicator size="large" color="#3B82F6" />
-        <Text className="text-slate-400 mt-4 font-medium">
-          Loading Insights...
-        </Text>
+      <View
+        className="flex-1 justify-center items-center"
+        style={{ backgroundColor: isDark ? "#1C1916" : "#FAF8F4" }}
+      >
+        <View
+          className="p-8 rounded-3xl"
+          style={{
+            backgroundColor: isDark ? "#231F1B" : "#FDFCFA",
+            shadowColor: isDark ? "#000" : "#9D8660",
+            shadowOffset: { width: 0, height: 8 },
+            shadowOpacity: isDark ? 0.3 : 0.1,
+            shadowRadius: 24,
+            elevation: 4,
+          }}
+        >
+          <ActivityIndicator size="large" color={isDark ? "#A8C5A8" : "#5B8A5B"} />
+          <Text
+            className="mt-4 font-medium text-sm text-center"
+            style={{ color: isDark ? "#BDA77D" : "#9D8660" }}
+          >
+            Loading insights...
+          </Text>
+        </View>
       </View>
     );
   }
@@ -171,32 +215,60 @@ export default function ChartsScreen() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaView
-        className="flex-1 bg-slate-50 dark:bg-slate-950"
+        className="flex-1"
+        style={{ backgroundColor: isDark ? "#1C1916" : "#FAF8F4" }}
         edges={["top"]}
       >
         {/* Header */}
-        <View className="px-6 py-4 bg-slate-50 dark:bg-slate-950">
+        <View
+          className="px-6 py-5"
+          style={{ backgroundColor: isDark ? "#1C1916" : "#FAF8F4" }}
+        >
           <View className="flex-row justify-between items-end">
             <View>
-              <Text className="text-3xl font-extrabold text-slate-900 dark:text-white">
+              <Text
+                className="text-xs font-medium mb-1"
+                style={{ color: isDark ? "#A8C5A8" : "#5B8A5B" }}
+              >
+                Your wellness journey
+              </Text>
+              <Text
+                className="text-2xl font-bold"
+                style={{ color: isDark ? "#F5F1E8" : "#3D352A" }}
+              >
                 Insights
               </Text>
-              <Text className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+              <Text
+                className="text-sm mt-0.5"
+                style={{ color: isDark ? "#BDA77D" : "#9D8660" }}
+              >
                 {moodCount} entries tracked
               </Text>
             </View>
             <TouchableOpacity
               onPress={onRefresh}
-              className="bg-white dark:bg-slate-800 p-2 rounded-full border border-slate-200 dark:border-slate-700"
+              className="p-3 rounded-2xl"
+              style={{
+                backgroundColor: isDark ? "#231F1B" : "#FDFCFA",
+                shadowColor: isDark ? "#000" : "#9D8660",
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: isDark ? 0.25 : 0.1,
+                shadowRadius: 8,
+                elevation: 2,
+              }}
             >
-              <Ionicons name="refresh" size={20} color="#64748b" />
+              <Ionicons
+                name="refresh"
+                size={18}
+                color={isDark ? "#A8C5A8" : "#5B8A5B"}
+              />
             </TouchableOpacity>
           </View>
         </View>
 
         {moodCount > 0 ? (
           <>
-            <TabSelector activeTab={activeTab} onTabPress={handleTabPress} />
+            <TabSelector activeTab={activeTab} onTabPress={handleTabPress} isDark={isDark} />
             <PagerView
               ref={pagerRef}
               style={{ flex: 1 }}
@@ -219,17 +291,37 @@ export default function ChartsScreen() {
             </PagerView>
           </>
         ) : (
-          <View className="flex-1 justify-center items-center p-8 opacity-70">
-            <View className="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-full items-center justify-center mb-6">
-              <Text className="text-4xl">📊</Text>
+          <View className="flex-1 justify-center items-center p-8">
+            <View
+              className="p-8 rounded-3xl items-center max-w-xs"
+              style={{
+                backgroundColor: isDark ? "#231F1B" : "#FDFCFA",
+                shadowColor: isDark ? "#000" : "#9D8660",
+                shadowOffset: { width: 0, height: 8 },
+                shadowOpacity: isDark ? 0.3 : 0.1,
+                shadowRadius: 24,
+                elevation: 4,
+              }}
+            >
+              <View
+                className="w-20 h-20 rounded-3xl items-center justify-center mb-5"
+                style={{ backgroundColor: isDark ? "#2D3D2D" : "#E8EFE8" }}
+              >
+                <Text className="text-4xl">📊</Text>
+              </View>
+              <Text
+                className="text-xl font-bold mb-2 text-center"
+                style={{ color: isDark ? "#F5F1E8" : "#3D352A" }}
+              >
+                No Insights Yet
+              </Text>
+              <Text
+                className="text-center text-sm leading-6"
+                style={{ color: isDark ? "#BDA77D" : "#9D8660" }}
+              >
+                Start tracking your moods to discover patterns and understand your emotional well-being better.
+              </Text>
             </View>
-            <Text className="text-slate-900 dark:text-white text-xl font-bold mb-2">
-              No Data Yet
-            </Text>
-            <Text className="text-slate-500 dark:text-slate-400 text-center leading-6">
-              Start tracking your moods to unlock insights about your patterns
-              and well-being.
-            </Text>
           </View>
         )}
       </SafeAreaView>

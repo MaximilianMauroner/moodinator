@@ -31,8 +31,8 @@ export function PreferencesSection({
           action={
             <Link href="/notifications" asChild>
               <TouchableOpacity>
-                <View className="bg-blue-100 dark:bg-blue-900/30 px-3 py-1 rounded-full">
-                  <Text className="text-blue-600 dark:text-blue-400 font-medium text-sm">
+                <View className="px-3 py-1.5 rounded-full bg-sage-100 dark:bg-sage-600/30">
+                  <Text className="font-medium text-sm text-sage-500 dark:text-sage-300">
                     Configure
                   </Text>
                 </View>
@@ -44,4 +44,3 @@ export function PreferencesSection({
     </>
   );
 }
-

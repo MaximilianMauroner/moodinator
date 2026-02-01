@@ -40,9 +40,11 @@ import {
   MoodEntryFormValues,
   MoodEntryModal,
 } from "@/components/MoodEntryModal";
+import { useColorScheme } from "@/hooks/useColorScheme";
 const SHOW_LABELS_KEY = "showLabelsPreference";
 
-const toastConfig = {
+// Toast config will be generated inside component with color scheme access
+const createToastConfig = (isDark: boolean) => ({
   success: ({
     text1,
     text2,
@@ -54,36 +56,66 @@ const toastConfig = {
     hide: () => void;
     onPress: () => void;
   }) => (
-    <View className="flex-row items-center bg-blue-600 rounded-2xl px-4 py-3 shadow-lg m-3">
+    <View
+      className="flex-row items-center rounded-2xl px-4 py-3 m-3"
+      style={{
+        backgroundColor: isDark ? "#231F1B" : "#FDFCFA",
+        shadowColor: isDark ? "#000" : "#9D8660",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: isDark ? 0.3 : 0.15,
+        shadowRadius: 12,
+        elevation: 5,
+      }}
+    >
       <View className="flex-1 flex-row items-center" style={{ minHeight: 48 }}>
-        <View className="flex-1 ml-3">
-          <Text className="text-white font-bold text-base">{text1}</Text>
+        <View
+          className="w-10 h-10 rounded-full items-center justify-center mr-3"
+          style={{ backgroundColor: isDark ? "#2D3D2D" : "#E8EFE8" }}
+        >
+          <Text className="text-lg">✓</Text>
+        </View>
+        <View className="flex-1">
+          <Text
+            className="font-semibold text-sm"
+            style={{ color: isDark ? "#F5F1E8" : "#3D352A" }}
+          >
+            {text1}
+          </Text>
           {text2 ? (
-            <Text className="text-white/90 text-xs">{text2}</Text>
+            <Text
+              className="text-xs mt-0.5"
+              style={{ color: isDark ? "#BDA77D" : "#9D8660" }}
+            >
+              {text2}
+            </Text>
           ) : null}
         </View>
         <HapticTab onPress={onPress}>
-          <Text
-            className="text-blue-600 font-semibold text-sm px-2 py-1 bg-white rounded-lg ml-2"
-            accessibilityRole="button"
+          <View
+            className="px-3 py-2 rounded-xl ml-2"
+            style={{ backgroundColor: isDark ? "#2D3D2D" : "#E8EFE8" }}
           >
-            Undo
-          </Text>
+            <Text
+              className="font-semibold text-sm"
+              style={{ color: isDark ? "#A8C5A8" : "#5B8A5B" }}
+            >
+              Undo
+            </Text>
+          </View>
         </HapticTab>
       </View>
-      <HapticTab onPress={hide}>
-        <IconSymbol
-          name="xmark"
-          size={20}
-          color="#fff"
-          style={{ marginLeft: 8 }}
-        />
+      <HapticTab onPress={hide} className="ml-2">
+        <IconSymbol name="xmark" size={18} color={isDark ? "#6B5C4A" : "#BDA77D"} />
       </HapticTab>
     </View>
   ),
-};
+});
 
 export default function HomeScreen() {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
+  const toastConfig = useMemo(() => createToastConfig(isDark), [isDark]);
+
   const [moods, setMoods] = useState<MoodEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastTracked, setLastTracked] = useState<Date | null>(null);
@@ -121,7 +153,7 @@ export default function HomeScreen() {
     []
   );
 
-  const SWIPE_THRESHOLD = 100; // pixels to trigger action
+  const SWIPE_THRESHOLD = 100;
 
   const fetchMoods = useCallback(async () => {
     setLoading(true);
@@ -133,7 +165,7 @@ export default function HomeScreen() {
       }
     } finally {
       setLoading(false);
-      setRefreshing(false); // <-- ensure refreshing is reset
+      setRefreshing(false);
     }
   }, []);
 
@@ -173,11 +205,11 @@ export default function HomeScreen() {
     setMoods((prev) => prev.filter((m) => m.id !== mood.id));
     Toast.show({
       type: "success",
-      text1: "Mood deleted",
-      text2: "You can undo this action",
+      text1: "Entry removed",
+      text2: "Tap Undo to restore",
       autoHide: true,
       visibilityTime: 3000,
-      progressBarColor: "#3b82f6",
+      progressBarColor: "#A78BFA",
       onPress: async () => {
         if (mood) {
           const crmood = await insertMoodEntry({
@@ -234,7 +266,7 @@ export default function HomeScreen() {
   const handleDateTimeSave = useCallback(
     async (moodId: number, newTimestamp: number) => {
       await updateMoodTimestamp(moodId, newTimestamp);
-      await fetchMoods(); // Refresh the moods list
+      await fetchMoods();
       setShowDateModal(false);
     },
     [fetchMoods]
@@ -286,7 +318,6 @@ export default function HomeScreen() {
     try {
       const migrationStatus = await AsyncStorage.getItem(MIGRATION_KEY);
 
-      // If migration has already succeeded or been marked as failed, do not retry
       if (migrationStatus === "true" || migrationStatus === "failed") {
         return;
       }
@@ -295,12 +326,10 @@ export default function HomeScreen() {
       const result = await migrateEmotionsToCategories();
       console.log(`Migration complete: ${result.migrated} entries migrated, ${result.skipped} skipped`);
       await AsyncStorage.setItem(MIGRATION_KEY, "true");
-      // Reload moods after migration
-      await loadMoods();
+      await fetchMoods();
     } catch (error) {
       console.error("Failed to run emotion migration:", error);
 
-      // Track retry attempts and, after several failures, stop retrying and notify the user
       try {
         const currentRetriesRaw = await AsyncStorage.getItem(MIGRATION_RETRY_KEY);
         const currentRetries = currentRetriesRaw ? parseInt(currentRetriesRaw, 10) || 0 : 0;
@@ -309,20 +338,19 @@ export default function HomeScreen() {
         await AsyncStorage.setItem(MIGRATION_RETRY_KEY, String(nextRetries));
 
         if (nextRetries >= MAX_MIGRATION_RETRIES) {
-          // Mark migration as failed so it is not retried on every app launch
           await AsyncStorage.setItem(MIGRATION_KEY, "failed");
 
-          // Provide a user-facing message so the user is aware of the issue
-          Toast.show(
-            "We couldn't finish updating some past mood entries. New entries will still work.",
-            { type: "error" }
-          );
+          Toast.show({
+            type: "error",
+            text1: "Migration Issue",
+            text2: "We couldn't finish updating some past mood entries. New entries will still work.",
+          });
         }
       } catch (storageError) {
         console.error("Failed to update migration retry state:", storageError);
       }
     }
-  }, []);
+  }, [fetchMoods]);
 
   useEffect(() => {
     loadShowLabelsPreference();
@@ -387,43 +415,91 @@ export default function HomeScreen() {
     return (
       <View className="flex-1 items-center justify-center p-8">
         {loading ? (
-          <Text className="text-center text-slate-500 dark:text-slate-400">
+          <Text
+            className="text-center"
+            style={{ color: isDark ? "#BDA77D" : "#9D8660" }}
+          >
             Loading...
           </Text>
         ) : (
-          <>
-            <Text className="text-6xl mb-2">📝</Text>
-            <Text className="text-center text-slate-500 dark:text-slate-400">
-              No moods tracked yet.
+          <View className="items-center">
+            <View
+              className="w-24 h-24 rounded-3xl items-center justify-center mb-5"
+              style={{
+                backgroundColor: isDark ? "#2D3D2D" : "#E8EFE8",
+                shadowColor: isDark ? "#000" : "#5B8A5B",
+                shadowOffset: { width: 0, height: 8 },
+                shadowOpacity: isDark ? 0.3 : 0.15,
+                shadowRadius: 16,
+                elevation: 4,
+              }}
+            >
+              <Text className="text-5xl">🌿</Text>
+            </View>
+            <Text
+              className="text-center font-semibold text-lg mb-1"
+              style={{ color: isDark ? "#F5F1E8" : "#3D352A" }}
+            >
+              Start your journey
             </Text>
-            <Text className="text-center text-slate-400 dark:text-slate-500 mt-1">
-              Tap a mood above to get started.
+            <Text
+              className="text-center text-sm max-w-[200px]"
+              style={{ color: isDark ? "#BDA77D" : "#9D8660" }}
+            >
+              Tap a mood above to log how you're feeling right now
             </Text>
-          </>
+          </View>
         )}
       </View>
     );
-  }, [loading]);
+  }, [loading, isDark]);
 
   return (
     <>
       <GestureHandlerRootView style={{ flex: 1 }}>
-        {/* Use solid backgrounds (NativeWind gradients are not supported on native) */}
-        <SafeAreaView className="flex-1 bg-slate-50 dark:bg-slate-950">
+        <SafeAreaView
+          className="flex-1"
+          style={{ backgroundColor: isDark ? "#1C1916" : "#FAF8F4" }}
+        >
           <View className="flex-1 px-4 pt-4">
-            <View className="flex-row justify-between items-end mb-6">
+            {/* Organic header */}
+            <View className="flex-row justify-between items-center mb-6">
               <View>
-                <Text className="text-3xl font-bold text-slate-900 dark:text-white">
+                <Text
+                  className="text-3xl font-bold"
+                  style={{ color: isDark ? "#F5F1E8" : "#3D352A" }}
+                >
                   Moodinator
                 </Text>
-                <Text className="text-sm text-slate-500 dark:text-slate-400 font-medium">
-                  How are you feeling right now?
+                <Text
+                  className="text-sm mt-1"
+                  style={{ color: isDark ? "#BDA77D" : "#9D8660" }}
+                >
+                  Track your emotional wellness
                 </Text>
               </View>
               {lastTracked && (
-                <View className="bg-white dark:bg-slate-800 px-3 py-1 rounded-full border border-slate-200 dark:border-slate-700">
-                  <Text className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                    Latest:{" "}
+                <View
+                  className="px-3 py-2 rounded-xl"
+                  style={{
+                    backgroundColor: isDark ? "#231F1B" : "#FDFCFA",
+                    shadowColor: isDark ? "#000" : "#9D8660",
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: isDark ? 0.25 : 0.08,
+                    shadowRadius: 8,
+                    elevation: 2,
+                  }}
+                >
+                  <Text
+                    className="text-[10px] font-medium mb-0.5"
+                    style={{ color: isDark ? "#6B5C4A" : "#BDA77D" }}
+                  >
+                    Last entry
+                  </Text>
+                  <Text
+                    className="text-sm font-semibold"
+                    style={{ color: isDark ? "#D4C4A0" : "#6B5C4A" }}
+                  >
                     {lastTracked.toLocaleTimeString([], {
                       hour: "2-digit",
                       minute: "2-digit",
@@ -433,6 +509,7 @@ export default function HomeScreen() {
               )}
             </View>
 
+            {/* Mood buttons */}
             <View>
               {showDetailedLabels ? (
                 <MoodButtonsDetailed
@@ -447,15 +524,27 @@ export default function HomeScreen() {
               )}
             </View>
 
-            <View className="flex-1 mt-6">
+            {/* History section */}
+            <View className="flex-1 mt-4">
               <View className="flex-row justify-between items-center mb-3 px-1">
-                <Text className="font-bold text-lg text-slate-800 dark:text-slate-200">
-                  Recent History
+                <Text
+                  className="font-semibold text-base"
+                  style={{ color: isDark ? "#F5F1E8" : "#3D352A" }}
+                >
+                  Recent entries
                 </Text>
                 {moods.length > 0 && (
-                  <Text className="text-xs text-slate-400 dark:text-slate-500 font-medium bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md">
-                    {moods.length} entries
-                  </Text>
+                  <View
+                    className="px-2.5 py-1 rounded-full"
+                    style={{ backgroundColor: isDark ? "#2D3D2D" : "#E8EFE8" }}
+                  >
+                    <Text
+                      className="text-xs font-medium"
+                      style={{ color: isDark ? "#A8C5A8" : "#5B8A5B" }}
+                    >
+                      {moods.length} total
+                    </Text>
+                  </View>
                 )}
               </View>
               <FlatList
@@ -470,8 +559,8 @@ export default function HomeScreen() {
                   <RefreshControl
                     refreshing={refreshing}
                     onRefresh={onRefresh}
-                    colors={["#3b82f6"]}
-                    tintColor="#3b82f6"
+                    colors={[isDark ? "#7BA87B" : "#5B8A5B"]}
+                    tintColor={isDark ? "#7BA87B" : "#5B8A5B"}
                   />
                 }
                 showsVerticalScrollIndicator={false}

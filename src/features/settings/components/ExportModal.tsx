@@ -8,14 +8,15 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  StyleSheet,
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import * as Clipboard from "expo-clipboard";
 import { Ionicons } from "@expo/vector-icons";
+import { useColorScheme } from "nativewind";
 import { exportMoods } from "@db/db";
-import { styles } from "../styles";
 
 type ExportRange = "week" | "month" | "custom" | "full";
 type ExportRangePayload =
@@ -121,6 +122,8 @@ export function ExportModal({
   visible: boolean;
   onClose: () => void;
 }) {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === "dark";
   const [loading, setLoading] = useState(false);
   const [exportRange, setExportRange] = useState<ExportRange>("week");
   const [customStartDate, setCustomStartDate] = useState(() => {
@@ -175,30 +178,30 @@ export function ExportModal({
       animationType="slide"
       onRequestClose={onClose}
     >
-      <View className="flex-1 bg-black/40 justify-end">
-        <View className="bg-white dark:bg-slate-900 rounded-t-3xl p-6 border-t border-slate-200 dark:border-slate-800 pb-10">
+      <View className="flex-1 justify-end bg-black/40">
+        <View className="rounded-t-3xl p-6 pb-10 bg-paper-100 dark:bg-paper-900 border-t border-sand-300 dark:border-paper-800">
           <View className="items-center mb-6">
-            <View className="w-12 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full mb-4" />
-            <Text className="text-xl font-bold text-slate-900 dark:text-slate-100">
+            <View className="w-12 h-1.5 rounded-full mb-4 bg-sand-300 dark:bg-sand-800" />
+            <Text className="text-xl font-bold text-paper-800 dark:text-paper-200">
               Export Data
             </Text>
           </View>
 
-          <View className="flex-row bg-slate-100 dark:bg-slate-800 p-1 rounded-xl mb-6">
+          <View className="flex-row p-1 rounded-xl mb-6 bg-paper-200 dark:bg-paper-800">
             {(["week", "month", "custom", "full"] as const).map((opt) => (
               <Pressable
                 key={opt}
                 onPress={() => setExportRange(opt)}
                 className={`flex-1 py-2 rounded-lg ${
-                  exportRange === opt ? "bg-white dark:bg-slate-700" : ""
+                  exportRange === opt ? "bg-white dark:bg-sand-800" : ""
                 }`}
-                style={exportRange === opt ? styles.segmentShadow : undefined}
+                style={exportRange === opt ? localStyles.segmentShadow : undefined}
               >
                 <Text
                   className={`text-center font-medium capitalize ${
                     exportRange === opt
-                      ? "text-slate-900 dark:text-slate-100"
-                      : "text-slate-500 dark:text-slate-400"
+                      ? "text-paper-800 dark:text-paper-200"
+                      : "text-sand-500 dark:text-sand-800"
                   }`}
                 >
                   {opt === "week"
@@ -217,23 +220,23 @@ export function ExportModal({
             <View className="flex-row gap-3 mb-6">
               <Pressable
                 onPress={() => setShowStartDatePicker(true)}
-                className="flex-1 bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700"
+                className="flex-1 p-3 rounded-xl bg-paper-200 dark:bg-paper-800 border border-sand-300 dark:border-sand-800"
               >
-                <Text className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                <Text className="text-xs mb-1 text-sand-500 dark:text-sand-800">
                   From
                 </Text>
-                <Text className="text-base font-medium text-slate-900 dark:text-slate-100">
+                <Text className="text-base font-medium text-paper-800 dark:text-paper-200">
                   {customStartDate.toLocaleDateString()}
                 </Text>
               </Pressable>
               <Pressable
                 onPress={() => setShowEndDatePicker(true)}
-                className="flex-1 bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700"
+                className="flex-1 p-3 rounded-xl bg-paper-200 dark:bg-paper-800 border border-sand-300 dark:border-sand-800"
               >
-                <Text className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                <Text className="text-xs mb-1 text-sand-500 dark:text-sand-800">
                   To
                 </Text>
-                <Text className="text-base font-medium text-slate-900 dark:text-slate-100">
+                <Text className="text-base font-medium text-paper-800 dark:text-paper-200">
                   {customEndDate.toLocaleDateString()}
                 </Text>
               </Pressable>
@@ -278,7 +281,7 @@ export function ExportModal({
             <TouchableOpacity
               onPress={handleExportShare}
               disabled={loading}
-              className="bg-blue-600 p-4 rounded-xl flex-row justify-center items-center"
+              className="p-4 rounded-xl flex-row justify-center items-center bg-sage-500 dark:bg-sage-600"
             >
               {loading ? (
                 <ActivityIndicator color="white" />
@@ -299,9 +302,9 @@ export function ExportModal({
 
             <TouchableOpacity
               onPress={onClose}
-              className="bg-slate-100 dark:bg-slate-800 p-4 rounded-xl items-center"
+              className="p-4 rounded-xl items-center bg-paper-200 dark:bg-paper-800"
             >
-              <Text className="text-slate-900 dark:text-slate-300 font-semibold">
+              <Text className="font-semibold text-sand-600 dark:text-sand-400">
                 Cancel
               </Text>
             </TouchableOpacity>
@@ -311,3 +314,13 @@ export function ExportModal({
     </Modal>
   );
 }
+
+const localStyles = StyleSheet.create({
+  segmentShadow: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+});
