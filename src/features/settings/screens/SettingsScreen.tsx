@@ -4,7 +4,14 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system";
 import * as Notifications from "expo-notifications";
-import { importMoods, clearMoods, seedMoods } from "@db/db";
+import {
+  importMoods,
+  clearMoods,
+  seedMoods,
+  updateEmotionCategoryInMoods,
+  removeEmotionFromMoods,
+  getEmotionNamesFromMoods,
+} from "@db/db";
 import {
   createBackup,
   getBackupFolder,
@@ -31,6 +38,8 @@ export function SettingsScreen() {
   >(null);
   const [exportModalVisible, setExportModalVisible] = useState(false);
   const [newEmotion, setNewEmotion] = useState("");
+  const [newEmotionCategory, setNewEmotionCategory] =
+    useState<Emotion["category"]>("neutral");
   const [newContext, setNewContext] = useState("");
   const [backupInfo, setBackupInfo] = useState<{
     count: number;
@@ -127,20 +136,130 @@ export function SettingsScreen() {
     }
     const updated = [
       ...emotions,
-      { name: trimmed, category: "neutral" } as Emotion,
+      { name: trimmed, category: newEmotionCategory } as Emotion,
     ];
     await setEmotions(updated);
     setNewEmotion("");
-  }, [emotions, newEmotion, setEmotions]);
+  }, [emotions, newEmotion, newEmotionCategory, setEmotions]);
 
-  const handleRemoveEmotion = useCallback(
-    async (value: string) => {
-      const updated = emotions.filter((item) => item.name !== value);
-      const finalList = updated.length > 0 ? updated : DEFAULT_EMOTIONS;
-      await setEmotions(finalList);
+  const handleUpdateEmotionCategory = useCallback(
+    async (name: string, category: Emotion["category"]) => {
+      const target = name.trim().toLowerCase();
+      const updated = emotions.map((emotion) =>
+        emotion.name.trim().toLowerCase() === target
+          ? { ...emotion, category }
+          : emotion
+      );
+
+      const changed = emotions.some(
+        (emotion) =>
+          emotion.name.trim().toLowerCase() === target &&
+          emotion.category !== category
+      );
+      if (!changed) {
+        return;
+      }
+
+      await setEmotions(updated);
+      try {
+        const result = await updateEmotionCategoryInMoods(name, category);
+        if (result.updated > 0) {
+          Alert.alert("Updated", `Updated ${result.updated} entries.`);
+        }
+      } catch (error) {
+        console.error("Failed to update mood entries for emotion:", error);
+        Alert.alert(
+          "Update Failed",
+          "Emotion category updated in settings, but existing mood entries could not be updated."
+        );
+      }
     },
     [emotions, setEmotions]
   );
+
+  const handleRemoveEmotion = useCallback(
+    async (value: string) => {
+      Alert.alert(
+        "Remove Emotion",
+        "Do you want to remove this emotion from settings only, or also from past entries?",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Settings Only",
+            onPress: async () => {
+              const updated = emotions.filter((item) => item.name !== value);
+              const finalList = updated.length > 0 ? updated : DEFAULT_EMOTIONS;
+              await setEmotions(finalList);
+            },
+          },
+          {
+            text: "Also Past Entries",
+            style: "destructive",
+            onPress: async () => {
+              const updated = emotions.filter((item) => item.name !== value);
+              const finalList = updated.length > 0 ? updated : DEFAULT_EMOTIONS;
+              await setEmotions(finalList);
+              try {
+                const result = await removeEmotionFromMoods(value);
+                Alert.alert(
+                  "Updated",
+                  `Removed from ${result.updated} entries.`
+                );
+              } catch (error) {
+                console.error("Failed to remove emotion from moods:", error);
+                Alert.alert(
+                  "Update Failed",
+                  "Emotion removed from settings, but past entries could not be updated."
+                );
+              }
+            },
+          },
+        ]
+      );
+    },
+    [emotions, setEmotions]
+  );
+
+  const handleImportEmotionsFromEntries = useCallback(async () => {
+    try {
+      const names = await getEmotionNamesFromMoods();
+      if (names.length === 0) {
+        Alert.alert("No Emotions Found", "No emotions were found in past entries.");
+        return;
+      }
+
+      const existing = new Set(
+        emotions.map((emotion) => emotion.name.trim().toLowerCase())
+      );
+      const additions = names.filter(
+        (name) => !existing.has(name.trim().toLowerCase())
+      );
+
+      if (additions.length === 0) {
+        Alert.alert(
+          "Up to Date",
+          "All emotions from past entries are already in your presets."
+        );
+        return;
+      }
+
+      const updated = [
+        ...emotions,
+        ...additions.map(
+          (name) => ({ name, category: "neutral" }) as Emotion
+        ),
+      ];
+
+      await setEmotions(updated);
+      Alert.alert(
+        "Imported",
+        `Added ${additions.length} emotion${additions.length === 1 ? "" : "s"} as neutral presets.`
+      );
+    } catch (error) {
+      console.error("Failed to import emotions from entries:", error);
+      Alert.alert("Import Failed", "Could not import emotions from entries.");
+    }
+  }, [emotions, setEmotions]);
 
   const handleAddContext = useCallback(async () => {
     const trimmed = newContext.trim();
@@ -280,11 +399,15 @@ export function SettingsScreen() {
           emotions={emotions}
           contexts={contexts}
           newEmotion={newEmotion}
+          newEmotionCategory={newEmotionCategory}
           setNewEmotion={setNewEmotion}
+          setNewEmotionCategory={setNewEmotionCategory}
           newContext={newContext}
           setNewContext={setNewContext}
           onAddEmotion={handleAddEmotion}
           onRemoveEmotion={handleRemoveEmotion}
+          onUpdateEmotionCategory={handleUpdateEmotionCategory}
+          onImportEmotionsFromEntries={handleImportEmotionsFromEntries}
           onAddContext={handleAddContext}
           onRemoveContext={handleRemoveContext}
         />

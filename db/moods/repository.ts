@@ -7,7 +7,12 @@ import {
   serializeEmotions,
   toMoodEntry,
 } from "./serialization";
-import { linkEmotionsToMood } from "./emotions";
+import {
+  deleteEmotion,
+  linkEmotionsToMood,
+  upsertEmotionCategory,
+} from "./emotions";
+import { parseEmotionItem } from "./emotionUtils";
 
 export async function insertMood(
   mood: number,
@@ -212,6 +217,167 @@ export async function getMoodCount(): Promise<number> {
   const result = await db.getFirstAsync("SELECT COUNT(*) as count FROM moods");
   const count = (result as any)?.count || 0;
   return count;
+}
+
+export async function updateEmotionCategoryInMoods(
+  emotionName: string,
+  category: Emotion["category"]
+): Promise<{ updated: number }> {
+  const db = await getDb();
+  const target = emotionName.trim().toLowerCase();
+  let updated = 0;
+
+  await db.execAsync("BEGIN TRANSACTION;");
+  try {
+    const rows = await db.getAllAsync("SELECT id, emotions FROM moods;");
+
+    for (const row of rows as any[]) {
+      const rawEmotions = row.emotions;
+      if (!rawEmotions || rawEmotions === "[]") {
+        continue;
+      }
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(rawEmotions);
+      } catch {
+        continue;
+      }
+
+      if (!Array.isArray(parsed)) {
+        continue;
+      }
+
+      const normalized = parsed
+        .map(parseEmotionItem)
+        .filter((item): item is Emotion => item !== null);
+
+      let changed = false;
+      const next = normalized.map((emotion) => {
+        if (emotion.name.trim().toLowerCase() === target) {
+          if (emotion.category !== category) {
+            changed = true;
+          }
+          return { ...emotion, category };
+        }
+        return emotion;
+      });
+
+      if (!changed) {
+        continue;
+      }
+
+      await db.runAsync(
+        "UPDATE moods SET emotions = ? WHERE id = ?;",
+        serializeEmotions(next),
+        row.id
+      );
+      updated += 1;
+    }
+
+    await upsertEmotionCategory(emotionName, category);
+    await db.execAsync("COMMIT;");
+    return { updated };
+  } catch (error) {
+    await db.execAsync("ROLLBACK;");
+    throw error;
+  }
+}
+
+export async function removeEmotionFromMoods(
+  emotionName: string
+): Promise<{ updated: number }> {
+  const db = await getDb();
+  const target = emotionName.trim().toLowerCase();
+  let updated = 0;
+
+  await db.execAsync("BEGIN TRANSACTION;");
+  try {
+    const rows = await db.getAllAsync("SELECT id, emotions FROM moods;");
+
+    for (const row of rows as any[]) {
+      const rawEmotions = row.emotions;
+      if (!rawEmotions || rawEmotions === "[]") {
+        continue;
+      }
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(rawEmotions);
+      } catch {
+        continue;
+      }
+
+      if (!Array.isArray(parsed)) {
+        continue;
+      }
+
+      const normalized = parsed
+        .map(parseEmotionItem)
+        .filter((item): item is Emotion => item !== null);
+
+      const next = normalized.filter(
+        (emotion) => emotion.name.trim().toLowerCase() !== target
+      );
+
+      if (next.length === normalized.length) {
+        continue;
+      }
+
+      await db.runAsync(
+        "UPDATE moods SET emotions = ? WHERE id = ?;",
+        serializeEmotions(next),
+        row.id
+      );
+      await linkEmotionsToMood(db, row.id, next);
+      updated += 1;
+    }
+
+    await deleteEmotion(emotionName);
+    await db.execAsync("COMMIT;");
+    return { updated };
+  } catch (error) {
+    await db.execAsync("ROLLBACK;");
+    throw error;
+  }
+}
+
+export async function getEmotionNamesFromMoods(): Promise<string[]> {
+  const db = await getDb();
+  const rows = await db.getAllAsync("SELECT emotions FROM moods;");
+  const seen = new Map<string, string>();
+
+  for (const row of rows as any[]) {
+    const rawEmotions = row.emotions;
+    if (!rawEmotions || rawEmotions === "[]") {
+      continue;
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(rawEmotions);
+    } catch {
+      continue;
+    }
+
+    if (!Array.isArray(parsed)) {
+      continue;
+    }
+
+    const normalized = parsed
+      .map(parseEmotionItem)
+      .filter((item): item is Emotion => item !== null);
+
+    for (const emotion of normalized) {
+      const key = emotion.name.trim().toLowerCase();
+      if (!key || seen.has(key)) {
+        continue;
+      }
+      seen.set(key, emotion.name.trim());
+    }
+  }
+
+  return Array.from(seen.values()).sort((a, b) => a.localeCompare(b));
 }
 
 export async function getMoodsWithinRange(

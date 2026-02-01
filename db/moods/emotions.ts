@@ -81,6 +81,32 @@ export async function deleteEmotion(name: string): Promise<void> {
   await db.runAsync("DELETE FROM emotions WHERE name = ?;", name);
 }
 
+export async function upsertEmotionCategory(
+  name: string,
+  category: Emotion["category"]
+): Promise<void> {
+  const db = await getDb();
+  const existing = await db.getFirstAsync(
+    "SELECT id FROM emotions WHERE name = ?;",
+    name
+  );
+
+  if (existing) {
+    await db.runAsync(
+      "UPDATE emotions SET category = ? WHERE name = ?;",
+      category,
+      name
+    );
+    return;
+  }
+
+  await db.runAsync(
+    "INSERT INTO emotions (name, category) VALUES (?, ?);",
+    name,
+    category
+  );
+}
+
 async function getOrCreateEmotionId(
   db: SQLite.SQLiteDatabase,
   emotion: Emotion

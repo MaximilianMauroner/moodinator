@@ -1,9 +1,11 @@
-import React, { useMemo } from "react";
+import React from "react";
 import type { QuickEntryPrefs } from "@/lib/entrySettings";
 import type { Emotion } from "@db/types";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingCard } from "../components/SettingCard";
+import { SettingRow } from "../components/SettingRow";
 import { ToggleRow } from "../components/ToggleRow";
+import { EmotionListEditor } from "../components/EmotionListEditor";
 import { ListEditor } from "../components/ListEditor";
 
 export function EntryCustomizationSection({
@@ -12,11 +14,15 @@ export function EntryCustomizationSection({
   emotions,
   contexts,
   newEmotion,
+  newEmotionCategory,
   setNewEmotion,
+  setNewEmotionCategory,
   newContext,
   setNewContext,
   onAddEmotion,
   onRemoveEmotion,
+  onUpdateEmotionCategory,
+  onImportEmotionsFromEntries,
   onAddContext,
   onRemoveContext,
 }: {
@@ -25,19 +31,18 @@ export function EntryCustomizationSection({
   emotions: Emotion[];
   contexts: string[];
   newEmotion: string;
+  newEmotionCategory: Emotion["category"];
   setNewEmotion: (value: string) => void;
+  setNewEmotionCategory: (value: Emotion["category"]) => void;
   newContext: string;
   setNewContext: (value: string) => void;
   onAddEmotion: () => void;
   onRemoveEmotion: (value: string) => void;
+  onUpdateEmotionCategory: (name: string, category: Emotion["category"]) => void;
+  onImportEmotionsFromEntries: () => void;
   onAddContext: () => void;
   onRemoveContext: (value: string) => void;
 }) {
-  const emotionNames = useMemo(
-    () => emotions.map((emotion) => emotion.name),
-    [emotions]
-  );
-
   return (
     <>
       <SectionHeader title="Entry Customization" icon="✨" />
@@ -62,15 +67,23 @@ export function EntryCustomizationSection({
           value={quickEntryPrefs.showNotes}
           onChange={(v) => onQuickEntryToggle("showNotes", v)}
         />
-        <ListEditor
+        <EmotionListEditor
           title="Emotions"
           description="Custom emotions for entries"
           placeholder="Add emotion..."
-          items={emotionNames}
+          emotions={emotions}
           newValue={newEmotion}
+          newCategory={newEmotionCategory}
           onChangeNewValue={setNewEmotion}
+          onChangeNewCategory={setNewEmotionCategory}
           onAdd={onAddEmotion}
           onRemove={onRemoveEmotion}
+          onUpdateCategory={onUpdateEmotionCategory}
+        />
+        <SettingRow
+          label="Import emotions from entries"
+          subLabel="Adds any emotions found in past entries as neutral presets."
+          onPress={onImportEmotionsFromEntries}
         />
         <ListEditor
           title="Contexts"
