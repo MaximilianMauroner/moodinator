@@ -19,12 +19,14 @@ export function AdvancedSection({
 }) {
   return (
     <>
-      <SectionHeader title="Advanced" icon="🛠️" />
+      <SectionHeader title="Developer" icon="🛠️" />
       <SettingCard>
         <ToggleRow
           title="Developer Mode"
+          description="Enable advanced options"
           value={devOptionsEnabled}
           onChange={onToggleDevOptions}
+          icon="code-slash-outline"
           isLast={!devOptionsEnabled}
         />
         {devOptionsEnabled && (

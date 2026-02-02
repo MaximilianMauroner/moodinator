@@ -45,28 +45,41 @@ export function EntryCustomizationSection({
 }) {
   return (
     <>
-      <SectionHeader title="Entry Customization" icon="✨" />
+      <SectionHeader title="Quick Entry" icon="⚡" />
       <SettingCard>
         <ToggleRow
-          title="Quick Entry: Emotions"
+          title="Emotions"
+          description="Show emotions in quick entry"
           value={quickEntryPrefs.showEmotions}
           onChange={(v) => onQuickEntryToggle("showEmotions", v)}
+          icon="heart-outline"
         />
         <ToggleRow
-          title="Quick Entry: Context"
+          title="Context"
+          description="Show context tags in quick entry"
           value={quickEntryPrefs.showContext}
           onChange={(v) => onQuickEntryToggle("showContext", v)}
+          icon="location-outline"
         />
         <ToggleRow
-          title="Quick Entry: Energy"
+          title="Energy"
+          description="Show energy level in quick entry"
           value={quickEntryPrefs.showEnergy}
           onChange={(v) => onQuickEntryToggle("showEnergy", v)}
+          icon="flash-outline"
         />
         <ToggleRow
-          title="Quick Entry: Notes"
+          title="Notes"
+          description="Show notes field in quick entry"
           value={quickEntryPrefs.showNotes}
           onChange={(v) => onQuickEntryToggle("showNotes", v)}
+          icon="document-text-outline"
+          isLast
         />
+      </SettingCard>
+
+      <SectionHeader title="Customize" icon="✨" />
+      <SettingCard>
         <EmotionListEditor
           title="Emotions"
           description="Custom emotions for entries"
@@ -81,8 +94,9 @@ export function EntryCustomizationSection({
           onUpdateCategory={onUpdateEmotionCategory}
         />
         <SettingRow
-          label="Import emotions from entries"
-          subLabel="Adds any emotions found in past entries as neutral presets."
+          label="Import from entries"
+          subLabel="Add emotions from past entries as presets"
+          icon="download-outline"
           onPress={onImportEmotionsFromEntries}
         />
         <ListEditor

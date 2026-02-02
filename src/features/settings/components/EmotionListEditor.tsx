@@ -3,7 +3,7 @@ import { View, Text, TextInput, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { Emotion } from "@db/types";
 import { BUTTON_HINTS } from "@/constants/accessibility";
-import { useThemeColors, colors } from "@/constants/colors";
+import { useThemeColors } from "@/constants/colors";
 import { haptics } from "@/lib/haptics";
 
 const CATEGORY_OPTIONS: { value: Emotion["category"]; label: string }[] = [
@@ -39,7 +39,7 @@ export const EmotionListEditor = memo(function EmotionListEditor({
   onUpdateCategory: (name: string, category: Emotion["category"]) => void;
   isLast?: boolean;
 }) {
-  const { isDark, get, getCategoryStyles } = useThemeColors();
+  const { get, getCategoryStyles } = useThemeColors();
   const [expandedName, setExpandedName] = useState<string | null>(null);
   const categoryStyles = getCategoryStyles();
 

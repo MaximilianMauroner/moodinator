@@ -15,17 +15,22 @@ export function PreferencesSection({
 }) {
   return (
     <>
-      <SectionHeader title="Preferences" icon="⚙️" />
+      <SectionHeader title="Display" icon="🎨" />
       <SettingCard>
         <ToggleRow
           title="Detailed Labels"
           description="Show mood descriptions in charts"
           value={showDetailedLabels}
           onChange={onToggleDetailedLabels}
+          icon="text-outline"
         />
+      </SettingCard>
+
+      <SectionHeader title="Notifications" icon="🔔" />
+      <SettingCard>
         <SettingRow
-          label="Notifications"
-          subLabel="Manage reminders"
+          label="Notification Settings"
+          subLabel="Manage your reminders"
           icon="notifications-outline"
           isLast
           action={

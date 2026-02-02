@@ -1,6 +1,7 @@
 import React, { memo } from "react";
 import { Switch, Platform } from "react-native";
 import { useColorScheme } from "nativewind";
+import { Ionicons } from "@expo/vector-icons";
 import { SettingRow } from "./SettingRow";
 import { SETTINGS_ACCESSIBILITY } from "@/constants/accessibility";
 
@@ -10,12 +11,14 @@ export const ToggleRow = memo(function ToggleRow({
   value,
   onChange,
   isLast,
+  icon,
 }: {
   title: string;
   description?: string;
   value: boolean;
   onChange: (v: boolean) => void;
   isLast?: boolean;
+  icon?: keyof typeof Ionicons.glyphMap;
 }) {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === "dark";
@@ -25,6 +28,7 @@ export const ToggleRow = memo(function ToggleRow({
       label={title}
       subLabel={description}
       isLast={isLast}
+      icon={icon}
       action={
         <Switch
           value={value}

@@ -2,7 +2,6 @@ import React from "react";
 import { View, Text, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useColorScheme } from "nativewind";
-import { BUTTON_HINTS } from "@/constants/accessibility";
 import { haptics } from "@/lib/haptics";
 
 export function SettingRow({
