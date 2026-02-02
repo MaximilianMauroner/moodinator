@@ -1,13 +1,14 @@
 import React, { useEffect } from "react";
 import { View, Text, Pressable } from "react-native";
 import { Stack } from "expo-router";
-import { registerBackgroundBackupTask } from "@db/backgroundBackup";
+// import { registerBackgroundBackupTask } from "@db/backgroundBackup";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 import "./global.css";
 
 // Import backgroundBackup at module level to ensure task is defined before registration
-import "@db/backgroundBackup";
+// Temporarily disabled due to expo-task-manager compatibility issue with New Architecture
+// import "@db/backgroundBackup";
 
 /**
  * Root-level error fallback for critical app errors.
@@ -41,9 +42,9 @@ function RootErrorFallback({ error, resetError }: { error: Error; resetError: ()
 
 export default function Layout() {
   useEffect(() => {
-    // Register background backup task for weekly automatic backups
-    // The task runs in the background even when the app is closed
-    registerBackgroundBackupTask();
+    // Background backup temporarily disabled due to expo-task-manager compatibility issue
+    // TODO: Re-enable when expo-background-task supports New Architecture
+    // registerBackgroundBackupTask();
   }, []);
 
   return (

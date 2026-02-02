@@ -1,5 +1,6 @@
 import React, { useCallback } from "react";
-import { FlatList, RefreshControl } from "react-native";
+import { RefreshControl } from "react-native";
+import { FlashList } from "@shopify/flash-list";
 import { DisplayMoodItem } from "@/components/DisplayMoodItem";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
@@ -18,7 +19,7 @@ interface MoodHistoryListProps {
 }
 
 /**
- * FlatList component for displaying mood history entries.
+ * FlashList component for displaying mood history entries.
  * Includes pull-to-refresh and empty state handling.
  */
 export function MoodHistoryList({
@@ -60,9 +61,8 @@ export function MoodHistoryList({
   }, [loading]);
 
   return (
-    <FlatList
+    <FlashList
       data={moods}
-      initialNumToRender={10}
       contentContainerStyle={{
         paddingBottom: 100,
       }}
@@ -77,13 +77,9 @@ export function MoodHistoryList({
         />
       }
       showsVerticalScrollIndicator={false}
-      removeClippedSubviews={true}
-      windowSize={7}
-      maxToRenderPerBatch={10}
-      updateCellsBatchingPeriod={50}
       extraData={moods}
-      style={{ flex: 1 }}
       ListEmptyComponent={renderEmptyComponent}
+      estimatedItemSize={120}
     />
   );
 }
