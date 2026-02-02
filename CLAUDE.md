@@ -68,6 +68,22 @@ Avoid NativeWind `shadow-*` classes in dynamic components - use inline `style` w
 - Quick Entry (tap mood button): Basic fields configured via `quickEntryFieldConfig`
 - Detailed Entry (long press): All fields including photos, voice, location via `detailedFieldConfig`
 
+## Privacy & Legal Documents
+
+**Data Storage Policy**: All user data is stored locally on-device only. No data is transmitted to external servers, no accounts are required, and no analytics/tracking is used.
+
+**Legal Files**:
+- `PRIVACY_POLICY.md` - Root markdown file
+- `TERMS_OF_SERVICE.md` - Root markdown file
+- `src/app/settings/privacy-policy.tsx` - In-app screen
+- `src/app/settings/terms-of-service.tsx` - In-app screen
+
+**When modifying data collection or storage:**
+1. Update both the markdown files AND the in-app screens
+2. Update the "Last Updated" date in all four files
+3. Ensure the privacy policy accurately reflects what data is collected and how it's stored
+4. Maintain consistency: the app must never store data externally without updating these documents
+
 ## Improvements Tracking
 
 **CRITICAL**: All improvement recommendations are tracked in `improvements.md`.
