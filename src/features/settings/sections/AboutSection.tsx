@@ -1,25 +1,18 @@
 import React from "react";
 import { Linking, Alert } from "react-native";
+import { useRouter } from "expo-router";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingCard } from "../components/SettingCard";
 import { SettingRow } from "../components/SettingRow";
 
 const APP_VERSION = "1.0.0";
-const PRIVACY_POLICY_URL = "https://moodinator.app/privacy";
-const SUPPORT_EMAIL = "support@moodinator.app";
+const SUPPORT_EMAIL = "support.moodinator@lab4code.com";
 
 export function AboutSection() {
-  const handlePrivacyPress = async () => {
-    try {
-      const supported = await Linking.canOpenURL(PRIVACY_POLICY_URL);
-      if (supported) {
-        await Linking.openURL(PRIVACY_POLICY_URL);
-      } else {
-        Alert.alert("Error", "Cannot open privacy policy link");
-      }
-    } catch {
-      Alert.alert("Error", "Failed to open privacy policy");
-    }
+  const router = useRouter();
+
+  const handlePrivacyPress = () => {
+    router.push("/settings/privacy-policy");
   };
 
   const handleContactPress = async () => {
