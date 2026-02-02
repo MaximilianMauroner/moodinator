@@ -43,6 +43,27 @@ Planned improvements for Moodinator. See CLAUDE.md for instructions on maintaini
 - Local encryption option
 - Cloud backup (iCloud/Google Drive)
 - Background auto-backup via expo-task-manager
+- Cross-device sync (optional, user-controlled)
+
+### Widgets
+- Calendar widget for quick mood entry
+- Home screen widget showing recent mood
+
+### User Experience
+- Onboarding tutorial for new users
+- Improved haptic feedback patterns (varied intensity, custom patterns)
+
+---
+
+## Release Preparation
+
+### App Store Submission
+- App icon design
+- Splash screen design
+- App Store screenshots and preview video
+- App Store listing copy (description, keywords)
+- Privacy policy URL configuration
+- App review preparation
 
 ---
 
