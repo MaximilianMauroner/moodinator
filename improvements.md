@@ -7,7 +7,6 @@ Planned improvements for Moodinator. See CLAUDE.md for instructions on maintaini
 ## Low Priority - Features
 
 ### Analytics & Insights
-- Mood correlations with emotions/context/time-of-day
 - Weekly trend notifications
 - "Good day" pattern detection
 - Streak milestones and celebrations
@@ -26,20 +25,14 @@ Planned improvements for Moodinator. See CLAUDE.md for instructions on maintaini
 ### Export Options
 - CSV/Excel export
 - PDF reports with charts
-- Encrypted export with password protection
 - HealthKit/Google Fit integration
 
 ### Personalization
-- Custom mood scale (emoji, 0-100, etc.)
-- Configurable number of mood levels (e.g., 5 buttons instead of 10)
-- Customizable mood labels (rename "Elated", "Crisis", etc. to user-preferred terms)
-- Customizable mood level colors
 - Theme color customization
 - Font size adjustment
 - Language/localization
 
 ### Privacy & Data
-- App lock with biometric authentication (FaceID/TouchID/fingerprint) or PIN/password
 - Local encryption option
 - Cloud backup (iCloud/Google Drive)
 - Cross-device sync (optional, user-controlled)
@@ -47,10 +40,6 @@ Planned improvements for Moodinator. See CLAUDE.md for instructions on maintaini
 ### Widgets
 - Calendar widget for quick mood entry
 - Home screen widget showing recent mood
-
-### User Experience
-- Onboarding tutorial for new users
-- Improved haptic feedback patterns (varied intensity, custom patterns)
 
 ---
 

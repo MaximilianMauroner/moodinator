@@ -117,6 +117,14 @@ export function SettingsScreen() {
 
         <View className="gap-3">
           <SettingsCategoryCard
+            title="Mood Scale"
+            description="Customize levels, labels, and colors"
+            icon="options-outline"
+            href="/settings/mood-scale"
+            accentColor="sage"
+          />
+
+          <SettingsCategoryCard
             title="Emotions"
             description="Manage your emotion presets"
             icon="happy-outline"
@@ -154,6 +162,20 @@ export function SettingsScreen() {
             description="Create a report for your therapist"
             icon="medical-outline"
             href="/therapy-export"
+            accentColor="dusk"
+          />
+        </View>
+
+        <Text className="text-xs font-semibold uppercase tracking-wider text-sand-500 dark:text-sand-400 mb-3 mt-6 ml-1">
+          Privacy & Security
+        </Text>
+
+        <View className="gap-3">
+          <SettingsCategoryCard
+            title="App Lock"
+            description="Biometric or device passcode"
+            icon="lock-closed-outline"
+            href="/settings/app-lock"
             accentColor="dusk"
           />
         </View>

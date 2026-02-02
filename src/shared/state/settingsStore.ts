@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { QuickEntryPrefs } from "@/lib/entrySettings";
 import type { Emotion } from "@db/types";
+import type { MoodScaleConfig } from "@/types/moodScaleConfig";
 import {
   DEFAULT_CONTEXTS,
   DEFAULT_EMOTIONS,
@@ -12,10 +13,17 @@ import {
   saveEmotionPresets,
   saveQuickEntryPrefs,
 } from "@/lib/entrySettings";
-import { DEV_OPTIONS_KEY, SHOW_LABELS_KEY } from "@/shared/storage/keys";
-import { getBoolean, setBoolean } from "@/shared/storage/asyncStorage";
+import {
+  DEV_OPTIONS_KEY,
+  SHOW_LABELS_KEY,
+  MOOD_SCALE_CONFIG_KEY,
+  APP_LOCK_ENABLED_KEY,
+  HAS_COMPLETED_ONBOARDING_KEY,
+} from "@/shared/storage/keys";
+import { getBoolean, setBoolean, getJson, setJson } from "@/shared/storage/asyncStorage";
 import { HAPTICS_ENABLED_KEY } from "@/services/settingsService";
 import { setHapticsEnabled as setHapticsEnabledGlobal } from "@/lib/haptics";
+import { getDefaultMoodScaleConfig } from "@/lib/moodScaleUtils";
 
 export type SettingsStore = {
   hydrated: boolean;
@@ -28,6 +36,15 @@ export type SettingsStore = {
   contexts: string[];
   quickEntryPrefs: QuickEntryPrefs;
 
+  // Mood scale configuration
+  moodScaleConfig: MoodScaleConfig | null;
+
+  // App lock
+  appLockEnabled: boolean;
+
+  // Onboarding
+  hasCompletedOnboarding: boolean;
+
   hydrate: () => Promise<void>;
   setShowDetailedLabels: (value: boolean) => Promise<void>;
   setDevOptionsEnabled: (value: boolean) => Promise<void>;
@@ -36,6 +53,15 @@ export type SettingsStore = {
   setEmotions: (values: Emotion[]) => Promise<void>;
   setContexts: (values: string[]) => Promise<void>;
   setQuickEntryPrefs: (prefs: QuickEntryPrefs) => Promise<void>;
+
+  // Mood scale
+  setMoodScaleConfig: (config: MoodScaleConfig) => Promise<void>;
+
+  // App lock
+  setAppLockEnabled: (value: boolean) => Promise<void>;
+
+  // Onboarding
+  setHasCompletedOnboarding: (value: boolean) => Promise<void>;
 };
 
 export const useSettingsStore = create<SettingsStore>((set) => ({
@@ -49,16 +75,32 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
   contexts: DEFAULT_CONTEXTS,
   quickEntryPrefs: DEFAULT_QUICK_ENTRY_PREFS,
 
+  moodScaleConfig: null,
+  appLockEnabled: false,
+  hasCompletedOnboarding: false,
+
   hydrate: async () => {
-    const [showDetailedLabels, devOptionsEnabled, hapticsEnabled, emotions, contexts, prefs] =
-      await Promise.all([
-        getBoolean(SHOW_LABELS_KEY),
-        getBoolean(DEV_OPTIONS_KEY),
-        getBoolean(HAPTICS_ENABLED_KEY),
-        getEmotionPresets(),
-        getContextTags(),
-        getQuickEntryPrefs(),
-      ]);
+    const [
+      showDetailedLabels,
+      devOptionsEnabled,
+      hapticsEnabled,
+      emotions,
+      contexts,
+      prefs,
+      moodScaleConfig,
+      appLockEnabled,
+      hasCompletedOnboarding,
+    ] = await Promise.all([
+      getBoolean(SHOW_LABELS_KEY),
+      getBoolean(DEV_OPTIONS_KEY),
+      getBoolean(HAPTICS_ENABLED_KEY),
+      getEmotionPresets(),
+      getContextTags(),
+      getQuickEntryPrefs(),
+      getJson<MoodScaleConfig>(MOOD_SCALE_CONFIG_KEY),
+      getBoolean(APP_LOCK_ENABLED_KEY),
+      getBoolean(HAS_COMPLETED_ONBOARDING_KEY),
+    ]);
 
     const hapticsValue = hapticsEnabled ?? true;
     setHapticsEnabledGlobal(hapticsValue);
@@ -71,6 +113,9 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
       emotions,
       contexts,
       quickEntryPrefs: prefs,
+      moodScaleConfig: moodScaleConfig ?? getDefaultMoodScaleConfig(),
+      appLockEnabled: appLockEnabled ?? false,
+      hasCompletedOnboarding: hasCompletedOnboarding ?? false,
     });
   },
 
@@ -103,5 +148,20 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
   setQuickEntryPrefs: async (prefs) => {
     await saveQuickEntryPrefs(prefs);
     set({ quickEntryPrefs: prefs });
+  },
+
+  setMoodScaleConfig: async (config) => {
+    await setJson(MOOD_SCALE_CONFIG_KEY, config);
+    set({ moodScaleConfig: config });
+  },
+
+  setAppLockEnabled: async (value) => {
+    await setBoolean(APP_LOCK_ENABLED_KEY, value);
+    set({ appLockEnabled: value });
+  },
+
+  setHasCompletedOnboarding: async (value) => {
+    await setBoolean(HAS_COMPLETED_ONBOARDING_KEY, value);
+    set({ hasCompletedOnboarding: value });
   },
 }));
