@@ -4,13 +4,17 @@ import {
   Alert,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   Switch,
   Text,
   View,
+  StyleSheet,
+  TouchableOpacity,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { useColorScheme } from "nativewind";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
@@ -25,48 +29,55 @@ import { MoodDateRange, MoodRangePreset, getMoodsWithinRange } from "@db/db";
 
 type RangeOption = MoodRangePreset | "custom";
 
-const FIELD_OPTIONS: Array<{
+const FIELD_OPTIONS: {
   key: TherapyExportField;
   label: string;
   description: string;
-}> = [
+  icon: keyof typeof Ionicons.glyphMap;
+}[] = [
   {
     key: "timestamp",
     label: "Timestamp",
     description: "Exact date and time of the entry",
+    icon: "time-outline",
   },
   {
     key: "mood",
     label: "Mood Score",
     description: "0-10 rating selected for the entry",
+    icon: "happy-outline",
   },
   {
     key: "emotions",
     label: "Emotions",
     description: "Selected emotion tags (up to 3)",
+    icon: "heart-outline",
   },
   {
     key: "context",
     label: "Context Tags",
     description: "Where you were or who you were with",
+    icon: "location-outline",
   },
   {
     key: "energy",
     label: "Energy Level",
     description: "Selected energy value (0-10)",
+    icon: "flash-outline",
   },
   {
     key: "notes",
     label: "Notes",
     description: "Additional thoughts saved with the entry",
+    icon: "document-text-outline",
   },
 ];
 
-const RANGE_OPTIONS: Array<{
+const RANGE_OPTIONS: {
   key: RangeOption;
   label: string;
   description: string;
-}> = [
+}[] = [
   {
     key: "week",
     label: "Last 7 Days",
@@ -148,6 +159,9 @@ function buildCsv(
 
 export default function TherapyExportScreen() {
   const router = useRouter();
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === "dark";
+
   const [selectedFields, setSelectedFields] = useState<TherapyExportField[]>(
     DEFAULT_THERAPY_EXPORT_PREFS.fields
   );
@@ -159,6 +173,8 @@ export default function TherapyExportScreen() {
   });
   const [customEndDate, setCustomEndDate] = useState(() => new Date());
   const [loading, setLoading] = useState(false);
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -184,9 +200,7 @@ export default function TherapyExportScreen() {
 
   const rangeSummary = useMemo(() => {
     if (rangeOption === "custom") {
-      return `${formatDateSlug(customStartDate)} → ${formatDateSlug(
-        customEndDate
-      )}`;
+      return `${formatDateSlug(customStartDate)} → ${formatDateSlug(customEndDate)}`;
     }
     const option = RANGE_OPTIONS.find((opt) => opt.key === rangeOption);
     return option?.label ?? "Last 7 Days";
@@ -232,9 +246,7 @@ export default function TherapyExportScreen() {
       const csv = buildCsv(rows, selectedFields);
       const fileSuffix =
         rangeOption === "custom"
-          ? `${formatDateSlug(customStartDate)}-to-${formatDateSlug(
-              customEndDate
-            )}`
+          ? `${formatDateSlug(customStartDate)}-to-${formatDateSlug(customEndDate)}`
           : rangeOption;
       const fileUri = `${FileSystem.cacheDirectory}therapy-export-${fileSuffix}.csv`;
       await FileSystem.writeAsStringAsync(fileUri, csv, {
@@ -265,110 +277,167 @@ export default function TherapyExportScreen() {
     }
   };
 
-  return (
-    <SafeAreaView className="flex-1 bg-white dark:bg-slate-950">
-      <ScrollView className="flex-1 my-4">
-        <View className="p-4 space-y-6 flex gap-2">
-          <View className="flex-row items-center justify-between">
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => router.back()}
-              className="px-4 py-2 rounded-xl bg-white/90 dark:bg-white/10 border border-slate-200 dark:border-slate-700 shadow-sm"
-            >
-              <Text className="text-lg font-semibold text-slate-700 dark:text-slate-100">
-                Back
-              </Text>
-            </Pressable>
-            <Text className="text-xl font-bold text-slate-900 dark:text-white flex-1 text-center">
-              Therapy Export Profile
-            </Text>
-            <View className="w-[64px]" />
-          </View>
+  const selectedCount = selectedFields.length;
 
-          <View className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-100 dark:border-slate-800 shadow-sm space-y-2">
-            <Text className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-2">
+  return (
+    <SafeAreaView className="flex-1 bg-paper-100 dark:bg-paper-900" edges={["top"]}>
+      {/* Header */}
+      <View className="px-4 pt-2 pb-4 bg-paper-100 dark:bg-paper-900">
+        {/* Back button row */}
+        <TouchableOpacity
+          onPress={() => router.back()}
+          className="flex-row items-center py-2 -ml-1 mb-3"
+          activeOpacity={0.7}
+        >
+          <Ionicons
+            name="chevron-back"
+            size={24}
+            color={isDark ? "#A8C5A8" : "#5B8A5B"}
+          />
+          <Text className="text-base font-medium ml-1 text-sage-500 dark:text-sage-300">
+            Settings
+          </Text>
+        </TouchableOpacity>
+
+        {/* Title row with icon */}
+        <View className="flex-row items-center">
+          <View className="w-14 h-14 rounded-2xl items-center justify-center mr-4 bg-dusk-100 dark:bg-dusk-800">
+            <Ionicons name="medical-outline" size={28} color={isDark ? "#C4BBCF" : "#847596"} />
+          </View>
+          <View className="flex-1">
+            <Text className="text-xs font-medium mb-0.5 text-dusk-500 dark:text-dusk-300">
+              Data
+            </Text>
+            <Text className="text-2xl font-bold text-paper-800 dark:text-paper-200 tracking-tight">
+              Therapy Export
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ paddingBottom: 40, paddingTop: 16 }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Info banner */}
+        <View className="mx-4 mb-4 p-4 rounded-2xl bg-dusk-100 dark:bg-dusk-800">
+          <View className="flex-row items-center mb-2">
+            <Text className="text-2xl mr-2">📋</Text>
+            <Text className="text-base font-bold text-dusk-500 dark:text-dusk-300">
               Share what matters
             </Text>
-            <Text className="text-sm text-slate-600 dark:text-slate-300">
-              Customize the CSV your therapist receives. Pick the fields to
-              include, choose a timeframe, and export a spreadsheet-ready file.
-            </Text>
-            <Text className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-              Current range: {rangeSummary}
+          </View>
+          <Text className="text-xs text-sand-500 dark:text-sand-400 mb-2">
+            Customize the CSV your therapist receives. Pick the fields to include, choose a timeframe, and export a spreadsheet-ready file.
+          </Text>
+          <View className="flex-row items-center mt-1">
+            <Ionicons name="calendar-outline" size={14} color={isDark ? "#C4BBCF" : "#847596"} />
+            <Text className="text-xs font-medium ml-1 text-dusk-500 dark:text-dusk-300">
+              {rangeSummary}
             </Text>
           </View>
+        </View>
 
-          <View className="space-y-3">
-            <Text className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-3">
-              Fields to Include
-            </Text>
-            <View className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800">
-              {FIELD_OPTIONS.map((field) => {
-                const enabled = selectedFields.includes(field.key);
-                return (
-                  <View
-                    key={field.key}
-                    className="flex-row items-center justify-between px-4 py-4"
-                  >
-                    <View className="flex-1 pr-4">
-                      <Text className="text-base font-medium text-slate-900 dark:text-slate-100">
-                        {field.label}
-                      </Text>
-                      <Text className="text-sm text-slate-500 dark:text-slate-400">
-                        {field.description}
-                      </Text>
-                    </View>
-                    <Switch
-                      value={enabled}
-                      onValueChange={() => handleToggleField(field.key)}
+        {/* Fields Section */}
+        <View className="mx-4 mb-4">
+          <Text className="text-xs font-semibold uppercase tracking-wider text-sand-500 dark:text-sand-400 mb-2 ml-1">
+            Fields to Include ({selectedCount}/6)
+          </Text>
+          <View
+            className="rounded-2xl bg-paper-50 dark:bg-paper-850 overflow-hidden"
+            style={isDark ? styles.sectionShadowDark : styles.sectionShadowLight}
+          >
+            {FIELD_OPTIONS.map((field, index) => {
+              const enabled = selectedFields.includes(field.key);
+              const isLast = index === FIELD_OPTIONS.length - 1;
+              return (
+                <View
+                  key={field.key}
+                  className={`flex-row items-center p-4 ${!isLast ? "border-b border-paper-200 dark:border-paper-800" : ""}`}
+                >
+                  <View className="w-9 h-9 rounded-xl items-center justify-center mr-3 bg-sage-100 dark:bg-sage-600/20">
+                    <Ionicons
+                      name={field.icon}
+                      size={18}
+                      color={isDark ? "#A8C5A8" : "#5B8A5B"}
                     />
                   </View>
+                  <View className="flex-1 mr-4">
+                    <Text className="text-base font-medium text-paper-800 dark:text-paper-200">
+                      {field.label}
+                    </Text>
+                    <Text className="text-sm text-sand-500 dark:text-sand-400 mt-0.5">
+                      {field.description}
+                    </Text>
+                  </View>
+                  <Switch
+                    value={enabled}
+                    onValueChange={() => handleToggleField(field.key)}
+                    trackColor={{
+                      false: isDark ? "#3D352A" : "#E5D9BF",
+                      true: "#5B8A5B",
+                    }}
+                    thumbColor={Platform.OS === "ios" ? undefined : "#fff"}
+                    ios_backgroundColor={isDark ? "#3D352A" : "#E5D9BF"}
+                  />
+                </View>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* Time Range Section */}
+        <View className="mx-4 mb-4">
+          <Text className="text-xs font-semibold uppercase tracking-wider text-sand-500 dark:text-sand-400 mb-2 ml-1">
+            Time Range
+          </Text>
+          <View
+            className="rounded-2xl bg-paper-50 dark:bg-paper-850 overflow-hidden p-4"
+            style={isDark ? styles.sectionShadowDark : styles.sectionShadowLight}
+          >
+            <View className="gap-3">
+              {RANGE_OPTIONS.map((option) => {
+                const isSelected = rangeOption === option.key;
+                return (
+                  <Pressable
+                    key={option.key}
+                    onPress={() => setRangeOption(option.key)}
+                    className={`rounded-2xl border px-4 py-3 ${
+                      isSelected
+                        ? "border-sage-500 bg-sage-100 dark:bg-sage-600/20"
+                        : "border-paper-200 dark:border-paper-800"
+                    }`}
+                  >
+                    <Text
+                      className={`font-semibold ${
+                        isSelected
+                          ? "text-sage-500 dark:text-sage-300"
+                          : "text-paper-800 dark:text-paper-200"
+                      }`}
+                    >
+                      {option.label}
+                    </Text>
+                    <Text className="text-xs text-sand-500 dark:text-sand-400 mt-1">
+                      {option.description}
+                    </Text>
+                  </Pressable>
                 );
               })}
             </View>
-          </View>
 
-          <View className="space-y-3">
-            <Text className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-3">
-              Time Range
-            </Text>
-            <View className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-4 space-y-4">
-              {RANGE_OPTIONS.map((option) => (
-                <Pressable
-                  key={option.key}
-                  onPress={() => setRangeOption(option.key)}
-                  className={`rounded-2xl border px-4 py-4 ${
-                    rangeOption === option.key
-                      ? "border-blue-500 bg-blue-50 dark:bg-blue-950/40"
-                      : "border-slate-200 dark:border-slate-700"
-                  }`}
-                >
-                  <Text
-                    className={`font-semibold ${
-                      rangeOption === option.key
-                        ? "text-blue-700 dark:text-blue-300"
-                        : "text-slate-900 dark:text-slate-100"
-                    }`}
-                  >
-                    {option.label}
+            {rangeOption === "custom" && (
+              <View className="mt-4 gap-4">
+                <View>
+                  <Text className="text-sm font-semibold text-paper-700 dark:text-paper-300 mb-2">
+                    Start Date
                   </Text>
-                  <Text className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    {option.description}
-                  </Text>
-                </Pressable>
-              ))}
-
-              {rangeOption === "custom" && (
-                <View className="space-y-5 pt-2">
-                  <View className="space-y-2">
-                    <Text className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">
-                      Start Date
-                    </Text>
-                    <View className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-2">
+                  {Platform.OS === "ios" ? (
+                    <View className="rounded-2xl border border-paper-200 dark:border-paper-800 bg-paper-100 dark:bg-paper-900 p-2 overflow-hidden">
                       <DateTimePicker
                         value={customStartDate}
                         mode="date"
-                        display={Platform.OS === "ios" ? "spinner" : "default"}
+                        display="spinner"
                         maximumDate={customEndDate}
                         onChange={(_, date) => {
                           if (date) {
@@ -380,16 +449,50 @@ export default function TherapyExportScreen() {
                         }}
                       />
                     </View>
-                  </View>
-                  <View className="space-y-2">
-                    <Text className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">
-                      End Date
-                    </Text>
-                    <View className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-2">
+                  ) : (
+                    <>
+                      <Pressable
+                        onPress={() => setShowStartPicker(true)}
+                        className="rounded-2xl border border-paper-200 dark:border-paper-800 bg-paper-100 dark:bg-paper-900 p-4 flex-row items-center justify-between"
+                      >
+                        <View className="flex-row items-center">
+                          <Ionicons name="calendar-outline" size={20} color={isDark ? "#A8C5A8" : "#5B8A5B"} />
+                          <Text className="text-base font-medium text-paper-800 dark:text-paper-200 ml-3">
+                            {customStartDate.toLocaleDateString()}
+                          </Text>
+                        </View>
+                        <Ionicons name="chevron-down" size={20} color={isDark ? "#6B5C4A" : "#9D8660"} />
+                      </Pressable>
+                      {showStartPicker && (
+                        <DateTimePicker
+                          value={customStartDate}
+                          mode="date"
+                          display="default"
+                          maximumDate={customEndDate}
+                          onChange={(_, date) => {
+                            setShowStartPicker(false);
+                            if (date) {
+                              setCustomStartDate(date);
+                              if (date > customEndDate) {
+                                setCustomEndDate(date);
+                              }
+                            }
+                          }}
+                        />
+                      )}
+                    </>
+                  )}
+                </View>
+                <View>
+                  <Text className="text-sm font-semibold text-paper-700 dark:text-paper-300 mb-2">
+                    End Date
+                  </Text>
+                  {Platform.OS === "ios" ? (
+                    <View className="rounded-2xl border border-paper-200 dark:border-paper-800 bg-paper-100 dark:bg-paper-900 p-2 overflow-hidden">
                       <DateTimePicker
                         value={customEndDate}
                         mode="date"
-                        display={Platform.OS === "ios" ? "spinner" : "default"}
+                        display="spinner"
                         minimumDate={customStartDate}
                         maximumDate={new Date()}
                         onChange={(_, date) => {
@@ -402,35 +505,103 @@ export default function TherapyExportScreen() {
                         }}
                       />
                     </View>
-                  </View>
+                  ) : (
+                    <>
+                      <Pressable
+                        onPress={() => setShowEndPicker(true)}
+                        className="rounded-2xl border border-paper-200 dark:border-paper-800 bg-paper-100 dark:bg-paper-900 p-4 flex-row items-center justify-between"
+                      >
+                        <View className="flex-row items-center">
+                          <Ionicons name="calendar-outline" size={20} color={isDark ? "#A8C5A8" : "#5B8A5B"} />
+                          <Text className="text-base font-medium text-paper-800 dark:text-paper-200 ml-3">
+                            {customEndDate.toLocaleDateString()}
+                          </Text>
+                        </View>
+                        <Ionicons name="chevron-down" size={20} color={isDark ? "#6B5C4A" : "#9D8660"} />
+                      </Pressable>
+                      {showEndPicker && (
+                        <DateTimePicker
+                          value={customEndDate}
+                          mode="date"
+                          display="default"
+                          minimumDate={customStartDate}
+                          maximumDate={new Date()}
+                          onChange={(_, date) => {
+                            setShowEndPicker(false);
+                            if (date) {
+                              setCustomEndDate(date);
+                              if (date < customStartDate) {
+                                setCustomStartDate(date);
+                              }
+                            }
+                          }}
+                        />
+                      )}
+                    </>
+                  )}
                 </View>
-              )}
-            </View>
+              </View>
+            )}
           </View>
+        </View>
 
-          <View className="space-y-4 pt-2">
-            <Pressable
-              onPress={handleExport}
-              disabled={loading}
-              className={`rounded-3xl py-4 items-center ${
-                loading ? "bg-blue-400" : "bg-blue-600"
-              }`}
-            >
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text className="text-white font-semibold text-base">
+        {/* Export Button */}
+        <View className="mx-4 mt-2">
+          <Pressable
+            onPress={handleExport}
+            disabled={loading}
+            className={`rounded-2xl py-4 items-center flex-row justify-center ${
+              loading ? "bg-sage-400" : "bg-sage-500"
+            }`}
+            style={isDark ? styles.buttonShadowDark : styles.buttonShadowLight}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <Ionicons name="share-outline" size={20} color="#fff" />
+                <Text className="text-white font-semibold text-base ml-2">
                   Export CSV for Therapist
                 </Text>
-              )}
-            </Pressable>
-            <Text className="text-xs text-center text-slate-500 dark:text-slate-400">
-              CSV files include column headers. Arrays are joined with
-              semicolons.
-            </Text>
-          </View>
+              </>
+            )}
+          </Pressable>
+          <Text className="text-xs text-center text-sand-500 dark:text-sand-400 mt-3">
+            CSV files include column headers. Arrays are joined with semicolons.
+          </Text>
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  sectionShadowLight: {
+    elevation: 2,
+    shadowColor: "#9D8660",
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  sectionShadowDark: {
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  buttonShadowLight: {
+    elevation: 3,
+    shadowColor: "#5B8A5B",
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  buttonShadowDark: {
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+  },
+});

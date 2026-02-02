@@ -46,13 +46,13 @@ export function DataSection({
         <SettingRow
           label="Import Data"
           subLabel="Restore from JSON backup"
-          icon="refresh-outline"
+          icon="cloud-upload-outline"
           onPress={onImport}
         />
         <SettingRow
           label="Therapy Export"
           subLabel="Create a report for your therapist"
-          icon="document-text-outline"
+          icon="medical-outline"
           action={
             <Link href="/therapy-export" asChild>
               <TouchableOpacity>

@@ -15,7 +15,6 @@ import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import * as Clipboard from "expo-clipboard";
 import { Ionicons } from "@expo/vector-icons";
-import { useColorScheme } from "nativewind";
 import { exportMoods } from "@db/db";
 
 type ExportRange = "week" | "month" | "custom" | "full";
@@ -122,8 +121,6 @@ export function ExportModal({
   visible: boolean;
   onClose: () => void;
 }) {
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === "dark";
   const [loading, setLoading] = useState(false);
   const [exportRange, setExportRange] = useState<ExportRange>("week");
   const [customStartDate, setCustomStartDate] = useState(() => {
