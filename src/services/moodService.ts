@@ -15,12 +15,17 @@ import {
   getAllMoods,
   getMoodCount,
   getMoodsWithinRange,
+  getMoodsPaginated,
   hasMoodBeenLoggedToday,
   updateEmotionCategoryInMoods,
   removeEmotionFromMoods,
   getEmotionNamesFromMoods,
+  type PaginationOptions,
+  type PaginatedResult,
 } from "@db/db";
 import type { MoodDateRange } from "@db/moods/range";
+
+export type { PaginationOptions, PaginatedResult };
 
 export interface MoodServiceInterface {
   // CRUD operations
@@ -30,6 +35,7 @@ export interface MoodServiceInterface {
 
   // Queries
   getAll: () => Promise<MoodEntry[]>;
+  getPaginated: (options: PaginationOptions) => Promise<PaginatedResult<MoodEntry>>;
   getInRange: (range?: MoodDateRange) => Promise<MoodEntry[]>;
   getToday: () => Promise<MoodEntry | null>;
   getYesterday: () => Promise<MoodEntry | null>;
@@ -125,6 +131,13 @@ export const moodService: MoodServiceInterface = {
    */
   async getAll(): Promise<MoodEntry[]> {
     return getAllMoods();
+  },
+
+  /**
+   * Get mood entries with pagination
+   */
+  async getPaginated(options: PaginationOptions): Promise<PaginatedResult<MoodEntry>> {
+    return getMoodsPaginated(options);
   },
 
   /**

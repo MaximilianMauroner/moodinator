@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { MoodEntry, MoodEntryInput } from "@db/types";
-import { moodService } from "@/services/moodService";
+import { moodService, type PaginatedResult } from "@/services/moodService";
 
 type LoadStatus = "idle" | "loading" | "error" | "refreshing";
 
@@ -11,8 +11,14 @@ export type MoodsStore = {
   lastLoadedAt: number | null;
   lastTracked: Date | null;
 
+  // Pagination state
+  totalCount: number;
+  hasMore: boolean;
+  currentOffset: number;
+
   // Actions
   loadAll: () => Promise<void>;
+  loadMore: (pageSize?: number) => Promise<void>;
   refreshMoods: () => Promise<void>;
   create: (entry: MoodEntryInput) => Promise<MoodEntry>;
   update: (
@@ -37,12 +43,17 @@ function computeLastTracked(moods: MoodEntry[]): Date | null {
   return new Date(sorted[0].timestamp);
 }
 
+const DEFAULT_PAGE_SIZE = 50;
+
 export const useMoodsStore = create<MoodsStore>((set, get) => ({
   moods: [],
   status: "idle",
   error: null,
   lastLoadedAt: null,
   lastTracked: null,
+  totalCount: 0,
+  hasMore: false,
+  currentOffset: 0,
 
   setLocal: (moods) =>
     set({
@@ -59,6 +70,9 @@ export const useMoodsStore = create<MoodsStore>((set, get) => ({
         status: "idle",
         lastLoadedAt: Date.now(),
         lastTracked: computeLastTracked(moods),
+        totalCount: moods.length,
+        hasMore: false,
+        currentOffset: moods.length,
       });
     } catch (error) {
       console.error("[moodsStore] Failed to load moods:", error);
@@ -66,6 +80,29 @@ export const useMoodsStore = create<MoodsStore>((set, get) => ({
         status: "error",
         error: error instanceof Error ? error.message : "Failed to load moods",
       });
+    }
+  },
+
+  loadMore: async (pageSize = DEFAULT_PAGE_SIZE) => {
+    const { status, currentOffset, hasMore } = get();
+    if (status === "loading" || !hasMore) return;
+
+    set({ status: "loading" });
+    try {
+      const result = await moodService.getPaginated({
+        limit: pageSize,
+        offset: currentOffset,
+      });
+      set((state) => ({
+        moods: [...state.moods, ...result.data],
+        status: "idle",
+        totalCount: result.total,
+        hasMore: result.hasMore,
+        currentOffset: state.currentOffset + result.data.length,
+      }));
+    } catch (error) {
+      console.error("[moodsStore] Failed to load more moods:", error);
+      set({ status: "idle" });
     }
   },
 
@@ -78,6 +115,9 @@ export const useMoodsStore = create<MoodsStore>((set, get) => ({
         status: "idle",
         lastLoadedAt: Date.now(),
         lastTracked: computeLastTracked(moods),
+        totalCount: moods.length,
+        hasMore: false,
+        currentOffset: moods.length,
       });
     } catch (error) {
       console.error("[moodsStore] Failed to refresh moods:", error);

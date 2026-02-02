@@ -233,6 +233,42 @@ export async function getAllMoods(): Promise<MoodEntry[]> {
   return rows.map(toMoodEntry);
 }
 
+export type PaginationOptions = {
+  limit: number;
+  offset: number;
+};
+
+export type PaginatedResult<T> = {
+  data: T[];
+  total: number;
+  hasMore: boolean;
+};
+
+export async function getMoodsPaginated(
+  options: PaginationOptions
+): Promise<PaginatedResult<MoodEntry>> {
+  const db = await getDb();
+  const { limit, offset } = options;
+
+  const [rows, countResult] = await Promise.all([
+    db.getAllAsync<MoodRow>(
+      "SELECT * FROM moods ORDER BY timestamp DESC LIMIT ? OFFSET ?;",
+      limit,
+      offset
+    ),
+    db.getFirstAsync<CountResult>("SELECT COUNT(*) as count FROM moods;"),
+  ]);
+
+  const total = countResult?.count ?? 0;
+  const data = rows.map(toMoodEntry);
+
+  return {
+    data,
+    total,
+    hasMore: offset + data.length < total,
+  };
+}
+
 export async function deleteMood(id: number) {
   const db = await getDb();
   return await db.runAsync("DELETE FROM moods WHERE id = ?;", id);

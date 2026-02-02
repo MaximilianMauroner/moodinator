@@ -5,9 +5,13 @@ import type { MoodEntry } from "@db/types";
 import type { SwipeDirection } from "@/types/mood";
 import { haptics } from "@/lib/haptics";
 
+type MoodsSetter =
+  | React.Dispatch<React.SetStateAction<MoodEntry[]>>
+  | ((updater: MoodEntry[] | ((prev: MoodEntry[]) => MoodEntry[])) => void);
+
 interface UseMoodItemActionsParams {
-  setMoods: React.Dispatch<React.SetStateAction<MoodEntry[]>>;
-  setLastTracked: React.Dispatch<React.SetStateAction<Date | null>>;
+  setMoods: MoodsSetter;
+  setLastTracked: React.Dispatch<React.SetStateAction<Date | null>> | (() => void);
   setEditingEntry: (entry: MoodEntry) => void;
 }
 

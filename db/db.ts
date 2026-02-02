@@ -6,6 +6,7 @@ export {
   getMoodCount,
   getMoodsWithinRange,
   getMoodsInRange,
+  getMoodsPaginated,
   hasMoodBeenLoggedToday,
   insertMood,
   insertMoodEntry,
@@ -15,8 +16,10 @@ export {
   getEmotionNamesFromMoods,
   updateMoodNote,
   updateMoodTimestamp,
+  type PaginationOptions,
+  type PaginatedResult,
 } from "./moods/repository";
-export { exportMoods, importMoods, importOldBackup } from "./moods/importExport";
+export { exportMoods, importMoods, importOldBackup, type ImportResult } from "./moods/importExport";
 export { clearMoods, seedMoods, seedMoodsFromFile } from "./moods/seed";
 export { migrateEmotionsToCategories } from "./moods/migrations";
 export {

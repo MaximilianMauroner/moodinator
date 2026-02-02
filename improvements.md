@@ -6,28 +6,11 @@ Planned improvements for Moodinator. See CLAUDE.md for instructions on maintaini
 
 ## High Priority
 
-### State Management Consolidation
-- **Issue**: Mix of custom hooks (`useMoodData`) and Zustand stores (`moodsStore.ts`)
-- **Fix**: Standardize on Zustand exclusively; migrate `useMoodData` to use `useMoodsStore`
-
 ### Database Schema Normalization
 - **Issue**: Emotions stored both as JSON strings AND in normalized tables (duplicate data)
 - **Files**: `/db/moods/schema.ts`, `/db/moods/serialization.ts`
 - **Fix**: Remove JSON emotion column, use only junction tables (`mood_emotions`)
-
-### Data Validation Layer
-- **Issue**: Imported data not validated; silent failures on malformed JSON
-- **Fix**: Create `/db/validation.ts` with JSON schema validation, range checks (mood 0-10, energy 0-10), timestamp sanity checks
-
-### Performance - Mood History Pagination
-- **Issue**: `MoodHistoryList` renders all entries; will lag with 1000+ moods
-- **File**: `/src/components/home/MoodHistoryList.tsx`
-- **Fix**: Add `maxToRenderPerBatch={30}`, `windowSize`, and implement query-level pagination in repository
-
-### Error Handling
-- **Issue**: Async operations fail silently; error boundaries return blank screens
-- **Files**: `/db/backup.ts`, `/src/components/ErrorBoundary.tsx`
-- **Fix**: Implement Result type pattern `{ success: true; data: T } | { success: false; error: string }`, always show user-friendly recovery UI
+- **Note**: Requires careful migration to avoid data loss; consider phased approach
 
 ---
 

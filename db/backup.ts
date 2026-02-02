@@ -4,6 +4,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Notifications from "expo-notifications";
 import { exportMoods } from "./db";
 
+export type BackupResult<T> =
+  | { success: true; data: T }
+  | { success: false; error: string };
+
 const LAST_BACKUP_KEY = "lastBackupTimestamp";
 const BACKUP_SCHEDULED_ID_KEY = "backupScheduledId";
 const BACKUP_FOLDER_KEY = "backupFolderUri"; // User-selected backup folder URI
@@ -141,18 +145,28 @@ function getBackupFilename(timestamp: number): string {
  * Creates a new backup of all mood data
  * Saves to user-selected backup folder (or default if not selected)
  */
-export async function createBackup(): Promise<string | null> {
+export async function createBackup(): Promise<BackupResult<string>> {
   try {
     // On Android, enforce user-selected folder
     if (Platform.OS === "android") {
       const userFolder = await getBackupFolder();
       if (!userFolder) {
-        console.warn("No backup folder selected on Android, skipping backup");
-        return null;
+        return {
+          success: false,
+          error: "No backup folder selected. Please select a backup location in Settings.",
+        };
       }
     }
 
-    const backupDir = await ensureBackupDirectory();
+    let backupDir: string;
+    try {
+      backupDir = await ensureBackupDirectory();
+    } catch (e) {
+      return {
+        success: false,
+        error: "Could not access backup folder. Please check permissions or select a new location.",
+      };
+    }
 
     const timestamp = Date.now();
     const filename = getBackupFilename(timestamp);
@@ -179,12 +193,23 @@ export async function createBackup(): Promise<string | null> {
       } catch (e) {
         console.error("Error writing to SAF directory:", e);
         // Fallback to default directory
-        const defaultUri = `${DEFAULT_BACKUP_DIR}${filename}`;
-        await FileSystem.writeAsStringAsync(defaultUri, jsonData, {
-          encoding: FileSystem.EncodingType.UTF8,
-        });
-        fileUri = defaultUri;
-        console.warn("Fell back to default directory due to SAF error");
+        try {
+          const defaultDirInfo = await FileSystem.getInfoAsync(DEFAULT_BACKUP_DIR);
+          if (!defaultDirInfo.exists) {
+            await FileSystem.makeDirectoryAsync(DEFAULT_BACKUP_DIR, { intermediates: true });
+          }
+          const defaultUri = `${DEFAULT_BACKUP_DIR}${filename}`;
+          await FileSystem.writeAsStringAsync(defaultUri, jsonData, {
+            encoding: FileSystem.EncodingType.UTF8,
+          });
+          fileUri = defaultUri;
+          console.warn("Fell back to default directory due to SAF error");
+        } catch (fallbackError) {
+          return {
+            success: false,
+            error: "Could not write backup file. Storage may be full or permissions denied.",
+          };
+        }
       }
     } else {
       // Standard FileSystem path
@@ -203,10 +228,13 @@ export async function createBackup(): Promise<string | null> {
     if (deletedCount > 0) {
       console.log(`Cleaned up ${deletedCount} old backup(s)`);
     }
-    return fileUri;
+    return { success: true, data: fileUri };
   } catch (error) {
     console.error("Error creating backup:", error);
-    return null;
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "An unexpected error occurred while creating backup.",
+    };
   }
 }
 
@@ -410,12 +438,17 @@ export async function cleanupOldBackups(): Promise<number> {
  * Performs automatic backup check and creation if needed
  * This is called when the scheduled backup time arrives
  */
-export async function performAutomaticBackup(): Promise<void> {
+export async function performAutomaticBackup(): Promise<BackupResult<string | null>> {
   try {
     // Check if backup is needed
     if (await isBackupNeeded()) {
       console.log("Creating automatic weekly backup...");
-      await createBackup();
+      const result = await createBackup();
+
+      if (!result.success) {
+        console.error("Automatic backup failed:", result.error);
+        return result;
+      }
 
       // Clean up old backups after creating a new one
       const deletedCount = await cleanupOldBackups();
@@ -425,10 +458,15 @@ export async function performAutomaticBackup(): Promise<void> {
 
       // Reschedule for next week
       await rescheduleWeeklyBackup();
+      return result;
     }
+    return { success: true, data: null };
   } catch (error) {
     console.error("Error performing automatic backup:", error);
-    // Don't throw - we don't want backup failures to crash the app
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Automatic backup failed unexpectedly.",
+    };
   }
 }
 

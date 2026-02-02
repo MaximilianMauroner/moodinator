@@ -17,13 +17,13 @@ import {
   MoodHistoryList,
 } from "@/components/home";
 
-import { useMoodData } from "@/hooks/useMoodData";
+import { useMoodsStore } from "@/shared/state/moodsStore";
 import { useEntrySettings } from "@/hooks/useEntrySettings";
 import { useMoodModals } from "@/hooks/useMoodModals";
 import { useMoodItemActions } from "@/hooks/useMoodItemActions";
 import { useColorScheme } from "@/hooks/useColorScheme";
 
-import { insertMood, updateMoodTimestamp, updateMoodEntry, migrateEmotionsToCategories } from "@db/db";
+import { updateMoodTimestamp, migrateEmotionsToCategories } from "@db/db";
 import type { MoodEntry } from "@db/types";
 import { Toast } from "toastify-react-native";
 
@@ -102,15 +102,45 @@ function HomeScreenContent() {
   const isDark = colorScheme === "dark";
   const toastConfig = useMemo(() => createToastConfig(isDark), [isDark]);
 
-  // Custom hooks for state management
-  const moodData = useMoodData();
+  // Zustand store for mood data
+  const moods = useMoodsStore((state) => state.moods);
+  const status = useMoodsStore((state) => state.status);
+  const lastTracked = useMoodsStore((state) => state.lastTracked);
+  const loadAll = useMoodsStore((state) => state.loadAll);
+  const refreshMoods = useMoodsStore((state) => state.refreshMoods);
+  const createMood = useMoodsStore((state) => state.create);
+  const updateMood = useMoodsStore((state) => state.update);
+  const setLocal = useMoodsStore((state) => state.setLocal);
+
+  const loading = status === "loading";
+  const refreshing = status === "refreshing";
+
+  // Wrapper for setMoods that supports function updaters
+  const setMoods = useCallback(
+    (updater: MoodEntry[] | ((prev: MoodEntry[]) => MoodEntry[])) => {
+      if (typeof updater === "function") {
+        const currentMoods = useMoodsStore.getState().moods;
+        setLocal(updater(currentMoods));
+      } else {
+        setLocal(updater);
+      }
+    },
+    [setLocal]
+  );
+
+  // Custom hooks for other state management
   const entrySettings = useEntrySettings();
   const modals = useMoodModals();
   const itemActions = useMoodItemActions({
-    setMoods: moodData.setMoods,
-    setLastTracked: moodData.setLastTracked,
+    setMoods,
+    setLastTracked: () => {}, // lastTracked is computed from moods
     setEditingEntry: modals.setEditingEntry,
   });
+
+  // Load moods on mount
+  useEffect(() => {
+    loadAll();
+  }, [loadAll]);
 
   // Run emotion migration on mount
   const runEmotionMigration = useCallback(async () => {
@@ -129,7 +159,7 @@ function HomeScreenContent() {
       const result = await migrateEmotionsToCategories();
       console.log(`Migration complete: ${result.migrated} entries migrated, ${result.skipped} skipped`);
       await AsyncStorage.setItem(MIGRATION_KEY, "true");
-      await moodData.fetchMoods();
+      await loadAll();
     } catch (error) {
       console.error("Failed to run emotion migration:", error);
 
@@ -153,7 +183,7 @@ function HomeScreenContent() {
         console.error("Failed to update migration retry state:", storageError);
       }
     }
-  }, [moodData.fetchMoods]);
+  }, [loadAll]);
 
   useEffect(() => {
     runEmotionMigration();
@@ -161,7 +191,9 @@ function HomeScreenContent() {
 
   // Entry save handlers
   const handleEntrySave = useCallback(async (values: MoodEntryFormValues) => {
-    const newMood = await insertMood(values.mood, values.note || undefined, {
+    await createMood({
+      mood: values.mood,
+      note: values.note || null,
       emotions: values.emotions,
       contextTags: values.contextTags,
       energy: values.energy,
@@ -169,14 +201,12 @@ function HomeScreenContent() {
       location: values.location,
       voiceMemos: values.voiceMemos,
     });
-    moodData.setMoods((prev) => [newMood, ...prev]);
-    moodData.setLastTracked(new Date(newMood.timestamp ?? Date.now()));
-  }, [moodData.setMoods, moodData.setLastTracked]);
+  }, [createMood]);
 
   const handleEditEntrySave = useCallback(
     async (values: MoodEntryFormValues) => {
       if (!modals.editingEntry) return;
-      const updatedMood = await updateMoodEntry(modals.editingEntry.id, {
+      await updateMood(modals.editingEntry.id, {
         mood: values.mood,
         note: values.note ? values.note : null,
         emotions: values.emotions,
@@ -186,22 +216,17 @@ function HomeScreenContent() {
         location: values.location,
         voiceMemos: values.voiceMemos,
       });
-      if (updatedMood) {
-        moodData.setMoods((prev) =>
-          prev.map((m) => (m.id === updatedMood.id ? updatedMood : m))
-        );
-      }
     },
-    [modals.editingEntry, moodData.setMoods]
+    [modals.editingEntry, updateMood]
   );
 
   const handleDateTimeSave = useCallback(
     async (moodId: number, newTimestamp: number) => {
       await updateMoodTimestamp(moodId, newTimestamp);
-      await moodData.fetchMoods();
+      await loadAll();
       modals.closeDateModal();
     },
-    [moodData.fetchMoods, modals.closeDateModal]
+    [loadAll, modals.closeDateModal]
   );
 
   const handleMoodItemLongPress = useCallback(
@@ -220,7 +245,7 @@ function HomeScreenContent() {
         >
           <View className="flex-1 px-4 pt-4">
             {/* Header */}
-            <HomeHeader lastTracked={moodData.lastTracked} />
+            <HomeHeader lastTracked={lastTracked} />
 
             {/* Mood Buttons */}
             <MoodButtonSelector
@@ -231,12 +256,12 @@ function HomeScreenContent() {
 
             {/* History Section */}
             <View className="flex-1 mt-4">
-              <HistoryListHeader moodCount={moodData.moods.length} />
+              <HistoryListHeader moodCount={moods.length} />
               <MoodHistoryList
-                moods={moodData.moods}
-                loading={moodData.loading}
-                refreshing={moodData.refreshing}
-                onRefresh={moodData.onRefresh}
+                moods={moods}
+                loading={loading}
+                refreshing={refreshing}
+                onRefresh={refreshMoods}
                 onSwipeableWillOpen={itemActions.onSwipeableWillOpen}
                 onMoodItemLongPress={handleMoodItemLongPress}
                 swipeThreshold={itemActions.SWIPE_THRESHOLD}

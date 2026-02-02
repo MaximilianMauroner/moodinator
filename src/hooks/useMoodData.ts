@@ -1,51 +1,56 @@
-import { useState, useCallback, useEffect } from "react";
-import { getAllMoods } from "@db/db";
+import { useCallback, useEffect } from "react";
+import { useMoodsStore } from "@/shared/state/moodsStore";
 import type { MoodEntry } from "@db/types";
 
 /**
  * Hook for managing mood data fetching and state.
- * Handles loading, refreshing, and tracking the last logged mood.
+ * Wraps the Zustand moodsStore for backwards compatibility.
+ * @deprecated Use useMoodsStore directly for new code.
  */
 export function useMoodData() {
-  const [moods, setMoods] = useState<MoodEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [lastTracked, setLastTracked] = useState<Date | null>(null);
+  const moods = useMoodsStore((state) => state.moods);
+  const status = useMoodsStore((state) => state.status);
+  const lastTracked = useMoodsStore((state) => state.lastTracked);
+  const loadAll = useMoodsStore((state) => state.loadAll);
+  const refreshMoods = useMoodsStore((state) => state.refreshMoods);
+  const setLocal = useMoodsStore((state) => state.setLocal);
+
+  const loading = status === "loading";
+  const refreshing = status === "refreshing";
 
   const fetchMoods = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await getAllMoods();
-      setMoods(data);
-      if (data.length > 0) {
-        setLastTracked(new Date(data[0].timestamp));
-      }
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
+    await loadAll();
+  }, [loadAll]);
 
-  const refreshMoods = useCallback(async () => {
-    try {
-      const data = await getAllMoods();
-      setMoods(data);
-      if (data.length > 0) {
-        setLastTracked(new Date(data[0].timestamp));
-      }
-    } finally {
-      setRefreshing(false);
-    }
-  }, []);
-
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    refreshMoods();
+  const onRefresh = useCallback(async () => {
+    await refreshMoods();
   }, [refreshMoods]);
+
+  // Compatibility wrapper for setMoods
+  const setMoods = useCallback(
+    (updater: MoodEntry[] | ((prev: MoodEntry[]) => MoodEntry[])) => {
+      if (typeof updater === "function") {
+        const currentMoods = useMoodsStore.getState().moods;
+        setLocal(updater(currentMoods));
+      } else {
+        setLocal(updater);
+      }
+    },
+    [setLocal]
+  );
+
+  // Compatibility wrapper for setLastTracked (computed from moods now)
+  const setLastTracked = useCallback(
+    (_date: Date) => {
+      // lastTracked is now computed from moods in the store
+      // This is a no-op for backwards compatibility
+    },
+    []
+  );
 
   useEffect(() => {
     fetchMoods();
-  }, []);
+  }, [fetchMoods]);
 
   return {
     moods,
