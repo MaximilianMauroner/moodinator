@@ -129,7 +129,7 @@ export const DisplayMoodItem = React.memo(
           accessibilityHint={getMoodItemHint()}
         >
           <View
-            className="rounded-2xl p-4"
+            className="rounded-2xl overflow-hidden"
             style={{
               backgroundColor: get("surface"),
               shadowColor: isDark ? "#000" : colors.sand.text.light,
@@ -139,108 +139,121 @@ export const DisplayMoodItem = React.memo(
               elevation: 3,
             }}
           >
-            {/* Header row */}
-            <View className="flex-row items-center justify-between mb-3">
-              <View className="flex-row items-center flex-1">
-                {/* Mood pill */}
-                <View
-                  className="flex-row items-center px-3 py-1.5 rounded-xl mr-3"
-                  style={{ backgroundColor: moodData.bgHex }}
-                >
+            <View className="flex-row">
+              {/* Left accent bar - mood-colored visual indicator */}
+              <View
+                style={{
+                  width: 4,
+                  backgroundColor: moodData.textHex,
+                }}
+              />
+
+              {/* Main content */}
+              <View className="flex-1 p-4">
+                {/* Header row */}
+                <View className="flex-row items-center justify-between mb-3">
+                  <View className="flex-row items-center flex-1">
+                    {/* Mood pill */}
+                    <View
+                      className="flex-row items-center px-3 py-1.5 rounded-xl mr-3"
+                      style={{ backgroundColor: moodData.bgHex }}
+                    >
+                      <Text
+                        className="text-lg font-bold mr-1.5"
+                        style={{ color: moodData.textHex, fontVariant: ["tabular-nums"] }}
+                      >
+                        {mood.mood}
+                      </Text>
+                      <Text
+                        className="text-sm font-semibold"
+                        style={{ color: moodData.textHex }}
+                      >
+                        {moodData.label}
+                      </Text>
+                    </View>
+
+                    {/* Energy badge */}
+                    {typeof mood.energy === "number" && (
+                      <View
+                        className="px-2 py-1 rounded-lg"
+                        style={{ backgroundColor: isDark ? colors.sand.bgHover.dark : colors.sand.bg.light }}
+                      >
+                        <Text
+                          className="text-[10px] font-semibold"
+                          style={{ color: isDark ? colors.sand.text.dark : colors.sand.text.light }}
+                        >
+                          Energy {mood.energy}/10
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Timestamp */}
                   <Text
-                    className="text-lg font-bold mr-1.5"
-                    style={{ color: moodData.textHex, fontVariant: ["tabular-nums"] }}
+                    className="text-xs"
+                    style={{ color: get("textMuted") }}
                   >
-                    {mood.mood}
-                  </Text>
-                  <Text
-                    className="text-sm font-semibold"
-                    style={{ color: moodData.textHex }}
-                  >
-                    {moodData.label}
+                    {formattedDate} · {formattedTime}
                   </Text>
                 </View>
 
-                {/* Energy badge */}
-                {typeof mood.energy === "number" && (
+                {/* Note */}
+                {mood.note ? (
                   <View
-                    className="px-2 py-1 rounded-lg"
-                    style={{ backgroundColor: isDark ? colors.sand.bgHover.dark : colors.sand.bg.light }}
+                    className="rounded-xl p-3 mb-3"
+                    style={{ backgroundColor: get("surfaceAlt") }}
                   >
                     <Text
-                      className="text-[10px] font-semibold"
-                      style={{ color: isDark ? colors.sand.text.dark : colors.sand.text.light }}
+                      className="text-sm leading-5"
+                      style={{ color: get("textSubtle") }}
+                      numberOfLines={3}
                     >
-                      Energy {mood.energy}/10
+                      {mood.note}
                     </Text>
+                  </View>
+                ) : null}
+
+                {/* Tags */}
+                {(sortedEmotions.length > 0 || (mood.contextTags?.length ?? 0) > 0) && (
+                  <View className="flex-row flex-wrap gap-2">
+                    {sortedEmotions.map((emotion) => {
+                      const catColors = getCategoryColors(emotion.category);
+                      return (
+                        <View
+                          key={`${mood.id}-${emotion.name}`}
+                          className="px-2.5 py-1 rounded-lg"
+                          style={{ backgroundColor: catColors.bg }}
+                        >
+                          <Text
+                            className="text-xs font-medium"
+                            style={{ color: catColors.text }}
+                          >
+                            {emotion.name}
+                          </Text>
+                        </View>
+                      );
+                    })}
+                    {mood.contextTags?.map((ctx) => {
+                      const ctxColors = getCategoryColors("neutral");
+                      return (
+                        <View
+                          key={`${mood.id}-${ctx}`}
+                          className="px-2.5 py-1 rounded-lg"
+                          style={{ backgroundColor: ctxColors.bg }}
+                        >
+                          <Text
+                            className="text-xs font-medium"
+                            style={{ color: ctxColors.text }}
+                          >
+                            #{ctx}
+                          </Text>
+                        </View>
+                      );
+                    })}
                   </View>
                 )}
               </View>
-
-              {/* Timestamp */}
-              <Text
-                className="text-xs"
-                style={{ color: get("textMuted") }}
-              >
-                {formattedDate} · {formattedTime}
-              </Text>
             </View>
-
-            {/* Note */}
-            {mood.note ? (
-              <View
-                className="rounded-xl p-3 mb-3"
-                style={{ backgroundColor: get("surfaceAlt") }}
-              >
-                <Text
-                  className="text-sm leading-5"
-                  style={{ color: get("textSubtle") }}
-                  numberOfLines={3}
-                >
-                  {mood.note}
-                </Text>
-              </View>
-            ) : null}
-
-            {/* Tags */}
-            {(sortedEmotions.length > 0 || (mood.contextTags?.length ?? 0) > 0) && (
-              <View className="flex-row flex-wrap gap-2">
-                {sortedEmotions.map((emotion) => {
-                  const catColors = getCategoryColors(emotion.category);
-                  return (
-                    <View
-                      key={`${mood.id}-${emotion.name}`}
-                      className="px-2.5 py-1 rounded-lg"
-                      style={{ backgroundColor: catColors.bg }}
-                    >
-                      <Text
-                        className="text-xs font-medium"
-                        style={{ color: catColors.text }}
-                      >
-                        {emotion.name}
-                      </Text>
-                    </View>
-                  );
-                })}
-                {mood.contextTags?.map((ctx) => {
-                  const ctxColors = getCategoryColors("neutral");
-                  return (
-                    <View
-                      key={`${mood.id}-${ctx}`}
-                      className="px-2.5 py-1 rounded-lg"
-                      style={{ backgroundColor: ctxColors.bg }}
-                    >
-                      <Text
-                        className="text-xs font-medium"
-                        style={{ color: ctxColors.text }}
-                      >
-                        #{ctx}
-                      </Text>
-                    </View>
-                  );
-                })}
-              </View>
-            )}
           </View>
         </Pressable>
       </Swipeable>

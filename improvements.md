@@ -30,6 +30,9 @@ Planned improvements for Moodinator. See CLAUDE.md for instructions on maintaini
 
 ### Personalization
 - Custom mood scale (emoji, 0-100, etc.)
+- Configurable number of mood levels (e.g., 5 buttons instead of 10)
+- Customizable mood labels (rename "Elated", "Crisis", etc. to user-preferred terms)
+- Customizable mood level colors
 - Theme color customization
 - Font size adjustment
 - Language/localization

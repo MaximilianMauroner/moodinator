@@ -80,7 +80,7 @@ export const MoodButtonsCompact: React.FC<MoodButtonsCompactProps> = ({
         />
         <Text
           className="text-xs font-medium mx-4 tracking-wide"
-          style={{ color: isDark ? colors.sand.textMuted.dark : colors.sand.text.light }}
+          style={{ color: isDark ? colors.sand.textMuted.dark : "#6B5C4A" }}
         >
           How are you feeling?
         </Text>

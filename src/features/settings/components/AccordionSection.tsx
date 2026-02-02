@@ -53,7 +53,7 @@ export function AccordionSection({
     },
     sand: {
       iconBg: isDark ? "#302A22" : "#F9F5ED",
-      iconColor: isDark ? "#D4C4A0" : "#9D8660",
+      iconColor: isDark ? "#D4C4A0" : "#7A6545",
       accentLine: isDark ? "#BDA77D" : "#D4C4A0",
     },
     coral: {
@@ -141,7 +141,7 @@ export function AccordionSection({
             <Ionicons
               name={expanded ? "chevron-up" : "chevron-down"}
               size={18}
-              color={isDark ? "#6B5C4A" : "#9D8660"}
+              color={isDark ? "#6B5C4A" : "#7A6B55"}
             />
           </View>
         </View>

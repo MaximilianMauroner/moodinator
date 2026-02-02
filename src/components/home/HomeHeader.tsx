@@ -25,7 +25,7 @@ export function HomeHeader({ lastTracked }: HomeHeaderProps) {
         </Text>
         <Text
           className="text-sm mt-1"
-          style={{ color: isDark ? "#BDA77D" : "#9D8660" }}
+          style={{ color: isDark ? "#BDA77D" : "#6B5C4A" }}
         >
           Track your emotional wellness
         </Text>
@@ -44,13 +44,13 @@ export function HomeHeader({ lastTracked }: HomeHeaderProps) {
         >
           <Text
             className="text-[10px] font-medium mb-0.5"
-            style={{ color: isDark ? "#6B5C4A" : "#BDA77D" }}
+            style={{ color: isDark ? "#6B5C4A" : "#7A6B55" }}
           >
             Last entry
           </Text>
           <Text
             className="text-sm font-semibold"
-            style={{ color: isDark ? "#D4C4A0" : "#6B5C4A" }}
+            style={{ color: isDark ? "#D4C4A0" : "#5C4E3D" }}
           >
             {lastTracked.toLocaleTimeString([], {
               hour: "2-digit",
