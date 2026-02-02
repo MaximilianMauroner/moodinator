@@ -1,11 +1,13 @@
 import React, { useEffect } from "react";
-import { View, Text, AppState, AppStateStatus, Pressable } from "react-native";
+import { View, Text, Pressable } from "react-native";
 import { Stack } from "expo-router";
-import * as Notifications from "expo-notifications";
-import { scheduleWeeklyBackup, checkScheduledBackup } from "@db/backup";
+import { registerBackgroundBackupTask } from "@db/backgroundBackup";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 import "./global.css";
+
+// Import backgroundBackup at module level to ensure task is defined before registration
+import "@db/backgroundBackup";
 
 /**
  * Root-level error fallback for critical app errors.
@@ -37,40 +39,11 @@ function RootErrorFallback({ error, resetError }: { error: Error; resetError: ()
   );
 }
 
-// Note: Notification handler is configured in useNotifications.ts
-// Backup notifications are configured to be silent (sound: false, no alert)
-
 export default function Layout() {
   useEffect(() => {
-    // Initialize weekly backup schedule
-    scheduleWeeklyBackup();
-
-    // Check for scheduled backup when app becomes active
-    const subscription = AppState.addEventListener(
-      "change",
-      (nextAppState: AppStateStatus) => {
-        if (nextAppState === "active") {
-          // App has come to the foreground, check if scheduled backup is needed
-          checkScheduledBackup();
-        }
-      }
-    );
-
-    // Also listen for notification responses (when user taps notification)
-    const notificationSubscription = Notifications.addNotificationResponseReceivedListener(
-      (response) => {
-        const notificationType = response.notification.request.content.data?.type;
-        if (notificationType === "weekly-backup") {
-          // Perform backup when notification is received
-          checkScheduledBackup();
-        }
-      }
-    );
-
-    return () => {
-      subscription.remove();
-      notificationSubscription.remove();
-    };
+    // Register background backup task for weekly automatic backups
+    // The task runs in the background even when the app is closed
+    registerBackgroundBackupTask();
   }, []);
 
   return (

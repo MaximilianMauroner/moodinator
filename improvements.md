@@ -42,7 +42,6 @@ Planned improvements for Moodinator. See CLAUDE.md for instructions on maintaini
 - App lock with biometric authentication (FaceID/TouchID/fingerprint) or PIN/password
 - Local encryption option
 - Cloud backup (iCloud/Google Drive)
-- Background auto-backup via expo-task-manager
 - Cross-device sync (optional, user-controlled)
 
 ### Widgets

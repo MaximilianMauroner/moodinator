@@ -1,7 +1,6 @@
 import * as FileSystem from "expo-file-system";
 import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as Notifications from "expo-notifications";
 import { exportMoods } from "./db";
 
 export type BackupResult<T> =
@@ -9,13 +8,9 @@ export type BackupResult<T> =
   | { success: false; error: string };
 
 const LAST_BACKUP_KEY = "lastBackupTimestamp";
-const BACKUP_SCHEDULED_ID_KEY = "backupScheduledId";
 const BACKUP_FOLDER_KEY = "backupFolderUri"; // User-selected backup folder URI
 const WEEKS_TO_KEEP = 8; // Keep backups for 8 weeks (rolling)
 const BACKUP_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
-const BACKUP_DAY_OF_WEEK = 0; // Sunday (0 = Sunday, 1 = Monday, etc.)
-const BACKUP_HOUR = 7; // 7 AM (early morning, less intrusive)
-const BACKUP_MINUTE = 0;
 
 // Default backup directory (fallback if user hasn't selected one)
 const DEFAULT_BACKUP_DIR = `${FileSystem.documentDirectory}MoodinatorBackups/`;
@@ -435,147 +430,10 @@ export async function cleanupOldBackups(): Promise<number> {
 }
 
 /**
- * Performs automatic backup check and creation if needed
- * This is called when the scheduled backup time arrives
+ * Gets the timestamp of the last backup (exported for background task)
  */
-export async function performAutomaticBackup(): Promise<BackupResult<string | null>> {
-  try {
-    // Check if backup is needed
-    if (await isBackupNeeded()) {
-      console.log("Creating automatic weekly backup...");
-      const result = await createBackup();
-
-      if (!result.success) {
-        console.error("Automatic backup failed:", result.error);
-        return result;
-      }
-
-      // Clean up old backups after creating a new one
-      const deletedCount = await cleanupOldBackups();
-      if (deletedCount > 0) {
-        console.log(`Cleaned up ${deletedCount} old backup(s)`);
-      }
-
-      // Reschedule for next week
-      await rescheduleWeeklyBackup();
-      return result;
-    }
-    return { success: true, data: null };
-  } catch (error) {
-    console.error("Error performing automatic backup:", error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Automatic backup failed unexpectedly.",
-    };
-  }
-}
-
-/**
- * Calculates the next Sunday at the backup time (2 AM)
- */
-function getNextBackupDate(): Date {
-  const now = new Date();
-  const next = new Date();
-  next.setHours(BACKUP_HOUR, BACKUP_MINUTE, 0, 0);
-
-  // Calculate days until next Sunday (0 = Sunday)
-  const daysUntilSunday = (7 - now.getDay() + BACKUP_DAY_OF_WEEK) % 7;
-
-  if (daysUntilSunday === 0) {
-    // Today is Sunday, check if we've passed the backup time
-    if (
-      now.getHours() > BACKUP_HOUR ||
-      (now.getHours() === BACKUP_HOUR && now.getMinutes() >= BACKUP_MINUTE)
-    ) {
-      // Backup time has passed today, schedule for next Sunday
-      next.setDate(now.getDate() + 7);
-    } else {
-      // Backup time hasn't passed today, use today
-      next.setDate(now.getDate());
-    }
-  } else {
-    // Schedule for the next Sunday
-    next.setDate(now.getDate() + daysUntilSunday);
-  }
-
-  return next;
-}
-
-/**
- * Schedules a weekly backup notification/check
- * The backup will be performed when the app is active at the scheduled time
- */
-export async function scheduleWeeklyBackup(): Promise<void> {
-  try {
-    // Cancel any existing scheduled backup
-    const existingId = await AsyncStorage.getItem(BACKUP_SCHEDULED_ID_KEY);
-    if (existingId) {
-      try {
-        await Notifications.cancelScheduledNotificationAsync(existingId);
-      } catch (e) {
-        console.warn("Failed to cancel existing backup notification:", e);
-      }
-      await AsyncStorage.removeItem(BACKUP_SCHEDULED_ID_KEY);
-    }
-
-    // Calculate next Sunday at 2 AM
-    const nextBackupDate = getNextBackupDate();
-
-    // Schedule backup notification for next Sunday
-    const notificationId = await Notifications.scheduleNotificationAsync({
-      content: {
-        title: "Weekly Backup",
-        body: "Your mood data is being backed up automatically",
-        data: { type: "weekly-backup" },
-        sound: false, // Silent notification
-      },
-      trigger: {
-        date: nextBackupDate,
-        type: Notifications.SchedulableTriggerInputTypes.DATE,
-      },
-    });
-
-    await AsyncStorage.setItem(BACKUP_SCHEDULED_ID_KEY, notificationId);
-    console.log(
-      `Weekly backup scheduled for ${nextBackupDate.toLocaleString()}`
-    );
-  } catch (error) {
-    console.error("Error scheduling weekly backup:", error);
-  }
-}
-
-/**
- * Reschedules the weekly backup after one has been performed
- * This ensures the backup continues to run weekly
- */
-export async function rescheduleWeeklyBackup(): Promise<void> {
-  await scheduleWeeklyBackup();
-}
-
-/**
- * Checks if it's time for a scheduled backup and performs it if needed
- * This should be called when the app becomes active
- */
-export async function checkScheduledBackup(): Promise<void> {
-  try {
-    const lastBackup = await getLastBackupTimestamp();
-    if (!lastBackup) {
-      // No backup exists yet, create one immediately
-      await performAutomaticBackup();
-      return;
-    }
-
-    // Check if it's been a week since last backup
-    const now = Date.now();
-    const timeSinceLastBackup = now - lastBackup;
-
-    // If it's been more than the backup interval, perform backup
-    if (timeSinceLastBackup >= BACKUP_INTERVAL_MS) {
-      await performAutomaticBackup();
-    }
-  } catch (error) {
-    console.error("Error checking scheduled backup:", error);
-  }
+export async function getLastBackupTime(): Promise<number | null> {
+  return getLastBackupTimestamp();
 }
 
 /**
