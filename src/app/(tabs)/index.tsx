@@ -165,6 +165,9 @@ function HomeScreenContent() {
       emotions: values.emotions,
       contextTags: values.contextTags,
       energy: values.energy,
+      photos: values.photos,
+      location: values.location,
+      voiceMemos: values.voiceMemos,
     });
     moodData.setMoods((prev) => [newMood, ...prev]);
     moodData.setLastTracked(new Date(newMood.timestamp ?? Date.now()));
@@ -179,6 +182,9 @@ function HomeScreenContent() {
         emotions: values.emotions,
         contextTags: values.contextTags,
         energy: values.energy,
+        photos: values.photos,
+        location: values.location,
+        voiceMemos: values.voiceMemos,
       });
       if (updatedMood) {
         moodData.setMoods((prev) =>

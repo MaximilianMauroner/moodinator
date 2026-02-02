@@ -76,89 +76,151 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
   };
 
   return (
-    <View className="mb-6">
-      <Text
-        className="text-sm font-semibold mb-2"
-        style={{ color: get("textSubtle") }}
-      >
-        Location
-      </Text>
+    <View>
+      {/* Section label */}
+      <View className="flex-row items-center justify-between mb-2">
+        <View className="flex-row items-center">
+          <View
+            className="w-6 h-6 rounded-md items-center justify-center mr-2"
+            style={{
+              backgroundColor: isDark ? "rgba(157, 134, 96, 0.15)" : "rgba(157, 134, 96, 0.1)",
+            }}
+          >
+            <Ionicons
+              name="location"
+              size={12}
+              color={isDark ? colors.sand.text.dark : colors.sand.text.light}
+            />
+          </View>
+          <Text
+            className="text-sm font-medium"
+            style={{ color: get("text") }}
+          >
+            Location
+          </Text>
+        </View>
+        {location && (
+          <Pressable
+            onPress={clearLocation}
+            className="flex-row items-center"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text
+              className="text-xs font-medium mr-1"
+              style={{ color: get("textMuted") }}
+            >
+              Clear
+            </Text>
+            <Ionicons name="close-circle" size={14} color={get("textMuted")} />
+          </Pressable>
+        )}
+      </View>
 
       {location ? (
+        // Location captured - show the result
         <View
-          className="flex-row items-center justify-between p-3 rounded-2xl"
+          className="flex-row items-center p-3 rounded-xl"
           style={{
-            backgroundColor: get("surface"),
+            backgroundColor: isDark ? "rgba(48, 42, 34, 0.6)" : "rgba(253, 252, 250, 0.9)",
             borderWidth: 1.5,
             borderColor: isDark ? colors.sand.border.dark : colors.sand.border.light,
-            shadowColor: isDark ? "#000" : colors.sand.text.light,
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: isDark ? 0.15 : 0.08,
-            shadowRadius: 6,
-            elevation: 2,
           }}
         >
-          <View className="flex-row items-center flex-1 mr-3">
-            <View
-              className="w-10 h-10 rounded-xl items-center justify-center mr-3"
-              style={{ backgroundColor: isDark ? colors.sand.bgHover.dark : colors.sand.bg.light }}
-            >
-              <Ionicons name="location" size={18} color={isDark ? colors.sand.text.dark : colors.sand.text.light} />
-            </View>
-            <View className="flex-1">
-              {location.name ? (
+          <View
+            className="w-9 h-9 rounded-lg items-center justify-center mr-3"
+            style={{ backgroundColor: isDark ? colors.sand.bgHover.dark : colors.sand.bg.light }}
+          >
+            <Ionicons
+              name="checkmark-circle"
+              size={18}
+              color={isDark ? colors.positive.text.dark : colors.positive.text.light}
+            />
+          </View>
+          <View className="flex-1">
+            {location.name ? (
+              <>
                 <Text
-                  className="text-sm font-medium"
+                  className="text-sm font-semibold"
                   style={{ color: get("text") }}
                   numberOfLines={1}
                 >
                   {location.name}
                 </Text>
-              ) : (
                 <Text
-                  className="text-xs"
+                  className="text-[10px]"
+                  style={{ color: get("textMuted") }}
+                >
+                  Location captured
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text
+                  className="text-sm font-semibold"
+                  style={{ color: get("text") }}
+                >
+                  Location captured
+                </Text>
+                <Text
+                  className="text-[10px]"
                   style={{ color: get("textMuted") }}
                 >
                   {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}
                 </Text>
-              )}
-            </View>
+              </>
+            )}
           </View>
-          <Pressable
-            onPress={clearLocation}
-            className="p-2"
-          >
-            <Ionicons name="close-circle" size={20} color={get("textMuted")} />
-          </Pressable>
         </View>
       ) : (
+        // No location - show capture button
         <Pressable
           onPress={captureLocation}
           disabled={loading}
-          className="flex-row items-center justify-center py-4 rounded-2xl"
+          className="flex-row items-center py-3 px-4 rounded-xl"
           style={{
             backgroundColor: isDark ? "rgba(157, 134, 96, 0.08)" : "rgba(157, 134, 96, 0.06)",
             borderWidth: 1.5,
-            borderColor: isDark ? "rgba(212, 196, 160, 0.3)" : "rgba(157, 134, 96, 0.25)",
+            borderColor: isDark ? "rgba(212, 196, 160, 0.25)" : "rgba(157, 134, 96, 0.2)",
             borderStyle: "dashed",
-            opacity: loading ? 0.6 : 1,
+            opacity: loading ? 0.7 : 1,
           }}
         >
           {loading ? (
-            <ActivityIndicator size="small" color={get("textMuted")} />
-          ) : (
             <>
-              <View
-                className="w-10 h-10 rounded-xl items-center justify-center mr-3"
-                style={{ backgroundColor: isDark ? colors.sand.bgHover.dark : colors.sand.bg.light }}
-              >
-                <Ionicons
-                  name="location"
-                  size={20}
+              <View className="w-9 h-9 items-center justify-center mr-3">
+                <ActivityIndicator
+                  size="small"
                   color={isDark ? colors.sand.text.dark : colors.sand.text.light}
                 />
               </View>
-              <View>
+              <View className="flex-1">
+                <Text
+                  className="text-sm font-semibold"
+                  style={{ color: isDark ? colors.sand.text.dark : colors.sand.text.light }}
+                >
+                  Getting Location...
+                </Text>
+                <Text
+                  className="text-xs"
+                  style={{ color: get("textMuted") }}
+                >
+                  Please wait
+                </Text>
+              </View>
+            </>
+          ) : (
+            <>
+              <View
+                className="w-9 h-9 rounded-lg items-center justify-center mr-3"
+                style={{ backgroundColor: isDark ? colors.sand.bgHover.dark : colors.sand.bg.light }}
+              >
+                <Ionicons
+                  name="navigate"
+                  size={18}
+                  color={isDark ? colors.sand.text.dark : colors.sand.text.light}
+                />
+              </View>
+              <View className="flex-1">
                 <Text
                   className="text-sm font-semibold"
                   style={{ color: isDark ? colors.sand.text.dark : colors.sand.text.light }}
@@ -169,9 +231,14 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
                   className="text-xs"
                   style={{ color: get("textMuted") }}
                 >
-                  Where are you right now?
+                  Tag where you are right now
                 </Text>
               </View>
+              <Ionicons
+                name="chevron-forward"
+                size={16}
+                color={get("textMuted")}
+              />
             </>
           )}
         </Pressable>

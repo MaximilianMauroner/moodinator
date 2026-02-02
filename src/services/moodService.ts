@@ -33,6 +33,7 @@ export interface MoodServiceInterface {
   getInRange: (range?: MoodDateRange) => Promise<MoodEntry[]>;
   getToday: () => Promise<MoodEntry | null>;
   getYesterday: () => Promise<MoodEntry | null>;
+  getLastEntry: () => Promise<MoodEntry | null>;
   getCount: () => Promise<number>;
   hasLoggedToday: () => Promise<boolean>;
 
@@ -152,6 +153,14 @@ export const moodService: MoodServiceInterface = {
       startDate: getStartOfYesterday(),
       endDate: getEndOfYesterday(),
     });
+    return moods.length > 0 ? moods[0] : null;
+  },
+
+  /**
+   * Get the most recent mood entry (for "same as last entry" feature)
+   */
+  async getLastEntry(): Promise<MoodEntry | null> {
+    const moods = await getAllMoods();
     return moods.length > 0 ? moods[0] : null;
   },
 
