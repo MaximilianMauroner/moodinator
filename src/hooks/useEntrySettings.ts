@@ -76,6 +76,9 @@ export function useEntrySettings() {
       context: true,
       energy: true,
       notes: true,
+      photos: true,
+      location: true,
+      voiceMemos: true,
     }),
     []
   );

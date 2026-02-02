@@ -92,22 +92,38 @@ export const PhotoAttachment: React.FC<PhotoAttachmentProps> = ({
   };
 
   return (
-    <View className="mb-6">
+    <View>
+      {/* Section label */}
       <View className="flex-row items-center justify-between mb-2">
+        <View className="flex-row items-center">
+          <View
+            className="w-6 h-6 rounded-md items-center justify-center mr-2"
+            style={{
+              backgroundColor: isDark ? "rgba(91, 138, 91, 0.15)" : "rgba(91, 138, 91, 0.1)",
+            }}
+          >
+            <Ionicons
+              name="image"
+              size={12}
+              color={get("primary")}
+            />
+          </View>
+          <Text
+            className="text-sm font-medium"
+            style={{ color: get("text") }}
+          >
+            Photos
+          </Text>
+        </View>
         <Text
-          className="text-sm font-semibold"
-          style={{ color: get("textSubtle") }}
-        >
-          Photos
-        </Text>
-        <Text
-          className="text-xs"
+          className="text-xs font-medium"
           style={{ color: get("textMuted") }}
         >
           {photos.length}/{maxPhotos}
         </Text>
       </View>
 
+      {/* Photo thumbnails */}
       {photos.length > 0 && (
         <ScrollView
           horizontal
@@ -129,7 +145,7 @@ export const PhotoAttachment: React.FC<PhotoAttachmentProps> = ({
             >
               <Image
                 source={{ uri }}
-                className="w-24 h-24 rounded-2xl"
+                className="w-20 h-20 rounded-xl"
                 resizeMode="cover"
                 style={{
                   borderWidth: 2,
@@ -138,7 +154,7 @@ export const PhotoAttachment: React.FC<PhotoAttachmentProps> = ({
               />
               <Pressable
                 onPress={() => removePhoto(index)}
-                className="absolute -top-2 -right-2 w-7 h-7 rounded-full items-center justify-center"
+                className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full items-center justify-center"
                 style={{
                   backgroundColor: isDark ? colors.negative.bgSelected.dark : colors.negative.bgSelected.light,
                   shadowColor: "#000",
@@ -148,35 +164,36 @@ export const PhotoAttachment: React.FC<PhotoAttachmentProps> = ({
                   elevation: 3,
                 }}
               >
-                <Ionicons name="close" size={16} color="#FFFFFF" />
+                <Ionicons name="close" size={14} color="#FFFFFF" />
               </Pressable>
             </View>
           ))}
         </ScrollView>
       )}
 
+      {/* Add photo button */}
       {photos.length < maxPhotos && (
         <Pressable
           onPress={showOptions}
-          className="flex-row items-center justify-center py-4 rounded-2xl"
+          className="flex-row items-center py-3 px-4 rounded-xl"
           style={{
             backgroundColor: isDark ? "rgba(91, 138, 91, 0.08)" : "rgba(91, 138, 91, 0.06)",
             borderWidth: 1.5,
-            borderColor: isDark ? "rgba(168, 197, 168, 0.3)" : "rgba(91, 138, 91, 0.25)",
+            borderColor: isDark ? "rgba(168, 197, 168, 0.25)" : "rgba(91, 138, 91, 0.2)",
             borderStyle: "dashed",
           }}
         >
           <View
-            className="w-10 h-10 rounded-xl items-center justify-center mr-3"
+            className="w-9 h-9 rounded-lg items-center justify-center mr-3"
             style={{ backgroundColor: get("primaryBg") }}
           >
             <Ionicons
               name="camera"
-              size={20}
+              size={18}
               color={get("primary")}
             />
           </View>
-          <View>
+          <View className="flex-1">
             <Text
               className="text-sm font-semibold"
               style={{ color: get("primary") }}
@@ -187,9 +204,14 @@ export const PhotoAttachment: React.FC<PhotoAttachmentProps> = ({
               className="text-xs"
               style={{ color: get("textMuted") }}
             >
-              Capture this moment
+              Capture or choose from library
             </Text>
           </View>
+          <Ionicons
+            name="chevron-forward"
+            size={16}
+            color={get("textMuted")}
+          />
         </Pressable>
       )}
     </View>

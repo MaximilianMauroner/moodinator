@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { View, Text, Pressable, Alert, ScrollView } from "react-native";
+import { View, Text, Pressable, Alert, ScrollView, Animated } from "react-native";
 import { Audio } from "expo-av";
 import { Ionicons } from "@expo/vector-icons";
 import { useThemeColors, colors } from "@/constants/colors";
@@ -21,6 +21,7 @@ export const VoiceMemoRecorder: React.FC<VoiceMemoRecorderProps> = ({
   const [isRecording, setIsRecording] = useState(false);
   const [playingIndex, setPlayingIndex] = useState<number | null>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     return () => {
@@ -29,6 +30,30 @@ export const VoiceMemoRecorder: React.FC<VoiceMemoRecorderProps> = ({
       }
     };
   }, []);
+
+  // Pulse animation for recording indicator
+  useEffect(() => {
+    if (isRecording) {
+      const pulse = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.15,
+            duration: 600,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 600,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      pulse.start();
+      return () => pulse.stop();
+    } else {
+      pulseAnim.setValue(1);
+    }
+  }, [isRecording, pulseAnim]);
 
   const startRecording = async () => {
     if (memos.length >= maxMemos) {
@@ -136,22 +161,38 @@ export const VoiceMemoRecorder: React.FC<VoiceMemoRecorderProps> = ({
   };
 
   return (
-    <View className="mb-6">
+    <View>
+      {/* Section label */}
       <View className="flex-row items-center justify-between mb-2">
+        <View className="flex-row items-center">
+          <View
+            className="w-6 h-6 rounded-md items-center justify-center mr-2"
+            style={{
+              backgroundColor: isDark ? "rgba(105, 92, 120, 0.15)" : "rgba(105, 92, 120, 0.1)",
+            }}
+          >
+            <Ionicons
+              name="mic"
+              size={12}
+              color={isDark ? colors.neutral.text.dark : colors.neutral.text.light}
+            />
+          </View>
+          <Text
+            className="text-sm font-medium"
+            style={{ color: get("text") }}
+          >
+            Voice Memos
+          </Text>
+        </View>
         <Text
-          className="text-sm font-semibold"
-          style={{ color: get("textSubtle") }}
-        >
-          Voice Memos
-        </Text>
-        <Text
-          className="text-xs"
+          className="text-xs font-medium"
           style={{ color: get("textMuted") }}
         >
           {memos.length}/{maxMemos}
         </Text>
       </View>
 
+      {/* Recorded memos */}
       {memos.length > 0 && (
         <ScrollView
           horizontal
@@ -159,69 +200,81 @@ export const VoiceMemoRecorder: React.FC<VoiceMemoRecorderProps> = ({
           className="mb-3"
           contentContainerStyle={{ paddingRight: 8 }}
         >
-          {memos.map((uri, index) => (
-            <View
-              key={`${uri}-${index}`}
-              className="mr-3 flex-row items-center px-4 py-3 rounded-2xl"
-              style={{
-                backgroundColor: playingIndex === index
-                  ? (isDark ? colors.neutral.bg.dark : colors.neutral.bg.light)
-                  : get("surface"),
-                borderWidth: 1.5,
-                borderColor: playingIndex === index
-                  ? (isDark ? colors.neutral.border.dark : colors.neutral.border.light)
-                  : get("border"),
-                shadowColor: isDark ? "#000" : colors.sand.text.light,
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: isDark ? 0.2 : 0.08,
-                shadowRadius: 6,
-                elevation: 2,
-              }}
-            >
+          {memos.map((uri, index) => {
+            const isPlaying = playingIndex === index;
+            return (
               <Pressable
+                key={`${uri}-${index}`}
                 onPress={() => playMemo(uri, index)}
-                className="w-10 h-10 rounded-xl items-center justify-center mr-3"
+                className="mr-3 flex-row items-center px-3 py-2.5 rounded-xl"
                 style={{
-                  backgroundColor: playingIndex === index
-                    ? get("primary")
-                    : (isDark ? colors.neutral.bg.dark : colors.neutral.bg.light),
+                  backgroundColor: isPlaying
+                    ? (isDark ? colors.neutral.bg.dark : colors.neutral.bg.light)
+                    : (isDark ? "rgba(48, 42, 34, 0.6)" : "rgba(253, 252, 250, 0.9)"),
+                  borderWidth: 1.5,
+                  borderColor: isPlaying
+                    ? (isDark ? colors.neutral.border.dark : colors.neutral.border.light)
+                    : (isDark ? "rgba(61, 53, 42, 0.4)" : "rgba(229, 217, 191, 0.5)"),
+                  shadowColor: isDark ? "#000" : colors.sand.text.light,
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: isDark ? 0.15 : 0.08,
+                  shadowRadius: 4,
+                  elevation: 2,
                 }}
               >
-                <Ionicons
-                  name={playingIndex === index ? "pause" : "play"}
-                  size={18}
-                  color={playingIndex === index ? "#FFFFFF" : (isDark ? colors.neutral.text.dark : colors.neutral.text.light)}
-                />
-              </Pressable>
-              <View className="mr-3">
-                <Text
-                  className="text-sm font-semibold"
-                  style={{ color: get("text") }}
+                <View
+                  className="w-8 h-8 rounded-lg items-center justify-center mr-2.5"
+                  style={{
+                    backgroundColor: isPlaying
+                      ? get("primary")
+                      : (isDark ? colors.neutral.bg.dark : colors.neutral.bg.light),
+                  }}
                 >
-                  Memo {index + 1}
-                </Text>
-                <Text
-                  className="text-xs"
-                  style={{ color: get("textMuted") }}
+                  <Ionicons
+                    name={isPlaying ? "pause" : "play"}
+                    size={14}
+                    color={isPlaying ? "#FFFFFF" : (isDark ? colors.neutral.text.dark : colors.neutral.text.light)}
+                  />
+                </View>
+                <View className="mr-2">
+                  <Text
+                    className="text-sm font-semibold"
+                    style={{ color: get("text") }}
+                  >
+                    Memo {index + 1}
+                  </Text>
+                  <Text
+                    className="text-[10px]"
+                    style={{ color: get("textMuted") }}
+                  >
+                    {isPlaying ? "Playing..." : "Tap to play"}
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    removeMemo(index);
+                  }}
+                  className="p-1.5 -mr-1"
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                  {playingIndex === index ? "Playing..." : "Tap to play"}
-                </Text>
-              </View>
-              <Pressable
-                onPress={() => removeMemo(index)}
-                className="p-1"
-              >
-                <Ionicons name="trash-outline" size={18} color={isDark ? colors.negative.text.dark : colors.negative.text.light} />
+                  <Ionicons
+                    name="trash-outline"
+                    size={16}
+                    color={isDark ? colors.negative.text.dark : colors.negative.text.light}
+                  />
+                </Pressable>
               </Pressable>
-            </View>
-          ))}
+            );
+          })}
         </ScrollView>
       )}
 
+      {/* Record button */}
       {memos.length < maxMemos && (
         <Pressable
           onPress={isRecording ? stopRecording : startRecording}
-          className="flex-row items-center justify-center py-4 rounded-2xl"
+          className="flex-row items-center py-3 px-4 rounded-xl"
           style={{
             backgroundColor: isRecording
               ? (isDark ? colors.negative.bg.dark : colors.negative.bg.light)
@@ -229,28 +282,29 @@ export const VoiceMemoRecorder: React.FC<VoiceMemoRecorderProps> = ({
             borderWidth: 1.5,
             borderColor: isRecording
               ? (isDark ? colors.negative.text.dark : colors.negative.text.light)
-              : (isDark ? "rgba(196, 187, 207, 0.3)" : "rgba(105, 92, 120, 0.25)"),
+              : (isDark ? "rgba(196, 187, 207, 0.25)" : "rgba(105, 92, 120, 0.2)"),
             borderStyle: isRecording ? "solid" : "dashed",
           }}
         >
-          <View
-            className="w-10 h-10 rounded-xl items-center justify-center mr-3"
+          <Animated.View
+            className="w-9 h-9 rounded-lg items-center justify-center mr-3"
             style={{
               backgroundColor: isRecording
                 ? (isDark ? "rgba(224, 107, 85, 0.2)" : "rgba(224, 107, 85, 0.15)")
                 : (isDark ? colors.neutral.bg.dark : colors.neutral.bg.light),
+              transform: [{ scale: pulseAnim }],
             }}
           >
             <Ionicons
               name={isRecording ? "stop" : "mic"}
-              size={20}
+              size={18}
               color={isRecording
                 ? (isDark ? colors.negative.text.dark : colors.negative.text.light)
                 : (isDark ? colors.neutral.text.dark : colors.neutral.text.light)
               }
             />
-          </View>
-          <View>
+          </Animated.View>
+          <View className="flex-1">
             <Text
               className="text-sm font-semibold"
               style={{
@@ -265,9 +319,15 @@ export const VoiceMemoRecorder: React.FC<VoiceMemoRecorderProps> = ({
               className="text-xs"
               style={{ color: get("textMuted") }}
             >
-              {isRecording ? "Tap to save your thoughts" : "Speak your mind freely"}
+              {isRecording ? "Tap to save your recording" : "Capture your thoughts verbally"}
             </Text>
           </View>
+          {isRecording && (
+            <View
+              className="w-3 h-3 rounded-full"
+              style={{ backgroundColor: isDark ? colors.negative.text.dark : colors.negative.text.light }}
+            />
+          )}
         </Pressable>
       )}
     </View>
