@@ -14,6 +14,7 @@ import {
 import type { MoodEntry } from "@db/types";
 import { moodScale } from "@/constants/moodScale";
 import { Ionicons } from "@expo/vector-icons";
+import { chartColors, getChartColor } from "@/constants/colors";
 
 /**
  * Daily aggregate data point for charts
@@ -79,34 +80,39 @@ export const getMoodScaleBg = (moodValue: number) => {
 // Shared chart configuration with proper y-axis range (0-10)
 export const getBaseChartConfig = (
   gradientFrom: string,
-  gradientTo: string,
+  _gradientTo: string,
   isDark?: boolean
-) => ({
-  backgroundColor: isDark ? "#0f172a" : "#ffffff",
-  backgroundGradientFrom: isDark ? "#0f172a" : "#ffffff",
-  backgroundGradientTo: isDark ? "#0f172a" : "#ffffff",
-  fillShadowGradient: gradientFrom,
-  fillShadowGradientOpacity: 0.1,
-  decimalPlaces: 1,
-  color: (opacity = 1) =>
-    isDark
-      ? `rgba(255, 255, 255, ${opacity})`
-      : `rgba(59, 130, 246, ${opacity})`,
-  labelColor: (opacity = 1) =>
-    isDark
-      ? `rgba(148, 163, 184, ${opacity})`
-      : `rgba(100, 116, 139, ${opacity})`,
-  style: { borderRadius: 16 },
-  propsForDots: { r: "4", strokeWidth: "2", stroke: "#fff" },
-  yAxisMin: 0,
-  yAxisMax: 10,
-  yAxisInterval: 1,
-  propsForBackgroundLines: {
-      strokeDasharray: "6, 6",
-      stroke: isDark ? "#1e293b" : "#e2e8f0",
-      strokeWidth: 1,
-  }
-});
+) => {
+  const bgColor = getChartColor("chartBg", !!isDark) as string;
+  const gridColor = getChartColor("gridLine", !!isDark) as string;
+
+  return {
+    backgroundColor: bgColor,
+    backgroundGradientFrom: bgColor,
+    backgroundGradientTo: bgColor,
+    fillShadowGradient: gradientFrom,
+    fillShadowGradientOpacity: chartColors.fillOpacity,
+    decimalPlaces: 1,
+    color: (opacity = 1) =>
+      isDark
+        ? `rgba(255, 255, 255, ${opacity})`
+        : `rgba(59, 130, 246, ${opacity})`,
+    labelColor: (opacity = 1) =>
+      isDark
+        ? `rgba(148, 163, 184, ${opacity})`
+        : `rgba(100, 116, 139, ${opacity})`,
+    style: { borderRadius: 16 },
+    propsForDots: { r: String(chartColors.dotRadius), strokeWidth: "2", stroke: chartColors.dotStroke },
+    yAxisMin: 0,
+    yAxisMax: 10,
+    yAxisInterval: 1,
+    propsForBackgroundLines: {
+        strokeDasharray: "6, 6",
+        stroke: gridColor,
+        strokeWidth: 1,
+    }
+  };
+};
 
 // Helper function to get days in range
 export const getDaysInRange = (start: Date, end: Date): Date[] => {
@@ -359,7 +365,7 @@ export const processWeeklyMoodData = (allMoods: MoodEntry[], maxWeeks: number = 
 };
 
 // Mini Weekly Chart Component for Overview (memoized for performance)
-export const MiniWeeklyChart = React.memo(({ weeklyData }: { weeklyData: WeeklyDataPoint[] }) => {
+export const MiniWeeklyChart = React.memo(({ weeklyData, reduceMotion = false }: { weeklyData: WeeklyDataPoint[]; reduceMotion?: boolean }) => {
   const scheme = useColorScheme();
   const isDark = scheme === "dark";
 
@@ -367,9 +373,14 @@ export const MiniWeeklyChart = React.memo(({ weeklyData }: { weeklyData: WeeklyD
     return null;
   }
 
+  // Calculate chart data
   const weeklyAverages = weeklyData.map((week) => week.avg);
   const minValue = Math.min(...weeklyAverages);
   const maxValue = Math.max(...weeklyAverages);
+
+  // Generate accessibility summary
+  const avgOfAverages = weeklyAverages.reduce((sum, val) => sum + val, 0) / weeklyAverages.length;
+  const accessibilityLabel = `Weekly mood overview chart showing ${weeklyData.length} weeks of data. Average mood: ${avgOfAverages.toFixed(1)} out of 10.`;
 
   // Add some padding to the y-axis range
   const padding = (maxValue - minValue) * 0.1 || 0.5; // 10% padding or 0.5 minimum
@@ -383,6 +394,11 @@ export const MiniWeeklyChart = React.memo(({ weeklyData }: { weeklyData: WeeklyD
   else if (range <= 4) yInterval = 1;
   else if (range <= 8) yInterval = 2;
   else yInterval = 2;
+
+  // Get chart colors from tokens
+  const bgColor = getChartColor("chartBg", isDark) as string;
+  const lineColor = getChartColor("line", isDark) as string;
+  const gridColor = getChartColor("gridLine", isDark) as string;
 
   const chartData = {
     labels: weeklyData.map((week) => format(week.weekStart, "MMM dd")),
@@ -404,11 +420,11 @@ export const MiniWeeklyChart = React.memo(({ weeklyData }: { weeklyData: WeeklyD
   };
 
   const chartConfig = {
-    backgroundColor: isDark ? "#0f172a" : "#ffffff",
-    backgroundGradientFrom: isDark ? "#0f172a" : "#ffffff",
-    backgroundGradientTo: isDark ? "#0f172a" : "#ffffff",
-    fillShadowGradient: "#3b82f6",
-    fillShadowGradientOpacity: 0.1,
+    backgroundColor: bgColor,
+    backgroundGradientFrom: bgColor,
+    backgroundGradientTo: bgColor,
+    fillShadowGradient: lineColor,
+    fillShadowGradientOpacity: chartColors.fillOpacity,
     decimalPlaces: 1,
     color: (opacity = 1) => `rgba(59, 130, 246, ${opacity})`,
     labelColor: (opacity = 1) =>
@@ -416,19 +432,24 @@ export const MiniWeeklyChart = React.memo(({ weeklyData }: { weeklyData: WeeklyD
         ? `rgba(148, 163, 184, ${opacity})`
         : `rgba(100, 116, 139, ${opacity})`,
     style: { borderRadius: 16 },
-    propsForDots: { r: "4", strokeWidth: "2", stroke: "#fff" },
+    propsForDots: { r: String(chartColors.dotRadius), strokeWidth: "2", stroke: chartColors.dotStroke },
     yAxisMin: yMin,
     yAxisMax: yMax,
     yAxisInterval: yInterval,
     propsForBackgroundLines: {
         strokeDasharray: "6, 6",
-        stroke: isDark ? "#1e293b" : "#e2e8f0",
+        stroke: gridColor,
         strokeWidth: 1,
     }
   };
 
   return (
-    <View className="mx-4 mb-6 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-2xl shadow-sm overflow-hidden">
+    <View
+      className="mx-4 mb-6 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-2xl shadow-sm overflow-hidden"
+      accessible
+      accessibilityRole="image"
+      accessibilityLabel={accessibilityLabel}
+    >
       <View className="flex-row justify-between items-center mb-4 px-2">
             <Text className="text-lg font-bold text-slate-800 dark:text-slate-200">
                 Overview
@@ -443,7 +464,7 @@ export const MiniWeeklyChart = React.memo(({ weeklyData }: { weeklyData: WeeklyD
         height={200}
         chartConfig={chartConfig}
         style={{ borderRadius: 16 }}
-        bezier
+        bezier={!reduceMotion}
         segments={5}
       />
     </View>

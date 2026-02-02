@@ -10,6 +10,8 @@ export default function DisplaySettingsScreen() {
   const hydrate = useSettingsStore((state) => state.hydrate);
   const showDetailedLabels = useSettingsStore((state) => state.showDetailedLabels);
   const setShowDetailedLabels = useSettingsStore((state) => state.setShowDetailedLabels);
+  const hapticsEnabled = useSettingsStore((state) => state.hapticsEnabled);
+  const setHapticsEnabled = useSettingsStore((state) => state.setHapticsEnabled);
 
   useEffect(() => {
     hydrate();
@@ -36,6 +38,17 @@ export default function DisplaySettingsScreen() {
             value={showDetailedLabels}
             onChange={setShowDetailedLabels}
             icon="text-outline"
+            isLast
+          />
+        </SettingsSection>
+
+        <SettingsSection title="Feedback">
+          <ToggleRow
+            title="Haptic Feedback"
+            description="Vibration feedback when interacting with buttons and controls"
+            value={hapticsEnabled}
+            onChange={setHapticsEnabled}
+            icon="hand-left-outline"
             isLast
           />
         </SettingsSection>

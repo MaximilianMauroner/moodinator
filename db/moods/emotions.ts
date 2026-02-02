@@ -241,3 +241,23 @@ export async function ensureDefaultEmotions(): Promise<void> {
     ...values
   );
 }
+
+/**
+ * Get emotions for a specific mood entry from the junction table.
+ * Returns emotions from the normalized table structure.
+ */
+export async function getEmotionsForMood(moodId: number): Promise<Emotion[]> {
+  const db = await getDb();
+  const rows = await db.getAllAsync<EmotionRow>(
+    `SELECT e.id, e.name, e.category
+     FROM emotions e
+     INNER JOIN mood_emotions me ON e.id = me.emotion_id
+     WHERE me.mood_id = ?
+     ORDER BY e.name ASC;`,
+    moodId
+  );
+  return rows.map((row) => ({
+    name: row.name,
+    category: row.category,
+  }));
+}

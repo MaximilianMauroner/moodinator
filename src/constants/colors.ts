@@ -102,6 +102,46 @@ export type ColorKey = keyof typeof colors;
 export type ThemeMode = "light" | "dark";
 
 /**
+ * Chart-specific color tokens for consistent chart styling.
+ */
+export const chartColors = {
+  // Line/area chart colors
+  line: { light: "#3b82f6", dark: "#60a5fa" },
+  lineSecondary: { light: "#8b5cf6", dark: "#a78bfa" },
+  fill: { light: "#3b82f6", dark: "#60a5fa" },
+  fillOpacity: 0.1,
+
+  // Grid and axis
+  gridLine: { light: "#e2e8f0", dark: "#1e293b" },
+  axisLabel: { light: "#64748b", dark: "#94a3b8" },
+
+  // Background
+  chartBg: { light: "#ffffff", dark: "#0f172a" },
+
+  // Dot styling
+  dotStroke: "#ffffff",
+  dotRadius: 4,
+
+  // Tooltip
+  tooltipBg: { light: "#1e293b", dark: "#f8fafc" },
+  tooltipText: { light: "#f8fafc", dark: "#1e293b" },
+} as const;
+
+/**
+ * Get chart color based on theme.
+ */
+export function getChartColor(
+  key: keyof typeof chartColors,
+  isDark: boolean
+): string | number {
+  const value = chartColors[key];
+  if (typeof value === "object" && value !== null && "light" in value) {
+    return isDark ? value.dark : value.light;
+  }
+  return value;
+}
+
+/**
  * Hook to access theme colors based on current color scheme
  */
 export function useThemeColors() {

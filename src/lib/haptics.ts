@@ -12,6 +12,34 @@ import { Platform } from "react-native";
 const isHapticsSupported = Platform.OS !== "web";
 
 /**
+ * Module-level flag to enable/disable haptic feedback globally.
+ * This is set by the settings store on app startup and when settings change.
+ */
+let hapticsEnabled = true;
+
+/**
+ * Set the global haptics enabled state.
+ * Called by the settings store when preferences change.
+ */
+export function setHapticsEnabled(enabled: boolean): void {
+  hapticsEnabled = enabled;
+}
+
+/**
+ * Get the current haptics enabled state.
+ */
+export function getHapticsEnabled(): boolean {
+  return hapticsEnabled;
+}
+
+/**
+ * Check if haptics should fire (supported and enabled)
+ */
+function shouldTriggerHaptics(): boolean {
+  return isHapticsSupported && hapticsEnabled;
+}
+
+/**
  * Haptic feedback utilities
  */
 export const haptics = {
@@ -20,7 +48,7 @@ export const haptics = {
    * Use for: button presses, toggles, small selections
    */
   light: () => {
-    if (isHapticsSupported) {
+    if (shouldTriggerHaptics()) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
   },
@@ -30,7 +58,7 @@ export const haptics = {
    * Use for: dragging, menu selections, card interactions
    */
   medium: () => {
-    if (isHapticsSupported) {
+    if (shouldTriggerHaptics()) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
   },
@@ -40,7 +68,7 @@ export const haptics = {
    * Use for: completing major actions, emphasis
    */
   heavy: () => {
-    if (isHapticsSupported) {
+    if (shouldTriggerHaptics()) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     }
   },
@@ -50,7 +78,7 @@ export const haptics = {
    * Use for: save success, entry creation, restore actions
    */
   success: () => {
-    if (isHapticsSupported) {
+    if (shouldTriggerHaptics()) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
   },
@@ -60,7 +88,7 @@ export const haptics = {
    * Use for: delete actions, swipe-to-delete, destructive operations
    */
   warning: () => {
-    if (isHapticsSupported) {
+    if (shouldTriggerHaptics()) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     }
   },
@@ -70,7 +98,7 @@ export const haptics = {
    * Use for: validation errors, failed operations
    */
   error: () => {
-    if (isHapticsSupported) {
+    if (shouldTriggerHaptics()) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
   },
@@ -80,7 +108,7 @@ export const haptics = {
    * Use for: picker changes, slider movements, scrolling selections
    */
   selection: () => {
-    if (isHapticsSupported) {
+    if (shouldTriggerHaptics()) {
       Haptics.selectionAsync();
     }
   },

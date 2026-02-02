@@ -34,6 +34,14 @@ async function createIndexes(database: SQLite.SQLiteDatabase) {
   await database.execAsync(
     "CREATE INDEX IF NOT EXISTS idx_mood_emotions_mood_id ON mood_emotions(mood_id);"
   );
+  // Index on emotions.name for lookups by name
+  await database.execAsync(
+    "CREATE INDEX IF NOT EXISTS idx_emotions_name ON emotions(name);"
+  );
+  // Index on mood_emotions.emotion_id for reverse lookups
+  await database.execAsync(
+    "CREATE INDEX IF NOT EXISTS idx_mood_emotions_emotion_id ON mood_emotions(emotion_id);"
+  );
 }
 
 async function ensureMoodTableColumns(database: SQLite.SQLiteDatabase) {
