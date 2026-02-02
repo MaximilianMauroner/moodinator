@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -19,10 +20,14 @@ import { WeekNavigator } from "../components/WeekNavigator";
 import { InsightCard } from "../components/InsightCard";
 import { PatternCard } from "../components/PatternCard";
 import { StreakBadge } from "../components/StreakBadge";
+import { EntryDetailModal } from "../components/EntryDetailModal";
+import type { MoodEntry } from "@db/types";
 
 export function InsightsScreen() {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === "dark";
+  const [selectedEntry, setSelectedEntry] = useState<MoodEntry | null>(null);
+  const [showAllEntries, setShowAllEntries] = useState(false);
 
   const {
     allMoods,
@@ -45,6 +50,11 @@ export function InsightsScreen() {
   } = useInsightsData();
 
   const [refreshing, setRefreshing] = React.useState(false);
+
+  // Reset expanded state when period or date changes
+  useEffect(() => {
+    setShowAllEntries(false);
+  }, [period, currentDate]);
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
@@ -192,7 +202,10 @@ export function InsightsScreen() {
 
             <ScrollView
               className="flex-1"
-              contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
+              contentContainerStyle={{
+                paddingHorizontal: 16,
+                paddingBottom: Platform.OS === "ios" ? 100 : 24,
+              }}
               showsVerticalScrollIndicator={false}
               refreshControl={
                 <RefreshControl
@@ -283,8 +296,8 @@ export function InsightsScreen() {
                     </View>
                   )}
 
-                  {/* Recent Entries Preview */}
-                  {period !== "day" && periodMoods.length > 0 && (
+                  {/* Entries List */}
+                  {periodMoods.length > 0 && (
                     <View
                       className="rounded-3xl bg-paper-50 dark:bg-paper-850 p-5"
                       style={{
@@ -303,21 +316,23 @@ export function InsightsScreen() {
                           }}
                         >
                           <Ionicons
-                            name="list"
+                            name={period === "day" ? "time" : "list"}
                             size={20}
                             color={isDark ? "#A8C5A8" : "#5B8A5B"}
                           />
                         </View>
                         <Text className="text-base font-semibold text-paper-800 dark:text-paper-200">
-                          Recent Entries
+                          {period === "day" ? "Today's Entries" : "Recent Entries"}
                         </Text>
                       </View>
 
-                      {periodMoods.slice(0, 5).map((mood, index) => (
-                        <View
+                      {(showAllEntries ? periodMoods : periodMoods.slice(0, 5)).map((mood, index, arr) => (
+                        <TouchableOpacity
                           key={mood.id}
+                          onPress={() => setSelectedEntry(mood)}
+                          activeOpacity={0.7}
                           className={`flex-row items-center py-3 ${
-                            index < Math.min(periodMoods.length, 5) - 1
+                            index < arr.length - 1
                               ? "border-b border-paper-200 dark:border-paper-800"
                               : ""
                           }`}
@@ -338,16 +353,34 @@ export function InsightsScreen() {
                               {getMoodLabel(mood.mood)}
                             </Text>
                             <Text className="text-xs text-sand-500 dark:text-sand-400">
-                              {format(new Date(mood.timestamp), "EEE, MMM d 'at' h:mm a")}
+                              {period === "day"
+                                ? format(new Date(mood.timestamp), "h:mm a")
+                                : format(new Date(mood.timestamp), "EEE, MMM d 'at' h:mm a")}
                             </Text>
                           </View>
-                        </View>
+                          <Ionicons
+                            name="chevron-forward"
+                            size={16}
+                            color={isDark ? "#6B5C4A" : "#BDA77D"}
+                          />
+                        </TouchableOpacity>
                       ))}
 
                       {periodMoods.length > 5 && (
-                        <Text className="text-xs text-center mt-3 text-sand-500 dark:text-sand-400">
-                          +{periodMoods.length - 5} more entries
-                        </Text>
+                        <TouchableOpacity
+                          onPress={() => setShowAllEntries(!showAllEntries)}
+                          activeOpacity={0.7}
+                          className="mt-3 py-2"
+                        >
+                          <Text
+                            className="text-xs text-center font-medium"
+                            style={{ color: isDark ? "#A8C5A8" : "#5B8A5B" }}
+                          >
+                            {showAllEntries
+                              ? "Show less"
+                              : `+${periodMoods.length - 5} more entries`}
+                          </Text>
+                        </TouchableOpacity>
                       )}
                     </View>
                   )}
@@ -384,6 +417,14 @@ export function InsightsScreen() {
           </>
         )}
       </SafeAreaView>
+
+      {/* Entry Detail Modal */}
+      <EntryDetailModal
+        entry={selectedEntry}
+        onClose={() => setSelectedEntry(null)}
+        getMoodLabel={getMoodLabel}
+        getMoodColor={getMoodColor}
+      />
     </GestureHandlerRootView>
   );
 }
