@@ -53,6 +53,9 @@ export function useMoodModals() {
             contextTags: editingEntry.contextTags,
             energy: editingEntry.energy,
             note: editingEntry.note ?? "",
+            photos: editingEntry.photos,
+            location: editingEntry.location,
+            voiceMemos: editingEntry.voiceMemos,
           }
         : undefined,
     [editingEntry]
