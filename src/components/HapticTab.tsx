@@ -32,6 +32,7 @@ export function HapticTab({ hapticStyle = "selection", ...props }: HapticTabProp
     medium: 40,
     rigid: 30,
     soft: 15,
+    none: 0,
   };
 
   const triggerHaptic = () => {

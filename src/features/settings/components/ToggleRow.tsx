@@ -12,6 +12,7 @@ export const ToggleRow = memo(function ToggleRow({
   onChange,
   isLast,
   icon,
+  disabled,
 }: {
   title: string;
   description?: string;
@@ -19,6 +20,7 @@ export const ToggleRow = memo(function ToggleRow({
   onChange: (v: boolean) => void;
   isLast?: boolean;
   icon?: keyof typeof Ionicons.glyphMap;
+  disabled?: boolean;
 }) {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === "dark";
@@ -33,9 +35,10 @@ export const ToggleRow = memo(function ToggleRow({
         <Switch
           value={value}
           onValueChange={onChange}
+          disabled={disabled}
           trackColor={{
             false: isDark ? "#3D352A" : "#E5D9BF",
-            true: "#5B8A5B",
+            true: disabled ? "#8FBB8F" : "#5B8A5B",
           }}
           thumbColor={Platform.OS === "ios" ? undefined : "#fff"}
           ios_backgroundColor={isDark ? "#3D352A" : "#E5D9BF"}
