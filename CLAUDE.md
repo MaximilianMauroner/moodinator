@@ -77,4 +77,9 @@ Avoid NativeWind `shadow-*` classes in dynamic components - use inline `style` w
 2. **REMOVE the item from `improvements.md`** - this is mandatory
 3. Commit both your code changes AND the updated improvements.md
 
+**When committing and pushing code:**
+1. Review the changed code for potential improvements
+2. Add any new suggestions to `improvements.md` (code quality, performance, features, etc.)
+3. Include the updated improvements.md in your commit
+
 The improvements.md file must only contain unimplemented items. Stale/completed items make the list unreliable for future work.
