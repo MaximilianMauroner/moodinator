@@ -70,7 +70,11 @@ Avoid NativeWind `shadow-*` classes in dynamic components - use inline `style` w
 
 ## Improvements Tracking
 
-**IMPORTANT**: All improvement recommendations are tracked in `improvements.md`. When implementing a suggestion:
-1. Complete the implementation
-2. Remove the item from `improvements.md`
-3. Keep the file current - it should only contain unimplemented improvements
+**CRITICAL**: All improvement recommendations are tracked in `improvements.md`.
+
+**When implementing ANY suggestion from improvements.md:**
+1. Complete the implementation fully
+2. **REMOVE the item from `improvements.md`** - this is mandatory
+3. Commit both your code changes AND the updated improvements.md
+
+The improvements.md file must only contain unimplemented items. Stale/completed items make the list unreliable for future work.

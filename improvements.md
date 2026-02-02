@@ -1,6 +1,6 @@
 # Improvements Tracking
 
-**IMPORTANT**: This file tracks planned improvements for Moodinator. When you implement an item, **remove it from this file**. Keep this list current - only unimplemented improvements should remain here.
+Planned improvements for Moodinator. See CLAUDE.md for instructions on maintaining this file.
 
 ---
 
