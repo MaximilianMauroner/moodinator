@@ -2,21 +2,29 @@ import React from "react";
 import { View, Text, ScrollView, Alert, Linking, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useColorScheme } from "nativewind";
+import { useRouter } from "expo-router";
 import { SettingsPageHeader } from "@/features/settings/components/SettingsPageHeader";
 import { SettingsSection } from "@/features/settings/components/SettingsSection";
 import { SettingRow } from "@/features/settings/components/SettingRow";
 
+const SUPPORT_EMAIL = "support.moodinator@lab4code.com";
+
 export default function AboutSettingsScreen() {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === "dark";
+  const router = useRouter();
 
   const handlePrivacyPolicy = () => {
-    Alert.alert("Privacy Policy", "Privacy policy link coming soon.");
+    router.push("/settings/privacy-policy");
+  };
+
+  const handleTermsOfService = () => {
+    router.push("/settings/terms-of-service");
   };
 
   const handleContactSupport = () => {
-    Linking.openURL("mailto:support@moodinator.app").catch(() => {
-      Alert.alert("Contact Support", "Email: support@moodinator.app");
+    Linking.openURL(`mailto:${SUPPORT_EMAIL}`).catch(() => {
+      Alert.alert("Contact Support", `Email: ${SUPPORT_EMAIL}`);
     });
   };
 
@@ -86,7 +94,7 @@ export default function AboutSettingsScreen() {
             label="Terms of Service"
             subLabel="View terms and conditions"
             icon="document-text-outline"
-            onPress={() => Alert.alert("Terms of Service", "Coming soon.")}
+            onPress={handleTermsOfService}
             isLast
           />
         </SettingsSection>
