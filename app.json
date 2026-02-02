@@ -18,7 +18,10 @@
         "NSLocationWhenInUseUsageDescription": "We use your location to tag your mood entries with where you were.",
         "NSMicrophoneUsageDescription": "We use the microphone to record voice memos for your mood entries.",
         "UIFileSharingEnabled": true,
-        "LSSupportsOpeningDocumentsInPlace": true
+        "LSSupportsOpeningDocumentsInPlace": true,
+        "UIBackgroundModes": [
+          "fetch"
+        ]
       }
     },
     "android": {
@@ -93,6 +96,8 @@
       ],
       "expo-font",
       "expo-web-browser",
+      "expo-background-task",
+      "expo-task-manager",
       "expo-location",
       [
         "expo-av",
