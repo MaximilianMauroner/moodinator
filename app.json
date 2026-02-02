@@ -24,6 +24,9 @@
         ]
       }
     },
+    "androidStatusBar": {
+      "translucent": true
+    },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
@@ -50,7 +53,11 @@
           "image": "./assets/images/icon.png",
           "imageWidth": 250,
           "resizeMode": "contain",
-          "backgroundColor": "#FAF8F4"
+          "backgroundColor": "#FAF8F4",
+          "dark": {
+            "image": "./assets/images/icon.png",
+            "backgroundColor": "#1C1916"
+          }
         }
       ],
       [
