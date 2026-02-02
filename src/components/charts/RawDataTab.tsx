@@ -18,6 +18,7 @@ import {
 } from "./ChartComponents";
 import { moodScale } from "@/constants/moodScale";
 import { useColorScheme } from "@/hooks/useColorScheme";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 export const RawDataTab = ({
   moods,
@@ -233,11 +234,11 @@ export const RawDataTab = ({
 
   if (!moods.length) {
     return (
-      <View className="flex-1 justify-center items-center p-8">
-        <Text className="text-gray-500 dark:text-slate-400 text-center text-lg">
-          No mood data available yet
-        </Text>
-      </View>
+      <EmptyState
+        icon="analytics-outline"
+        title="No mood data available"
+        description="Start logging moods to see your data analysis"
+      />
     );
   }
 

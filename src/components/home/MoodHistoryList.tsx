@@ -1,7 +1,9 @@
 import React, { useCallback } from "react";
-import { View, Text, FlatList, RefreshControl } from "react-native";
+import { FlatList, RefreshControl } from "react-native";
 import { DisplayMoodItem } from "@/components/DisplayMoodItem";
 import { useColorScheme } from "@/hooks/useColorScheme";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { EmptyState } from "@/components/ui/EmptyState";
 import type { MoodEntry } from "@db/types";
 import type { SwipeDirection } from "@/types/mood";
 
@@ -44,47 +46,18 @@ export function MoodHistoryList({
   );
 
   const renderEmptyComponent = useCallback(() => {
+    if (loading) {
+      return <LoadingSpinner message="Loading..." />;
+    }
+
     return (
-      <View className="flex-1 items-center justify-center p-8">
-        {loading ? (
-          <Text
-            className="text-center"
-            style={{ color: isDark ? "#BDA77D" : "#9D8660" }}
-          >
-            Loading...
-          </Text>
-        ) : (
-          <View className="items-center">
-            <View
-              className="w-24 h-24 rounded-3xl items-center justify-center mb-5"
-              style={{
-                backgroundColor: isDark ? "#2D3D2D" : "#E8EFE8",
-                shadowColor: isDark ? "#000" : "#5B8A5B",
-                shadowOffset: { width: 0, height: 8 },
-                shadowOpacity: isDark ? 0.3 : 0.15,
-                shadowRadius: 16,
-                elevation: 4,
-              }}
-            >
-              <Text className="text-5xl">🌿</Text>
-            </View>
-            <Text
-              className="text-center font-semibold text-lg mb-1"
-              style={{ color: isDark ? "#F5F1E8" : "#3D352A" }}
-            >
-              Start your journey
-            </Text>
-            <Text
-              className="text-center text-sm max-w-[200px]"
-              style={{ color: isDark ? "#BDA77D" : "#9D8660" }}
-            >
-              Tap a mood above to log how you're feeling right now
-            </Text>
-          </View>
-        )}
-      </View>
+      <EmptyState
+        emoji="🌿"
+        title="Start your journey"
+        description="Tap a mood above to log how you're feeling right now"
+      />
     );
-  }, [loading, isDark]);
+  }, [loading]);
 
   return (
     <FlatList
