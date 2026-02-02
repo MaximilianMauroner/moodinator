@@ -1,4 +1,4 @@
-import type { MoodEntry } from "../types";
+import type { MoodEntry, Emotion } from "../types";
 import { getDb } from "../client";
 import { getMoodsWithinRange } from "./repository";
 import type { MoodDateRange } from "./range";
@@ -12,7 +12,13 @@ import {
 } from "./serialization";
 import { linkEmotionsToMood } from "./emotions";
 import { parseEmotionItem } from "./emotionUtils";
-import type { Emotion } from "../types";
+import {
+  validateMoodEntry,
+  sanitizeMoodValue,
+  sanitizeTimestamp,
+  formatValidationErrors,
+  type ValidationResult,
+} from "../validation";
 
 export async function exportMoods(range?: MoodDateRange): Promise<string> {
   const moods = await getMoodsWithinRange(range);
@@ -28,22 +34,58 @@ export async function exportMoods(range?: MoodDateRange): Promise<string> {
   );
 }
 
-export async function importMoods(jsonData: string): Promise<number> {
-  try {
-    const moods = JSON.parse(jsonData) as MoodEntry[];
-    const db = await getDb();
+export type ImportResult = {
+  imported: number;
+  skipped: number;
+  errors: string[];
+};
 
-    for (const mood of moods) {
-      const note = (mood as any)?.notes ?? (mood as any)?.note ?? null;
-      const timestamp = parseTimestamp((mood as any)?.timestamp);
-      const emotions = sanitizeImportedEmotions((mood as any)?.emotions);
-      const contextSource =
-        (mood as any)?.contextTags ?? (mood as any)?.context ?? [];
+export async function importMoods(jsonData: string): Promise<ImportResult> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(jsonData);
+  } catch {
+    throw new Error("Invalid JSON format");
+  }
+
+  if (!Array.isArray(parsed)) {
+    throw new Error("Import data must be an array");
+  }
+
+  const db = await getDb();
+  const result: ImportResult = { imported: 0, skipped: 0, errors: [] };
+
+  await db.execAsync("BEGIN TRANSACTION;");
+  try {
+    for (let i = 0; i < parsed.length; i++) {
+      const rawMood = parsed[i] as Record<string, unknown>;
+
+      // Validate mood value is present (required field)
+      if (rawMood?.mood === undefined || rawMood?.mood === null) {
+        result.skipped++;
+        result.errors.push(`Entry ${i}: Missing mood value`);
+        continue;
+      }
+
+      // Validate mood is in range
+      const moodValue = sanitizeMoodValue(rawMood.mood);
+      if (typeof rawMood.mood === "number" && (rawMood.mood < 0 || rawMood.mood > 10)) {
+        result.skipped++;
+        result.errors.push(`Entry ${i}: Mood value ${rawMood.mood} is out of range (0-10)`);
+        continue;
+      }
+
+      // Normalize and sanitize other fields
+      const note = (rawMood?.notes ?? rawMood?.note ?? null) as string | null;
+      const timestamp = sanitizeTimestamp(rawMood?.timestamp);
+      const emotions = sanitizeImportedEmotions(rawMood?.emotions);
+      const contextSource = rawMood?.contextTags ?? rawMood?.context ?? [];
       const contextTags = sanitizeImportedArray(contextSource);
-      const energy = sanitizeEnergy((mood as any)?.energy);
-      const result = await db.runAsync(
+      const energy = sanitizeEnergy(rawMood?.energy);
+
+      const dbResult = await db.runAsync(
         "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy) VALUES (?, ?, ?, ?, ?, ?);",
-        mood.mood,
+        moodValue,
         note,
         timestamp,
         serializeEmotions(emotions),
@@ -52,26 +94,51 @@ export async function importMoods(jsonData: string): Promise<number> {
       );
 
       if (emotions.length > 0) {
-        await linkEmotionsToMood(db, result.lastInsertRowId, emotions);
+        await linkEmotionsToMood(db, dbResult.lastInsertRowId, emotions);
       }
+
+      result.imported++;
     }
-    return moods.length;
+
+    await db.execAsync("COMMIT;");
+    return result;
   } catch (error) {
+    await db.execAsync("ROLLBACK;");
     console.error("Error importing moods:", error);
-    throw new Error("Invalid mood data format");
+    throw new Error(`Import failed: ${error instanceof Error ? error.message : "Unknown error"}`);
   }
 }
 
-export async function importOldBackup(jsonData: string): Promise<number> {
+export async function importOldBackup(jsonData: string): Promise<ImportResult> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(jsonData);
+  } catch {
+    throw new Error("Invalid JSON format in backup");
+  }
+
+  if (!Array.isArray(parsed)) {
+    throw new Error("Backup data must be an array");
+  }
+
   const db = await getDb();
+  const result: ImportResult = { imported: 0, skipped: 0, errors: [] };
 
   await db.execAsync("BEGIN TRANSACTION;");
   try {
-    const moods = JSON.parse(jsonData) as any[];
+    for (let i = 0; i < parsed.length; i++) {
+      const mood = parsed[i] as Record<string, unknown>;
 
-    for (const mood of moods) {
-      const note = mood?.notes ?? mood?.note ?? null;
-      const timestamp = parseTimestamp(mood?.timestamp);
+      // Validate mood value is present
+      if (mood?.mood === undefined || mood?.mood === null) {
+        result.skipped++;
+        result.errors.push(`Entry ${i}: Missing mood value`);
+        continue;
+      }
+
+      const note = (mood?.notes ?? mood?.note ?? null) as string | null;
+      const timestamp = sanitizeTimestamp(mood?.timestamp);
+      const moodValue = sanitizeMoodValue(mood?.mood);
 
       let emotions: Emotion[] = [];
       if (mood?.emotions && Array.isArray(mood.emotions)) {
@@ -84,9 +151,9 @@ export async function importOldBackup(jsonData: string): Promise<number> {
       const contextTags = sanitizeImportedArray(contextSource);
       const energy = sanitizeEnergy(mood?.energy);
 
-      const result = await db.runAsync(
+      const dbResult = await db.runAsync(
         "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy) VALUES (?, ?, ?, ?, ?, ?);",
-        mood.mood,
+        moodValue,
         note,
         timestamp,
         serializeEmotions(emotions),
@@ -95,15 +162,17 @@ export async function importOldBackup(jsonData: string): Promise<number> {
       );
 
       if (emotions.length > 0) {
-        await linkEmotionsToMood(db, result.lastInsertRowId, emotions);
+        await linkEmotionsToMood(db, dbResult.lastInsertRowId, emotions);
       }
+
+      result.imported++;
     }
 
     await db.execAsync("COMMIT;");
-    return moods.length;
+    return result;
   } catch (error) {
     await db.execAsync("ROLLBACK;");
     console.error("Error importing old backup:", error);
-    throw new Error("Invalid backup data format");
+    throw new Error(`Backup import failed: ${error instanceof Error ? error.message : "Unknown error"}`);
   }
 }

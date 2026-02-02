@@ -524,7 +524,7 @@ export const RawDataTab = ({
             Average Energy
           </Text>
           <Text className="text-lg font-semibold text-orange-500 dark:text-orange-300">
-            {avgEnergy !== null ? `${avgEnergy.toFixed(1)}/10` : "—"}
+            {avgEnergy !== null ? `${avgEnergy.toFixed(1)}/10` : "-"}
           </Text>
         </View>
       </View>

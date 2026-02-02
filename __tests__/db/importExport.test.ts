@@ -92,9 +92,11 @@ describe("Import/Export", () => {
         },
       ]);
 
-      const count = await importMoods(data);
+      const result = await importMoods(data);
 
-      expect(count).toBe(1);
+      expect(result.imported).toBe(1);
+      expect(result.skipped).toBe(0);
+      expect(result.errors).toHaveLength(0);
       const moods = mockDb.__getMoods();
       expect(moods).toHaveLength(1);
       expect(moods[0].mood).toBe(7);
@@ -164,20 +166,35 @@ describe("Import/Export", () => {
 
     it("throws error for invalid JSON", async () => {
       await expect(importMoods("not valid json")).rejects.toThrow(
-        "Invalid mood data format"
+        "Invalid JSON format"
       );
     });
 
-    it("returns count of imported moods", async () => {
+    it("returns result with count of imported moods", async () => {
       const data = JSON.stringify([
         { mood: 5 },
         { mood: 6 },
         { mood: 7 },
       ]);
 
-      const count = await importMoods(data);
+      const result = await importMoods(data);
 
-      expect(count).toBe(3);
+      expect(result.imported).toBe(3);
+      expect(result.skipped).toBe(0);
+    });
+
+    it("skips invalid entries and reports errors", async () => {
+      const data = JSON.stringify([
+        { mood: 5 }, // valid
+        { mood: 15 }, // invalid - out of range
+        { mood: 7 }, // valid
+      ]);
+
+      const result = await importMoods(data);
+
+      expect(result.imported).toBe(2);
+      expect(result.skipped).toBe(1);
+      expect(result.errors.length).toBeGreaterThan(0);
     });
   });
 
@@ -192,9 +209,9 @@ describe("Import/Export", () => {
         },
       ]);
 
-      const count = await importOldBackup(data);
+      const result = await importOldBackup(data);
 
-      expect(count).toBe(1);
+      expect(result.imported).toBe(1);
       const moods = mockDb.__getMoods();
       expect(moods[0].mood).toBe(7);
     });
@@ -212,7 +229,7 @@ describe("Import/Export", () => {
       mockDb.runAsync.mockRejectedValueOnce(new Error("Import failed"));
 
       await expect(importOldBackup(JSON.stringify([{ mood: 5 }]))).rejects.toThrow(
-        "Invalid backup data format"
+        "Backup import failed"
       );
       expect(mockDb.execAsync).toHaveBeenCalledWith("ROLLBACK;");
     });
@@ -271,8 +288,9 @@ describe("Import/Export", () => {
       const exported = await exportMoods();
       expect(JSON.parse(exported)).toEqual([]);
 
-      const count = await importMoods(exported);
-      expect(count).toBe(0);
+      const result = await importMoods(exported);
+      expect(result.imported).toBe(0);
+      expect(result.skipped).toBe(0);
     });
   });
 });

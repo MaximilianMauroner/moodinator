@@ -1,4 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from "react";
+import { View, Text, Pressable } from "react-native";
 
 export interface ErrorBoundaryProps {
   children: ReactNode;
@@ -15,6 +16,100 @@ export interface ErrorFallbackProps {
 interface ErrorBoundaryState {
   hasError: boolean;
   error: Error | null;
+}
+
+/**
+ * Default fallback component shown when no custom fallback is provided.
+ * Provides a minimal but user-friendly error display with retry option.
+ */
+function DefaultErrorFallback({ error, resetError }: ErrorFallbackProps) {
+  return (
+    <View
+      style={{
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+        padding: 24,
+        backgroundColor: "#FAF8F4",
+      }}
+    >
+      <View
+        style={{
+          width: 64,
+          height: 64,
+          borderRadius: 16,
+          backgroundColor: "#FDE8E4",
+          justifyContent: "center",
+          alignItems: "center",
+          marginBottom: 16,
+        }}
+      >
+        <Text style={{ fontSize: 28 }}>⚠️</Text>
+      </View>
+      <Text
+        style={{
+          fontSize: 18,
+          fontWeight: "600",
+          color: "#3D352A",
+          marginBottom: 8,
+          textAlign: "center",
+        }}
+      >
+        Something went wrong
+      </Text>
+      <Text
+        style={{
+          fontSize: 14,
+          color: "#6B5C4A",
+          marginBottom: 24,
+          textAlign: "center",
+          maxWidth: 280,
+        }}
+      >
+        An unexpected error occurred. Tap below to try again.
+      </Text>
+      {__DEV__ && (
+        <View
+          style={{
+            backgroundColor: "#F9F5ED",
+            borderRadius: 8,
+            padding: 12,
+            marginBottom: 16,
+            maxWidth: 320,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 12,
+              fontFamily: "monospace",
+              color: "#C75441",
+            }}
+            numberOfLines={3}
+          >
+            {error.message}
+          </Text>
+        </View>
+      )}
+      <Pressable
+        onPress={resetError}
+        style={{
+          backgroundColor: "#5B8A5B",
+          paddingVertical: 14,
+          paddingHorizontal: 32,
+          borderRadius: 16,
+          shadowColor: "#5B8A5B",
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.25,
+          shadowRadius: 8,
+          elevation: 4,
+        }}
+      >
+        <Text style={{ color: "#FFFFFF", fontSize: 16, fontWeight: "600" }}>
+          Try Again
+        </Text>
+      </Pressable>
+    </View>
+  );
 }
 
 /**
@@ -61,8 +156,8 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
         return fallback;
       }
 
-      // Default fallback (minimal)
-      return null;
+      // Default user-friendly fallback
+      return <DefaultErrorFallback error={error} resetError={this.resetError} />;
     }
 
     return children;
