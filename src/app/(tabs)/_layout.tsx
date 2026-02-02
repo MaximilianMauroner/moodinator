@@ -15,7 +15,7 @@ export default function TabLayout() {
   // Soft Organic palette
   const colors = {
     active: isDark ? "#A8C5A8" : "#5B8A5B",
-    inactive: isDark ? "#6B5C4A" : "#BDA77D",
+    inactive: isDark ? "#6B5C4A" : "#7A6B55",
     background: isDark ? "#1C1916" : "#FAF8F4",
     border: isDark ? "#2A2520" : "#E5D9BF",
   };

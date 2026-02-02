@@ -14,8 +14,8 @@ export const colors = {
 
   // Text colors
   text: { light: "#3D352A", dark: "#F5F1E8" },
-  textMuted: { light: "#6B5C4A", dark: "#BDA77D" },
-  textSubtle: { light: "#9D8660", dark: "#D4C4A0" },
+  textMuted: { light: "#5C4E3D", dark: "#BDA77D" },
+  textSubtle: { light: "#7A6B55", dark: "#D4C4A0" },
   textInverse: { light: "#FFFFFF", dark: "#FFFFFF" },
 
   // Primary accent (sage green)
@@ -61,8 +61,8 @@ export const colors = {
     bgSelected: { light: "#9D8660", dark: "#BDA77D" },
     bgHover: { light: "#FDF8EF", dark: "#3D352A" },
     border: { light: "#E5D9BF", dark: "#3D352A" },
-    text: { light: "#9D8660", dark: "#D4C4A0" },
-    textMuted: { light: "#BDA77D", dark: "#6B5C4A" },
+    text: { light: "#7A6B55", dark: "#D4C4A0" },
+    textMuted: { light: "#8C7A60", dark: "#6B5C4A" },
   },
 
   // Dusk/purple tones (for context tags)

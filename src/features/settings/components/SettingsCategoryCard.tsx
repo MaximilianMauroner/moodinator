@@ -39,10 +39,10 @@ export function SettingsCategoryCard({
     },
     sand: {
       iconBg: isDark ? "#302A22" : "#F9F5ED",
-      iconColor: isDark ? "#D4C4A0" : "#9D8660",
+      iconColor: isDark ? "#D4C4A0" : "#7A6545",
       accentLine: isDark ? "#BDA77D" : "#D4C4A0",
       badgeBg: isDark ? "rgba(189, 167, 125, 0.2)" : "#F9F5ED",
-      badgeText: isDark ? "#D4C4A0" : "#9D8660",
+      badgeText: isDark ? "#D4C4A0" : "#7A6545",
     },
     coral: {
       iconBg: isDark ? "#3D2822" : "#FDE8E4",
@@ -138,7 +138,7 @@ export function SettingsCategoryCard({
                 <Ionicons
                   name="chevron-forward"
                   size={18}
-                  color={isDark ? "#6B5C4A" : "#9D8660"}
+                  color={isDark ? "#6B5C4A" : "#7A6B55"}
                 />
               </View>
             </View>

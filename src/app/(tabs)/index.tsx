@@ -70,7 +70,7 @@ const createToastConfig = (isDark: boolean) => ({
           {text2 ? (
             <Text
               className="text-xs mt-0.5"
-              style={{ color: isDark ? "#BDA77D" : "#9D8660" }}
+              style={{ color: isDark ? "#BDA77D" : "#6B5C4A" }}
             >
               {text2}
             </Text>
@@ -91,7 +91,7 @@ const createToastConfig = (isDark: boolean) => ({
         </HapticTab>
       </View>
       <HapticTab onPress={hide} className="ml-2">
-        <IconSymbol name="xmark" size={18} color={isDark ? "#6B5C4A" : "#BDA77D"} />
+        <IconSymbol name="xmark" size={18} color={isDark ? "#6B5C4A" : "#7A6B55"} />
       </HapticTab>
     </View>
   ),

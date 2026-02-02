@@ -53,7 +53,7 @@ function PatternItem({ pattern, isLast }: { pattern: Pattern; isLast: boolean })
       case "weekend":
         return {
           bg: isDark ? "#302A22" : "#F9F5ED",
-          color: isDark ? "#D4C4A0" : "#9D8660",
+          color: isDark ? "#D4C4A0" : "#7A6545",
         };
       case "emotion":
         return {

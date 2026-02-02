@@ -3,6 +3,7 @@ import { View, Text } from "react-native";
 import { HapticTab } from "./HapticTab";
 import { moodScale } from "@/constants/moodScale";
 import { getMoodButtonLabel, getMoodButtonHint } from "@/constants/accessibility";
+import { useThemeColors, colors } from "@/constants/colors";
 
 interface MoodButtonsDetailedProps {
   onMoodPress: (mood: number) => void;
@@ -13,6 +14,8 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
   onMoodPress,
   onLongPress,
 }) => {
+  const { isDark, get } = useThemeColors();
+
   const moodData = React.useMemo(() => {
     return moodScale.map((mood) => ({
       value: mood.value,
@@ -21,10 +24,10 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
       color: mood.color,
       bg: mood.bg,
       borderColor: mood.borderColor,
-      textHex: mood.textHex,
-      bgHex: mood.bgHex,
+      textHex: isDark ? mood.textHexDark : mood.textHex,
+      bgHex: isDark ? mood.bgHexDark : mood.bgHex,
     }));
-  }, []);
+  }, [isDark]);
 
   const firstMood = moodData[0];
   const middleMoods = moodData.slice(1, 6);
@@ -34,11 +37,20 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
     <View className="mb-4">
       {/* Soft header */}
       <View className="flex-row items-center justify-center mb-4">
-        <View className="h-px flex-1 bg-slate-200" />
-        <Text className="text-xs font-medium text-slate-400 mx-3 tracking-wide">
+        <View
+          className="h-px flex-1"
+          style={{ backgroundColor: get("border") }}
+        />
+        <Text
+          className="text-xs font-medium mx-3 tracking-wide"
+          style={{ color: isDark ? colors.sand.textMuted.dark : "#6B5C4A" }}
+        >
           How are you feeling? (Detailed)
         </Text>
-        <View className="h-px flex-1 bg-slate-200" />
+        <View
+          className="h-px flex-1"
+          style={{ backgroundColor: get("border") }}
+        />
       </View>
 
       <View className="flex-row flex-wrap justify-between gap-2">
@@ -175,23 +187,25 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
 
       {/* Gentle scale indicator */}
       <View className="mt-4 mx-2">
-        <View className="flex-row h-1.5 rounded-full overflow-hidden bg-slate-100">
-          <View className="flex-1 bg-violet-300" />
-          <View className="flex-1 bg-indigo-300" />
-          <View className="flex-1 bg-sky-300" />
-          <View className="flex-1 bg-teal-300" />
-          <View className="flex-1 bg-emerald-300" />
-          <View className="flex-1 bg-slate-300" />
-          <View className="flex-1 bg-amber-300" />
-          <View className="flex-1 bg-orange-300" />
-          <View className="flex-1 bg-rose-300" />
-          <View className="flex-1 bg-red-300" />
+        <View
+          className="flex-row h-1 rounded-full overflow-hidden"
+          style={{ backgroundColor: get("surfaceAlt") }}
+        >
+          {colors.moodGradient.map((color, index) => (
+            <View key={index} className="flex-1" style={{ backgroundColor: color }} />
+          ))}
         </View>
-        <View className="flex-row justify-between mt-1.5 px-1">
-          <Text className="text-[10px] font-medium text-emerald-500">
+        <View className="flex-row justify-between mt-2 px-0.5">
+          <Text
+            className="text-[10px] font-medium"
+            style={{ color: isDark ? colors.primaryMuted.dark : colors.primary.light }}
+          >
             Great
           </Text>
-          <Text className="text-[10px] font-medium text-rose-400">
+          <Text
+            className="text-[10px] font-medium"
+            style={{ color: isDark ? colors.negative.text.dark : colors.negative.text.light }}
+          >
             Need support
           </Text>
         </View>

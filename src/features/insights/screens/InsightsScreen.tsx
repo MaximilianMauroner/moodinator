@@ -82,7 +82,7 @@ export function InsightsScreen() {
           <ActivityIndicator size="large" color={isDark ? "#A8C5A8" : "#5B8A5B"} />
           <Text
             className="mt-4 font-medium text-sm text-center"
-            style={{ color: isDark ? "#BDA77D" : "#9D8660" }}
+            style={{ color: isDark ? "#BDA77D" : "#6B5C4A" }}
           >
             Loading insights...
           </Text>
@@ -122,7 +122,7 @@ export function InsightsScreen() {
               </Text>
               <Text
                 className="text-sm mt-0.5"
-                style={{ color: isDark ? "#BDA77D" : "#9D8660" }}
+                style={{ color: isDark ? "#BDA77D" : "#6B5C4A" }}
               >
                 {allMoods.length} entries tracked
               </Text>
@@ -177,7 +177,7 @@ export function InsightsScreen() {
               </Text>
               <Text
                 className="text-center text-sm leading-6"
-                style={{ color: isDark ? "#BDA77D" : "#9D8660" }}
+                style={{ color: isDark ? "#BDA77D" : "#6B5C4A" }}
               >
                 Start tracking your moods to discover patterns and understand your
                 emotional well-being better.

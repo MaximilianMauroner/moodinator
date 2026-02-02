@@ -31,8 +31,8 @@ export function SettingsPageHeader({
     },
     sand: {
       iconBg: isDark ? "#302A22" : "#F9F5ED",
-      iconColor: isDark ? "#D4C4A0" : "#9D8660",
-      subtitleColor: isDark ? "#D4C4A0" : "#9D8660",
+      iconColor: isDark ? "#D4C4A0" : "#7A6545",
+      subtitleColor: isDark ? "#D4C4A0" : "#7A6545",
     },
     coral: {
       iconBg: isDark ? "#3D2822" : "#FDE8E4",
