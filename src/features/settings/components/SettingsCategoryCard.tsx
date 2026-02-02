@@ -120,7 +120,7 @@ export function SettingsCategoryCard({
                 </Text>
                 {preview && (
                   <Text
-                    className="text-xs text-paper-500 dark:text-paper-500 mt-1"
+                    className="text-xs text-sage-500 dark:text-sage-300 mt-1"
                     numberOfLines={1}
                   >
                     {preview}
