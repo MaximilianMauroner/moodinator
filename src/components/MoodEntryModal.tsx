@@ -7,7 +7,6 @@ import {
     ScrollView,
     TextInput,
     Alert,
-    Animated,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { moodScale } from "@/constants/moodScale";
@@ -318,7 +317,7 @@ export const MoodEntryModal: React.FC<MoodEntryModalProps> = ({
                 voiceMemos: fieldConfig.voiceMemos ? voiceMemos : [],
                 basedOnEntryId,
             });
-            haptics.success();
+            haptics.moodLogged();
             onClose();
         } catch (error) {
             console.error("Failed to save mood entry:", error);

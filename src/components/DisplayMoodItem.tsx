@@ -18,8 +18,9 @@ interface Props {
   swipeThreshold: number;
 }
 
-export const DisplayMoodItem = React.memo(
-  ({ mood, onSwipeableWillOpen, onLongPress, swipeThreshold }: Props) => {
+export const DisplayMoodItem = React.memo(function DisplayMoodItem(
+  { mood, onSwipeableWillOpen, onLongPress, swipeThreshold }: Props
+) {
     const swipeableRef = useRef<typeof Swipeable.prototype | null>(null);
     const { isDark, get, getCategoryColors } = useThemeColors();
 
@@ -48,9 +49,9 @@ export const DisplayMoodItem = React.memo(
     const handleSwipeableOpen = (direction: string) => {
       // Haptic feedback based on swipe direction
       if (direction === "right") {
-        haptics.warning(); // Delete action
+        haptics.destructive(); // Delete action - more prominent warning
       } else {
-        haptics.light(); // Edit action
+        haptics.swipeThreshold(); // Edit action - subtle confirmation
       }
       runOnJS(onSwipeableWillOpen)(direction as SwipeDirection, mood);
       setTimeout(() => {

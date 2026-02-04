@@ -4,6 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import * as Notifications from "expo-notifications";
 import { clearMoods, seedMoods } from "@db/db";
 import { useSettingsStore } from "@/shared/state/settingsStore";
+import { useOnboardingStore } from "@/features/onboarding";
 import { SettingsPageHeader } from "@/features/settings/components/SettingsPageHeader";
 import { SettingsSection } from "@/features/settings/components/SettingsSection";
 import { SettingRow } from "@/features/settings/components/SettingRow";
@@ -13,10 +14,28 @@ export default function DeveloperSettingsScreen() {
   const hydrate = useSettingsStore((state) => state.hydrate);
   const devOptionsEnabled = useSettingsStore((state) => state.devOptionsEnabled);
   const setDevOptionsEnabled = useSettingsStore((state) => state.setDevOptionsEnabled);
+  const resetOnboarding = useOnboardingStore((state) => state.reset);
 
   useEffect(() => {
     hydrate();
   }, [hydrate]);
+
+  const handleResetOnboarding = useCallback(() => {
+    Alert.alert(
+      "Reset Onboarding",
+      "This will show the onboarding tutorial on next app launch. Continue?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Reset",
+          onPress: async () => {
+            await resetOnboarding();
+            Alert.alert("Done", "Onboarding will show on next app launch.");
+          },
+        },
+      ]
+    );
+  }, [resetOnboarding]);
 
   const handleSeedMoods = useCallback(async () => {
     try {
@@ -105,6 +124,12 @@ export default function DeveloperSettingsScreen() {
                 subLabel="Send a push notification in 2s"
                 icon="notifications-circle-outline"
                 onPress={handleTestNotification}
+              />
+              <SettingRow
+                label="Reset Onboarding"
+                subLabel="Show onboarding on next launch"
+                icon="refresh-outline"
+                onPress={handleResetOnboarding}
                 isLast
               />
             </SettingsSection>
