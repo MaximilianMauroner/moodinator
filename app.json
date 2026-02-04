@@ -112,7 +112,8 @@
         {
           "microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone to record voice memos."
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true

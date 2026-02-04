@@ -86,6 +86,14 @@ export function SettingsScreen() {
 
         <View className="gap-3">
           <SettingsCategoryCard
+            title="Security"
+            description="App lock and privacy settings"
+            icon="shield-checkmark-outline"
+            href="/settings/security"
+            accentColor="sage"
+          />
+
+          <SettingsCategoryCard
             title="Display"
             description="Labels, charts, and visual options"
             icon="eye-outline"

@@ -26,7 +26,7 @@ const hapticMap: Record<Exclude<HapticStyle, "none">, HapticFeedbackTypes> = {
 
 export function HapticTab({ hapticStyle = "selection", ...props }: HapticTabProps) {
   // Vibration durations for Android (in ms)
-  const vibrationDurations: Record<HapticStyle, number> = {
+  const vibrationDurations: Record<Exclude<HapticStyle, "none">, number> = {
     selection: 10,
     light: 20,
     medium: 40,

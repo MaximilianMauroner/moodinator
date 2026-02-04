@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Platform,
+  Pressable,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -21,13 +22,18 @@ import { InsightCard } from "../components/InsightCard";
 import { PatternCard } from "../components/PatternCard";
 import { StreakBadge } from "../components/StreakBadge";
 import { EntryDetailModal } from "../components/EntryDetailModal";
+import { MoodCalendar } from "@/components/calendar";
+import { haptics } from "@/lib/haptics";
 import type { MoodEntry } from "@db/types";
+
+type ViewMode = "calendar" | "charts";
 
 export function InsightsScreen() {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === "dark";
   const [selectedEntry, setSelectedEntry] = useState<MoodEntry | null>(null);
   const [showAllEntries, setShowAllEntries] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("calendar");
 
   const {
     allMoods,
@@ -55,6 +61,11 @@ export function InsightsScreen() {
   useEffect(() => {
     setShowAllEntries(false);
   }, [period, currentDate]);
+
+  const handleViewModeChange = useCallback((mode: ViewMode) => {
+    haptics.selection();
+    setViewMode(mode);
+  }, []);
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
@@ -150,6 +161,66 @@ export function InsightsScreen() {
           </View>
         </View>
 
+        {/* View Mode Toggle */}
+        {hasData && (
+          <View className="flex-row mx-4 mb-4 p-1 rounded-2xl" style={{
+            backgroundColor: isDark ? "#231F1B" : "#F5F1E8",
+          }}>
+            <Pressable
+              onPress={() => handleViewModeChange("calendar")}
+              className="flex-1 flex-row items-center justify-center py-2.5 rounded-xl"
+              style={{
+                backgroundColor: viewMode === "calendar"
+                  ? isDark ? "#5B8A5B" : "#5B8A5B"
+                  : "transparent",
+              }}
+              accessibilityRole="button"
+              accessibilityState={{ selected: viewMode === "calendar" }}
+              accessibilityLabel="Calendar view"
+            >
+              <Ionicons
+                name="calendar"
+                size={16}
+                color={viewMode === "calendar" ? "#FFFFFF" : isDark ? "#BDA77D" : "#6B5C4A"}
+              />
+              <Text
+                className="text-sm font-semibold ml-2"
+                style={{
+                  color: viewMode === "calendar" ? "#FFFFFF" : isDark ? "#BDA77D" : "#6B5C4A",
+                }}
+              >
+                Calendar
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => handleViewModeChange("charts")}
+              className="flex-1 flex-row items-center justify-center py-2.5 rounded-xl"
+              style={{
+                backgroundColor: viewMode === "charts"
+                  ? isDark ? "#5B8A5B" : "#5B8A5B"
+                  : "transparent",
+              }}
+              accessibilityRole="button"
+              accessibilityState={{ selected: viewMode === "charts" }}
+              accessibilityLabel="Charts view"
+            >
+              <Ionicons
+                name="bar-chart"
+                size={16}
+                color={viewMode === "charts" ? "#FFFFFF" : isDark ? "#BDA77D" : "#6B5C4A"}
+              />
+              <Text
+                className="text-sm font-semibold ml-2"
+                style={{
+                  color: viewMode === "charts" ? "#FFFFFF" : isDark ? "#BDA77D" : "#6B5C4A",
+                }}
+              >
+                Charts
+              </Text>
+            </Pressable>
+          </View>
+        )}
+
         {!hasData ? (
           <View className="flex-1 justify-center items-center p-8">
             <View
@@ -184,6 +255,21 @@ export function InsightsScreen() {
               </Text>
             </View>
           </View>
+        ) : viewMode === "calendar" ? (
+          <ScrollView
+            className="flex-1 px-4"
+            contentContainerStyle={{ paddingBottom: Platform.OS === "ios" ? 100 : 24 }}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={isDark ? "#A8C5A8" : "#5B8A5B"}
+              />
+            }
+          >
+            <MoodCalendar />
+          </ScrollView>
         ) : (
           <>
             {/* Time Period Selector */}

@@ -1,8 +1,10 @@
 import React, { useEffect } from "react";
-import { View, Text, Pressable } from "react-native";
+import { View, Text, Pressable, AppState, AppStateStatus } from "react-native";
 import { Stack } from "expo-router";
 // import { registerBackgroundBackupTask } from "@db/backgroundBackup";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { LockScreen, useAppLockStore } from "@/features/appLock";
+import { OnboardingScreen, useOnboardingStore } from "@/features/onboarding";
 
 import "./global.css";
 
@@ -41,11 +43,56 @@ function RootErrorFallback({ error, resetError }: { error: Error; resetError: ()
 }
 
 export default function Layout() {
+  const { hydrated: lockHydrated, hydrate: hydrateLock, isEnabled, isLocked, lock } = useAppLockStore();
+  const { hydrated: onboardingHydrated, hydrate: hydrateOnboarding, hasCompletedOnboarding } = useOnboardingStore();
+
+  // Hydrate stores on mount
+  useEffect(() => {
+    hydrateLock();
+    hydrateOnboarding();
+  }, [hydrateLock, hydrateOnboarding]);
+
+  const hydrated = lockHydrated && onboardingHydrated;
+
+  // Lock app when it goes to background
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      if (nextAppState === "background" || nextAppState === "inactive") {
+        lock();
+      }
+    };
+
+    const subscription = AppState.addEventListener("change", handleAppStateChange);
+    return () => subscription.remove();
+  }, [lock]);
+
   useEffect(() => {
     // Background backup temporarily disabled due to expo-task-manager compatibility issue
     // TODO: Re-enable when expo-background-task supports New Architecture
     // registerBackgroundBackupTask();
   }, []);
+
+  // Show onboarding if not completed (first launch)
+  if (hydrated && !hasCompletedOnboarding) {
+    return (
+      <ErrorBoundary FallbackComponent={RootErrorFallback}>
+        <View className="flex-1 bg-white dark:bg-slate-950">
+          <OnboardingScreen />
+        </View>
+      </ErrorBoundary>
+    );
+  }
+
+  // Show lock screen if app lock is enabled and locked
+  if (hydrated && isEnabled && isLocked) {
+    return (
+      <ErrorBoundary FallbackComponent={RootErrorFallback}>
+        <View className="flex-1 bg-white dark:bg-slate-950">
+          <LockScreen />
+        </View>
+      </ErrorBoundary>
+    );
+  }
 
   return (
     <ErrorBoundary FallbackComponent={RootErrorFallback}>
