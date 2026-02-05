@@ -30,8 +30,10 @@ export default function SecuritySettingsScreen() {
   const canUseBiometrics = biometricsAvailable && biometricsEnrolled;
 
   useEffect(() => {
-    hydrate();
-  }, [hydrate]);
+    if (!hydrated) {
+      hydrate();
+    }
+  }, [hydrate, hydrated]);
 
   const handleToggleAppLock = useCallback(
     async (enabled: boolean) => {
@@ -158,7 +160,7 @@ export default function SecuritySettingsScreen() {
             <Text className="text-xs text-sand-500 dark:text-sand-400">
               {!biometricsAvailable
                 ? "Your device doesn't support biometric authentication."
-                : "No biometrics enrolled. Set up Face ID or Touch ID in Settings to use biometric unlock."}
+                : "No biometrics enrolled. Set up biometrics in your device settings to use biometric unlock."}
             </Text>
           </View>
         )}

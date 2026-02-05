@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { getMoodsByMonth } from "@db/db";
 import type { MoodEntry } from "@db/types";
 import { moodScale } from "@/constants/moodScale";
@@ -22,12 +22,18 @@ export type CalendarMonthData = {
 
 export function useCalendarData(initialYear?: number, initialMonth?: number) {
   const now = new Date();
-  const [year, setYear] = useState(initialYear ?? now.getFullYear());
-  const [month, setMonth] = useState(initialMonth ?? now.getMonth());
+  const [displayDate, setDisplayDate] = useState(() => (
+    new Date(initialYear ?? now.getFullYear(), initialMonth ?? now.getMonth(), 1)
+  ));
   const [monthData, setMonthData] = useState<CalendarMonthData | null>(null);
   const [loading, setLoading] = useState(true);
+  const latestRequestIdRef = useRef(0);
+
+  const year = displayDate.getFullYear();
+  const month = displayDate.getMonth();
 
   const loadMonthData = useCallback(async () => {
+    const requestId = ++latestRequestIdRef.current;
     setLoading(true);
     try {
       const moodsByDay = await getMoodsByMonth(year, month);
@@ -62,6 +68,10 @@ export function useCalendarData(initialYear?: number, initialMonth?: number) {
         });
       }
 
+      if (requestId !== latestRequestIdRef.current) {
+        return;
+      }
+
       setMonthData({
         year,
         month,
@@ -72,7 +82,9 @@ export function useCalendarData(initialYear?: number, initialMonth?: number) {
     } catch (error) {
       console.error("Failed to load calendar data:", error);
     } finally {
-      setLoading(false);
+      if (requestId === latestRequestIdRef.current) {
+        setLoading(false);
+      }
     }
   }, [year, month]);
 
@@ -81,27 +93,28 @@ export function useCalendarData(initialYear?: number, initialMonth?: number) {
   }, [loadMonthData]);
 
   const goToPreviousMonth = useCallback(() => {
-    if (month === 0) {
-      setMonth(11);
-      setYear((y) => y - 1);
-    } else {
-      setMonth((m) => m - 1);
-    }
-  }, [month]);
+    setDisplayDate((previousDate) => (
+      new Date(previousDate.getFullYear(), previousDate.getMonth() - 1, 1)
+    ));
+  }, []);
 
   const goToNextMonth = useCallback(() => {
-    if (month === 11) {
-      setMonth(0);
-      setYear((y) => y + 1);
-    } else {
-      setMonth((m) => m + 1);
-    }
-  }, [month]);
+    setDisplayDate((previousDate) => {
+      const today = new Date();
+      const maxYear = today.getFullYear();
+      const maxMonth = today.getMonth();
+      const nextDate = new Date(previousDate.getFullYear(), previousDate.getMonth() + 1, 1);
+      const exceedsCurrentMonth =
+        nextDate.getFullYear() > maxYear
+        || (nextDate.getFullYear() === maxYear && nextDate.getMonth() > maxMonth);
+
+      return exceedsCurrentMonth ? previousDate : nextDate;
+    });
+  }, []);
 
   const goToToday = useCallback(() => {
     const today = new Date();
-    setYear(today.getFullYear());
-    setMonth(today.getMonth());
+    setDisplayDate(new Date(today.getFullYear(), today.getMonth(), 1));
   }, []);
 
   const isCurrentMonth = useMemo(() => {
@@ -115,8 +128,8 @@ export function useCalendarData(initialYear?: number, initialMonth?: number) {
   }, [year, month]);
 
   const monthName = useMemo(() => {
-    return new Date(year, month).toLocaleDateString("en-US", { month: "long" });
-  }, [year, month]);
+    return displayDate.toLocaleDateString("en-US", { month: "long" });
+  }, [displayDate]);
 
   return {
     year,

@@ -40,14 +40,16 @@ export function SetupPinScreen() {
           if (newConfirmPin.length === pinLength) {
             // Verify pins match
             if (newConfirmPin === pin) {
-              haptics.success();
-              savePin(pin);
-              setEnabled(true);
-              Alert.alert(
-                "PIN Set",
-                "Your app is now protected with a PIN.",
-                [{ text: "OK", onPress: () => router.back() }]
-              );
+              void (async () => {
+                haptics.success();
+                await savePin(pin);
+                await setEnabled(true);
+                Alert.alert(
+                  "PIN Set",
+                  "Your app is now protected with a PIN.",
+                  [{ text: "OK", onPress: () => router.back() }]
+                );
+              })();
             } else {
               haptics.pinError();
               setError(true);

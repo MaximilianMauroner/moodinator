@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import * as LocalAuthentication from "expo-local-authentication";
-import { Platform } from "react-native";
+import { AppState, Platform } from "react-native";
 
 export type BiometricType = "fingerprint" | "facial" | "iris" | "none";
 
@@ -9,32 +9,56 @@ export function useBiometrics() {
   const [biometricType, setBiometricType] = useState<BiometricType>("none");
   const [isEnrolled, setIsEnrolled] = useState(false);
 
-  useEffect(() => {
-    checkBiometrics();
-  }, []);
-
-  const checkBiometrics = async () => {
+  const checkBiometrics = useCallback(async () => {
     try {
       const compatible = await LocalAuthentication.hasHardwareAsync();
       setIsAvailable(compatible);
 
-      if (compatible) {
-        const enrolled = await LocalAuthentication.isEnrolledAsync();
-        setIsEnrolled(enrolled);
+      if (!compatible) {
+        setIsEnrolled(false);
+        setBiometricType("none");
+        return;
+      }
 
-        const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
-        if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
-          setBiometricType("facial");
-        } else if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
-          setBiometricType("fingerprint");
-        } else if (types.includes(LocalAuthentication.AuthenticationType.IRIS)) {
-          setBiometricType("iris");
-        }
+      const enrolled = await LocalAuthentication.isEnrolledAsync();
+      setIsEnrolled(enrolled);
+
+      if (!enrolled) {
+        setBiometricType("none");
+        return;
+      }
+
+      const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
+      if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
+        setBiometricType("facial");
+      } else if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
+        setBiometricType("fingerprint");
+      } else if (types.includes(LocalAuthentication.AuthenticationType.IRIS)) {
+        setBiometricType("iris");
+      } else {
+        setBiometricType("none");
       }
     } catch (error) {
       console.error("Error checking biometrics:", error);
+      setIsAvailable(false);
+      setIsEnrolled(false);
+      setBiometricType("none");
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    void checkBiometrics();
+  }, [checkBiometrics]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextAppState) => {
+      if (nextAppState === "active") {
+        void checkBiometrics();
+      }
+    });
+
+    return () => subscription.remove();
+  }, [checkBiometrics]);
 
   const authenticate = useCallback(async (): Promise<boolean> => {
     if (!isAvailable || !isEnrolled) {
@@ -57,10 +81,7 @@ export function useBiometrics() {
   }, [isAvailable, isEnrolled]);
 
   const getBiometricLabel = (): string => {
-    if (Platform.OS === "ios") {
-      return biometricType === "facial" ? "Face ID" : "Touch ID";
-    }
-    return biometricType === "facial" ? "Face Unlock" : "Fingerprint";
+    return "Biometrics";
   };
 
   const getBiometricIcon = (): string => {
@@ -75,6 +96,7 @@ export function useBiometrics() {
     isEnrolled,
     biometricType,
     authenticate,
+    checkBiometrics,
     getBiometricLabel,
     getBiometricIcon,
   };
