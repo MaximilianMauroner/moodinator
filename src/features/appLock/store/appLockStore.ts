@@ -62,7 +62,7 @@ export const useAppLockStore = create<AppLockStore>((set, get) => ({
 
     const pinLength = pinLengthStr === "6" ? 6 : 4;
     const hasPinSet = !!storedHash;
-    const enabled = isEnabled ?? false;
+    const enabled = (isEnabled ?? false) && hasPinSet;
 
     set({
       hydrated: true,
@@ -73,16 +73,28 @@ export const useAppLockStore = create<AppLockStore>((set, get) => ({
       // Auto-lock on app start if enabled
       isLocked: enabled && hasPinSet,
     });
+
+    // Keep persisted state consistent if app lock is enabled without a valid PIN.
+    if ((isEnabled ?? false) && !hasPinSet) {
+      await setBoolean(APP_LOCK_ENABLED_KEY, false);
+    }
   },
 
   setEnabled: async (enabled) => {
-    await setBoolean(APP_LOCK_ENABLED_KEY, enabled);
     const { hasPinSet } = get();
+    if (enabled && !hasPinSet) {
+      set({ isEnabled: false, isLocked: false, failedAttempts: 0 });
+      await setBoolean(APP_LOCK_ENABLED_KEY, false);
+      return;
+    }
+
     set({
       isEnabled: enabled,
-      // Lock immediately if enabling and PIN is set
-      isLocked: enabled && hasPinSet,
+      // Keep current session unlocked when enabling from settings.
+      isLocked: enabled ? get().isLocked : false,
+      failedAttempts: enabled ? get().failedAttempts : 0,
     });
+    await setBoolean(APP_LOCK_ENABLED_KEY, enabled);
   },
 
   setBiometricsEnabled: async (enabled) => {
@@ -110,9 +122,10 @@ export const useAppLockStore = create<AppLockStore>((set, get) => ({
   },
 
   clearPin: async () => {
-    await SecureStore.deleteItemAsync(PIN_HASH_KEY);
-    set({ hasPinSet: false, isEnabled: false, isLocked: false });
+    // Disable lock state immediately before async storage operations.
+    set({ hasPinSet: false, isEnabled: false, isLocked: false, failedAttempts: 0 });
     await setBoolean(APP_LOCK_ENABLED_KEY, false);
+    await SecureStore.deleteItemAsync(PIN_HASH_KEY);
   },
 
   lock: () => {

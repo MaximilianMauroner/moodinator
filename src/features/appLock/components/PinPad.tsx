@@ -17,6 +17,19 @@ const digits = [
   ["", "0", "delete"],
 ];
 
+const digitHints: Record<string, string> = {
+  "1": "",
+  "2": "ABC",
+  "3": "DEF",
+  "4": "GHI",
+  "5": "JKL",
+  "6": "MNO",
+  "7": "PQRS",
+  "8": "TUV",
+  "9": "WXYZ",
+  "0": "+",
+};
+
 export function PinPad({ onDigitPress, onDeletePress, disabled }: PinPadProps) {
   const { isDark, get } = useThemeColors();
 
@@ -33,23 +46,34 @@ export function PinPad({ onDigitPress, onDeletePress, disabled }: PinPadProps) {
   };
 
   return (
-    <View className="px-8">
-      {digits.map((row, rowIndex) => (
-        <View key={rowIndex} className="flex-row justify-center mb-4">
-          {row.map((digit, digitIndex) => (
-            <PinButton
-              key={`${rowIndex}-${digitIndex}`}
-              digit={digit}
-              onPress={handlePress}
-              disabled={disabled}
-              isDark={isDark}
-              surfaceColor={get("surface")}
-              textColor={get("text")}
-              mutedColor={get("textMuted")}
-            />
-          ))}
-        </View>
-      ))}
+    <View className="px-5 mt-3">
+      <View
+        className="rounded-[28px] px-3 pt-4 pb-2"
+        style={{
+          backgroundColor: get("surfaceAlt"),
+          borderColor: get("borderSubtle"),
+          borderWidth: 1,
+        }}
+      >
+        {digits.map((row, rowIndex) => (
+          <View key={rowIndex} className="flex-row justify-center mb-3">
+            {row.map((digit, digitIndex) => (
+              <PinButton
+                key={`${rowIndex}-${digitIndex}`}
+                digit={digit}
+                onPress={handlePress}
+                disabled={disabled}
+                isDark={isDark}
+                surfaceColor={get("surfaceElevated")}
+                textColor={get("text")}
+                mutedColor={get("textMuted")}
+                borderColor={get("borderSubtle")}
+                primaryBgColor={get("primaryBg")}
+              />
+            ))}
+          </View>
+        ))}
+      </View>
     </View>
   );
 }
@@ -62,6 +86,8 @@ type PinButtonProps = {
   surfaceColor: string;
   textColor: string;
   mutedColor: string;
+  borderColor: string;
+  primaryBgColor: string;
 };
 
 function PinButton({
@@ -72,51 +98,74 @@ function PinButton({
   surfaceColor,
   textColor,
   mutedColor,
+  borderColor,
+  primaryBgColor,
 }: PinButtonProps) {
   if (!digit) {
-    return <View style={{ width: 80, height: 80, marginHorizontal: 12 }} />;
+    return <View style={{ width: 94, height: 76, marginHorizontal: 5 }} />;
   }
 
   const isDelete = digit === "delete";
+  const hint = digitHints[digit];
 
   return (
     <Pressable
       onPress={() => onPress(digit)}
       disabled={disabled}
-      className="mx-3"
+      className="mx-[5px]"
       style={({ pressed }) => ({
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        backgroundColor: pressed
-          ? isDark
-            ? "rgba(91, 138, 91, 0.2)"
-            : "rgba(91, 138, 91, 0.1)"
-          : surfaceColor,
+        width: 94,
+        height: 76,
+        borderRadius: 24,
+        backgroundColor: pressed ? primaryBgColor : surfaceColor,
+        borderWidth: 1,
+        borderColor: pressed ? (isDark ? "rgba(168, 197, 168, 0.35)" : "rgba(91, 138, 91, 0.22)") : borderColor,
         justifyContent: "center",
         alignItems: "center",
         shadowColor: isDark ? "#000" : "#9D8660",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: isDark ? 0.25 : 0.1,
-        shadowRadius: 8,
-        elevation: 3,
+        shadowOffset: { width: 0, height: pressed ? 1 : 6 },
+        shadowOpacity: isDark ? (pressed ? 0.2 : 0.35) : (pressed ? 0.08 : 0.14),
+        shadowRadius: pressed ? 4 : 10,
+        elevation: pressed ? 1 : 3,
+        transform: [{ scale: pressed ? 0.97 : 1 }],
         opacity: disabled ? 0.5 : 1,
       })}
       accessibilityRole="button"
       accessibilityLabel={isDelete ? "Delete" : digit}
     >
       {isDelete ? (
-        <Ionicons name="backspace-outline" size={28} color={mutedColor} />
+        <View className="items-center">
+          <Ionicons name="backspace-outline" size={22} color={mutedColor} />
+          <Text
+            className="mt-[1px] text-[10px] font-semibold tracking-[1px]"
+            style={{ color: mutedColor }}
+          >
+            DEL
+          </Text>
+        </View>
       ) : (
-        <Text
-          style={{
-            fontSize: 32,
-            fontWeight: "600",
-            color: textColor,
-          }}
-        >
-          {digit}
-        </Text>
+        <View className="items-center">
+          <Text
+            style={{
+              fontSize: 33,
+              fontWeight: "600",
+              lineHeight: 36,
+              color: textColor,
+            }}
+          >
+            {digit}
+          </Text>
+          {hint ? (
+            <Text
+              className="text-[10px] font-semibold tracking-[1.5px]"
+              style={{ color: mutedColor }}
+            >
+              {hint}
+            </Text>
+          ) : (
+            <View style={{ height: 12 }} />
+          )}
+        </View>
       )}
     </Pressable>
   );

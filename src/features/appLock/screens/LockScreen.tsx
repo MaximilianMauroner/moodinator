@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { View, Text, Pressable } from "react-native";
 import { BlurView } from "expo-blur";
 import Animated, {
@@ -22,6 +22,9 @@ export function LockScreen() {
   const [pin, setPin] = useState("");
   const [error, setError] = useState(false);
   const [showPinPad, setShowPinPad] = useState(false);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const isAuthenticatingRef = useRef(false);
+  const hasAutoPromptedRef = useRef(false);
 
   const {
     pinLength,
@@ -62,18 +65,28 @@ export function LockScreen() {
   }));
 
   const handleBiometricAuth = useCallback(async () => {
-    const success = await authenticate();
-    if (success) {
-      haptics.unlockSuccess();
-      resetFailedAttempts();
-      unlock();
+    if (isAuthenticatingRef.current) return;
+
+    isAuthenticatingRef.current = true;
+    setIsAuthenticating(true);
+    try {
+      const success = await authenticate();
+      if (success) {
+        haptics.unlockSuccess();
+        resetFailedAttempts();
+        unlock();
+      }
+    } finally {
+      isAuthenticatingRef.current = false;
+      setIsAuthenticating(false);
     }
   }, [authenticate, unlock, resetFailedAttempts]);
 
   // Auto-trigger biometric on mount
   useEffect(() => {
-    if (canUseBiometrics && !showPinPad) {
-      handleBiometricAuth();
+    if (canUseBiometrics && !showPinPad && !hasAutoPromptedRef.current) {
+      hasAutoPromptedRef.current = true;
+      void handleBiometricAuth();
     }
   }, [canUseBiometrics, showPinPad, handleBiometricAuth]);
 
@@ -157,6 +170,7 @@ export function LockScreen() {
                   onPress={handleBiometricAuth}
                   label={getBiometricLabel()}
                   icon={getBiometricIcon()}
+                  disabled={isAuthenticating}
                 />
               )}
 

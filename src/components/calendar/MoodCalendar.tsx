@@ -2,6 +2,7 @@ import React, { useState, useCallback } from "react";
 import { View, ActivityIndicator } from "react-native";
 import { GestureDetector, Gesture } from "react-native-gesture-handler";
 import { useThemeColors } from "@/constants/colors";
+import { haptics } from "@/lib/haptics";
 import { useCalendarData, type CalendarDayData } from "./useCalendarData";
 import { CalendarHeader } from "./CalendarHeader";
 import { CalendarWeekHeader } from "./CalendarWeekHeader";
@@ -39,11 +40,24 @@ export function MoodCalendar({ onAddEntry, onEditEntry }: MoodCalendarProps) {
 
   // Swipe gesture for month navigation
   const swipeGesture = Gesture.Pan()
-    .activeOffsetX([-30, 30])
+    .runOnJS(true)
+    .maxPointers(1)
+    .minDistance(16)
+    .activeOffsetX([-24, 24])
+    .failOffsetY([-14, 14])
     .onEnd((event) => {
-      if (event.translationX > 80) {
+      const horizontalDistance = Math.abs(event.translationX);
+      const verticalDistance = Math.abs(event.translationY);
+
+      if (horizontalDistance < 80 || horizontalDistance < verticalDistance) {
+        return;
+      }
+
+      if (event.translationX > 0) {
+        haptics.monthChange();
         goToPreviousMonth();
       } else if (event.translationX < -80 && canGoNext) {
+        haptics.monthChange();
         goToNextMonth();
       }
     });
@@ -102,7 +116,7 @@ export function MoodCalendar({ onAddEntry, onEditEntry }: MoodCalendarProps) {
           day={day}
           data={dayData}
           isToday={isToday}
-          isCurrentMonth
+          isCurrentMonth={isCurrentMonth}
           onPress={handleDayPress}
           onLongPress={handleDayLongPress}
         />
