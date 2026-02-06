@@ -1,7 +1,7 @@
 {
   "name": "moodinator",
   "main": "expo-router/entry",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "scripts": {
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
@@ -10,6 +10,7 @@
     "web": "expo start --web",
     "test": "jest --watchAll",
     "lint": "expo lint",
+    "prebuild": "bun scripts/bump-version.js",
     "build": "eas build --platform android --profile preview --local"
   },
   "jest": {
