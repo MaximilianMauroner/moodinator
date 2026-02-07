@@ -1,5 +1,6 @@
 import React, { useEffect, useCallback, useMemo } from "react";
-import { View, Text, SafeAreaView } from "react-native";
+import { View, Text, SafeAreaView, RefreshControl } from "react-native";
+import { FlashList } from "@shopify/flash-list";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import ToastManager from "toastify-react-native";
@@ -10,11 +11,13 @@ import { DateTimePickerModal } from "@/components/DateTimePickerModal";
 import { MoodEntryModal, MoodEntryFormValues } from "@/components/MoodEntryModal";
 import { HapticTab } from "@/components/HapticTab";
 import { IconSymbol } from "@/components/ui/IconSymbol";
+import { DisplayMoodItem } from "@/components/DisplayMoodItem";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { EmptyState } from "@/components/ui/EmptyState";
 import {
   HomeHeader,
   MoodButtonSelector,
   HistoryListHeader,
-  MoodHistoryList,
 } from "@/components/home";
 
 import { useMoodsStore } from "@/shared/state/moodsStore";
@@ -247,24 +250,67 @@ function HomeScreenContent() {
             {/* Header */}
             <HomeHeader lastTracked={lastTracked} />
 
-            {/* Mood Buttons */}
-            <MoodButtonSelector
-              showDetailedLabels={entrySettings.showDetailedLabels}
-              onMoodPress={modals.handleMoodPress}
-              onLongPress={modals.handleLongPress}
-            />
+            {/* Mood Buttons - in detailed mode, rendered as FlashList header */}
+            {!entrySettings.showDetailedLabels && (
+              <MoodButtonSelector
+                showDetailedLabels={false}
+                onMoodPress={modals.handleMoodPress}
+                onLongPress={modals.handleLongPress}
+              />
+            )}
 
-            {/* History Section */}
-            <View className="flex-1 mt-4">
-              <HistoryListHeader moodCount={moods.length} />
-              <MoodHistoryList
-                moods={moods}
-                loading={loading}
-                refreshing={refreshing}
-                onRefresh={refreshMoods}
-                onSwipeableWillOpen={itemActions.onSwipeableWillOpen}
-                onMoodItemLongPress={handleMoodItemLongPress}
-                swipeThreshold={itemActions.SWIPE_THRESHOLD}
+            {/* Entries List */}
+            <View className={entrySettings.showDetailedLabels ? "flex-1" : "flex-1 mt-4"}>
+              {!entrySettings.showDetailedLabels && (
+                <HistoryListHeader moodCount={moods.length} />
+              )}
+              <FlashList
+                data={moods}
+                keyExtractor={(item) => item.id.toString()}
+                renderItem={({ item }) => (
+                  <DisplayMoodItem
+                    mood={item}
+                    onSwipeableWillOpen={itemActions.onSwipeableWillOpen}
+                    onLongPress={handleMoodItemLongPress}
+                    swipeThreshold={itemActions.SWIPE_THRESHOLD}
+                  />
+                )}
+                ListHeaderComponent={
+                  entrySettings.showDetailedLabels ? (
+                    <View>
+                      <MoodButtonSelector
+                        showDetailedLabels={true}
+                        onMoodPress={modals.handleMoodPress}
+                        onLongPress={modals.handleLongPress}
+                      />
+                      <View className="mt-4">
+                        <HistoryListHeader moodCount={moods.length} />
+                      </View>
+                    </View>
+                  ) : null
+                }
+                ListEmptyComponent={
+                  loading ? (
+                    <LoadingSpinner message="Loading..." />
+                  ) : (
+                    <EmptyState
+                      emoji="🌿"
+                      title="Start your journey"
+                      description="Tap a mood above to log how you're feeling right now"
+                    />
+                  )
+                }
+                refreshControl={
+                  <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={refreshMoods}
+                    colors={[isDark ? "#7BA87B" : "#5B8A5B"]}
+                    tintColor={isDark ? "#7BA87B" : "#5B8A5B"}
+                  />
+                }
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 100 }}
+                estimatedItemSize={120}
               />
             </View>
           </View>

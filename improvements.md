@@ -26,6 +26,7 @@ Planned improvements for Moodinator. See CLAUDE.md for instructions on maintaini
 ### Export Options
 - CSV/Excel export
 - PDF reports with charts
+- Encrypted export with password protection
 - HealthKit/Google Fit integration
 
 ### Personalization
@@ -38,9 +39,30 @@ Planned improvements for Moodinator. See CLAUDE.md for instructions on maintaini
 - Language/localization
 
 ### Privacy & Data
+- App lock with biometric authentication (FaceID/TouchID/fingerprint) or PIN/password
 - Local encryption option
 - Cloud backup (iCloud/Google Drive)
-- Background auto-backup via expo-task-manager
+- Cross-device sync (optional, user-controlled)
+
+### Widgets
+- Calendar widget for quick mood entry
+- Home screen widget showing recent mood
+
+### User Experience
+- Onboarding tutorial for new users
+- Improved haptic feedback patterns (varied intensity, custom patterns)
+
+---
+
+## Release Preparation
+
+### App Store Submission
+- App icon design
+- Splash screen design
+- App Store screenshots and preview video
+- App Store listing copy (description, keywords)
+- Privacy policy URL configuration
+- App review preparation
 
 ---
 

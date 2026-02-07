@@ -4,7 +4,7 @@
     "slug": "moodinator",
     "version": "1.0.1",
     "orientation": "portrait",
-    "icon": "./assets/images/icon-no-text.png",
+    "icon": "./assets/images/icon.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -18,25 +18,32 @@
         "NSLocationWhenInUseUsageDescription": "We use your location to tag your mood entries with where you were.",
         "NSMicrophoneUsageDescription": "We use the microphone to record voice memos for your mood entries.",
         "UIFileSharingEnabled": true,
-        "LSSupportsOpeningDocumentsInPlace": true
+        "LSSupportsOpeningDocumentsInPlace": true,
+        "UIBackgroundModes": [
+          "fetch"
+        ]
       }
+    },
+    "androidStatusBar": {
+      "translucent": true
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon-no-text.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#FAF8F4"
       },
       "package": "com.lab4code.moodinator",
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.VIBRATE"
       ]
     },
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/icon-no-text.png"
+      "favicon": "./assets/images/icon.png"
     },
     "plugins": [
       "expo-router",
@@ -44,10 +51,14 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/icon-no-text.png",
+          "image": "./assets/images/icon.png",
           "imageWidth": 250,
           "resizeMode": "contain",
-          "backgroundColor": "#FFDA61"
+          "backgroundColor": "#FAF8F4",
+          "dark": {
+            "image": "./assets/images/icon.png",
+            "backgroundColor": "#1C1916"
+          }
         }
       ],
       [
@@ -85,14 +96,16 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/icon-no-text.png",
-          "color": "#FFDA61",
+          "icon": "./assets/images/icon.png",
+          "color": "#5B8A5B",
           "defaultChannel": "default",
           "enableBackgroundRemoteNotifications": true
         }
       ],
       "expo-font",
       "expo-web-browser",
+      "expo-background-task",
+      "expo-task-manager",
       "expo-location",
       [
         "expo-av",
