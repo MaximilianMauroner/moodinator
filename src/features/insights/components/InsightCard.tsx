@@ -1,10 +1,13 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useColorScheme } from "nativewind";
 import { TrendIndicator, TrendDirection } from "./TrendIndicator";
+import { SurfaceCard } from "@/components/ui/SurfaceCard";
+import { IconBadge } from "@/components/ui/IconBadge";
+import { typography } from "@/constants/typography";
 
-interface InsightCardProps {
+type InsightCardSharedProps = {
   icon: keyof typeof Ionicons.glyphMap;
   title: string;
   metric: string | number;
@@ -15,11 +18,14 @@ interface InsightCardProps {
     value?: number;
   };
   metricColor?: string;
-  compact?: boolean;
   variant?: "default" | "accent" | "warm";
-}
+};
 
-export function InsightCard({
+type InsightCardBaseProps = InsightCardSharedProps & {
+  compact: boolean;
+};
+
+function InsightCardBase({
   icon,
   title,
   metric,
@@ -27,9 +33,9 @@ export function InsightCard({
   interpretation,
   trend,
   metricColor,
-  compact = false,
+  compact,
   variant = "default",
-}: InsightCardProps) {
+}: InsightCardBaseProps) {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === "dark";
 
@@ -58,42 +64,31 @@ export function InsightCard({
   };
 
   const variantStyles = getVariantStyles();
+  const tone = variant === "warm" ? "sand" : variant === "accent" ? "sage" : "neutral";
 
   return (
-    <View
-      className={`rounded-3xl bg-paper-50 dark:bg-paper-850 overflow-hidden ${compact ? "" : ""}`}
-      style={[isDark ? styles.cardShadowDark : styles.cardShadowLight, { flex: 1 }]}
+    <SurfaceCard
+      tone={tone}
+      accentColor={variantStyles.accentLine}
+      padding={compact ? 16 : 20}
+      style={{ flex: 1 }}
     >
-      {/* Subtle top accent line */}
-      <View
-        style={{
-          height: 3,
-          backgroundColor: variantStyles.accentLine,
-          opacity: 0.6,
-        }}
-      />
-
-      <View className={compact ? "p-4" : "p-5"}>
+      <View>
         {/* Header with icon and title */}
         <View className="flex-row items-start justify-between mb-3">
           <View className="flex-row items-center flex-1">
-            <View
-              className="w-10 h-10 rounded-2xl items-center justify-center mr-3"
-              style={{
-                backgroundColor: variantStyles.iconBg,
-              }}
-            >
-              <Ionicons
-                name={icon}
-                size={20}
-                color={variantStyles.iconColor}
-              />
-            </View>
+            <IconBadge
+              icon={icon}
+              tone={variant === "warm" ? "sand" : variant === "accent" ? "sage" : "neutral"}
+              size={compact ? "sm" : "md"}
+              style={{ marginRight: 12 }}
+            />
             <Text
-              className={`font-semibold text-paper-700 dark:text-paper-300 flex-1 ${
+              className={`text-paper-700 dark:text-paper-300 flex-1 ${
                 compact ? "text-sm" : "text-base"
               }`}
               numberOfLines={1}
+              style={compact ? typography.bodySm : typography.bodyMd}
             >
               {title}
             </Text>
@@ -110,19 +105,18 @@ export function InsightCard({
         {/* Large metric display */}
         <View className="flex-row items-baseline">
           <Text
-            className={`font-extrabold tracking-tight ${compact ? "text-3xl" : "text-4xl"}`}
+            className="text-paper-800 dark:text-paper-100"
             style={{
+              ...(compact ? typography.metricMd : typography.metricLg),
               color: metricColor || (isDark ? "#F5F1E8" : "#3D352A"),
-              letterSpacing: -1,
             }}
           >
             {metric}
           </Text>
           {metricSuffix && (
             <Text
-              className={`font-medium ml-1 text-sand-500 dark:text-sand-400 ${
-                compact ? "text-sm" : "text-base"
-              }`}
+              className="ml-1 text-sand-500 dark:text-sand-400"
+              style={compact ? typography.bodySm : typography.bodyMd}
             >
               {metricSuffix}
             </Text>
@@ -137,32 +131,24 @@ export function InsightCard({
               style={{ backgroundColor: variantStyles.iconColor, opacity: 0.7 }}
             />
             <Text
-              className={`text-sand-500 dark:text-sand-400 leading-5 ${
-                compact ? "text-xs" : "text-sm"
-              }`}
+              className="text-sand-500 dark:text-sand-400"
+              style={compact ? typography.bodySm : typography.bodyMd}
             >
               {interpretation}
             </Text>
           </View>
         )}
       </View>
-    </View>
+    </SurfaceCard>
   );
 }
 
-const styles = StyleSheet.create({
-  cardShadowLight: {
-    elevation: 4,
-    shadowColor: "#9D8660",
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 6 },
-  },
-  cardShadowDark: {
-    elevation: 4,
-    shadowColor: "#000",
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 6 },
-  },
-});
+export type InsightCardProps = InsightCardSharedProps;
+
+export function InsightCard(props: InsightCardProps) {
+  return <InsightCardBase {...props} compact={false} />;
+}
+
+export function CompactInsightCard(props: InsightCardProps) {
+  return <InsightCardBase {...props} compact={true} />;
+}

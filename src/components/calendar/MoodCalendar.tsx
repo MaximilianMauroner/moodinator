@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { View, ActivityIndicator } from "react-native";
 import { GestureDetector, Gesture } from "react-native-gesture-handler";
 import { useThemeColors } from "@/constants/colors";
@@ -13,9 +13,10 @@ import type { MoodEntry } from "@db/types";
 type MoodCalendarProps = {
   onAddEntry?: (date: Date) => void;
   onEditEntry?: (entry: MoodEntry) => void;
+  onRefreshReady?: (refreshFn: (() => Promise<void>) | null) => void;
 };
 
-export function MoodCalendar({ onAddEntry, onEditEntry }: MoodCalendarProps) {
+export function MoodCalendar({ onAddEntry, onEditEntry, onRefreshReady }: MoodCalendarProps) {
   const { isDark, get } = useThemeColors();
   const {
     year,
@@ -28,6 +29,7 @@ export function MoodCalendar({ onAddEntry, onEditEntry }: MoodCalendarProps) {
     goToToday,
     isCurrentMonth,
     canGoNext,
+    refresh,
   } = useCalendarData();
 
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -91,6 +93,13 @@ export function MoodCalendar({ onAddEntry, onEditEntry }: MoodCalendarProps) {
     },
     [onEditEntry]
   );
+
+  useEffect(() => {
+    onRefreshReady?.(refresh);
+    return () => {
+      onRefreshReady?.(null);
+    };
+  }, [onRefreshReady, refresh]);
 
   // Generate calendar grid
   const renderCalendarGrid = () => {

@@ -3,7 +3,7 @@ import {
   View,
   Text,
   ScrollView,
-  Dimensions,
+  useWindowDimensions,
   RefreshControl,
 } from "react-native";
 import { LineChart } from "react-native-chart-kit";
@@ -27,6 +27,7 @@ export const RawDataTab = ({
   moods: MoodEntry[];
   onRefresh: () => void;
 }) => {
+  const { width: windowWidth } = useWindowDimensions();
   const scheme = useColorScheme();
   const isDark = scheme === "dark";
 
@@ -397,7 +398,7 @@ export const RawDataTab = ({
           <LineChart
             data={chartData}
             width={Math.max(
-              Dimensions.get("window").width - 64,
+              windowWidth - 64,
               chartData.labels.length * 40
             )}
             height={300}

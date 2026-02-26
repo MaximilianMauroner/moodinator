@@ -1,4 +1,4 @@
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { exportMoods } from "./db";
@@ -12,8 +12,11 @@ const BACKUP_FOLDER_KEY = "backupFolderUri"; // User-selected backup folder URI
 const WEEKS_TO_KEEP = 8; // Keep backups for 8 weeks (rolling)
 const BACKUP_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
 
-// Default backup directory (fallback if user hasn't selected one)
-const DEFAULT_BACKUP_DIR = `${FileSystem.documentDirectory}MoodinatorBackups/`;
+// Default backup directory (fallback if user hasn't selected one).
+// Use cache on iOS to reduce exposure of sensitive backups in user-browsable Documents.
+const DEFAULT_BACKUP_DIR = `${
+  Platform.OS === "ios" ? FileSystem.cacheDirectory : FileSystem.documentDirectory
+}MoodinatorBackups/`;
 
 /**
  * Gets the user-selected backup folder URI, or returns default

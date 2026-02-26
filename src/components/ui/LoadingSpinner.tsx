@@ -1,6 +1,9 @@
 import React from "react";
 import { View, Text, ActivityIndicator } from "react-native";
 import { useThemeColors } from "@/constants/colors";
+import { SurfaceCard } from "./SurfaceCard";
+import { IconBadge } from "./IconBadge";
+import { typography } from "@/constants/typography";
 
 interface LoadingSpinnerProps {
   message?: string;
@@ -24,18 +27,24 @@ export function LoadingSpinner({
       accessibilityRole="progressbar"
       accessibilityLabel={message || "Loading"}
     >
-      <ActivityIndicator
-        size={size}
-        color={get("primary")}
-      />
-      {message && (
-        <Text
-          className="text-center mt-4"
-          style={{ color: get("textMuted") }}
-        >
-          {message}
-        </Text>
-      )}
+      <SurfaceCard tone="sage" style={{ width: "100%", maxWidth: 280 }}>
+        <View className="items-center">
+          <IconBadge icon="hourglass-outline" tone="sage" size="lg" />
+          <ActivityIndicator
+            size={size}
+            color={get("primary")}
+            style={{ marginTop: 12 }}
+          />
+          {message && (
+            <Text
+              className="text-center mt-4"
+              style={[typography.bodyMd, { color: get("textMuted") }]}
+            >
+              {message}
+            </Text>
+          )}
+        </View>
+      </SurfaceCard>
     </View>
   );
 }

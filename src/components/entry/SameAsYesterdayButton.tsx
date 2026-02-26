@@ -7,7 +7,7 @@ import {
   Modal,
   ScrollView,
   Animated,
-  Dimensions,
+  useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useThemeColors, colors } from "@/constants/colors";
@@ -44,6 +44,7 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
   onCopy,
 }) => {
   const { isDark, get } = useThemeColors();
+  const { width: windowWidth } = useWindowDimensions();
   const [loading, setLoading] = useState(false);
   const [noEntry, setNoEntry] = useState(false);
   const [previewEntry, setPreviewEntry] = useState<MoodEntry | null>(null);
@@ -221,7 +222,7 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
                   }),
                 },
               ],
-              width: Dimensions.get("window").width - 48,
+              width: windowWidth - 48,
               maxWidth: 360,
             }}
           >
