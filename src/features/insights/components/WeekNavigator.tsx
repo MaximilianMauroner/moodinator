@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, Pressable, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useColorScheme } from "nativewind";
 import { format, startOfWeek, endOfWeek, isThisWeek, isToday } from "date-fns";
@@ -85,18 +85,17 @@ export function WeekNavigator({
     <View className="mx-4 mb-4">
       <View className="flex-row items-center justify-between">
         {/* Previous button */}
-        <TouchableOpacity
+        <Pressable
           onPress={onPrevious}
           disabled={!canGoPrevious}
           className="w-11 h-11 rounded-2xl items-center justify-center"
-          style={[
+          style={({ pressed }) => [
             {
               backgroundColor: isDark ? "#231F1B" : "#FDFCFA",
-              opacity: canGoPrevious ? 1 : 0.4,
+              opacity: !canGoPrevious ? 0.4 : pressed ? 0.7 : 1,
             },
             isDark ? styles.navButtonDark : styles.navButtonLight,
           ]}
-          activeOpacity={0.7}
           accessibilityRole="button"
           accessibilityLabel={`Previous ${period}`}
         >
@@ -105,7 +104,7 @@ export function WeekNavigator({
             size={20}
             color={isDark ? "#A8C5A8" : "#5B8A5B"}
           />
-        </TouchableOpacity>
+        </Pressable>
 
         {/* Center date display */}
         <View className="flex-1 items-center mx-3">
@@ -128,13 +127,15 @@ export function WeekNavigator({
         {/* Right side controls */}
         <View className="flex-row items-center gap-2">
           {showTodayButton && (
-            <TouchableOpacity
+            <Pressable
               onPress={onToday}
               className="px-3.5 py-2.5 rounded-xl"
-              style={{
-                backgroundColor: isDark ? "#2D3D2D" : "#E8EFE8",
-              }}
-              activeOpacity={0.7}
+              style={({ pressed }) => [
+                {
+                  backgroundColor: isDark ? "#2D3D2D" : "#E8EFE8",
+                },
+                pressed ? { opacity: 0.7 } : null,
+              ]}
               accessibilityRole="button"
               accessibilityLabel="Go to today"
             >
@@ -144,22 +145,21 @@ export function WeekNavigator({
               >
                 Today
               </Text>
-            </TouchableOpacity>
+            </Pressable>
           )}
 
           {/* Next button */}
-          <TouchableOpacity
+          <Pressable
             onPress={onNext}
             disabled={!canGoNext}
             className="w-11 h-11 rounded-2xl items-center justify-center"
-            style={[
+            style={({ pressed }) => [
               {
                 backgroundColor: isDark ? "#231F1B" : "#FDFCFA",
-                opacity: canGoNext ? 1 : 0.4,
+                opacity: !canGoNext ? 0.4 : pressed ? 0.7 : 1,
               },
               isDark ? styles.navButtonDark : styles.navButtonLight,
             ]}
-            activeOpacity={0.7}
             accessibilityRole="button"
             accessibilityLabel={`Next ${period}`}
           >
@@ -168,7 +168,7 @@ export function WeekNavigator({
               size={20}
               color={isDark ? "#A8C5A8" : "#5B8A5B"}
             />
-          </TouchableOpacity>
+          </Pressable>
         </View>
       </View>
     </View>

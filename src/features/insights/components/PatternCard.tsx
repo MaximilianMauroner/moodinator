@@ -1,8 +1,11 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useColorScheme } from "nativewind";
 import type { Pattern } from "../utils/patternDetection";
+import { SurfaceCard } from "@/components/ui/SurfaceCard";
+import { IconBadge } from "@/components/ui/IconBadge";
+import { typography } from "@/constants/typography";
 
 interface PatternCardProps {
   patterns: Pattern[];
@@ -118,35 +121,16 @@ export function PatternCard({ patterns }: PatternCardProps) {
   }
 
   return (
-    <View
-      className="rounded-3xl bg-paper-50 dark:bg-paper-850 overflow-hidden"
-      style={isDark ? styles.cardShadowDark : styles.cardShadowLight}
-    >
-      {/* Decorative top accent with gradient effect */}
-      <View
-        style={{
-          height: 3,
-          backgroundColor: isDark ? "#847596" : "#A396B3",
-          opacity: 0.7,
-        }}
-      />
-
-      <View className="p-5">
+    <SurfaceCard tone="dusk" accentColor={isDark ? "#847596" : "#A396B3"}>
+      <View>
         {/* Header */}
         <View className="flex-row items-center mb-2">
-          <View
-            className="w-11 h-11 rounded-2xl items-center justify-center mr-4"
-            style={{
-              backgroundColor: isDark ? "#2D2A33" : "#EFECF2",
-            }}
-          >
-            <Text className="text-xl">💡</Text>
-          </View>
+          <IconBadge icon="bulb-outline" tone="dusk" size="md" style={{ marginRight: 14 }} />
           <View className="flex-1">
-            <Text className="text-base font-bold text-paper-800 dark:text-paper-200">
+            <Text className="text-paper-800 dark:text-paper-200" style={typography.bodyMd}>
               Patterns Detected
             </Text>
-            <Text className="text-xs text-sand-500 dark:text-sand-400 mt-0.5">
+            <Text className="text-sand-500 dark:text-sand-400 mt-0.5" style={typography.bodySm}>
               Insights from your mood history
             </Text>
           </View>
@@ -176,23 +160,6 @@ export function PatternCard({ patterns }: PatternCardProps) {
           ))}
         </View>
       </View>
-    </View>
+    </SurfaceCard>
   );
 }
-
-const styles = StyleSheet.create({
-  cardShadowLight: {
-    elevation: 4,
-    shadowColor: "#9D8660",
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 6 },
-  },
-  cardShadowDark: {
-    elevation: 4,
-    shadowColor: "#000",
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 6 },
-  },
-});

@@ -5,6 +5,11 @@ module.exports = {
   darkMode: "class",
   theme: {
     extend: {
+      fontFamily: {
+        display: ["serif"],
+        body: ["sans-serif"],
+        mono: ["monospace"],
+      },
       colors: {
         // Soft Organic palette - warm, natural, cozy
         paper: {

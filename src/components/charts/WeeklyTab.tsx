@@ -3,7 +3,7 @@ import {
   View,
   Text,
   ScrollView,
-  Dimensions,
+  useWindowDimensions,
   TouchableOpacity,
   RefreshControl,
 } from "react-native";
@@ -28,6 +28,7 @@ export const WeeklyTab = ({
   moods: MoodEntry[];
   onRefresh: () => void;
 }) => {
+  const { width: windowWidth } = useWindowDimensions();
   const weeklyData = useMemo(() => processWeeklyMoodData(moods, 52), [moods]); // Limit to last 52 weeks
   const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set());
   const scheme = useColorScheme();
@@ -133,7 +134,7 @@ export const WeeklyTab = ({
           <LineChart
             data={chartData}
             width={Math.max(
-              Dimensions.get("window").width - 64,
+              windowWidth - 64,
               chartData.labels.length * 60
             )}
             height={220}

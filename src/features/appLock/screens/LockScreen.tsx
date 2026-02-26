@@ -23,6 +23,7 @@ export function LockScreen() {
   const [error, setError] = useState(false);
   const [showPinPad, setShowPinPad] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [lockoutNow, setLockoutNow] = useState(() => Date.now());
   const isAuthenticatingRef = useRef(false);
   const hasAutoPromptedRef = useRef(false);
 
@@ -34,6 +35,7 @@ export function LockScreen() {
     incrementFailedAttempts,
     resetFailedAttempts,
     failedAttempts,
+    lockoutUntil,
   } = useAppLockStore();
 
   const {
@@ -45,6 +47,22 @@ export function LockScreen() {
   } = useBiometrics();
 
   const canUseBiometrics = biometricsEnabled && biometricsAvailable && biometricsEnrolled;
+  const lockoutRemainingMs = lockoutUntil ? Math.max(0, lockoutUntil - lockoutNow) : 0;
+  const isPinLockedOut = lockoutRemainingMs > 0;
+  const lockoutRemainingSeconds = Math.ceil(lockoutRemainingMs / 1000);
+
+  useEffect(() => {
+    if (!isPinLockedOut) {
+      setLockoutNow(Date.now());
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setLockoutNow(Date.now());
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isPinLockedOut]);
 
   // App icon pulse animation
   const iconScale = useSharedValue(1);
@@ -73,7 +91,7 @@ export function LockScreen() {
       const success = await authenticate();
       if (success) {
         haptics.unlockSuccess();
-        resetFailedAttempts();
+        await resetFailedAttempts();
         unlock();
       }
     } finally {
@@ -92,24 +110,31 @@ export function LockScreen() {
 
   const handlePinComplete = useCallback(
     async (enteredPin: string) => {
+      if (isPinLockedOut) {
+        haptics.pinError();
+        setPin("");
+        return;
+      }
+
       const isValid = await verifyPin(enteredPin);
       if (isValid) {
         haptics.unlockSuccess();
-        resetFailedAttempts();
+        await resetFailedAttempts();
         unlock();
       } else {
         haptics.pinError();
         setError(true);
-        incrementFailedAttempts();
+        await incrementFailedAttempts();
         setPin("");
         setTimeout(() => setError(false), 500);
       }
     },
-    [verifyPin, unlock, incrementFailedAttempts, resetFailedAttempts]
+    [verifyPin, unlock, incrementFailedAttempts, resetFailedAttempts, isPinLockedOut]
   );
 
   const handleDigitPress = useCallback(
     (digit: string) => {
+      if (isPinLockedOut || error) return;
       if (pin.length < pinLength) {
         const newPin = pin + digit;
         setPin(newPin);
@@ -118,7 +143,7 @@ export function LockScreen() {
         }
       }
     },
-    [pin, pinLength, handlePinComplete]
+    [pin, pinLength, handlePinComplete, isPinLockedOut, error]
   );
 
   const handleDeletePress = useCallback(() => {
@@ -201,9 +226,17 @@ export function LockScreen() {
                 >
                   Enter PIN
                 </Text>
+                {isPinLockedOut && (
+                  <Text
+                    className="text-sm text-center"
+                    style={{ color: isDark ? "#F5A899" : "#C75441" }}
+                  >
+                    Too many attempts. Try again in {lockoutRemainingSeconds}s or use biometrics.
+                  </Text>
+                )}
                 {failedAttempts > 0 && (
                   <Text
-                    className="text-sm"
+                    className={`text-sm ${isPinLockedOut ? "mt-1" : ""}`}
                     style={{ color: isDark ? "#ED8370" : "#E06B55" }}
                   >
                     {failedAttempts} failed {failedAttempts === 1 ? "attempt" : "attempts"}
@@ -216,7 +249,7 @@ export function LockScreen() {
               <PinPad
                 onDigitPress={handleDigitPress}
                 onDeletePress={handleDeletePress}
-                disabled={error}
+                disabled={error || isPinLockedOut}
               />
 
               {canUseBiometrics && (

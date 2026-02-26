@@ -5,9 +5,9 @@ import {
   Modal,
   TextInput,
   Pressable,
-  SafeAreaView,
   Animated,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { IconSymbol } from "@/components/ui/IconSymbol";
 import { haptics } from "@/lib/haptics";
 

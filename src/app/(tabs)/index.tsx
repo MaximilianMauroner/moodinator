@@ -1,22 +1,30 @@
 import React, { useEffect, useCallback, useMemo } from "react";
-import { View, Text, SafeAreaView, RefreshControl } from "react-native";
+import { View, Text, RefreshControl } from "react-native";
 import { FlashList } from "@shopify/flash-list";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import ToastManager from "toastify-react-native";
+import { Ionicons } from "@expo/vector-icons";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { createScreenErrorFallback } from "@/components/ScreenErrorFallback";
 import { DateTimePickerModal } from "@/components/DateTimePickerModal";
-import { MoodEntryModal, MoodEntryFormValues } from "@/components/MoodEntryModal";
+import {
+  DetailedMoodEntryModal,
+  EditMoodEntryModal,
+  MoodEntryFormValues,
+  QuickMoodEntryModal,
+} from "@/components/MoodEntryModal";
 import { HapticTab } from "@/components/HapticTab";
 import { IconSymbol } from "@/components/ui/IconSymbol";
 import { DisplayMoodItem } from "@/components/DisplayMoodItem";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import {
+  CompactMoodButtonSelector,
+  DetailedMoodButtonSelector,
   HomeHeader,
-  MoodButtonSelector,
   HistoryListHeader,
 } from "@/components/home";
 
@@ -61,7 +69,11 @@ const createToastConfig = (isDark: boolean) => ({
           className="w-10 h-10 rounded-full items-center justify-center mr-3"
           style={{ backgroundColor: isDark ? "#2D3D2D" : "#E8EFE8" }}
         >
-          <Text className="text-lg">✓</Text>
+          <Ionicons
+            name="checkmark"
+            size={20}
+            color={isDark ? "#A8C5A8" : "#5B8A5B"}
+          />
         </View>
         <View className="flex-1">
           <Text
@@ -239,6 +251,70 @@ function HomeScreenContent() {
     [modals.openDateModal]
   );
 
+  const keyExtractor = useCallback((item: MoodEntry) => item.id.toString(), []);
+
+  const renderMoodItem = useCallback(
+    ({ item }: { item: MoodEntry }) => (
+      <DisplayMoodItem
+        mood={item}
+        onSwipeableWillOpen={itemActions.onSwipeableWillOpen}
+        onLongPress={handleMoodItemLongPress}
+        swipeThreshold={itemActions.SWIPE_THRESHOLD}
+      />
+    ),
+    [handleMoodItemLongPress, itemActions.SWIPE_THRESHOLD, itemActions.onSwipeableWillOpen]
+  );
+
+  const listHeaderComponent = useMemo(
+    () =>
+      entrySettings.showDetailedLabels ? (
+        <View>
+          <DetailedMoodButtonSelector
+            onMoodPress={modals.handleMoodPress}
+            onLongPress={modals.handleLongPress}
+          />
+          <View className="mt-4">
+            <HistoryListHeader moodCount={moods.length} />
+          </View>
+        </View>
+      ) : null,
+    [
+      entrySettings.showDetailedLabels,
+      modals.handleLongPress,
+      modals.handleMoodPress,
+      moods.length,
+    ]
+  );
+
+  const listEmptyComponent = useMemo(
+    () =>
+      loading ? (
+        <LoadingSpinner message="Loading..." />
+      ) : (
+        <EmptyState
+          icon="leaf-outline"
+          tone="sage"
+          title="Start your journey"
+          description="Tap a mood above to log how you're feeling right now"
+        />
+      ),
+    [loading]
+  );
+
+  const listRefreshControl = useMemo(
+    () => (
+      <RefreshControl
+        refreshing={refreshing}
+        onRefresh={refreshMoods}
+        colors={[isDark ? "#7BA87B" : "#5B8A5B"]}
+        tintColor={isDark ? "#7BA87B" : "#5B8A5B"}
+      />
+    ),
+    [isDark, refreshMoods, refreshing]
+  );
+
+  const listContentContainerStyle = useMemo(() => ({ paddingBottom: 100 }), []);
+
   return (
     <>
       <GestureHandlerRootView style={{ flex: 1 }}>
@@ -252,8 +328,7 @@ function HomeScreenContent() {
 
             {/* Mood Buttons - in detailed mode, rendered as FlashList header */}
             {!entrySettings.showDetailedLabels && (
-              <MoodButtonSelector
-                showDetailedLabels={false}
+              <CompactMoodButtonSelector
                 onMoodPress={modals.handleMoodPress}
                 onLongPress={modals.handleLongPress}
               />
@@ -266,51 +341,14 @@ function HomeScreenContent() {
               )}
               <FlashList
                 data={moods}
-                keyExtractor={(item) => item.id.toString()}
-                renderItem={({ item }) => (
-                  <DisplayMoodItem
-                    mood={item}
-                    onSwipeableWillOpen={itemActions.onSwipeableWillOpen}
-                    onLongPress={handleMoodItemLongPress}
-                    swipeThreshold={itemActions.SWIPE_THRESHOLD}
-                  />
-                )}
-                ListHeaderComponent={
-                  entrySettings.showDetailedLabels ? (
-                    <View>
-                      <MoodButtonSelector
-                        showDetailedLabels={true}
-                        onMoodPress={modals.handleMoodPress}
-                        onLongPress={modals.handleLongPress}
-                      />
-                      <View className="mt-4">
-                        <HistoryListHeader moodCount={moods.length} />
-                      </View>
-                    </View>
-                  ) : null
-                }
-                ListEmptyComponent={
-                  loading ? (
-                    <LoadingSpinner message="Loading..." />
-                  ) : (
-                    <EmptyState
-                      emoji="🌿"
-                      title="Start your journey"
-                      description="Tap a mood above to log how you're feeling right now"
-                    />
-                  )
-                }
-                refreshControl={
-                  <RefreshControl
-                    refreshing={refreshing}
-                    onRefresh={refreshMoods}
-                    colors={[isDark ? "#7BA87B" : "#5B8A5B"]}
-                    tintColor={isDark ? "#7BA87B" : "#5B8A5B"}
-                  />
-                }
+                keyExtractor={keyExtractor}
+                renderItem={renderMoodItem}
+                ListHeaderComponent={listHeaderComponent}
+                ListEmptyComponent={listEmptyComponent}
+                refreshControl={listRefreshControl}
+                contentInsetAdjustmentBehavior="automatic"
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ paddingBottom: 100 }}
-                estimatedItemSize={120}
+                contentContainerStyle={listContentContainerStyle}
               />
             </View>
           </View>
@@ -326,31 +364,26 @@ function HomeScreenContent() {
           onSave={handleDateTimeSave}
         />
       )}
-      <MoodEntryModal
+      <QuickMoodEntryModal
         visible={modals.quickEntryVisible}
-        title="Quick Entry"
         initialMood={modals.pendingMood}
         emotionOptions={entrySettings.emotionOptions}
         contextOptions={entrySettings.contextOptions}
         fieldConfig={entrySettings.quickEntryFieldConfig}
-        showMoodSelector={false}
         onClose={modals.closeQuickEntry}
         onSubmit={handleEntrySave}
       />
-      <MoodEntryModal
+      <DetailedMoodEntryModal
         visible={modals.detailedEntryVisible}
-        title="Detailed Entry"
         initialMood={modals.pendingMood}
         emotionOptions={entrySettings.emotionOptions}
         contextOptions={entrySettings.contextOptions}
         fieldConfig={entrySettings.detailedFieldConfig}
-        showMoodSelector={false}
         onClose={modals.closeDetailedEntry}
         onSubmit={handleEntrySave}
       />
-      <MoodEntryModal
+      <EditMoodEntryModal
         visible={Boolean(modals.editingEntry)}
-        title="Edit Entry"
         initialMood={modals.editingEntry?.mood ?? modals.pendingMood}
         emotionOptions={entrySettings.emotionOptions}
         contextOptions={entrySettings.contextOptions}

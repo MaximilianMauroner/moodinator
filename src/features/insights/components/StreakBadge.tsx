@@ -1,14 +1,21 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useColorScheme } from "nativewind";
+import { SurfaceCard } from "@/components/ui/SurfaceCard";
+import { IconBadge } from "@/components/ui/IconBadge";
+import { typography } from "@/constants/typography";
 
-interface StreakBadgeProps {
+type StreakBadgeSharedProps = {
   current: number;
   longest: number;
-  compact?: boolean;
-}
+};
 
-export function StreakBadge({ current, longest, compact = false }: StreakBadgeProps) {
+type StreakBadgeBaseProps = StreakBadgeSharedProps & {
+  compact: boolean;
+};
+
+function StreakBadgeBase({ current, longest, compact }: StreakBadgeBaseProps) {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === "dark";
 
@@ -31,8 +38,9 @@ export function StreakBadge({ current, longest, compact = false }: StreakBadgePr
 
   if (compact) {
     return (
-      <View
-        className="flex-row items-center px-4 py-2.5 rounded-2xl"
+      <SurfaceCard
+        tone={isOnStreak ? "sand" : "neutral"}
+        padding={12}
         style={{
           backgroundColor: isOnStreak
             ? isDark
@@ -43,38 +51,34 @@ export function StreakBadge({ current, longest, compact = false }: StreakBadgePr
             : "#F5F1E8",
         }}
       >
-        <Text className="text-xl mr-2">
-          {isOnStreak ? "🔥" : "💤"}
-        </Text>
-        <View>
+        <View className="flex-row items-center">
+          <IconBadge
+            icon={isOnStreak ? "flame-outline" : "moon-outline"}
+            tone={isOnStreak ? "sand" : "neutral"}
+            size="sm"
+            style={{ marginRight: 8 }}
+          />
           <Text
-            className="text-lg font-bold"
             style={{
+              ...typography.bodyMd,
+              fontWeight: "700",
               color: isOnStreak ? flameColors.primary : inactiveColors.primary,
             }}
           >
             {current} {current === 1 ? "day" : "days"}
           </Text>
         </View>
-      </View>
+      </SurfaceCard>
     );
   }
 
   return (
-    <View
-      className="rounded-3xl bg-paper-50 dark:bg-paper-850 overflow-hidden"
-      style={isDark ? styles.cardShadowDark : styles.cardShadowLight}
+    <SurfaceCard
+      tone="sand"
+      accentColor={isOnStreak ? flameColors.primary : inactiveColors.secondary}
+      accentHeight={4}
     >
-      {/* Gradient header accent */}
-      <View
-        style={{
-          height: 4,
-          backgroundColor: isOnStreak ? flameColors.primary : inactiveColors.secondary,
-          opacity: isOnStreak ? 1 : 0.5,
-        }}
-      />
-
-      <View className="p-5">
+      <View>
         {/* Main streak display */}
         <View className="flex-row items-start justify-between">
           <View className="flex-row items-center">
@@ -102,24 +106,28 @@ export function StreakBadge({ current, longest, compact = false }: StreakBadgePr
                   }}
                 />
               )}
-              <Text className="text-3xl">{isOnStreak ? "🔥" : "💤"}</Text>
+              <Ionicons
+                name={isOnStreak ? "flame" : "moon-outline"}
+                size={28}
+                color={isOnStreak ? flameColors.secondary : inactiveColors.primary}
+              />
             </View>
 
             <View>
-              <Text className="text-xs font-medium uppercase tracking-wider text-sand-500 dark:text-sand-400 mb-1">
+              <Text className="text-sand-500 dark:text-sand-400 mb-1" style={typography.eyebrow}>
                 Current Streak
               </Text>
               <View className="flex-row items-baseline">
                 <Text
-                  className="text-4xl font-extrabold"
+                  className="text-paper-800 dark:text-paper-100"
                   style={{
+                    ...typography.metricLg,
                     color: isOnStreak ? flameColors.primary : inactiveColors.primary,
-                    letterSpacing: -1,
                   }}
                 >
                   {current}
                 </Text>
-                <Text className="text-base font-semibold ml-2 text-sand-500 dark:text-sand-400">
+                <Text className="ml-2 text-sand-500 dark:text-sand-400" style={typography.bodyMd}>
                   {current === 1 ? "day" : "days"}
                 </Text>
               </View>
@@ -181,12 +189,7 @@ export function StreakBadge({ current, longest, compact = false }: StreakBadgePr
           }}
         >
           <View className="flex-1 items-center">
-            <View
-              className="w-8 h-8 rounded-xl items-center justify-center mb-2"
-              style={{ backgroundColor: isDark ? "#302A22" : "#F9F5ED" }}
-            >
-              <Text className="text-base">🏆</Text>
-            </View>
+            <IconBadge icon="trophy-outline" tone="sand" size="sm" style={{ marginBottom: 8 }} />
             <Text className="text-xs text-sand-500 dark:text-sand-400 mb-0.5">
               Personal Best
             </Text>
@@ -201,20 +204,12 @@ export function StreakBadge({ current, longest, compact = false }: StreakBadgePr
           />
 
           <View className="flex-1 items-center">
-            <View
-              className="w-8 h-8 rounded-xl items-center justify-center mb-2"
-              style={{
-                backgroundColor: isOnStreak
-                  ? isDark
-                    ? "rgba(34, 197, 94, 0.15)"
-                    : "#DCFCE7"
-                  : isDark
-                  ? "rgba(239, 68, 68, 0.15)"
-                  : "#FEE2E2",
-              }}
-            >
-              <Text className="text-base">{isOnStreak ? "✓" : "○"}</Text>
-            </View>
+            <IconBadge
+              icon={isOnStreak ? "checkmark" : "remove"}
+              tone={isOnStreak ? "sage" : "coral"}
+              size="sm"
+              style={{ marginBottom: 8 }}
+            />
             <Text className="text-xs text-sand-500 dark:text-sand-400 mb-0.5">
               Status
             </Text>
@@ -235,23 +230,16 @@ export function StreakBadge({ current, longest, compact = false }: StreakBadgePr
           </View>
         </View>
       </View>
-    </View>
+    </SurfaceCard>
   );
 }
 
-const styles = StyleSheet.create({
-  cardShadowLight: {
-    elevation: 4,
-    shadowColor: "#9D8660",
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 6 },
-  },
-  cardShadowDark: {
-    elevation: 4,
-    shadowColor: "#000",
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 6 },
-  },
-});
+export type StreakBadgeProps = StreakBadgeSharedProps;
+
+export function StreakBadge(props: StreakBadgeProps) {
+  return <StreakBadgeBase {...props} compact={false} />;
+}
+
+export function CompactStreakBadge(props: StreakBadgeProps) {
+  return <StreakBadgeBase {...props} compact={true} />;
+}

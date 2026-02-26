@@ -72,8 +72,17 @@ export default function Layout() {
     // registerBackgroundBackupTask();
   }, []);
 
+  // Prevent protected app content from rendering before auth/onboarding state is loaded.
+  if (!hydrated) {
+    return (
+      <ErrorBoundary FallbackComponent={RootErrorFallback}>
+        <View className="flex-1 bg-white dark:bg-slate-950" />
+      </ErrorBoundary>
+    );
+  }
+
   // Show onboarding if not completed (first launch)
-  if (hydrated && !hasCompletedOnboarding) {
+  if (!hasCompletedOnboarding) {
     return (
       <ErrorBoundary FallbackComponent={RootErrorFallback}>
         <View className="flex-1 bg-white dark:bg-slate-950">
@@ -84,7 +93,7 @@ export default function Layout() {
   }
 
   // Show lock screen if app lock is enabled and locked
-  if (hydrated && isEnabled && isLocked) {
+  if (isEnabled && isLocked) {
     return (
       <ErrorBoundary FallbackComponent={RootErrorFallback}>
         <View className="flex-1 bg-white dark:bg-slate-950">

@@ -7,7 +7,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.lab4code.moodinator",
@@ -17,8 +16,8 @@
         "NSPhotoLibraryAddUsageDescription": "We save the processed photo to your library when needed.",
         "NSLocationWhenInUseUsageDescription": "We use your location to tag your mood entries with where you were.",
         "NSMicrophoneUsageDescription": "We use the microphone to record voice memos for your mood entries.",
-        "UIFileSharingEnabled": true,
-        "LSSupportsOpeningDocumentsInPlace": true,
+        "UIFileSharingEnabled": false,
+        "LSSupportsOpeningDocumentsInPlace": false,
         "UIBackgroundModes": [
           "fetch"
         ]
@@ -113,7 +112,9 @@
           "microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone to record voice memos."
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "@react-native-community/datetimepicker",
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true

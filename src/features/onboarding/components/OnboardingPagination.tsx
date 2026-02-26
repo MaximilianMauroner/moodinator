@@ -36,14 +36,16 @@ type PaginationDotProps = {
 
 function PaginationDot({ isActive, activeColor, inactiveColor }: PaginationDotProps) {
   const animatedStyle = useAnimatedStyle(() => ({
-    width: withSpring(isActive ? 24 : 8, { damping: 15 }),
+    transform: [{ scaleX: withSpring(isActive ? 2 : 2 / 3, { damping: 15 }) }],
     backgroundColor: isActive ? activeColor : inactiveColor,
+    opacity: withSpring(isActive ? 1 : 0.85, { damping: 15 }),
   }));
 
   return (
     <Animated.View
       style={[
         {
+          width: 12,
           height: 8,
           borderRadius: 4,
         },
