@@ -13,10 +13,68 @@ const WEEKS_TO_KEEP = 8; // Keep backups for 8 weeks (rolling)
 const BACKUP_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
 
 // Default backup directory (fallback if user hasn't selected one).
-// Use cache on iOS to reduce exposure of sensitive backups in user-browsable Documents.
-const DEFAULT_BACKUP_DIR = `${
-  Platform.OS === "ios" ? FileSystem.cacheDirectory : FileSystem.documentDirectory
-}MoodinatorBackups/`;
+// Use documentDirectory so automatic backups are durable and survive OS cache eviction.
+// iOS file sharing / open-in-place is disabled in app config, which reduces user-browsable exposure.
+const DEFAULT_BACKUP_DIR = `${FileSystem.documentDirectory}MoodinatorBackups/`;
+
+// Legacy location introduced previously on iOS. Keep a migration path so existing backups remain visible.
+const LEGACY_IOS_CACHE_BACKUP_DIR =
+  Platform.OS === "ios" && FileSystem.cacheDirectory
+    ? `${FileSystem.cacheDirectory}MoodinatorBackups/`
+    : null;
+
+async function migrateLegacyIosCacheBackupsIfNeeded(targetDir: string): Promise<void> {
+  if (
+    Platform.OS !== "ios" ||
+    !LEGACY_IOS_CACHE_BACKUP_DIR ||
+    targetDir !== DEFAULT_BACKUP_DIR ||
+    LEGACY_IOS_CACHE_BACKUP_DIR === DEFAULT_BACKUP_DIR
+  ) {
+    return;
+  }
+
+  try {
+    const legacyDirInfo = await FileSystem.getInfoAsync(LEGACY_IOS_CACHE_BACKUP_DIR);
+    if (!legacyDirInfo.exists) {
+      return;
+    }
+
+    const files = await FileSystem.readDirectoryAsync(LEGACY_IOS_CACHE_BACKUP_DIR);
+    let migratedCount = 0;
+
+    for (const file of files) {
+      if (!file.startsWith("moodinator-backup-") || !file.endsWith(".json")) {
+        continue;
+      }
+
+      const from = `${LEGACY_IOS_CACHE_BACKUP_DIR}${file}`;
+      const to = `${DEFAULT_BACKUP_DIR}${file}`;
+      const targetInfo = await FileSystem.getInfoAsync(to);
+
+      if (targetInfo.exists) {
+        continue;
+      }
+
+      try {
+        await FileSystem.moveAsync({ from, to });
+        migratedCount++;
+      } catch (moveError) {
+        try {
+          await FileSystem.copyAsync({ from, to });
+          migratedCount++;
+        } catch (copyError) {
+          console.warn(`Failed to migrate legacy backup ${file}:`, copyError);
+        }
+      }
+    }
+
+    if (migratedCount > 0) {
+      console.log(`Migrated ${migratedCount} legacy iOS backup(s) from cache to documents`);
+    }
+  } catch (error) {
+    console.warn("Error migrating legacy iOS cache backups:", error);
+  }
+}
 
 /**
  * Gets the user-selected backup folder URI, or returns default
@@ -88,6 +146,8 @@ async function ensureBackupDirectory(): Promise<string> {
     if (!dirInfo.exists) {
       await FileSystem.makeDirectoryAsync(backupDir, { intermediates: true });
     }
+
+    await migrateLegacyIosCacheBackupsIfNeeded(backupDir);
   } catch (error) {
     console.error("Error ensuring backup directory exists:", error);
     // If user-selected folder fails, try default
@@ -99,6 +159,7 @@ async function ensureBackupDirectory(): Promise<string> {
           intermediates: true,
         });
       }
+      await migrateLegacyIosCacheBackupsIfNeeded(DEFAULT_BACKUP_DIR);
       return DEFAULT_BACKUP_DIR;
     }
     throw error;
@@ -268,6 +329,7 @@ async function getBackupFiles(): Promise<
 > {
   try {
     const backupDir = await getBackupDirectory();
+    await migrateLegacyIosCacheBackupsIfNeeded(backupDir);
     const backupFiles: Array<{
       uri: string;
       timestamp: number;

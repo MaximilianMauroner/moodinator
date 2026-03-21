@@ -76,8 +76,9 @@ export function MoodCalendar({ onAddEntry, onEditEntry, onRefreshReady }: MoodCa
 
   const handleDayLongPress = useCallback(
     (day: number) => {
+      if (!onAddEntry) return;
       const date = new Date(year, month, day, 12, 0, 0);
-      onAddEntry?.(date);
+      onAddEntry(date);
     },
     [year, month, onAddEntry]
   );
@@ -127,7 +128,7 @@ export function MoodCalendar({ onAddEntry, onEditEntry, onRefreshReady }: MoodCa
           isToday={isToday}
           isCurrentMonth={isCurrentMonth}
           onPress={handleDayPress}
-          onLongPress={handleDayLongPress}
+          onLongPress={onAddEntry ? handleDayLongPress : undefined}
         />
       );
 
@@ -201,6 +202,7 @@ export function MoodCalendar({ onAddEntry, onEditEntry, onRefreshReady }: MoodCa
           entries={selectedEntries}
           onClose={handleCloseModal}
           onEditEntry={handleEditEntry}
+          canAddEntry={Boolean(onAddEntry)}
         />
       )}
     </View>

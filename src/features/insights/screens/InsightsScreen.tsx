@@ -78,6 +78,10 @@ export function InsightsScreen() {
     calendarRefreshRef.current = refreshCalendar;
   }, []);
 
+  const handleCalendarEntryPress = useCallback((entry: MoodEntry) => {
+    setSelectedEntry(entry);
+  }, []);
+
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
     try {
@@ -263,7 +267,10 @@ export function InsightsScreen() {
               />
             }
           >
-            <MoodCalendar onRefreshReady={handleCalendarRefreshReady} />
+            <MoodCalendar
+              onRefreshReady={handleCalendarRefreshReady}
+              onEditEntry={handleCalendarEntryPress}
+            />
           </ScrollView>
         ) : (
           <>
