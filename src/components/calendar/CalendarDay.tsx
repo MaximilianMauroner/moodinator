@@ -10,7 +10,7 @@ type CalendarDayProps = {
   isToday: boolean;
   isCurrentMonth: boolean;
   onPress: (day: number, data?: CalendarDayData) => void;
-  onLongPress: (day: number) => void;
+  onLongPress?: (day: number) => void;
 };
 
 export function CalendarDay({
@@ -29,6 +29,7 @@ export function CalendarDay({
   };
 
   const handleLongPress = () => {
+    if (!onLongPress) return;
     haptics.longPressActivate();
     onLongPress(day);
   };
@@ -42,11 +43,19 @@ export function CalendarDay({
     ? "rgba(42, 37, 32, 0.5)"
     : "rgba(245, 241, 232, 0.6)";
 
+  const accessibilityHint = hasMood
+    ? onLongPress
+      ? "Tap to view entries. Long press to add entry"
+      : "Tap to view entries"
+    : onLongPress
+    ? "Tap to view day details or long press to add entry"
+    : "Tap to view day details";
+
   return (
     <View className="flex-1 items-center py-1">
       <Pressable
         onPress={handlePress}
-        onLongPress={handleLongPress}
+        onLongPress={onLongPress ? handleLongPress : undefined}
         delayLongPress={400}
         className="items-center justify-center"
         style={({ pressed }) => ({
@@ -64,7 +73,7 @@ export function CalendarDay({
         })}
         accessibilityRole="button"
         accessibilityLabel={`Day ${day}${hasMood ? `, has ${data!.entries.length} mood entries` : ""}`}
-        accessibilityHint={hasMood ? "Tap to view entries" : "Long press to add entry"}
+        accessibilityHint={accessibilityHint}
       >
         <Text
           className="text-sm font-semibold"

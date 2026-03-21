@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { View, Text, Pressable, AppState, AppStateStatus } from "react-native";
+import { View, Text, Pressable, AppState, AppStateStatus, ActivityIndicator } from "react-native";
 import { Stack } from "expo-router";
 // import { registerBackgroundBackupTask } from "@db/backgroundBackup";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -42,6 +42,23 @@ function RootErrorFallback({ error, resetError }: { error: Error; resetError: ()
   );
 }
 
+function AppBootSplash() {
+  return (
+    <View className="flex-1 bg-white dark:bg-slate-950 justify-center items-center px-8">
+      <View className="w-20 h-20 rounded-3xl items-center justify-center mb-5 bg-emerald-50 dark:bg-emerald-900/20">
+        <Text className="text-3xl">🌿</Text>
+      </View>
+      <Text className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+        Moodinator
+      </Text>
+      <Text className="text-sm text-slate-600 dark:text-slate-400 mb-5 text-center">
+        Preparing your private space...
+      </Text>
+      <ActivityIndicator size="small" color="#5B8A5B" />
+    </View>
+  );
+}
+
 export default function Layout() {
   const { hydrated: lockHydrated, hydrate: hydrateLock, isEnabled, isLocked, lock } = useAppLockStore();
   const { hydrated: onboardingHydrated, hydrate: hydrateOnboarding, hasCompletedOnboarding } = useOnboardingStore();
@@ -76,7 +93,7 @@ export default function Layout() {
   if (!hydrated) {
     return (
       <ErrorBoundary FallbackComponent={RootErrorFallback}>
-        <View className="flex-1 bg-white dark:bg-slate-950" />
+        <AppBootSplash />
       </ErrorBoundary>
     );
   }

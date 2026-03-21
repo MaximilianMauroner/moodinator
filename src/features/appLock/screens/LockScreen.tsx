@@ -82,6 +82,14 @@ export function LockScreen() {
     transform: [{ scale: iconScale.value }],
   }));
 
+  const finalizeSuccessfulAuth = useCallback(() => {
+    // Never block a valid unlock on lockout-metadata persistence failures.
+    unlock();
+    void resetFailedAttempts().catch((persistError) => {
+      console.warn("Failed to reset PIN attempt state after successful auth:", persistError);
+    });
+  }, [unlock, resetFailedAttempts]);
+
   const handleBiometricAuth = useCallback(async () => {
     if (isAuthenticatingRef.current) return;
 
@@ -91,14 +99,13 @@ export function LockScreen() {
       const success = await authenticate();
       if (success) {
         haptics.unlockSuccess();
-        await resetFailedAttempts();
-        unlock();
+        finalizeSuccessfulAuth();
       }
     } finally {
       isAuthenticatingRef.current = false;
       setIsAuthenticating(false);
     }
-  }, [authenticate, unlock, resetFailedAttempts]);
+  }, [authenticate, finalizeSuccessfulAuth]);
 
   // Auto-trigger biometric on mount
   useEffect(() => {
@@ -119,8 +126,7 @@ export function LockScreen() {
       const isValid = await verifyPin(enteredPin);
       if (isValid) {
         haptics.unlockSuccess();
-        await resetFailedAttempts();
-        unlock();
+        finalizeSuccessfulAuth();
       } else {
         haptics.pinError();
         setError(true);
@@ -129,7 +135,7 @@ export function LockScreen() {
         setTimeout(() => setError(false), 500);
       }
     },
-    [verifyPin, unlock, incrementFailedAttempts, resetFailedAttempts, isPinLockedOut]
+    [verifyPin, incrementFailedAttempts, finalizeSuccessfulAuth, isPinLockedOut]
   );
 
   const handleDigitPress = useCallback(

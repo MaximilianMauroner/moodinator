@@ -13,6 +13,7 @@ type DayDetailModalProps = {
   entries: MoodEntry[];
   onClose: () => void;
   onEditEntry?: (entry: MoodEntry) => void;
+  canAddEntry?: boolean;
 };
 
 export function DayDetailModal({
@@ -21,6 +22,7 @@ export function DayDetailModal({
   entries,
   onClose,
   onEditEntry,
+  canAddEntry = false,
 }: DayDetailModalProps) {
   const { isDark, get, getCategoryColors } = useThemeColors();
 
@@ -123,7 +125,9 @@ export function DayDetailModal({
                   className="text-sm text-center"
                   style={{ color: get("textMuted") }}
                 >
-                  Long press on this day to add an entry
+                  {canAddEntry
+                    ? "Long press on this day to add an entry"
+                    : "No mood entries for this day"}
                 </Text>
               </View>
             ) : (
@@ -133,7 +137,7 @@ export function DayDetailModal({
                   return (
                     <Pressable
                       key={entry.id}
-                      onPress={() => handleEditEntry(entry)}
+                      onPress={onEditEntry ? () => handleEditEntry(entry) : undefined}
                       className="rounded-2xl overflow-hidden"
                       style={{
                         backgroundColor: get("surface"),
@@ -233,14 +237,15 @@ export function DayDetailModal({
                           )}
                         </View>
 
-                        {/* Chevron indicator */}
-                        <View className="justify-center pr-3">
-                          <Ionicons
-                            name="chevron-forward"
-                            size={16}
-                            color={get("textMuted")}
-                          />
-                        </View>
+                        {onEditEntry && (
+                          <View className="justify-center pr-3">
+                            <Ionicons
+                              name="chevron-forward"
+                              size={16}
+                              color={get("textMuted")}
+                            />
+                          </View>
+                        )}
                       </View>
                     </Pressable>
                   );
