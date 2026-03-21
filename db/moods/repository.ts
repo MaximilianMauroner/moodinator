@@ -489,3 +489,40 @@ export async function getMoodsInRange(
   );
   return rows.map(toMoodEntry);
 }
+
+/**
+ * Get moods grouped by day for a specific month
+ * @param year - The year (e.g., 2024)
+ * @param month - The month (0-11, where 0 is January)
+ * @returns Map of day number (1-31) to array of mood entries for that day
+ */
+export async function getMoodsByMonth(
+  year: number,
+  month: number
+): Promise<Map<number, MoodEntry[]>> {
+  const db = await getDb();
+
+  // Get the first and last day of the month
+  const startOfMonth = new Date(year, month, 1, 0, 0, 0, 0);
+  const endOfMonth = new Date(year, month + 1, 0, 23, 59, 59, 999);
+
+  const rows = await db.getAllAsync<MoodRow>(
+    "SELECT * FROM moods WHERE timestamp >= ? AND timestamp <= ? ORDER BY timestamp ASC;",
+    startOfMonth.getTime(),
+    endOfMonth.getTime()
+  );
+
+  const moodsByDay = new Map<number, MoodEntry[]>();
+
+  for (const row of rows) {
+    const entry = toMoodEntry(row);
+    const entryDate = new Date(entry.timestamp);
+    const day = entryDate.getDate();
+
+    const existing = moodsByDay.get(day) || [];
+    existing.push(entry);
+    moodsByDay.set(day, existing);
+  }
+
+  return moodsByDay;
+}

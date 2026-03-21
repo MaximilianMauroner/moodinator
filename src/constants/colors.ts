@@ -106,25 +106,25 @@ export type ThemeMode = "light" | "dark";
  */
 export const chartColors = {
   // Line/area chart colors
-  line: { light: "#3b82f6", dark: "#60a5fa" },
-  lineSecondary: { light: "#8b5cf6", dark: "#a78bfa" },
-  fill: { light: "#3b82f6", dark: "#60a5fa" },
-  fillOpacity: 0.1,
+  line: { light: "#5B8A5B", dark: "#A8C5A8" },
+  lineSecondary: { light: "#847596", dark: "#C4BBCF" },
+  fill: { light: "#7BA87B", dark: "#7BA87B" },
+  fillOpacity: 0.14,
 
   // Grid and axis
-  gridLine: { light: "#e2e8f0", dark: "#1e293b" },
-  axisLabel: { light: "#64748b", dark: "#94a3b8" },
+  gridLine: { light: "#EDE7DA", dark: "#3D352A" },
+  axisLabel: { light: "#7A6B55", dark: "#BDA77D" },
 
   // Background
-  chartBg: { light: "#ffffff", dark: "#0f172a" },
+  chartBg: { light: "#FDFCFA", dark: "#231F1B" },
 
   // Dot styling
   dotStroke: "#ffffff",
   dotRadius: 4,
 
   // Tooltip
-  tooltipBg: { light: "#1e293b", dark: "#f8fafc" },
-  tooltipText: { light: "#f8fafc", dark: "#1e293b" },
+  tooltipBg: { light: "#3D352A", dark: "#F5F1E8" },
+  tooltipText: { light: "#F5F1E8", dark: "#3D352A" },
 } as const;
 
 /**

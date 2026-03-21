@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, Pressable, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useColorScheme } from "nativewind";
 
@@ -34,21 +34,19 @@ export function TimePeriodSelector({ value, onChange }: TimePeriodSelectorProps)
         const isActive = value === period.id;
 
         return (
-          <TouchableOpacity
+          <Pressable
             key={period.id}
             onPress={() => onChange(period.id)}
             className="flex-1 flex-row items-center justify-center py-3 rounded-xl"
-            style={
+            style={({ pressed }) => [
               isActive
-                ? [
-                    {
-                      backgroundColor: isDark ? "#1C1916" : "#FDFCFA",
-                    },
-                    isDark ? styles.activeShadowDark : styles.activeShadowLight,
-                  ]
-                : {}
-            }
-            activeOpacity={0.8}
+                ? {
+                    backgroundColor: isDark ? "#1C1916" : "#FDFCFA",
+                  }
+                : null,
+              isActive ? (isDark ? styles.activeShadowDark : styles.activeShadowLight) : null,
+              pressed ? { opacity: 0.8 } : null,
+            ]}
             accessibilityRole="tab"
             accessibilityLabel={`${period.label} view`}
             accessibilityState={{ selected: isActive }}
@@ -81,7 +79,7 @@ export function TimePeriodSelector({ value, onChange }: TimePeriodSelectorProps)
             >
               {period.label}
             </Text>
-          </TouchableOpacity>
+          </Pressable>
         );
       })}
     </View>

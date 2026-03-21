@@ -3,7 +3,7 @@ import {
   View,
   Text,
   ScrollView,
-  Dimensions,
+  useWindowDimensions,
   TouchableOpacity,
   RefreshControl,
 } from "react-native";
@@ -148,6 +148,7 @@ export const DailyTab = ({
   moods: MoodEntry[];
   onRefresh: () => void;
 }) => {
+  const { width: windowWidth } = useWindowDimensions();
   const scheme = useColorScheme();
   const isDark = scheme === "dark";
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
@@ -274,7 +275,7 @@ export const DailyTab = ({
           <LineChart
             data={chartData}
             width={Math.max(
-              Dimensions.get("window").width - 64,
+              windowWidth - 64,
               chartData.labels.length * 40
             )}
             height={220}

@@ -7,7 +7,6 @@ import {
     ScrollView,
     TextInput,
     Alert,
-    Animated,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { moodScale } from "@/constants/moodScale";
@@ -46,7 +45,7 @@ export type MoodEntryFieldConfig = {
     voiceMemos?: boolean;
 };
 
-type MoodEntryModalProps = {
+type BaseMoodEntryModalProps = {
     visible: boolean;
     title: string;
     initialMood: number;
@@ -198,7 +197,7 @@ const MediaAttachmentRow: React.FC<{
     );
 };
 
-export const MoodEntryModal: React.FC<MoodEntryModalProps> = ({
+const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     visible,
     title,
     initialMood,
@@ -318,7 +317,7 @@ export const MoodEntryModal: React.FC<MoodEntryModalProps> = ({
                 voiceMemos: fieldConfig.voiceMemos ? voiceMemos : [],
                 basedOnEntryId,
             });
-            haptics.success();
+            haptics.moodLogged();
             onClose();
         } catch (error) {
             console.error("Failed to save mood entry:", error);
@@ -543,9 +542,9 @@ export const MoodEntryModal: React.FC<MoodEntryModalProps> = ({
                                                 className={`px-3 py-2 rounded-xl ${disabled ? "opacity-40" : ""}`}
                                                 style={{
                                                     backgroundColor: catColors.bg,
-                                                    borderWidth: isSelected ? 0 : 1,
+                                                    // Keep chip dimensions stable so wrapped rows don't reflow on toggle.
+                                                    borderWidth: 1,
                                                     borderColor: catColors.border,
-                                                    transform: [{ scale: isSelected ? 1.02 : 1 }],
                                                 }}
                                                 accessibilityRole="button"
                                                 accessibilityLabel={getEmotionChipLabel(emotion.name, emotion.category, isSelected)}
@@ -587,9 +586,9 @@ export const MoodEntryModal: React.FC<MoodEntryModalProps> = ({
                                                 className="px-3 py-2 rounded-xl"
                                                 style={{
                                                     backgroundColor: ctxColors.bg,
-                                                    borderWidth: isSelected ? 0 : 1,
+                                                    // Keep chip dimensions stable so wrapped rows don't reflow on toggle.
+                                                    borderWidth: 1,
                                                     borderColor: ctxColors.border,
-                                                    transform: [{ scale: isSelected ? 1.02 : 1 }],
                                                 }}
                                                 accessibilityRole="button"
                                                 accessibilityLabel={`Context: ${ctx}, ${isSelected ? "selected" : "not selected"}`}
@@ -797,3 +796,45 @@ export const MoodEntryModal: React.FC<MoodEntryModalProps> = ({
         </Modal>
     );
 };
+
+type MoodEntryModalSharedProps = {
+    visible: boolean;
+    initialMood: number;
+    emotionOptions: Emotion[];
+    contextOptions: string[];
+    onClose: () => void;
+    onSubmit: (values: MoodEntryFormValues) => Promise<void> | void;
+    initialValues?: Partial<MoodEntryFormValues>;
+};
+
+type MoodEntryModalVariantProps = MoodEntryModalSharedProps & {
+    fieldConfig: MoodEntryFieldConfig;
+};
+
+export type QuickMoodEntryModalProps = MoodEntryModalVariantProps;
+export type DetailedMoodEntryModalProps = MoodEntryModalVariantProps;
+export type EditMoodEntryModalProps = MoodEntryModalVariantProps;
+
+export const QuickMoodEntryModal: React.FC<QuickMoodEntryModalProps> = (props) => (
+    <BaseMoodEntryModal
+        {...props}
+        title="Quick Entry"
+        showMoodSelector={false}
+    />
+);
+
+export const DetailedMoodEntryModal: React.FC<DetailedMoodEntryModalProps> = (props) => (
+    <BaseMoodEntryModal
+        {...props}
+        title="Detailed Entry"
+        showMoodSelector={false}
+    />
+);
+
+export const EditMoodEntryModal: React.FC<EditMoodEntryModalProps> = (props) => (
+    <BaseMoodEntryModal
+        {...props}
+        title="Edit Entry"
+        showMoodSelector={true}
+    />
+);

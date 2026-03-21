@@ -2,11 +2,11 @@
 export { InsightsScreen } from "./screens/InsightsScreen";
 
 // Components
-export { InsightCard } from "./components/InsightCard";
+export { InsightCard, CompactInsightCard } from "./components/InsightCard";
 export { TimePeriodSelector } from "./components/TimePeriodSelector";
 export { WeekNavigator } from "./components/WeekNavigator";
 export { PatternCard } from "./components/PatternCard";
-export { StreakBadge } from "./components/StreakBadge";
+export { StreakBadge, CompactStreakBadge } from "./components/StreakBadge";
 export { TrendIndicator, getTrendDirection } from "./components/TrendIndicator";
 
 // Hooks
