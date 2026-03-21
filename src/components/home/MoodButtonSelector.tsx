@@ -3,36 +3,43 @@ import { View } from "react-native";
 import { MoodButtonsDetailed } from "@/components/MoodButtonsDetailed";
 import { MoodButtonsCompact } from "@/components/MoodButtonsCompact";
 
-interface MoodButtonSelectorProps {
-  showDetailedLabels: boolean;
+interface MoodButtonSelectorSharedProps {
   onMoodPress: (mood: number) => void;
   onLongPress: (mood: number) => void;
 }
 
-/**
- * Wrapper component that renders either detailed or compact mood buttons
- * based on user preference.
- */
-export function MoodButtonSelector({
-  showDetailedLabels,
+function MoodButtonSelectorContainer({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return <View>{children}</View>;
+}
+
+export function CompactMoodButtonSelector({
   onMoodPress,
   onLongPress,
-}: MoodButtonSelectorProps) {
+}: MoodButtonSelectorSharedProps) {
   return (
-    <View>
-      {showDetailedLabels ? (
-        <MoodButtonsDetailed
-          onMoodPress={onMoodPress}
-          onLongPress={onLongPress}
-        />
-      ) : (
-        <MoodButtonsCompact
-          onMoodPress={onMoodPress}
-          onLongPress={onLongPress}
-        />
-      )}
-    </View>
+    <MoodButtonSelectorContainer>
+      <MoodButtonsCompact
+        onMoodPress={onMoodPress}
+        onLongPress={onLongPress}
+      />
+    </MoodButtonSelectorContainer>
   );
 }
 
-export default MoodButtonSelector;
+export function DetailedMoodButtonSelector({
+  onMoodPress,
+  onLongPress,
+}: MoodButtonSelectorSharedProps) {
+  return (
+    <MoodButtonSelectorContainer>
+      <MoodButtonsDetailed
+        onMoodPress={onMoodPress}
+        onLongPress={onLongPress}
+      />
+    </MoodButtonSelectorContainer>
+  );
+}

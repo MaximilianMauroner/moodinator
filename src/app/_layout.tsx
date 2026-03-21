@@ -1,8 +1,10 @@
 import React, { useEffect } from "react";
-import { View, Text, Pressable } from "react-native";
+import { View, Text, Pressable, AppState, AppStateStatus, ActivityIndicator } from "react-native";
 import { Stack } from "expo-router";
 // import { registerBackgroundBackupTask } from "@db/backgroundBackup";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { LockScreen, useAppLockStore } from "@/features/appLock";
+import { OnboardingScreen, useOnboardingStore } from "@/features/onboarding";
 
 import "./global.css";
 
@@ -40,12 +42,83 @@ function RootErrorFallback({ error, resetError }: { error: Error; resetError: ()
   );
 }
 
+function AppBootSplash() {
+  return (
+    <View className="flex-1 bg-white dark:bg-slate-950 justify-center items-center px-8">
+      <View className="w-20 h-20 rounded-3xl items-center justify-center mb-5 bg-emerald-50 dark:bg-emerald-900/20">
+        <Text className="text-3xl">🌿</Text>
+      </View>
+      <Text className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+        Moodinator
+      </Text>
+      <Text className="text-sm text-slate-600 dark:text-slate-400 mb-5 text-center">
+        Preparing your private space...
+      </Text>
+      <ActivityIndicator size="small" color="#5B8A5B" />
+    </View>
+  );
+}
+
 export default function Layout() {
+  const { hydrated: lockHydrated, hydrate: hydrateLock, isEnabled, isLocked, lock } = useAppLockStore();
+  const { hydrated: onboardingHydrated, hydrate: hydrateOnboarding, hasCompletedOnboarding } = useOnboardingStore();
+
+  // Hydrate stores on mount
+  useEffect(() => {
+    hydrateLock();
+    hydrateOnboarding();
+  }, [hydrateLock, hydrateOnboarding]);
+
+  const hydrated = lockHydrated && onboardingHydrated;
+
+  // Lock app when it goes to background
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      if (nextAppState === "background" || nextAppState === "inactive") {
+        lock();
+      }
+    };
+
+    const subscription = AppState.addEventListener("change", handleAppStateChange);
+    return () => subscription.remove();
+  }, [lock]);
+
   useEffect(() => {
     // Background backup temporarily disabled due to expo-task-manager compatibility issue
     // TODO: Re-enable when expo-background-task supports New Architecture
     // registerBackgroundBackupTask();
   }, []);
+
+  // Prevent protected app content from rendering before auth/onboarding state is loaded.
+  if (!hydrated) {
+    return (
+      <ErrorBoundary FallbackComponent={RootErrorFallback}>
+        <AppBootSplash />
+      </ErrorBoundary>
+    );
+  }
+
+  // Show onboarding if not completed (first launch)
+  if (!hasCompletedOnboarding) {
+    return (
+      <ErrorBoundary FallbackComponent={RootErrorFallback}>
+        <View className="flex-1 bg-white dark:bg-slate-950">
+          <OnboardingScreen />
+        </View>
+      </ErrorBoundary>
+    );
+  }
+
+  // Show lock screen if app lock is enabled and locked
+  if (isEnabled && isLocked) {
+    return (
+      <ErrorBoundary FallbackComponent={RootErrorFallback}>
+        <View className="flex-1 bg-white dark:bg-slate-950">
+          <LockScreen />
+        </View>
+      </ErrorBoundary>
+    );
+  }
 
   return (
     <ErrorBoundary FallbackComponent={RootErrorFallback}>

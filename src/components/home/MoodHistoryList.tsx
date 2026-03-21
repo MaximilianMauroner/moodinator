@@ -53,7 +53,8 @@ export function MoodHistoryList({
 
     return (
       <EmptyState
-        emoji="🌿"
+        icon="leaf-outline"
+        tone="sage"
         title="Start your journey"
         description="Tap a mood above to log how you're feeling right now"
       />
@@ -79,7 +80,6 @@ export function MoodHistoryList({
       showsVerticalScrollIndicator={false}
       extraData={moods}
       ListEmptyComponent={renderEmptyComponent}
-      estimatedItemSize={120}
     />
   );
 }

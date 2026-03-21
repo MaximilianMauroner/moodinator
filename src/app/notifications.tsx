@@ -144,6 +144,7 @@ function NotificationsScreenContent() {
 
         <ScrollView
           className="flex-1 px-4"
+          contentInsetAdjustmentBehavior="automatic"
           contentContainerStyle={{ paddingBottom: 100 }}
           showsVerticalScrollIndicator={false}
         >

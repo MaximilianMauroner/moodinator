@@ -1,0 +1,210 @@
+import React, { useState, useCallback, useEffect } from "react";
+import { View, ActivityIndicator } from "react-native";
+import { GestureDetector, Gesture } from "react-native-gesture-handler";
+import { useThemeColors } from "@/constants/colors";
+import { haptics } from "@/lib/haptics";
+import { useCalendarData, type CalendarDayData } from "./useCalendarData";
+import { CalendarHeader } from "./CalendarHeader";
+import { CalendarWeekHeader } from "./CalendarWeekHeader";
+import { CalendarDay } from "./CalendarDay";
+import { DayDetailModal } from "./DayDetailModal";
+import type { MoodEntry } from "@db/types";
+
+type MoodCalendarProps = {
+  onAddEntry?: (date: Date) => void;
+  onEditEntry?: (entry: MoodEntry) => void;
+  onRefreshReady?: (refreshFn: (() => Promise<void>) | null) => void;
+};
+
+export function MoodCalendar({ onAddEntry, onEditEntry, onRefreshReady }: MoodCalendarProps) {
+  const { isDark, get } = useThemeColors();
+  const {
+    year,
+    month,
+    monthName,
+    monthData,
+    loading,
+    goToPreviousMonth,
+    goToNextMonth,
+    goToToday,
+    isCurrentMonth,
+    canGoNext,
+    refresh,
+  } = useCalendarData();
+
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedEntries, setSelectedEntries] = useState<MoodEntry[]>([]);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+
+  const today = new Date();
+  const isThisMonth = year === today.getFullYear() && month === today.getMonth();
+  const todayDay = isThisMonth ? today.getDate() : -1;
+
+  // Swipe gesture for month navigation
+  const swipeGesture = Gesture.Pan()
+    .runOnJS(true)
+    .maxPointers(1)
+    .minDistance(16)
+    .activeOffsetX([-24, 24])
+    .failOffsetY([-14, 14])
+    .onEnd((event) => {
+      const horizontalDistance = Math.abs(event.translationX);
+      const verticalDistance = Math.abs(event.translationY);
+
+      if (horizontalDistance < 80 || horizontalDistance < verticalDistance) {
+        return;
+      }
+
+      if (event.translationX > 0) {
+        haptics.monthChange();
+        goToPreviousMonth();
+      } else if (event.translationX < -80 && canGoNext) {
+        haptics.monthChange();
+        goToNextMonth();
+      }
+    });
+
+  const handleDayPress = useCallback(
+    (day: number, data?: CalendarDayData) => {
+      const date = new Date(year, month, day);
+      setSelectedDate(date);
+      setSelectedEntries(data?.entries ?? []);
+      setShowDetailModal(true);
+    },
+    [year, month]
+  );
+
+  const handleDayLongPress = useCallback(
+    (day: number) => {
+      if (!onAddEntry) return;
+      const date = new Date(year, month, day, 12, 0, 0);
+      onAddEntry(date);
+    },
+    [year, month, onAddEntry]
+  );
+
+  const handleCloseModal = useCallback(() => {
+    setShowDetailModal(false);
+  }, []);
+
+  const handleEditEntry = useCallback(
+    (entry: MoodEntry) => {
+      setShowDetailModal(false);
+      onEditEntry?.(entry);
+    },
+    [onEditEntry]
+  );
+
+  useEffect(() => {
+    onRefreshReady?.(refresh);
+    return () => {
+      onRefreshReady?.(null);
+    };
+  }, [onRefreshReady, refresh]);
+
+  // Generate calendar grid
+  const renderCalendarGrid = () => {
+    if (!monthData) return null;
+
+    const { days, daysInMonth, firstDayOfWeek } = monthData;
+    const rows: React.ReactNode[] = [];
+    let cells: React.ReactNode[] = [];
+
+    // Add empty cells for days before the 1st
+    for (let i = 0; i < firstDayOfWeek; i++) {
+      cells.push(<View key={`empty-start-${i}`} className="flex-1" />);
+    }
+
+    // Add day cells
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dayData = days.get(day);
+      const isToday = day === todayDay;
+
+      cells.push(
+        <CalendarDay
+          key={day}
+          day={day}
+          data={dayData}
+          isToday={isToday}
+          isCurrentMonth={isCurrentMonth}
+          onPress={handleDayPress}
+          onLongPress={onAddEntry ? handleDayLongPress : undefined}
+        />
+      );
+
+      // Start new row after Saturday
+      if ((firstDayOfWeek + day) % 7 === 0) {
+        rows.push(
+          <View key={`row-${rows.length}`} className="flex-row">
+            {cells}
+          </View>
+        );
+        cells = [];
+      }
+    }
+
+    // Add remaining cells for last row
+    if (cells.length > 0) {
+      while (cells.length < 7) {
+        cells.push(<View key={`empty-end-${cells.length}`} className="flex-1" />);
+      }
+      rows.push(
+        <View key={`row-${rows.length}`} className="flex-row">
+          {cells}
+        </View>
+      );
+    }
+
+    return rows;
+  };
+
+  return (
+    <View
+      className="rounded-3xl p-4"
+      style={{
+        backgroundColor: get("surface"),
+        shadowColor: isDark ? "#000" : "#9D8660",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: isDark ? 0.25 : 0.08,
+        shadowRadius: 12,
+        elevation: 3,
+      }}
+    >
+      <CalendarHeader
+        monthName={monthName}
+        year={year}
+        onPrevious={goToPreviousMonth}
+        onNext={goToNextMonth}
+        onToday={goToToday}
+        canGoNext={canGoNext}
+        isCurrentMonth={isCurrentMonth}
+      />
+
+      <GestureDetector gesture={swipeGesture}>
+        <View>
+          <CalendarWeekHeader />
+
+          {loading ? (
+            <View className="items-center justify-center py-16">
+              <ActivityIndicator size="small" color={get("primary")} />
+            </View>
+          ) : (
+            <View className="gap-1">{renderCalendarGrid()}</View>
+          )}
+        </View>
+      </GestureDetector>
+
+      {/* Day Detail Modal */}
+      {selectedDate && (
+        <DayDetailModal
+          visible={showDetailModal}
+          date={selectedDate}
+          entries={selectedEntries}
+          onClose={handleCloseModal}
+          onEditEntry={handleEditEntry}
+          canAddEntry={Boolean(onAddEntry)}
+        />
+      )}
+    </View>
+  );
+}

@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, Dimensions } from "react-native";
+import { View, Text, useWindowDimensions } from "react-native";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { LineChart } from "react-native-chart-kit";
 import {
@@ -368,6 +368,7 @@ export const processWeeklyMoodData = (allMoods: MoodEntry[], maxWeeks: number = 
 export const MiniWeeklyChart = React.memo(({ weeklyData, reduceMotion = false }: { weeklyData: WeeklyDataPoint[]; reduceMotion?: boolean }) => {
   const scheme = useColorScheme();
   const isDark = scheme === "dark";
+  const { width: windowWidth } = useWindowDimensions();
 
   if (!weeklyData.length) {
     return null;
@@ -460,7 +461,7 @@ export const MiniWeeklyChart = React.memo(({ weeklyData, reduceMotion = false }:
       </View>
       <LineChart
         data={chartData}
-        width={Dimensions.get("window").width - 64}
+        width={windowWidth - 64}
         height={200}
         chartConfig={chartConfig}
         style={{ borderRadius: 16 }}
