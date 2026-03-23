@@ -33,6 +33,8 @@ export function EmptyState({
 }: EmptyStateProps) {
   const { get, isDark } = useThemeColors();
   const resolvedIcon = icon ?? "document-text-outline";
+  const haloSize = 96;
+  const contentWidth = 272;
   const accent = {
     sage: isDark ? "#7BA87B" : "#5B8A5B",
     sand: isDark ? "#D4C4A0" : "#9D8660",
@@ -43,21 +45,25 @@ export function EmptyState({
 
   return (
     <View
-      className="flex-1 items-center justify-center p-8"
+      className="flex-1 items-center justify-center px-6 py-8"
       accessible
       accessibilityRole="text"
       accessibilityLabel={`${title}${description ? `. ${description}` : ""}`}
     >
-      <SurfaceCard tone={tone === "neutral" ? "sand" : tone} style={{ width: "100%", maxWidth: 360 }}>
-        <View className="items-center">
-          <View className="items-center justify-center mb-5">
+      <SurfaceCard
+        tone={tone === "neutral" ? "sand" : tone}
+        style={{ width: "100%", maxWidth: 360 }}
+        contentStyle={{ alignItems: "center", paddingHorizontal: 24, paddingVertical: 28 }}
+      >
+        <View className="items-center w-full">
+          <View className="items-center justify-center mb-4">
             <View
               pointerEvents="none"
               className="absolute"
               style={{
-                width: 110,
-                height: 110,
-                borderRadius: 55,
+                width: haloSize,
+                height: haloSize,
+                borderRadius: haloSize / 2,
                 backgroundColor: accent,
                 opacity: isDark ? 0.14 : 0.08,
               }}
@@ -75,16 +81,16 @@ export function EmptyState({
           </View>
 
           <Text
-            className="text-center text-paper-800 dark:text-paper-200 mb-1"
-            style={typography.titleMd}
+            className="text-center text-paper-800 dark:text-paper-200"
+            style={[typography.titleMd, { maxWidth: contentWidth, marginBottom: 8 }]}
           >
             {title}
           </Text>
 
           {description && (
             <Text
-              className="text-center px-2"
-              style={[typography.bodyMd, { color: get("textMuted") }]}
+              className="text-center"
+              style={[typography.bodyMd, { color: get("textMuted"), maxWidth: contentWidth }]}
             >
               {description}
             </Text>
