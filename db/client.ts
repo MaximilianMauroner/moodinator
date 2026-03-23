@@ -38,26 +38,44 @@ async function applySqlCipherKey(database: SQLite.SQLiteDatabase, key: string): 
   await database.execAsync(`PRAGMA key = '${key}';`);
 }
 
+function isSqlCipherUnavailableError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return error.message.includes("PRAGMA key or rekey");
+}
+
 async function configureDatabaseEncryption(database: SQLite.SQLiteDatabase): Promise<void> {
   // SQLCipher is enabled in app.json only for iOS builds.
   if (Platform.OS !== "ios") return;
 
   const key = await getOrCreateDbKey();
+  try {
+    const readableWithoutKey = await canReadMainSchema(database);
 
-  const readableWithoutKey = await canReadMainSchema(database);
+    if (readableWithoutKey) {
+      // Existing plaintext DB (or brand-new DB). Encrypt it in place.
+      await database.execAsync(`PRAGMA rekey = '${key}';`);
+    }
 
-  if (readableWithoutKey) {
-    // Existing plaintext DB (or brand-new DB). Encrypt it in place.
-    await database.execAsync(`PRAGMA rekey = '${key}';`);
-  }
+    await applySqlCipherKey(database, key);
 
-  await applySqlCipherKey(database, key);
+    const readableWithKey = await canReadMainSchema(database);
+    if (!readableWithKey) {
+      throw new Error(
+        "Failed to open encrypted database. The SQLCipher key may be missing or invalid."
+      );
+    }
+  } catch (error) {
+    if (isSqlCipherUnavailableError(error)) {
+      console.warn(
+        "SQLCipher is unavailable in the current iOS build; continuing with the local SQLite database."
+      );
+      return;
+    }
 
-  const readableWithKey = await canReadMainSchema(database);
-  if (!readableWithKey) {
-    throw new Error(
-      "Failed to open encrypted database. The SQLCipher key may be missing or invalid."
-    );
+    throw error;
   }
 }
 

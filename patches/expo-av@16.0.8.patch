@@ -1,0 +1,330 @@
+diff --git a/ios/EXAV/EXAV.h b/ios/EXAV/EXAV.h
+index 42a79e1183530a18ea5b515700755bd6560ac2a8..c4c510d5a020141ae5ec5edb254e07754b1a12c9 100644
+--- a/ios/EXAV/EXAV.h
++++ b/ios/EXAV/EXAV.h
+@@ -7,7 +7,6 @@
+ #import <ExpoModulesCore/EXModuleRegistryConsumer.h>
+ #import <ExpoModulesCore/EXAppLifecycleListener.h>
+ #import <ExpoModulesCore/EXExportedModule.h>
+-#import <ExpoModulesCore/EXEventEmitter.h>
+ #import <EXAV/EXAVObject.h>
+ 
+ typedef NS_OPTIONS(NSUInteger, EXAudioInterruptionMode)
+@@ -57,7 +56,7 @@ typedef NS_OPTIONS(NSUInteger, EXAudioRecordingOptionBitRateStrategy)
+ 
+ @end
+ 
+-@interface EXAV : EXExportedModule <RCTBridgeModule, EXEventEmitter, EXAppLifecycleListener, EXModuleRegistryConsumer, EXAVInterface>
++@interface EXAV : EXExportedModule <RCTBridgeModule, EXAppLifecycleListener, EXModuleRegistryConsumer, EXAVInterface>
+ 
+ - (void)handleMediaServicesReset:(NSNotification *)notification;
+ - (void)handleAudioSessionInterruption:(NSNotification *)notification;
+diff --git a/ios/EXAV/EXAV.m b/ios/EXAV/EXAV.m
+index 7153d286adb56461bfecf916e164c932a17b5d56..da46b4d09160e4a720430142be6a41c78f3f0c0a 100644
+--- a/ios/EXAV/EXAV.m
++++ b/ios/EXAV/EXAV.m
+@@ -2,8 +2,9 @@
+ 
+ #import <AVFoundation/AVFoundation.h>
+ 
++#import <React/RCTEventDispatcher.h>
++
+ #import <ExpoModulesCore/EXUIManager.h>
+-#import <ExpoModulesCore/EXEventEmitterService.h>
+ #import <ExpoModulesCore/EXAppLifecycleService.h>
+ #import <ExpoModulesCore/EXFileSystemInterface.h>
+ #import <ExpoModulesCore/EXPermissionsInterface.h>
+@@ -40,6 +41,11 @@ NSString *const EXDidUpdatePlaybackStatusEventName = @"didUpdatePlaybackStatus";
+ 
+ NSString *const EXDidUpdateMetadataEventName = @"didUpdateMetadata";
+ 
++static NSError *EXAVErrorWithMessage(NSString *message)
++{
++  return [NSError errorWithDomain:@"EXAV" code:0 userInfo:@{NSLocalizedDescriptionKey: message}];
++}
++
+ @interface EXAV ()
+ 
+ @property (nonatomic, weak) RCTBridge *bridge;
+@@ -266,11 +272,11 @@ EX_EXPORT_MODULE(ExponentAV);
+   BOOL shouldPlayInBackground = ((NSNumber *)mode[@"staysActiveInBackground"]).boolValue;
+   
+   if (!playsInSilentMode && interruptionMode == EXAudioInterruptionModeDuckOthers) {
+-    return EXErrorWithMessage(@"Impossible audio mode: playsInSilentMode == false and duckOthers == true cannot be set on iOS.");
++    return EXAVErrorWithMessage(@"Impossible audio mode: playsInSilentMode == false and duckOthers == true cannot be set on iOS.");
+   } else if (!playsInSilentMode && allowsRecording) {
+-    return EXErrorWithMessage(@"Impossible audio mode: playsInSilentMode == false and allowsRecording == true cannot be set on iOS.");
++    return EXAVErrorWithMessage(@"Impossible audio mode: playsInSilentMode == false and allowsRecording == true cannot be set on iOS.");
+   } else if (!playsInSilentMode && shouldPlayInBackground) {
+-    return EXErrorWithMessage(@"Impossible audio mode: playsInSilentMode == false and staysActiveInBackground == true cannot be set on iOS.");
++    return EXAVErrorWithMessage(@"Impossible audio mode: playsInSilentMode == false and staysActiveInBackground == true cannot be set on iOS.");
+   } else {
+     if (!allowsRecording) {
+       if (_audioRecorder && [_audioRecorder isRecording]) {
+@@ -356,10 +362,10 @@ EX_EXPORT_MODULE(ExponentAV);
+ - (NSError *)promoteAudioSessionIfNecessary
+ {
+   if (!_audioIsEnabled) {
+-    return EXErrorWithMessage(@"Expo Audio is disabled, so the audio session could not be activated.");
++    return EXAVErrorWithMessage(@"Expo Audio is disabled, so the audio session could not be activated.");
+   }
+   if (_isBackgrounded && !_staysActiveInBackground && ![_kernelAudioSessionManagerDelegate isActiveForModule:self]) {
+-    return EXErrorWithMessage(@"This experience is currently in the background, so the audio session could not be activated.");
++    return EXAVErrorWithMessage(@"This experience is currently in the background, so the audio session could not be activated.");
+   }
+   
+   EXAVAudioSessionMode audioSessionModeRequired = [self _getAudioSessionModeRequired];
+@@ -584,13 +590,13 @@ withEXVideoViewForTag:(nonnull NSNumber *)reactTag
+ - (NSError *)_createNewAudioRecorder
+ {
+   if (_audioRecorder) {
+-    return EXErrorWithMessage(@"Recorder is already prepared.");
++    return EXAVErrorWithMessage(@"Recorder is already prepared.");
+   }
+   
+   id<EXFileSystemInterface> fileSystem = [_expoModuleRegistry getModuleImplementingProtocol:@protocol(EXFileSystemInterface)];
+   
+   if (!fileSystem) {
+-    return EXErrorWithMessage(@"No FileSystem module.");
++    return EXAVErrorWithMessage(@"No FileSystem module.");
+   }
+   
+   NSString *directory = [fileSystem.cachesDirectory stringByAppendingPathComponent:@"AV"];
+@@ -751,7 +757,8 @@ EX_EXPORT_METHOD_AS(loadForSound,
+ 
+ - (void)sendEventWithName:(NSString *)eventName body:(NSDictionary *)body
+ {
+-  [[_expoModuleRegistry getModuleImplementingProtocol:@protocol(EXEventEmitterService)] sendEventWithName:eventName body:body];
++  RCTEventDispatcher *eventDispatcher = [_bridge moduleForClass:[RCTEventDispatcher class]];
++  [eventDispatcher sendDeviceEventWithName:eventName body:body];
+ }
+ 
+ EX_EXPORT_METHOD_AS(unloadForSound,
+@@ -1013,8 +1020,8 @@ EX_EXPORT_METHOD_AS(unloadAudioRecorder,
+ }
+ 
+ EX_EXPORT_METHOD_AS(getAvailableInputs,
+-                    resolver:(UMPromiseResolveBlock)resolve
+-                    rejecter:(UMPromiseRejectBlock)reject)
++                    resolver:(EXPromiseResolveBlock)resolve
++                    rejecter:(EXPromiseRejectBlock)reject)
+ {
+   NSMutableArray *inputs = [NSMutableArray new];
+   for (AVAudioSessionPortDescription *desc in [_kernelAudioSessionManagerDelegate availableInputs]){
+@@ -1028,8 +1035,8 @@ EX_EXPORT_METHOD_AS(getAvailableInputs,
+ }
+ 
+ EX_EXPORT_METHOD_AS(getCurrentInput,
+-                    getCurrentInput:(UMPromiseResolveBlock)resolve
+-                    rejecter:(UMPromiseRejectBlock)reject)
++                    getCurrentInput:(EXPromiseResolveBlock)resolve
++                    rejecter:(EXPromiseRejectBlock)reject)
+ {
+   AVAudioSessionPortDescription *desc = [_kernelAudioSessionManagerDelegate activeInput];
+   if (desc) {
+@@ -1045,8 +1052,8 @@ EX_EXPORT_METHOD_AS(getCurrentInput,
+ 
+ EX_EXPORT_METHOD_AS(setInput,
+                     setInput:(NSString*)input
+-                    resolver:(UMPromiseResolveBlock)resolve
+-                    rejecter:(UMPromiseRejectBlock)reject)
++                    resolver:(EXPromiseResolveBlock)resolve
++                    rejecter:(EXPromiseRejectBlock)reject)
+ {
+   AVAudioSessionPortDescription* preferredInput = nil;
+   for (AVAudioSessionPortDescription *desc in [_kernelAudioSessionManagerDelegate availableInputs]){
+diff --git a/ios/EXAV/EXAVPlayerData.m b/ios/EXAV/EXAVPlayerData.m
+index 6f6998d932a641bc94d5a4ffdb8ea8965e6fadf6..fcdb1905ad1495111acbd51c329a928bfb1900c6 100644
+--- a/ios/EXAV/EXAVPlayerData.m
++++ b/ios/EXAV/EXAVPlayerData.m
+@@ -131,7 +131,7 @@ NSString *const EXAVPlayerDataObserverMetadataKeyPath = @"timedMetadata";
+     NSFileManager *fileManager = [NSFileManager defaultManager];
+     BOOL fileExists = [fileManager fileExistsAtPath:filePath isDirectory:&isDirectory];
+     if (!fileExists || isDirectory) {
+-      EXLogWarn(@"Expo-av: attempted to load an asset that doesn't exist: %@. This can happen when you persist an absolute path and then try to load from it. Make sure the provided path is relative to the application sandbox, e.g. `${FileSystem.documentDirectory}/some_file.m4a`.", url.path);
++      NSLog(@"Expo-av: attempted to load an asset that doesn't exist: %@. This can happen when you persist an absolute path and then try to load from it. Make sure the provided path is relative to the application sandbox, e.g. `${FileSystem.documentDirectory}/some_file.m4a`.", url.path);
+     }
+   }
+ }
+@@ -379,7 +379,7 @@ NSString *const EXAVPlayerDataObserverMetadataKeyPath = @"timedMetadata";
+         }
+       } else if (!seekSucceeded) {
+         if (reject) {
+-          reject(@"E_AV_SEEKING", nil, EXErrorWithMessage(@"Seeking interrupted."));
++          reject(@"E_AV_SEEKING", nil, [NSError errorWithDomain:@"EXAV" code:0 userInfo:@{NSLocalizedDescriptionKey: @"Seeking interrupted."}]);
+         }
+       } else if (resolve) {
+         resolve([self getStatus]);
+@@ -920,7 +920,7 @@ NSString *const EXAVPlayerDataObserverMetadataKeyPath = @"timedMetadata";
+   AVAssetTrack *track = item.tracks.firstObject.assetTrack;
+   if (!track)
+   {
+-    EXLogError(@"Failed to find a track in the current player item!");
++    NSLog(@"Failed to find a track in the current player item!");
+     return;
+   }
+ 
+@@ -948,7 +948,7 @@ NSString *const EXAVPlayerDataObserverMetadataKeyPath = @"timedMetadata";
+ 
+         CFRelease(audioProcessingTap);
+       } else {
+-        EXLogError(@"Failed to create MTAudioProcessingTap!");
++        NSLog(@"Failed to create MTAudioProcessingTap!");
+       }
+     }
+   }
+@@ -990,11 +990,11 @@ void EXTapPrepare(MTAudioProcessingTapRef tap, CMItemCount maxFrames, const Audi
+   context->supportedTapProcessingFormat = true;
+ 
+   if (processingFormat->mFormatID != kAudioFormatLinearPCM) {
+-    EXLogInfo(@"Audio Format ID for audioProcessingTap: LinearPCM");
++    NSLog(@"Audio Format ID for audioProcessingTap: LinearPCM");
+     // TODO(barthap): Does LinearPCM work with the audio sample buffer callback?
+   }
+   if (!(processingFormat->mFormatFlags & kAudioFormatFlagIsFloat)) {
+-    EXLogInfo(@"Audio Format ID for audioProcessingTap: Float only");
++    NSLog(@"Audio Format ID for audioProcessingTap: Float only");
+     // TODO(barthap): Does Float work with the audio sample buffer callback?
+   }
+ 
+@@ -1016,7 +1016,7 @@ void EXTapProcess(MTAudioProcessingTapRef tap, CMItemCount numberFrames, MTAudio
+     (AVAudioTapProcessorContext *)MTAudioProcessingTapGetStorage(tap);
+ 
+   if (!context->self) {
+-    EXLogWarn(@"Audio Processing Tap has been destroyed!");
++    NSLog(@"Audio Processing Tap has been destroyed!");
+     return;
+   }
+ 
+@@ -1029,7 +1029,7 @@ void EXTapProcess(MTAudioProcessingTapRef tap, CMItemCount numberFrames, MTAudio
+   // Get actual audio buffers from MTAudioProcessingTap
+   OSStatus status = MTAudioProcessingTapGetSourceAudio(tap, numberFrames, bufferListInOut, flagsOut, NULL, numberFramesOut);
+   if (noErr != status) {
+-    EXLogWarn(@"MTAudioProcessingTapGetSourceAudio: %d", (int)status);
++    NSLog(@"MTAudioProcessingTapGetSourceAudio: %d", (int)status);
+     return;
+   }
+ 
+diff --git a/ios/EXAV/EXAVTV.m b/ios/EXAV/EXAVTV.m
+index b6fccda059b6d02deda15173c631265c69c86e2a..cd25caaa76e307d58dbd9a9596f5d78e6df8d689 100644
+--- a/ios/EXAV/EXAVTV.m
++++ b/ios/EXAV/EXAVTV.m
+@@ -2,8 +2,9 @@
+ 
+ #import <AVFoundation/AVFoundation.h>
+ 
++#import <React/RCTEventDispatcher.h>
++
+ #import <ExpoModulesCore/EXUIManager.h>
+-#import <ExpoModulesCore/EXEventEmitterService.h>
+ #import <ExpoModulesCore/EXAppLifecycleService.h>
+ #import <ExpoModulesCore/EXFileSystemInterface.h>
+ #import <ExpoModulesCore/EXPermissionsInterface.h>
+@@ -24,6 +25,11 @@ NSString *const EXDidUpdatePlaybackStatusEventName = @"didUpdatePlaybackStatus";
+ 
+ NSString *const EXDidUpdateMetadataEventName = @"didUpdateMetadata";
+ 
++static NSError *EXAVErrorWithMessage(NSString *message)
++{
++  return [NSError errorWithDomain:@"EXAV" code:0 userInfo:@{NSLocalizedDescriptionKey: message}];
++}
++
+ @interface EXAV ()
+ 
+ @property (nonatomic, weak) RCTBridge *bridge;
+@@ -218,9 +224,9 @@ EX_EXPORT_MODULE(ExponentAV);
+   BOOL shouldPlayInBackground = ((NSNumber *)mode[@"staysActiveInBackground"]).boolValue;
+ 
+   if (!playsInSilentMode && interruptionMode == EXAudioInterruptionModeDuckOthers) {
+-    return EXErrorWithMessage(@"Impossible audio mode: playsInSilentMode == false and duckOthers == true cannot be set on iOS.");
++    return EXAVErrorWithMessage(@"Impossible audio mode: playsInSilentMode == false and duckOthers == true cannot be set on iOS.");
+   } else if (!playsInSilentMode && shouldPlayInBackground) {
+-    return EXErrorWithMessage(@"Impossible audio mode: playsInSilentMode == false and staysActiveInBackground == true cannot be set on iOS.");
++    return EXAVErrorWithMessage(@"Impossible audio mode: playsInSilentMode == false and staysActiveInBackground == true cannot be set on iOS.");
+   } else {
+     _playsInSilentMode = playsInSilentMode;
+     _audioInterruptionMode = interruptionMode;
+@@ -286,10 +292,10 @@ EX_EXPORT_MODULE(ExponentAV);
+ - (NSError *)promoteAudioSessionIfNecessary
+ {
+   if (!_audioIsEnabled) {
+-    return EXErrorWithMessage(@"Expo Audio is disabled, so the audio session could not be activated.");
++    return EXAVErrorWithMessage(@"Expo Audio is disabled, so the audio session could not be activated.");
+   }
+   if (_isBackgrounded && !_staysActiveInBackground && ![_kernelAudioSessionManagerDelegate isActiveForModule:self]) {
+-    return EXErrorWithMessage(@"This experience is currently in the background, so the audio session could not be activated.");
++    return EXAVErrorWithMessage(@"This experience is currently in the background, so the audio session could not be activated.");
+   }
+ 
+   EXAVAudioSessionMode audioSessionModeRequired = [self _getAudioSessionModeRequired];
+@@ -547,7 +553,8 @@ EX_EXPORT_METHOD_AS(loadForSound,
+ 
+ - (void)sendEventWithName:(NSString *)eventName body:(NSDictionary *)body
+ {
+-  [[_expoModuleRegistry getModuleImplementingProtocol:@protocol(EXEventEmitterService)] sendEventWithName:eventName body:body];
++  RCTEventDispatcher *eventDispatcher = [_bridge moduleForClass:[RCTEventDispatcher class]];
++  [eventDispatcher sendDeviceEventWithName:eventName body:body];
+ }
+ 
+ EX_EXPORT_METHOD_AS(unloadForSound,
+@@ -716,23 +723,23 @@ EX_EXPORT_METHOD_AS(unloadAudioRecorder,
+ }
+ 
+ EX_EXPORT_METHOD_AS(getAvailableInputs,
+-                    resolver:(UMPromiseResolveBlock)resolve
+-                    rejecter:(UMPromiseRejectBlock)reject)
++                    resolver:(EXPromiseResolveBlock)resolve
++                    rejecter:(EXPromiseRejectBlock)reject)
+ {
+   reject(@"E_UNSUPPORTED_PLATFORM", @"Not available on TV.", nil);
+ }
+ 
+ EX_EXPORT_METHOD_AS(getCurrentInput,
+-                    getCurrentInput:(UMPromiseResolveBlock)resolve
+-                    rejecter:(UMPromiseRejectBlock)reject)
++                    getCurrentInput:(EXPromiseResolveBlock)resolve
++                    rejecter:(EXPromiseRejectBlock)reject)
+ {
+   reject(@"E_UNSUPPORTED_PLATFORM", @"Not available on TV.", nil);
+ }
+ 
+ EX_EXPORT_METHOD_AS(setInput,
+                     setInput:(NSString*)input
+-                    resolver:(UMPromiseResolveBlock)resolve
+-                    rejecter:(UMPromiseRejectBlock)reject)
++                    resolver:(EXPromiseResolveBlock)resolve
++                    rejecter:(EXPromiseRejectBlock)reject)
+ {
+   reject(@"E_UNSUPPORTED_PLATFORM", @"Not available on TV.", nil);
+ }
+diff --git a/ios/EXAV/EXAudioRecordingPermissionRequester.m b/ios/EXAV/EXAudioRecordingPermissionRequester.m
+index 7d8375a9aee45784f9041d750fc08f30ce797dbb..19e1c6012fa8ac344ae0ff58f20d64b8e06cee6a 100644
+--- a/ios/EXAV/EXAudioRecordingPermissionRequester.m
++++ b/ios/EXAV/EXAudioRecordingPermissionRequester.m
+@@ -27,7 +27,7 @@ static SEL recordRecordPermissionSelector;
+ 
+   NSString *microphoneUsageDescription = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"NSMicrophoneUsageDescription"];
+   if (!microphoneUsageDescription) {
+-    EXFatal(EXErrorWithMessage(@"This app is missing NSMicrophoneUsageDescription, so audio services will fail. Add one of these keys to your bundle's Info.plist."));
++    NSLog(@"This app is missing NSMicrophoneUsageDescription, so audio services will fail. Add one of these keys to your bundle's Info.plist.");
+     systemStatus = AVAudioSessionRecordPermissionDenied;
+   } else {
+     systemStatus = [[AVAudioSession sharedInstance] recordPermission];
+diff --git a/ios/EXAV/Video/EXVideoView.h b/ios/EXAV/Video/EXVideoView.h
+index f7ff4ee0ba2bd14b6704a793ceaf1f768bd36770..0476c4851bac6f87211942224fe5a645c1cb076a 100644
+--- a/ios/EXAV/Video/EXVideoView.h
++++ b/ios/EXAV/Video/EXVideoView.h
+@@ -1,12 +1,11 @@
+ // Copyright 2015-present 650 Industries. All rights reserved.
+ 
+ #import <ExpoModulesCore/EXModuleRegistry.h>
+-#import <ExpoModulesCore/EXLegacyExpoViewProtocol.h>
+ 
+ #import <EXAV/EXAVObject.h>
+ #import <EXAV/EXVideoPlayerViewControllerDelegate.h>
+ 
+-@interface EXVideoView : UIView <EXVideoPlayerViewControllerDelegate, AVPlayerViewControllerDelegate, EXAVObject, EXLegacyExpoViewProtocol>
++@interface EXVideoView : UIView <EXVideoPlayerViewControllerDelegate, AVPlayerViewControllerDelegate, EXAVObject>
+ 
+ typedef NS_OPTIONS(NSUInteger, EXVideoFullscreenUpdate)
+ {

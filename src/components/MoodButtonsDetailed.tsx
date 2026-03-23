@@ -34,9 +34,9 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
   const lastMoods = moodData.slice(6);
 
   return (
-    <View className="mb-4">
+    <View className="mb-3">
       {/* Soft header */}
-      <View className="flex-row items-center justify-center mb-4">
+      <View className="flex-row items-center justify-center mb-3">
         <View
           className="h-px flex-1"
           style={{ backgroundColor: get("border") }}
@@ -57,7 +57,7 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
         {/* Featured mood (full width) */}
         <HapticTab
           key={firstMood.value}
-          className="items-center justify-center h-20 rounded-2xl w-full"
+          className="items-center justify-center h-[72px] rounded-2xl w-full"
           style={{
             backgroundColor: firstMood.bgHex || "#F1F5F9",
             shadowColor: firstMood.textHex || "#64748B",
@@ -73,16 +73,16 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
           accessibilityLabel={getMoodButtonLabel(firstMood.value, firstMood.label)}
           accessibilityHint={getMoodButtonHint()}
         >
-          <View className="flex-row items-center px-5">
+          <View className="flex-row items-center px-4">
             <Text
-              className="text-3xl font-bold mr-4"
+              className="text-[28px] font-bold mr-3"
               style={{ color: firstMood.textHex || "#64748B" }}
             >
               {firstMood.value}
             </Text>
             <View className="flex-1">
               <Text
-                className="text-base font-semibold"
+                className="text-[15px] font-semibold"
                 style={{ color: firstMood.textHex || "#64748B" }}
               >
                 {firstMood.label}
@@ -102,7 +102,7 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
         {middleMoods.map((mood) => (
           <HapticTab
             key={mood.value}
-            className="items-center justify-center h-28 rounded-2xl"
+            className="items-center justify-center h-24 rounded-2xl"
             style={{
               width: "48%",
               backgroundColor: mood.bgHex || "#F1F5F9",
@@ -120,7 +120,7 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
             accessibilityHint={getMoodButtonHint()}
           >
             <Text
-              className="text-2xl font-bold mb-1"
+              className="text-[22px] font-bold mb-1"
               style={{ color: mood.textHex || "#64748B" }}
             >
               {mood.value}
@@ -132,7 +132,7 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
               {mood.label}
             </Text>
             <Text
-              className="text-[10px] text-center px-3 leading-tight"
+              className="text-[9px] text-center px-3 leading-tight"
               style={{ color: mood.textHex || "#64748B", opacity: 0.7 }}
               numberOfLines={2}
             >
@@ -145,7 +145,7 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
         {lastMoods.map((mood) => (
           <HapticTab
             key={mood.value}
-            className="items-center justify-center h-28 rounded-2xl"
+            className="items-center justify-center h-24 rounded-2xl"
             style={{
               width: "48%",
               backgroundColor: mood.bgHex || "#F1F5F9",
@@ -163,7 +163,7 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
             accessibilityHint={getMoodButtonHint()}
           >
             <Text
-              className="text-2xl font-bold mb-1"
+              className="text-[22px] font-bold mb-1"
               style={{ color: mood.textHex || "#64748B" }}
             >
               {mood.value}
@@ -175,7 +175,7 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
               {mood.label}
             </Text>
             <Text
-              className="text-[10px] text-center px-3 leading-tight"
+              className="text-[9px] text-center px-3 leading-tight"
               style={{ color: mood.textHex || "#64748B", opacity: 0.7 }}
               numberOfLines={2}
             >
@@ -186,7 +186,7 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
       </View>
 
       {/* Gentle scale indicator */}
-      <View className="mt-4 mx-2">
+      <View className="mt-3 mx-2">
         <View
           className="flex-row h-1 rounded-full overflow-hidden"
           style={{ backgroundColor: get("surfaceAlt") }}

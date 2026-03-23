@@ -1,11 +1,17 @@
-import React, { useEffect, useCallback, useMemo } from "react";
-import { View, Text, RefreshControl } from "react-native";
+import React, { useEffect, useCallback, useMemo, useState } from "react";
+import { View, Text, RefreshControl, type LayoutChangeEvent } from "react-native";
 import { FlashList } from "@shopify/flash-list";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import ToastManager from "toastify-react-native";
 import { Ionicons } from "@expo/vector-icons";
+import Animated, {
+  Extrapolation,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+} from "react-native-reanimated";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { createScreenErrorFallback } from "@/components/ScreenErrorFallback";
@@ -39,6 +45,8 @@ import type { MoodEntry } from "@db/types";
 import { Toast } from "toastify-react-native";
 
 const HomeErrorFallback = createScreenErrorFallback("Home");
+const COMPACT_TOP_COLLAPSE = 180;
+const DETAILED_TOP_COLLAPSE = 220;
 
 // Toast config with theme support
 const createToastConfig = (isDark: boolean) => ({
@@ -129,6 +137,8 @@ function HomeScreenContent() {
 
   const loading = status === "loading";
   const refreshing = status === "refreshing";
+  const [topSectionHeight, setTopSectionHeight] = useState(0);
+  const topSectionScrollY = useSharedValue(0);
 
   // Wrapper for setMoods that supports function updaters
   const setMoods = useCallback(
@@ -241,14 +251,14 @@ function HomeScreenContent() {
       await loadAll();
       modals.closeDateModal();
     },
-    [loadAll, modals.closeDateModal]
+    [loadAll, modals]
   );
 
   const handleMoodItemLongPress = useCallback(
     (mood: MoodEntry) => {
       modals.openDateModal(mood);
     },
-    [modals.openDateModal]
+    [modals]
   );
 
   const keyExtractor = useCallback((item: MoodEntry) => item.id.toString(), []);
@@ -265,25 +275,67 @@ function HomeScreenContent() {
     [handleMoodItemLongPress, itemActions.SWIPE_THRESHOLD, itemActions.onSwipeableWillOpen]
   );
 
-  const listHeaderComponent = useMemo(
-    () =>
-      entrySettings.showDetailedLabels ? (
-        <View>
-          <DetailedMoodButtonSelector
-            onMoodPress={modals.handleMoodPress}
-            onLongPress={modals.handleLongPress}
-          />
-          <View className="mt-4">
-            <HistoryListHeader moodCount={moods.length} />
-          </View>
-        </View>
-      ) : null,
-    [
-      entrySettings.showDetailedLabels,
-      modals.handleLongPress,
-      modals.handleMoodPress,
-      moods.length,
-    ]
+  const estimatedTopSectionHeight = entrySettings.showDetailedLabels ? 560 : 440;
+  const expandedTopSectionHeight = topSectionHeight || estimatedTopSectionHeight;
+  const maxTopCollapse = entrySettings.showDetailedLabels
+    ? DETAILED_TOP_COLLAPSE
+    : COMPACT_TOP_COLLAPSE;
+  const topCollapseDistance = Math.min(
+    maxTopCollapse,
+    Math.max(expandedTopSectionHeight - 160, 0)
+  );
+
+  const handleTopSectionLayout = useCallback(
+    ({ nativeEvent }: LayoutChangeEvent) => {
+      const measuredHeight = Math.ceil(nativeEvent.layout.height);
+
+      setTopSectionHeight((currentHeight) =>
+        currentHeight === measuredHeight ? currentHeight : measuredHeight
+      );
+    },
+    []
+  );
+
+  const handleListScroll = useCallback(
+    (event: { nativeEvent: { contentOffset: { y: number } } }) => {
+      topSectionScrollY.value = Math.max(event.nativeEvent.contentOffset.y, 0);
+    },
+    [topSectionScrollY]
+  );
+
+  const topSectionAnimatedStyle = useAnimatedStyle(
+    () => ({
+      height:
+        expandedTopSectionHeight -
+        Math.min(topSectionScrollY.value, topCollapseDistance),
+    }),
+    [expandedTopSectionHeight, topCollapseDistance]
+  );
+
+  const topSectionContentAnimatedStyle = useAnimatedStyle(
+    () => {
+      const collapsedOffset = Math.min(topSectionScrollY.value, topCollapseDistance);
+
+      return {
+        opacity: interpolate(
+          collapsedOffset,
+          [0, topCollapseDistance],
+          [1, 0.96],
+          Extrapolation.CLAMP
+        ),
+        transform: [
+          {
+            translateY: interpolate(
+              collapsedOffset,
+              [0, topCollapseDistance],
+              [0, -topCollapseDistance * 0.55],
+              Extrapolation.CLAMP
+            ),
+          },
+        ],
+      };
+    },
+    [topCollapseDistance]
   );
 
   const listEmptyComponent = useMemo(
@@ -313,7 +365,12 @@ function HomeScreenContent() {
     [isDark, refreshMoods, refreshing]
   );
 
-  const listContentContainerStyle = useMemo(() => ({ paddingBottom: 100 }), []);
+  const listContentContainerStyle = useMemo(
+    () => ({
+      paddingBottom: 100,
+    }),
+    []
+  );
 
   return (
     <>
@@ -323,32 +380,41 @@ function HomeScreenContent() {
           style={{ backgroundColor: isDark ? "#1C1916" : "#FAF8F4" }}
         >
           <View className="flex-1 px-4 pt-4">
-            {/* Header */}
-            <HomeHeader lastTracked={lastTracked} />
+            <Animated.View
+              style={[topSectionAnimatedStyle, { overflow: "hidden" }]}
+            >
+              <Animated.View
+                onLayout={handleTopSectionLayout}
+                style={topSectionContentAnimatedStyle}
+              >
+                <HomeHeader lastTracked={lastTracked} />
+                {entrySettings.showDetailedLabels ? (
+                  <DetailedMoodButtonSelector
+                    onMoodPress={modals.handleMoodPress}
+                    onLongPress={modals.handleLongPress}
+                  />
+                ) : (
+                  <CompactMoodButtonSelector
+                    onMoodPress={modals.handleMoodPress}
+                    onLongPress={modals.handleLongPress}
+                  />
+                )}
+              </Animated.View>
+            </Animated.View>
 
-            {/* Mood Buttons - in detailed mode, rendered as FlashList header */}
-            {!entrySettings.showDetailedLabels && (
-              <CompactMoodButtonSelector
-                onMoodPress={modals.handleMoodPress}
-                onLongPress={modals.handleLongPress}
-              />
-            )}
-
-            {/* Entries List */}
-            <View className={entrySettings.showDetailedLabels ? "flex-1" : "flex-1 mt-4"}>
-              {!entrySettings.showDetailedLabels && (
-                <HistoryListHeader moodCount={moods.length} />
-              )}
+            <View className="flex-1 mt-4">
+              <HistoryListHeader moodCount={moods.length} />
               <FlashList
                 data={moods}
                 keyExtractor={keyExtractor}
                 renderItem={renderMoodItem}
-                ListHeaderComponent={listHeaderComponent}
                 ListEmptyComponent={listEmptyComponent}
                 refreshControl={listRefreshControl}
                 contentInsetAdjustmentBehavior="automatic"
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={listContentContainerStyle}
+                onScroll={handleListScroll}
+                scrollEventThrottle={16}
               />
             </View>
           </View>

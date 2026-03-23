@@ -40,6 +40,10 @@ describe("Import/Export", () => {
         emotions: '[{"name":"Happy","category":"positive"}]',
         context_tags: '["work"]',
         energy: 8,
+        photos_json: '["file:///photo.jpg"]',
+        location_json: '{"latitude":48.2,"longitude":16.37,"name":"Vienna"}',
+        voice_memos_json: '["file:///memo.m4a"]',
+        based_on_entry_id: 12,
       });
 
       const result = await exportMoods();
@@ -51,8 +55,14 @@ describe("Import/Export", () => {
         mood: 7,
         emotions: [{ name: "Happy", category: "positive" }],
         context: ["work"],
+        contextTags: ["work"],
         energy: 8,
+        note: "Great day",
         notes: "Great day",
+        photos: ["file:///photo.jpg"],
+        location: { latitude: 48.2, longitude: 16.37, name: "Vienna" },
+        voiceMemos: ["file:///memo.m4a"],
+        basedOnEntryId: 12,
       });
     });
 
@@ -89,6 +99,10 @@ describe("Import/Export", () => {
           emotions: [{ name: "Happy", category: "positive" }],
           context: ["work"],
           energy: 8,
+          photos: ["file:///photo.jpg"],
+          location: { latitude: 48.2, longitude: 16.37, name: "Vienna" },
+          voiceMemos: ["file:///memo.m4a"],
+          basedOnEntryId: 3,
         },
       ]);
 
@@ -100,6 +114,10 @@ describe("Import/Export", () => {
       const moods = mockDb.__getMoods();
       expect(moods).toHaveLength(1);
       expect(moods[0].mood).toBe(7);
+      expect(moods[0].photos_json).toBe('["file:///photo.jpg"]');
+      expect(moods[0].location_json).toBe('{"latitude":48.2,"longitude":16.37,"name":"Vienna"}');
+      expect(moods[0].voice_memos_json).toBe('["file:///memo.m4a"]');
+      expect(moods[0].based_on_entry_id).toBe(3);
     });
 
     it("links emotions during import", async () => {
@@ -265,6 +283,10 @@ describe("Import/Export", () => {
         emotions: '[{"name":"Happy","category":"positive"}]',
         context_tags: '["work","meeting"]',
         energy: 8,
+        photos_json: '["file:///photo.jpg"]',
+        location_json: '{"latitude":48.2,"longitude":16.37,"name":"Vienna"}',
+        voice_memos_json: '["file:///memo.m4a"]',
+        based_on_entry_id: 5,
       });
 
       // Export
@@ -282,6 +304,10 @@ describe("Import/Export", () => {
       expect(moods[0].note).toBe("Great day");
       expect(moods[0].timestamp).toBe(1705320000000);
       expect(moods[0].energy).toBe(8);
+      expect(moods[0].photos_json).toBe('["file:///photo.jpg"]');
+      expect(moods[0].location_json).toBe('{"latitude":48.2,"longitude":16.37,"name":"Vienna"}');
+      expect(moods[0].voice_memos_json).toBe('["file:///memo.m4a"]');
+      expect(moods[0].based_on_entry_id).toBe(5);
     });
 
     it("handles empty data gracefully", async () => {

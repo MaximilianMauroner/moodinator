@@ -1,9 +1,9 @@
 import { useCallback } from "react";
-import { deleteMood, insertMoodEntry } from "@db/db";
 import { Toast } from "toastify-react-native";
 import type { MoodEntry } from "@db/types";
 import type { SwipeDirection } from "@/types/mood";
 import { haptics } from "@/lib/haptics";
+import { moodService } from "@/services/moodService";
 
 type MoodsSetter =
   | React.Dispatch<React.SetStateAction<MoodEntry[]>>
@@ -28,7 +28,7 @@ export function useMoodItemActions({
   const handleDeleteMood = useCallback(
     async (mood: MoodEntry) => {
       haptics.warning(); // Haptic feedback for delete action
-      await deleteMood(mood.id);
+      await moodService.delete(mood.id);
       setMoods((prev) => prev.filter((m) => m.id !== mood.id));
       Toast.show({
         type: "success",
@@ -40,13 +40,17 @@ export function useMoodItemActions({
         onPress: async () => {
           if (mood) {
             haptics.success(); // Haptic feedback for undo/restore
-            const crmood = await insertMoodEntry({
+            const crmood = await moodService.create({
               mood: mood.mood,
               note: mood.note,
-              timestamp: new Date(mood.timestamp).getTime(),
+              timestamp: mood.timestamp,
               emotions: mood.emotions,
               contextTags: mood.contextTags,
               energy: mood.energy,
+              photos: mood.photos,
+              location: mood.location,
+              voiceMemos: mood.voiceMemos,
+              basedOnEntryId: mood.basedOnEntryId,
             });
 
             setMoods((prev) => {

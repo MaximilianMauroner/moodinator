@@ -35,7 +35,7 @@ export const MoodButtonsCompact: React.FC<MoodButtonsCompactProps> = ({
   const renderMoodButton = (mood: typeof moodData[0]) => (
     <HapticTab
       key={mood.value}
-      className="flex-1 items-center justify-center py-3.5 mx-1 rounded-2xl"
+      className="flex-1 items-center justify-center py-2.5 mx-1 rounded-2xl"
       style={{
         backgroundColor: mood.bgHex || get("surfaceAlt"),
         shadowColor: isDark ? "#000" : mood.textHex || colors.sand.text.light,
@@ -52,7 +52,7 @@ export const MoodButtonsCompact: React.FC<MoodButtonsCompactProps> = ({
       accessibilityHint={getMoodButtonHint()}
     >
       <Text
-        className="text-2xl font-bold mb-0.5"
+        className="text-xl font-bold mb-0.5"
         style={{
           color: mood.textHex || (isDark ? colors.sand.text.dark : colors.sand.text.light),
           fontVariant: ["tabular-nums"],
@@ -61,7 +61,7 @@ export const MoodButtonsCompact: React.FC<MoodButtonsCompactProps> = ({
         {mood.value}
       </Text>
       <Text
-        className="text-[9px] font-semibold text-center tracking-wide"
+        className="text-[8px] font-semibold text-center tracking-wide"
         style={{ color: mood.textHex || (isDark ? colors.sand.text.dark : colors.sand.text.light), opacity: 0.85 }}
         numberOfLines={1}
       >
@@ -71,9 +71,9 @@ export const MoodButtonsCompact: React.FC<MoodButtonsCompactProps> = ({
   );
 
   return (
-    <View className="mb-4">
+    <View className="mb-3">
       {/* Organic divider with question */}
-      <View className="flex-row items-center justify-center mb-4">
+      <View className="flex-row items-center justify-center mb-3">
         <View
           className="h-px flex-1"
           style={{ backgroundColor: get("border") }}
@@ -91,7 +91,7 @@ export const MoodButtonsCompact: React.FC<MoodButtonsCompactProps> = ({
       </View>
 
       {/* Button grid */}
-      <View className="gap-2.5">
+      <View className="gap-2">
         <View className="flex-row">
           {firstRowMoods.map(renderMoodButton)}
         </View>
@@ -104,7 +104,7 @@ export const MoodButtonsCompact: React.FC<MoodButtonsCompactProps> = ({
       </View>
 
       {/* Organic gradient scale */}
-      <View className="mt-4 mx-2">
+      <View className="mt-3 mx-2">
         <View
           className="flex-row h-1 rounded-full overflow-hidden"
           style={{ backgroundColor: get("surfaceAlt") }}
