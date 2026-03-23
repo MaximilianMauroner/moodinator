@@ -27,6 +27,7 @@ export function SettingsScreen() {
     try {
       const moods = await getAllMoods();
       setEntryCount(moods.length);
+      setDaysTracking(0);
       if (moods.length > 0) {
         const uniqueDays = new Set(
           moods.map((mood) => {

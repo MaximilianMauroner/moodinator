@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from "react";
-import { View, Text, Pressable, useWindowDimensions, FlatList, ViewToken } from "react-native";
+import { View, Text, Pressable, useWindowDimensions, FlatList, NativeScrollEvent, NativeSyntheticEvent } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Animated, {
   useAnimatedStyle,
@@ -22,39 +22,37 @@ export function OnboardingScreen() {
 
   const isLastPage = currentIndex === onboardingPages.length - 1;
 
-  const onViewableItemsChanged = useCallback(
-    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
-      if (viewableItems.length > 0 && viewableItems[0].index !== null) {
-        const newIndex = viewableItems[0].index;
-        if (newIndex !== currentIndex) {
-          haptics.pageChange();
-          setCurrentIndex(newIndex);
-        }
+  const handleScrollEnd = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const newIndex = Math.round(event.nativeEvent.contentOffset.x / width);
+
+      if (newIndex !== currentIndex) {
+        haptics.pageChange();
+        setCurrentIndex(newIndex);
       }
     },
-    [currentIndex]
+    [currentIndex, width]
   );
-
-  const viewabilityConfig = useRef({
-    viewAreaCoveragePercentThreshold: 50,
-  }).current;
 
   const handleNext = useCallback(() => {
     if (isLastPage) {
       haptics.success();
-      complete();
+      void complete();
     } else {
+      const nextIndex = currentIndex + 1;
+
       haptics.light();
-      flatListRef.current?.scrollToIndex({
-        index: currentIndex + 1,
+      setCurrentIndex(nextIndex);
+      flatListRef.current?.scrollToOffset({
+        offset: nextIndex * width,
         animated: true,
       });
     }
-  }, [currentIndex, isLastPage, complete]);
+  }, [currentIndex, isLastPage, complete, width]);
 
   const handleSkip = useCallback(() => {
     haptics.light();
-    complete();
+    void complete();
   }, [complete]);
 
   const buttonAnimatedStyle = useAnimatedStyle(() => ({
@@ -98,8 +96,7 @@ export function OnboardingScreen() {
         pagingEnabled
         showsHorizontalScrollIndicator={false}
         bounces={false}
-        onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={viewabilityConfig}
+        onMomentumScrollEnd={handleScrollEnd}
         renderItem={({ item, index }) => (
           <OnboardingPage page={item} isActive={index === currentIndex} />
         )}

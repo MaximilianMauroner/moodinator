@@ -215,6 +215,41 @@ export async function getNotificationSettings(): Promise<{ enabled: boolean; hou
     };
 }
 
+async function getLegacyNotificationSettings(): Promise<{
+    exists: boolean;
+    enabled: boolean;
+    hour: number;
+    minute: number;
+}> {
+    const enabled = await AsyncStorage.getItem(NOTIFICATIONS_ENABLED_KEY);
+    const timeData = await AsyncStorage.getItem(NOTIFICATION_TIME_KEY);
+    const scheduledId = await AsyncStorage.getItem(NOTIFICATION_SCHEDULED_ID_KEY);
+
+    let hour = 20;
+    let minute = 0;
+
+    if (timeData) {
+        try {
+            const parsed = JSON.parse(timeData);
+            if (typeof parsed?.hour === "number") {
+                hour = parsed.hour;
+            }
+            if (typeof parsed?.minute === "number") {
+                minute = parsed.minute;
+            }
+        } catch {
+            // Ignore malformed legacy values and fall back to defaults.
+        }
+    }
+
+    return {
+        exists: enabled !== null || timeData !== null || scheduledId !== null,
+        enabled: enabled !== "false",
+        hour,
+        minute,
+    };
+}
+
 // New functions for managing multiple notifications
 export async function getAllNotifications(): Promise<NotificationConfig[]> {
     try {
@@ -223,8 +258,8 @@ export async function getAllNotifications(): Promise<NotificationConfig[]> {
             return JSON.parse(stored);
         }
         // Migrate from old single notification if it exists
-        const oldSettings = await getNotificationSettings();
-        if (oldSettings.enabled) {
+        const oldSettings = await getLegacyNotificationSettings();
+        if (oldSettings.exists && oldSettings.enabled) {
             const migrated: NotificationConfig = {
                 id: 'migrated-1',
                 title: MOOD_REMINDER_TITLE,
@@ -250,6 +285,7 @@ export async function saveAllNotifications(notifications: NotificationConfig[]):
         await rescheduleAllNotifications(notifications);
     } catch (error) {
         console.error('Failed to save notifications:', error);
+        throw error;
     }
 }
 
@@ -272,6 +308,7 @@ async function rescheduleAllNotifications(notifications: NotificationConfig[]): 
     }
 
     // Schedule all enabled notifications
+    const schedulingErrors: string[] = [];
     for (const notification of notifications) {
         if (notification.enabled) {
             try {
@@ -291,12 +328,19 @@ async function rescheduleAllNotifications(notifications: NotificationConfig[]): 
                 notification.scheduledId = id;
             } catch (error) {
                 console.error(`Failed to schedule notification ${notification.id}:`, error);
+                schedulingErrors.push(notification.id);
             }
         }
     }
 
     // Save updated scheduled IDs
     await AsyncStorage.setItem(NOTIFICATIONS_LIST_KEY, JSON.stringify(notifications));
+
+    if (schedulingErrors.length > 0) {
+        throw new Error(
+            `Failed to schedule ${schedulingErrors.length} notification${schedulingErrors.length === 1 ? "" : "s"}`
+        );
+    }
 }
 
 export async function addNotification(notification: Omit<NotificationConfig, 'id' | 'scheduledId'>): Promise<NotificationConfig> {

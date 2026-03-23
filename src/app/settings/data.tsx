@@ -38,12 +38,12 @@ export default function DataSettingsScreen() {
   const handleManualBackup = useCallback(async () => {
     try {
       setLoading("backup");
-      const backupUri = await createBackup();
-      if (backupUri) {
+      const backupResult = await createBackup();
+      if (backupResult.success) {
         await loadBackupInfo();
         Alert.alert("Backup Created", "Weekly backup created successfully.");
       } else {
-        Alert.alert("Backup Failed", "Could not create backup.");
+        Alert.alert("Backup Failed", backupResult.error);
       }
     } catch (error) {
       Alert.alert("Backup Error", "Failed to create backup.");
@@ -81,8 +81,19 @@ export default function DataSettingsScreen() {
       const result = await DocumentPicker.getDocumentAsync({ type: "application/json" });
       if (result.canceled) return;
       const fileContent = await FileSystem.readAsStringAsync(result.assets[0].uri);
-      const importedCount = await importMoods(fileContent);
-      Alert.alert("Import Successful", `Successfully imported ${importedCount} mood entries.`);
+      const importResult = await importMoods(fileContent);
+      const summary = [
+        `Imported ${importResult.imported} entr${importResult.imported === 1 ? "y" : "ies"}.`,
+        importResult.skipped > 0
+          ? `Skipped ${importResult.skipped} invalid entr${importResult.skipped === 1 ? "y" : "ies"}.`
+          : null,
+        importResult.errors.length > 0
+          ? importResult.errors.slice(0, 2).join("\n")
+          : null,
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+      Alert.alert("Import Successful", summary);
     } catch (error) {
       Alert.alert("Import Error", "Failed to import mood data.");
       console.error(error);

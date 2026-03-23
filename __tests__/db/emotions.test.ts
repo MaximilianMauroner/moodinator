@@ -18,6 +18,7 @@ import {
   updateEmotion,
   deleteEmotion,
   upsertEmotionCategory,
+  linkEmotionsToMood,
 } from "../../db/moods/emotions";
 import type { Emotion } from "../../db/types";
 
@@ -159,17 +160,12 @@ describe("Emotions", () => {
 });
 
 describe("linkEmotionsToMood", () => {
-  // Re-import to get fresh module with mocks
   beforeEach(() => {
     mockDb.__reset();
     jest.clearAllMocks();
   });
 
   it("clears existing links before adding new ones", async () => {
-    // This test verifies the linkEmotionsToMood function clears existing
-    // mood_emotions entries before inserting new ones
-    const { linkEmotionsToMood } = await import("../../db/moods/emotions");
-
     await linkEmotionsToMood(mockDb as any, 1, [
       { name: "Happy", category: "positive" },
     ]);
@@ -182,8 +178,6 @@ describe("linkEmotionsToMood", () => {
   });
 
   it("creates emotion entries and links them", async () => {
-    const { linkEmotionsToMood } = await import("../../db/moods/emotions");
-
     await linkEmotionsToMood(mockDb as any, 1, [
       { name: "Happy", category: "positive" },
       { name: "Excited", category: "positive" },
@@ -197,8 +191,6 @@ describe("linkEmotionsToMood", () => {
   });
 
   it("handles empty emotions array", async () => {
-    const { linkEmotionsToMood } = await import("../../db/moods/emotions");
-
     await linkEmotionsToMood(mockDb as any, 1, []);
 
     // Should still clear existing links
