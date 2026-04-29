@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState } from "react";
 import {
   Pressable,
   Text,
@@ -6,9 +6,14 @@ import {
   View,
   Modal,
   ScrollView,
-  Animated,
   useWindowDimensions,
 } from "react-native";
+import Animated, {
+  useSharedValue,
+  withTiming,
+  withSpring,
+  Easing,
+} from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
 import { useThemeColors, colors } from "@/constants/colors";
 import { haptics } from "@/lib/haptics";
@@ -49,7 +54,11 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
   const [noEntry, setNoEntry] = useState(false);
   const [previewEntry, setPreviewEntry] = useState<MoodEntry | null>(null);
   const [showPreview, setShowPreview] = useState(false);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  // Reanimated shared values for preview modal
+  const overlayOpacity = useSharedValue(0);
+  const cardScale = useSharedValue(0.92);
+  const cardOpacity = useSharedValue(0);
 
   const fetchLastEntry = async (): Promise<MoodEntry | null> => {
     try {
@@ -92,11 +101,9 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
       if (lastEntry) {
         setPreviewEntry(lastEntry);
         setShowPreview(true);
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        }).start();
+        overlayOpacity.value = withTiming(1, { duration: 200, easing: Easing.out(Easing.cubic) });
+        cardScale.value = withSpring(1, { damping: 18, stiffness: 300 });
+        cardOpacity.value = withTiming(1, { duration: 220, easing: Easing.out(Easing.cubic) });
       } else {
         setNoEntry(true);
         haptics.warning();
@@ -110,14 +117,15 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
   };
 
   const handleClosePreview = () => {
-    Animated.timing(fadeAnim, {
-      toValue: 0,
-      duration: 150,
-      useNativeDriver: true,
-    }).start(() => {
+    overlayOpacity.value = withTiming(0, { duration: 160, easing: Easing.in(Easing.cubic) });
+    cardScale.value = withTiming(0.93, { duration: 150, easing: Easing.in(Easing.cubic) });
+    cardOpacity.value = withTiming(0, { duration: 150, easing: Easing.in(Easing.cubic) });
+    setTimeout(() => {
       setShowPreview(false);
       setPreviewEntry(null);
-    });
+      // Reset for next open
+      cardScale.value = 0.92;
+    }, 170);
   };
 
   const handleUseEntry = () => {
@@ -206,25 +214,30 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
         animationType="none"
         onRequestClose={handleClosePreview}
       >
-        <Pressable
-          className="flex-1 justify-center items-center"
-          style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
-          onPress={handleClosePreview}
+        <Animated.View
+          style={[
+            {
+              flex: 1,
+              justifyContent: "center",
+              alignItems: "center",
+              backgroundColor: "rgba(0,0,0,0.5)",
+              opacity: overlayOpacity,
+            },
+          ]}
         >
+          <Pressable
+            style={{ flex: 1, width: "100%", justifyContent: "center", alignItems: "center" }}
+            onPress={handleClosePreview}
+          >
           <Animated.View
-            style={{
-              opacity: fadeAnim,
-              transform: [
-                {
-                  scale: fadeAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0.9, 1],
-                  }),
-                },
-              ],
-              width: windowWidth - 48,
-              maxWidth: 360,
-            }}
+            style={[
+              {
+                width: windowWidth - 48,
+                maxWidth: 360,
+                opacity: cardOpacity,
+                transform: [{ scale: cardScale }],
+              },
+            ]}
           >
             <Pressable
               className="rounded-2xl overflow-hidden"
@@ -479,7 +492,8 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
               )}
             </Pressable>
           </Animated.View>
-        </Pressable>
+          </Pressable>
+        </Animated.View>
       </Modal>
     </>
   );

@@ -1,5 +1,11 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { View, Text, Pressable } from "react-native";
+import Animated, {
+    useSharedValue,
+    withSpring,
+    FadeIn,
+    FadeOut,
+} from "react-native-reanimated";
 import { useThemeColors } from "@/constants/colors";
 
 interface EnergySliderProps {
@@ -21,19 +27,18 @@ const ENERGY_LABELS: Record<number, string> = {
     10: "Wired",
 };
 
-// Segment fill colors — cool-to-warm gradient across the energy range
 const FILL_COLORS_LIGHT = [
-    "#B8CDD5", // 0 drained — cool muted blue
+    "#B8CDD5",
     "#AECAD3",
     "#A8C5D0",
-    "#B8C8BA", // 3 — starts warming
+    "#B8C8BA",
     "#C8BFA0",
-    "#BDA77D", // 5 moderate — sand
+    "#BDA77D",
     "#D4A574",
-    "#E09B5A", // 7
+    "#E09B5A",
     "#E08860",
     "#D47845",
-    "#C47040", // 10 wired — warm amber
+    "#C47040",
 ];
 
 const FILL_COLORS_DARK = [
@@ -50,6 +55,69 @@ const FILL_COLORS_DARK = [
     "#7D4528",
 ];
 
+// ─── Individual animated segment ────────────────────────────────────────────
+const EnergySegment: React.FC<{
+    index: number;
+    value: number | null;
+    fillColor: string;
+    emptyColorDark: string;
+    emptyColorLight: string;
+    isDark: boolean;
+    onPress: () => void;
+}> = ({ index, value, fillColor, emptyColorDark, emptyColorLight, isDark, onPress }) => {
+    const isFilled = value !== null && index <= value;
+    const isSelected = value === index;
+
+    const scaleY = useSharedValue(isSelected ? 1.12 : 1);
+
+    useEffect(() => {
+        scaleY.value = withSpring(isSelected ? 1.15 : 1, {
+            damping: 16,
+            stiffness: 420,
+            overshootClamping: true,
+        });
+    }, [isSelected]);
+
+    return (
+        <Animated.View
+            style={[
+                {
+                    flex: 1,
+                    height: 32,
+                    borderRadius: 4,
+                    backgroundColor: isFilled
+                        ? fillColor
+                        : isDark
+                        ? emptyColorDark
+                        : emptyColorLight,
+                    borderWidth: isSelected ? 2 : 0,
+                    borderColor: isSelected ? fillColor : "transparent",
+                    shadowColor: isSelected ? fillColor : "transparent",
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: isDark ? 0.4 : 0.3,
+                    shadowRadius: 4,
+                    elevation: isSelected ? 3 : 0,
+                    transform: [{ scaleY }],
+                },
+            ]}
+        >
+            <Pressable
+                onPress={onPress}
+                onPressIn={() => {
+                    scaleY.value = withSpring(0.9, { damping: 18, stiffness: 500 });
+                }}
+                onPressOut={() => {
+                    scaleY.value = withSpring(isSelected ? 1.15 : 1, { damping: 14, stiffness: 380 });
+                }}
+                style={{ flex: 1 }}
+                accessibilityRole="button"
+                accessibilityLabel={`Energy level ${index}: ${ENERGY_LABELS[index]}`}
+                accessibilityState={{ selected: isSelected }}
+            />
+        </Animated.View>
+    );
+};
+
 export const EnergySlider: React.FC<EnergySliderProps> = ({ value, onChange }) => {
     const { isDark, get } = useThemeColors();
     const fillColors = isDark ? FILL_COLORS_DARK : FILL_COLORS_LIGHT;
@@ -58,38 +126,18 @@ export const EnergySlider: React.FC<EnergySliderProps> = ({ value, onChange }) =
         <View>
             {/* Segmented bar */}
             <View className="flex-row gap-1 mb-2">
-                {Array.from({ length: 11 }, (_, i) => {
-                    const isFilled = value !== null && i <= value;
-                    const isSelected = value === i;
-
-                    return (
-                        <Pressable
-                            key={i}
-                            onPress={() => onChange(value === i ? null : i)}
-                            className="flex-1 rounded items-center justify-center"
-                            style={{
-                                height: 32,
-                                backgroundColor: isFilled
-                                    ? fillColors[i]
-                                    : isDark
-                                    ? "rgba(61, 53, 42, 0.25)"
-                                    : "rgba(229, 217, 191, 0.25)",
-                                borderWidth: isSelected ? 2 : 0,
-                                borderColor: isSelected ? fillColors[i] : "transparent",
-                                // Selected segment slightly taller for emphasis
-                                transform: [{ scaleY: isSelected ? 1.12 : 1 }],
-                                shadowColor: isSelected ? fillColors[i] : "transparent",
-                                shadowOffset: { width: 0, height: 2 },
-                                shadowOpacity: isDark ? 0.4 : 0.3,
-                                shadowRadius: 4,
-                                elevation: isSelected ? 3 : 0,
-                            }}
-                            accessibilityRole="button"
-                            accessibilityLabel={`Energy level ${i}: ${ENERGY_LABELS[i]}`}
-                            accessibilityState={{ selected: isSelected }}
-                        />
-                    );
-                })}
+                {Array.from({ length: 11 }, (_, i) => (
+                    <EnergySegment
+                        key={i}
+                        index={i}
+                        value={value}
+                        fillColor={fillColors[i]}
+                        emptyColorDark="rgba(61, 53, 42, 0.25)"
+                        emptyColorLight="rgba(229, 217, 191, 0.25)"
+                        isDark={isDark}
+                        onPress={() => onChange(value === i ? null : i)}
+                    />
+                ))}
             </View>
 
             {/* Scale labels + current value */}
@@ -105,7 +153,9 @@ export const EnergySlider: React.FC<EnergySliderProps> = ({ value, onChange }) =
                 </Text>
 
                 {value !== null ? (
-                    <Text
+                    <Animated.Text
+                        key={value}
+                        entering={FadeIn.duration(160)}
                         style={{
                             fontSize: 12,
                             fontWeight: "600",
@@ -113,7 +163,7 @@ export const EnergySlider: React.FC<EnergySliderProps> = ({ value, onChange }) =
                         }}
                     >
                         {ENERGY_LABELS[value]} · {value}/10
-                    </Text>
+                    </Animated.Text>
                 ) : (
                     <Text
                         style={{
@@ -139,31 +189,36 @@ export const EnergySlider: React.FC<EnergySliderProps> = ({ value, onChange }) =
 
             {/* Clear */}
             {value !== null && (
-                <Pressable
-                    onPress={() => onChange(null)}
-                    className="self-center px-4 py-1.5 rounded-full"
-                    style={{
-                        backgroundColor: isDark
-                            ? "rgba(42, 37, 32, 0.6)"
-                            : "rgba(245, 241, 232, 0.9)",
-                        borderWidth: 1,
-                        borderColor: isDark
-                            ? "rgba(61, 53, 42, 0.4)"
-                            : "rgba(229, 217, 191, 0.7)",
-                    }}
-                    accessibilityRole="button"
-                    accessibilityLabel="Clear energy level"
+                <Animated.View
+                    entering={FadeIn.duration(160)}
+                    exiting={FadeOut.duration(120)}
                 >
-                    <Text
+                    <Pressable
+                        onPress={() => onChange(null)}
+                        className="self-center px-4 py-1.5 rounded-full"
                         style={{
-                            fontSize: 11,
-                            fontWeight: "500",
-                            color: get("textMuted"),
+                            backgroundColor: isDark
+                                ? "rgba(42, 37, 32, 0.6)"
+                                : "rgba(245, 241, 232, 0.9)",
+                            borderWidth: 1,
+                            borderColor: isDark
+                                ? "rgba(61, 53, 42, 0.4)"
+                                : "rgba(229, 217, 191, 0.7)",
                         }}
+                        accessibilityRole="button"
+                        accessibilityLabel="Clear energy level"
                     >
-                        Clear
-                    </Text>
-                </Pressable>
+                        <Text
+                            style={{
+                                fontSize: 11,
+                                fontWeight: "500",
+                                color: get("textMuted"),
+                            }}
+                        >
+                            Clear
+                        </Text>
+                    </Pressable>
+                </Animated.View>
             )}
         </View>
     );
