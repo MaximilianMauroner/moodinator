@@ -1,9 +1,20 @@
 import { BottomTabBarButtonProps } from "@react-navigation/bottom-tabs";
 import { PlatformPressable } from "@react-navigation/elements";
 import { Platform, Vibration } from "react-native";
-import ReactNativeHapticFeedback, {
-  HapticFeedbackTypes,
-} from "react-native-haptic-feedback";
+
+// Lazy-load so the app works in Expo Go (no RNHapticFeedback in the binary).
+let _hapticMod: any = null;
+function getHaptic() {
+  if (!_hapticMod) {
+    try { _hapticMod = require("react-native-haptic-feedback"); }
+    catch { _hapticMod = { default: null, HapticFeedbackTypes: {} }; }
+  }
+  return _hapticMod as { default: any; HapticFeedbackTypes: Record<string, string> };
+}
+
+const HapticFeedbackTypes = new Proxy({} as Record<string, string>, {
+  get(_t, key: string) { return getHaptic().HapticFeedbackTypes?.[key] ?? key; },
+});
 
 type HapticStyle = "selection" | "light" | "medium" | "rigid" | "soft" | "none";
 
@@ -42,7 +53,7 @@ export function HapticTab({ hapticStyle = "selection", ...props }: HapticTabProp
       const duration = vibrationDurations[hapticStyle] || 20;
       Vibration.vibrate(duration);
     } else {
-      ReactNativeHapticFeedback.trigger(hapticMap[hapticStyle], options);
+      getHaptic().default?.trigger(hapticMap[hapticStyle], options);
     }
   };
 

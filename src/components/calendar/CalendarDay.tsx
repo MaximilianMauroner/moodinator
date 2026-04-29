@@ -52,16 +52,17 @@ export function CalendarDay({
     : "Tap to view day details";
 
   return (
-    <View className="flex-1 items-center py-1">
+    <View style={{ flex: 1, alignItems: "center", paddingVertical: 2 }}>
       <Pressable
         onPress={handlePress}
         onLongPress={onLongPress ? handleLongPress : undefined}
         delayLongPress={400}
-        className="items-center justify-center"
         style={({ pressed }) => ({
           width: 44,
-          height: 44,
+          height: 40,
           borderRadius: 14,
+          alignItems: "center",
+          justifyContent: "center",
           backgroundColor: pressed
             ? isDark
               ? "rgba(91, 138, 91, 0.3)"
@@ -89,21 +90,22 @@ export function CalendarDay({
         >
           {day}
         </Text>
+      </Pressable>
 
-        {/* Multiple entries indicator dot */}
+      {/* Multiple entries indicator — outside the cell so it never overlaps the number */}
+      <View style={{ height: 7, justifyContent: "center", alignItems: "center" }}>
         {data?.hasMultiple && (
           <View
-            className="absolute bottom-1"
             style={{
-              width: 4,
-              height: 4,
-              borderRadius: 2,
-              backgroundColor: isDark ? "#F5F1E8" : "#3D352A",
-              opacity: 0.6,
+              width: 6,
+              height: 6,
+              borderRadius: 3,
+              backgroundColor: get("primary"),
+              opacity: isCurrentMonth ? 1 : 0.4,
             }}
           />
         )}
-      </Pressable>
+      </View>
     </View>
   );
 }

@@ -1,5 +1,5 @@
-import React, { useState, useRef, useCallback } from "react";
-import { View, Text, Pressable, useWindowDimensions, FlatList, NativeScrollEvent, NativeSyntheticEvent } from "react-native";
+import React, { useState, useCallback } from "react";
+import { View, Text, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Animated, {
   useAnimatedStyle,
@@ -15,24 +15,12 @@ import { onboardingPages } from "../content";
 
 export function OnboardingScreen() {
   const { isDark, get } = useThemeColors();
-  const { width } = useWindowDimensions();
   const [currentIndex, setCurrentIndex] = useState(0);
-  const flatListRef = useRef<FlatList>(null);
   const { complete } = useOnboardingStore();
 
+  const isFirstPage = currentIndex === 0;
   const isLastPage = currentIndex === onboardingPages.length - 1;
-
-  const handleScrollEnd = useCallback(
-    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const newIndex = Math.round(event.nativeEvent.contentOffset.x / width);
-
-      if (newIndex !== currentIndex) {
-        haptics.pageChange();
-        setCurrentIndex(newIndex);
-      }
-    },
-    [currentIndex, width]
-  );
+  const currentPage = onboardingPages[currentIndex];
 
   const handleNext = useCallback(() => {
     if (isLastPage) {
@@ -43,12 +31,17 @@ export function OnboardingScreen() {
 
       haptics.light();
       setCurrentIndex(nextIndex);
-      flatListRef.current?.scrollToOffset({
-        offset: nextIndex * width,
-        animated: true,
-      });
     }
-  }, [currentIndex, isLastPage, complete, width]);
+  }, [currentIndex, isLastPage, complete]);
+
+  const handleBack = useCallback(() => {
+    if (isFirstPage) return;
+
+    const previousIndex = currentIndex - 1;
+
+    haptics.light();
+    setCurrentIndex(previousIndex);
+  }, [currentIndex, isFirstPage]);
 
   const handleSkip = useCallback(() => {
     haptics.light();
@@ -65,9 +58,35 @@ export function OnboardingScreen() {
       style={{ backgroundColor: get("background") }}
       edges={["top", "bottom"]}
     >
-      {/* Skip button */}
-      {!isLastPage && (
-        <View className="absolute top-16 right-6 z-10">
+      {/* Top controls */}
+      <View className="absolute top-16 left-6 right-6 z-10 flex-row items-center justify-between">
+        {!isFirstPage ? (
+          <Pressable
+            onPress={handleBack}
+            className="flex-row items-center px-4 py-2 rounded-xl"
+            style={{
+              backgroundColor: isDark ? "rgba(42, 37, 32, 0.8)" : "rgba(245, 241, 232, 0.9)",
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Previous onboarding page"
+          >
+            <Ionicons
+              name="arrow-back"
+              size={16}
+              color={get("textMuted")}
+            />
+            <Text
+              className="text-sm font-medium ml-1"
+              style={{ color: get("textMuted") }}
+            >
+              Back
+            </Text>
+          </Pressable>
+        ) : (
+          <View />
+        )}
+
+        {!isLastPage ? (
           <Pressable
             onPress={handleSkip}
             className="px-4 py-2 rounded-xl"
@@ -84,27 +103,16 @@ export function OnboardingScreen() {
               Skip
             </Text>
           </Pressable>
-        </View>
-      )}
-
-      {/* Pages */}
-      <FlatList
-        ref={flatListRef}
-        data={onboardingPages}
-        keyExtractor={(item) => item.id}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        bounces={false}
-        onMomentumScrollEnd={handleScrollEnd}
-        renderItem={({ item, index }) => (
-          <OnboardingPage page={item} isActive={index === currentIndex} />
+        ) : (
+          <View />
         )}
-        getItemLayout={(_, index) => ({
-          length: width,
-          offset: width * index,
-          index,
-        })}
+      </View>
+
+      {/* Page */}
+      <OnboardingPage
+        key={currentPage.id}
+        page={currentPage}
+        isActive
       />
 
       {/* Bottom section */}
@@ -129,7 +137,7 @@ export function OnboardingScreen() {
               elevation: 6,
             }}
             accessibilityRole="button"
-            accessibilityLabel={isLastPage ? "Get started" : "Next page"}
+            accessibilityLabel={isLastPage ? "Get started" : "Next onboarding page"}
           >
             <Text className="text-base font-bold text-white mr-2">
               {isLastPage ? "Get Started" : "Next"}

@@ -3,7 +3,7 @@ import { View, Text, Pressable, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useColorScheme } from "nativewind";
 
-export type TimePeriod = "week" | "day" | "all";
+export type TimePeriod = "week" | "month" | "all";
 
 interface TimePeriodSelectorProps {
   value: TimePeriod;
@@ -12,7 +12,7 @@ interface TimePeriodSelectorProps {
 
 const periods: { id: TimePeriod; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { id: "week", label: "Week", icon: "calendar-outline" },
-  { id: "day", label: "Day", icon: "today-outline" },
+  { id: "month", label: "Month", icon: "calendar-number-outline" },
   { id: "all", label: "All", icon: "infinite-outline" },
 ];
 
@@ -41,7 +41,7 @@ export function TimePeriodSelector({ value, onChange }: TimePeriodSelectorProps)
             style={({ pressed }) => [
               isActive
                 ? {
-                    backgroundColor: isDark ? "#1C1916" : "#FDFCFA",
+                    backgroundColor: isDark ? "#1E1B17" : "#FDFCFA",
                   }
                 : null,
               isActive ? (isDark ? styles.activeShadowDark : styles.activeShadowLight) : null,
@@ -60,7 +60,7 @@ export function TimePeriodSelector({ value, onChange }: TimePeriodSelectorProps)
                     ? "#A8C5A8"
                     : "#5B8A5B"
                   : isDark
-                  ? "#6B5C4A"
+                  ? "#9FB39A"
                   : "#BDA77D"
               }
               style={{ marginRight: 6 }}
@@ -73,7 +73,7 @@ export function TimePeriodSelector({ value, onChange }: TimePeriodSelectorProps)
                     ? "#A8C5A8"
                     : "#5B8A5B"
                   : isDark
-                  ? "#6B5C4A"
+                  ? "#9FB39A"
                   : "#BDA77D",
               }}
             >
