@@ -35,7 +35,7 @@ export function DataSection({
 
   return (
     <>
-      <SectionHeader title="Data" icon="💾" />
+      <SectionHeader title="Data" icon="save-outline" />
       <SettingCard>
         <SettingRow
           label="Export Data"

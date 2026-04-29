@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { View, Text, Pressable } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import Animated, {
   useAnimatedStyle,
@@ -179,7 +180,7 @@ export function LockScreen() {
                     elevation: 6,
                   }}
                 >
-                  <Text className="text-5xl">🌿</Text>
+                  <Ionicons name="leaf-outline" size={48} color={isDark ? "#A8C5A8" : "#5B8A5B"} />
                 </View>
               </Animated.View>
 

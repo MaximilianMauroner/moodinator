@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { View, Text, ScrollView, Alert, TouchableOpacity, Platform, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useColorScheme } from "nativewind";
+import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { importMoods } from "@db/db";
@@ -119,9 +120,12 @@ export default function DataSettingsScreen() {
         {/* Backup status banner */}
         <View className="mx-4 mb-4 p-4 rounded-2xl bg-sage-100 dark:bg-sage-600/20">
           <View className="flex-row items-center mb-2">
-            <Text className="text-2xl mr-2">
-              {backupInfo && backupInfo.count > 0 ? "☁️" : "📦"}
-            </Text>
+            <Ionicons
+              name={backupInfo && backupInfo.count > 0 ? "cloud-done-outline" : "cube-outline"}
+              size={20}
+              color={isDark ? "#A8C5A8" : "#5B8A5B"}
+              style={{ marginRight: 8 }}
+            />
             <Text className="text-base font-bold text-sage-500 dark:text-sage-300">
               {backupInfo
                 ? backupInfo.count > 0

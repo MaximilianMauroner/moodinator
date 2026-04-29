@@ -17,6 +17,7 @@ import {
   NotificationConfig,
 } from "@/hooks/useNotifications";
 import { IconSymbol } from "@/components/ui/IconSymbol";
+import { Ionicons } from "@expo/vector-icons";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { createScreenErrorFallback } from "@/components/ScreenErrorFallback";
 import { useThemeColors } from "@/constants/colors";
@@ -191,7 +192,7 @@ function NotificationsScreenContent() {
                 className="w-20 h-20 rounded-2xl items-center justify-center mb-5"
                 style={{ backgroundColor: get("primaryBg") }}
               >
-                <Text className="text-4xl">🔔</Text>
+                <Ionicons name="notifications-outline" size={36} color={get("primary")} />
               </View>
               <Text
                 className="text-lg font-semibold text-center mb-2"
@@ -336,7 +337,7 @@ function NotificationsScreenContent() {
               className="mt-6 rounded-2xl p-4 flex-row items-start"
               style={{ backgroundColor: get("surfaceAlt") }}
             >
-              <Text className="text-lg mr-3">💡</Text>
+              <Ionicons name="bulb-outline" size={20} color={get("primary")} style={{ marginRight: 12 }} />
               <View className="flex-1">
                 <Text
                   className="text-sm font-medium mb-1"

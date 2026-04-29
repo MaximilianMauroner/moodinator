@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import { View, Text, AppState, AppStateStatus, ActivityIndicator } from "react-native";
 import { Stack } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 // import { registerBackgroundBackupTask } from "@db/backgroundBackup";
 import { LockScreen, useAppLockStore } from "@/features/appLock";
 import { OnboardingScreen, useOnboardingStore } from "@/features/onboarding";
@@ -15,7 +16,7 @@ function AppBootSplash() {
   return (
     <View className="flex-1 bg-white dark:bg-slate-950 justify-center items-center px-8">
       <View className="w-20 h-20 rounded-3xl items-center justify-center mb-5 bg-emerald-50 dark:bg-emerald-900/20">
-        <Text className="text-3xl">🌿</Text>
+        <Ionicons name="leaf-outline" size={36} color="#5B8A5B" />
       </View>
       <Text className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
         Moodinator

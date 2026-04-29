@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useNavigation } from "expo-router";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import type { ErrorFallbackProps } from "./ErrorBoundary";
@@ -58,7 +59,7 @@ export function ScreenErrorFallback({
             className="w-16 h-16 rounded-2xl items-center justify-center self-center mb-4"
             style={{ backgroundColor: isDark ? "#3D2822" : "#FDE8E4" }}
           >
-            <Text className="text-3xl">⚠️</Text>
+            <Ionicons name="warning-outline" size={30} color={isDark ? "#F5A899" : "#C75441"} />
           </View>
 
           {/* Title */}

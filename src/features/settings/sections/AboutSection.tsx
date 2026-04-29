@@ -39,7 +39,7 @@ export function AboutSection() {
 
   return (
     <>
-      <SectionHeader title="About" icon="📖" />
+      <SectionHeader title="About" icon="book-outline" />
       <SettingCard>
         <SettingRow
           label="Version"

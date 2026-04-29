@@ -323,7 +323,7 @@ export default function TherapyExportScreen() {
         {/* Info banner */}
         <View className="mx-4 mb-4 p-4 rounded-2xl bg-dusk-100 dark:bg-dusk-800">
           <View className="flex-row items-center mb-2">
-            <Text className="text-2xl mr-2">📋</Text>
+            <Ionicons name="clipboard-outline" size={20} color={isDark ? "#C4BBCF" : "#847596"} style={{ marginRight: 8 }} />
             <Text className="text-base font-bold text-dusk-500 dark:text-dusk-300">
               Share what matters
             </Text>

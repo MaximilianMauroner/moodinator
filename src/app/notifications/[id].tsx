@@ -21,6 +21,7 @@ import {
   NotificationConfig,
 } from "@/hooks/useNotifications";
 import { IconSymbol } from "@/components/ui/IconSymbol";
+import { Ionicons } from "@expo/vector-icons";
 import { useThemeColors } from "@/constants/colors";
 import { haptics } from "@/lib/haptics";
 
@@ -132,11 +133,11 @@ export default function NotificationDetailScreen() {
     });
   };
 
-  const getTimeOfDayEmoji = () => {
-    if (hour >= 5 && hour < 12) return "🌅";
-    if (hour >= 12 && hour < 17) return "☀️";
-    if (hour >= 17 && hour < 21) return "🌆";
-    return "🌙";
+  const getTimeOfDayIcon = (): keyof typeof Ionicons.glyphMap => {
+    if (hour >= 5 && hour < 12) return "partly-sunny-outline";
+    if (hour >= 12 && hour < 17) return "sunny-outline";
+    if (hour >= 17 && hour < 21) return "cloudy-night-outline";
+    return "moon-outline";
   };
 
   if (loading) {
@@ -224,7 +225,7 @@ export default function NotificationDetailScreen() {
                     className="w-10 h-10 rounded-xl items-center justify-center mr-3"
                     style={{ backgroundColor: get("primaryBg") }}
                   >
-                    <Text className="text-lg">🔔</Text>
+                    <Ionicons name="notifications-outline" size={20} color={get("primary")} />
                   </View>
                   <View className="flex-1">
                     <Text
@@ -317,7 +318,7 @@ export default function NotificationDetailScreen() {
                 }}
               >
                 <View className="flex-row items-center">
-                  <Text className="text-2xl mr-3">{getTimeOfDayEmoji()}</Text>
+                  <Ionicons name={getTimeOfDayIcon()} size={24} color={get("text")} style={{ marginRight: 12 }} />
                   <Text
                     className="text-xl font-bold"
                     style={{ color: get("text") }}

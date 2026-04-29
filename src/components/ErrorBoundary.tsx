@@ -1,5 +1,6 @@
 import React, { Component, ErrorInfo, ReactNode } from "react";
 import { View, Text, Pressable } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
 export interface ErrorBoundaryProps {
   children: ReactNode;
@@ -44,7 +45,7 @@ function DefaultErrorFallback({ error, resetError }: ErrorFallbackProps) {
           marginBottom: 16,
         }}
       >
-        <Text style={{ fontSize: 28 }}>⚠️</Text>
+        <Ionicons name="warning-outline" size={28} color="#C75441" />
       </View>
       <Text
         style={{
