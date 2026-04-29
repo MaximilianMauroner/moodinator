@@ -1,11 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { View, Text, ScrollView, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import {
-  updateEmotionCategoryInMoods,
-  removeEmotionFromMoods,
-  getEmotionNamesFromMoods,
-} from "@db/db";
 import { useSettingsStore } from "@/shared/state/settingsStore";
 import { DEFAULT_EMOTIONS } from "@/lib/entrySettings";
 import type { Emotion } from "@db/types";
@@ -13,6 +8,7 @@ import { SettingsPageHeader } from "@/features/settings/components/SettingsPageH
 import { SettingsSection } from "@/features/settings/components/SettingsSection";
 import { SettingRow } from "@/features/settings/components/SettingRow";
 import { EmotionListEditor } from "@/features/settings/components/EmotionListEditor";
+import { moodService } from "@/services/moodService";
 
 export default function EmotionsSettingsScreen() {
 
@@ -52,13 +48,10 @@ export default function EmotionsSettingsScreen() {
       if (!changed) return;
       await setEmotions(updated);
       try {
-        const result = await updateEmotionCategoryInMoods(name, category);
-        if (result.updated > 0) {
-          Alert.alert("Updated", `Updated ${result.updated} entries.`);
-        }
+        await moodService.updateEmotionCategory(name, category);
       } catch (error) {
-        console.error("Failed to update mood entries for emotion:", error);
-        Alert.alert("Update Failed", "Emotion category updated but existing entries could not be updated.");
+        console.error("Failed to update emotion option:", error);
+        Alert.alert("Update Failed", "Emotion category could not be updated.");
       }
     },
     [emotions, setEmotions]
@@ -66,26 +59,18 @@ export default function EmotionsSettingsScreen() {
 
   const handleRemoveEmotion = useCallback(
     async (value: string) => {
-      Alert.alert("Remove Emotion", "Remove from settings only, or also past entries?", [
+      Alert.alert("Remove Emotion", "Remove this emotion from future selection? Past Mood Entries will keep their original emotion snapshots.", [
         { text: "Cancel", style: "cancel" },
         {
-          text: "Settings Only",
-          onPress: async () => {
-            const updated = emotions.filter((item) => item.name !== value);
-            await setEmotions(updated.length > 0 ? updated : DEFAULT_EMOTIONS);
-          },
-        },
-        {
-          text: "Also Past Entries",
+          text: "Remove",
           style: "destructive",
           onPress: async () => {
             const updated = emotions.filter((item) => item.name !== value);
             await setEmotions(updated.length > 0 ? updated : DEFAULT_EMOTIONS);
             try {
-              const result = await removeEmotionFromMoods(value);
-              Alert.alert("Updated", `Removed from ${result.updated} entries.`);
+              await moodService.removeEmotion(value);
             } catch (error) {
-              console.error("Failed to remove emotion from moods:", error);
+              console.error("Failed to remove emotion option:", error);
             }
           },
         },
@@ -96,7 +81,7 @@ export default function EmotionsSettingsScreen() {
 
   const handleImportFromEntries = useCallback(async () => {
     try {
-      const names = await getEmotionNamesFromMoods();
+      const names = await moodService.getEmotionNames();
       if (names.length === 0) {
         Alert.alert("No Emotions Found", "No emotions were found in past entries.");
         return;
