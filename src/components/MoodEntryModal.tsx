@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useState, useCallback, useRef } from "react";
 import {
     Modal,
     View,
@@ -9,6 +9,15 @@ import {
     Alert,
     useWindowDimensions,
 } from "react-native";
+import Animated, {
+    useSharedValue,
+    withTiming,
+    withSpring,
+    withSequence,
+    runOnJS,
+    Easing,
+    FadeIn,
+} from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
 import { moodScale } from "@/constants/moodScale";
 import { HapticTab } from "./HapticTab";
@@ -127,45 +136,76 @@ const MoodAdjustRow: React.FC<{
     const canDecrease = mood > 0;
     const canIncrease = mood < 10;
 
+    // Spring bump on mood change
+    const pillScale = useSharedValue(1);
+    const prevMood = useRef(mood);
+    useEffect(() => {
+        if (prevMood.current !== mood) {
+            prevMood.current = mood;
+            pillScale.value = withSequence(
+                withSpring(1.1, { damping: 10, stiffness: 500, mass: 0.6 }),
+                withSpring(1, { damping: 18, stiffness: 350 })
+            );
+        }
+    }, [mood]);
+
+    // Press feedback for chevron buttons
+    const decScale = useSharedValue(1);
+    const incScale = useSharedValue(1);
+
     return (
         <View className="flex-row items-center justify-center gap-3 py-2">
             {/* Decrease (better) */}
-            <HapticTab
-                onPress={() => canDecrease && onAdjust(mood - 1)}
-                disabled={!canDecrease}
-                className="w-9 h-9 rounded-full items-center justify-center"
-                style={{
-                    backgroundColor: isDark
-                        ? "rgba(42, 37, 32, 0.7)"
-                        : "rgba(245, 241, 232, 0.9)",
-                    borderWidth: 1,
-                    borderColor: isDark
-                        ? "rgba(61, 53, 42, 0.4)"
-                        : "rgba(229, 217, 191, 0.8)",
-                    opacity: canDecrease ? 1 : 0.25,
-                }}
-                accessibilityLabel={`Decrease mood to ${mood - 1}`}
-                accessibilityRole="button"
-            >
-                <Ionicons
-                    name="chevron-back"
-                    size={16}
-                    color={isDark ? colors.primary.dark : colors.primary.light}
-                />
-            </HapticTab>
+            <Animated.View style={{ transform: [{ scale: decScale }] }}>
+                <HapticTab
+                    onPress={() => canDecrease && onAdjust(mood - 1)}
+                    onPressIn={() => {
+                        if (canDecrease) decScale.value = withSpring(0.88, { damping: 18, stiffness: 500 });
+                    }}
+                    onPressOut={() => {
+                        decScale.value = withSpring(1, { damping: 14, stiffness: 350 });
+                    }}
+                    disabled={!canDecrease}
+                    className="w-9 h-9 rounded-full items-center justify-center"
+                    style={{
+                        backgroundColor: isDark
+                            ? "rgba(42, 37, 32, 0.7)"
+                            : "rgba(245, 241, 232, 0.9)",
+                        borderWidth: 1,
+                        borderColor: isDark
+                            ? "rgba(61, 53, 42, 0.4)"
+                            : "rgba(229, 217, 191, 0.8)",
+                        opacity: canDecrease ? 1 : 0.25,
+                    }}
+                    accessibilityLabel={`Decrease mood to ${mood - 1}`}
+                    accessibilityRole="button"
+                >
+                    <Ionicons
+                        name="chevron-back"
+                        size={16}
+                        color={isDark ? colors.primary.dark : colors.primary.light}
+                    />
+                </HapticTab>
+            </Animated.View>
 
-            {/* Mood pill */}
-            <View
-                className="px-5 py-2 rounded-2xl items-center"
-                style={{
-                    backgroundColor: bgHex,
-                    minWidth: 120,
-                    shadowColor: textHex,
-                    shadowOffset: { width: 0, height: 3 },
-                    shadowOpacity: isDark ? 0.3 : 0.18,
-                    shadowRadius: 8,
-                    elevation: 4,
-                }}
+            {/* Mood pill — springs on change */}
+            <Animated.View
+                style={[
+                    {
+                        backgroundColor: bgHex,
+                        minWidth: 120,
+                        paddingHorizontal: 20,
+                        paddingVertical: 8,
+                        borderRadius: 16,
+                        alignItems: "center",
+                        shadowColor: textHex,
+                        shadowOffset: { width: 0, height: 3 },
+                        shadowOpacity: isDark ? 0.3 : 0.18,
+                        shadowRadius: 8,
+                        elevation: 4,
+                    },
+                    { transform: [{ scale: pillScale }] },
+                ]}
             >
                 <Text
                     style={{
@@ -188,33 +228,74 @@ const MoodAdjustRow: React.FC<{
                 >
                     {moodData.label}
                 </Text>
-            </View>
+            </Animated.View>
 
             {/* Increase (worse) */}
-            <HapticTab
-                onPress={() => canIncrease && onAdjust(mood + 1)}
-                disabled={!canIncrease}
-                className="w-9 h-9 rounded-full items-center justify-center"
-                style={{
-                    backgroundColor: isDark
-                        ? "rgba(42, 37, 32, 0.7)"
-                        : "rgba(245, 241, 232, 0.9)",
-                    borderWidth: 1,
-                    borderColor: isDark
-                        ? "rgba(61, 53, 42, 0.4)"
-                        : "rgba(229, 217, 191, 0.8)",
-                    opacity: canIncrease ? 1 : 0.25,
-                }}
-                accessibilityLabel={`Increase mood to ${mood + 1}`}
-                accessibilityRole="button"
-            >
-                <Ionicons
-                    name="chevron-forward"
-                    size={16}
-                    color={isDark ? colors.negative.text.dark : colors.negative.text.light}
-                />
-            </HapticTab>
+            <Animated.View style={{ transform: [{ scale: incScale }] }}>
+                <HapticTab
+                    onPress={() => canIncrease && onAdjust(mood + 1)}
+                    onPressIn={() => {
+                        if (canIncrease) incScale.value = withSpring(0.88, { damping: 18, stiffness: 500 });
+                    }}
+                    onPressOut={() => {
+                        incScale.value = withSpring(1, { damping: 14, stiffness: 350 });
+                    }}
+                    disabled={!canIncrease}
+                    className="w-9 h-9 rounded-full items-center justify-center"
+                    style={{
+                        backgroundColor: isDark
+                            ? "rgba(42, 37, 32, 0.7)"
+                            : "rgba(245, 241, 232, 0.9)",
+                        borderWidth: 1,
+                        borderColor: isDark
+                            ? "rgba(61, 53, 42, 0.4)"
+                            : "rgba(229, 217, 191, 0.8)",
+                        opacity: canIncrease ? 1 : 0.25,
+                    }}
+                    accessibilityLabel={`Increase mood to ${mood + 1}`}
+                    accessibilityRole="button"
+                >
+                    <Ionicons
+                        name="chevron-forward"
+                        size={16}
+                        color={isDark ? colors.negative.text.dark : colors.negative.text.light}
+                    />
+                </HapticTab>
+            </Animated.View>
         </View>
+    );
+};
+
+// ─── Animated step dot ─────────────────────────────────────────────────────
+const AnimatedDot: React.FC<{ isActive: boolean; isDark: boolean }> = ({
+    isActive,
+    isDark,
+}) => {
+    const width = useSharedValue(isActive ? 16 : 6);
+    const opacity = useSharedValue(isActive ? 1 : 0.35);
+
+    useEffect(() => {
+        width.value = withSpring(isActive ? 16 : 6, {
+            damping: 22,
+            stiffness: 380,
+            overshootClamping: true,
+        });
+        opacity.value = withTiming(isActive ? 1 : 0.35, { duration: 200 });
+    }, [isActive]);
+
+    return (
+        <Animated.View
+            style={[
+                {
+                    height: 4,
+                    borderRadius: 2,
+                    backgroundColor: isDark
+                        ? colors.primary.dark
+                        : colors.primary.light,
+                },
+                { width, opacity },
+            ]}
+        />
     );
 };
 
@@ -228,24 +309,56 @@ const StepDots: React.FC<{
     return (
         <View className="flex-row items-center justify-center gap-1.5 mt-2">
             {Array.from({ length: total }, (_, i) => (
-                <View
-                    key={i}
-                    style={{
-                        width: i === current ? 16 : 6,
-                        height: 4,
-                        borderRadius: 2,
-                        backgroundColor:
-                            i === current
-                                ? isDark
-                                    ? colors.primary.dark
-                                    : colors.primary.light
-                                : isDark
-                                ? "rgba(61, 53, 42, 0.35)"
-                                : "rgba(180, 160, 130, 0.35)",
-                    }}
-                />
+                <AnimatedDot key={i} isActive={i === current} isDark={isDark} />
             ))}
         </View>
+    );
+};
+
+// ─── Context tag chip (animated) ───────────────────────────────────────────
+const ContextTagChip: React.FC<{
+    label: string;
+    isSelected: boolean;
+    bgColor: string;
+    borderColor: string;
+    textColor: string;
+    onPress: () => void;
+}> = ({ label, isSelected, bgColor, borderColor, textColor, onPress }) => {
+    const scale = useSharedValue(isSelected ? 1.04 : 1);
+
+    useEffect(() => {
+        scale.value = withSpring(isSelected ? 1.04 : 1, {
+            damping: 20,
+            stiffness: 380,
+            overshootClamping: true,
+        });
+    }, [isSelected]);
+
+    return (
+        <Animated.View style={{ transform: [{ scale }] }}>
+            <Pressable
+                onPress={onPress}
+                onPressIn={() => {
+                    scale.value = withSpring(0.94, { damping: 20, stiffness: 500 });
+                }}
+                onPressOut={() => {
+                    scale.value = withSpring(isSelected ? 1.04 : 1, { damping: 18, stiffness: 380 });
+                }}
+                className="px-3 py-2 rounded-xl"
+                style={{
+                    backgroundColor: bgColor,
+                    borderWidth: 1,
+                    borderColor: borderColor,
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={`Context: ${label}, ${isSelected ? "selected" : "not selected"}`}
+                accessibilityState={{ selected: isSelected }}
+            >
+                <Text className="text-sm font-medium" style={{ color: textColor }}>
+                    {label}
+                </Text>
+            </Pressable>
+        </Animated.View>
     );
 };
 
@@ -277,6 +390,16 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
 
     // ── Step state
     const [currentStep, setCurrentStep] = useState(0);
+
+    // ── Step transition animation
+    const stepOpacity = useSharedValue(1);
+
+    // ── Step title crossfade (matches body; no horizontal slide)
+    const titleOpacity = useSharedValue(1);
+
+    // ── Footer button press feedback
+    const nextBtnScale = useSharedValue(1);
+    const backBtnScale = useSharedValue(1);
 
     // ── Compute steps
     const steps = useMemo<StepId[]>(() => {
@@ -314,15 +437,44 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
             setBasedOnEntryId(initialValues?.basedOnEntryId ?? null);
             setIsSaving(false);
             setCurrentStep(0);
+            // Reset transition state when modal opens
+            stepOpacity.value = 1;
+            titleOpacity.value = 1;
         }
     }, [visible, initialMood, initialValues]);
+
+    // ── Animated step navigation (opacity dissolve only)
+    // Horizontal slide + dense grids (emotion chips) reads as “chips streaming away”.
+    // Fade out → setCurrentStep → useLayoutEffect fades back in.
+    // useLayoutEffect fires after React commits new content but before paint —
+    // no frames at opacity-0 with wrong content, no double-flicker race.
+    const prevStepRef = useRef(currentStep);
+    useLayoutEffect(() => {
+        if (prevStepRef.current !== currentStep) {
+            prevStepRef.current = currentStep;
+            stepOpacity.value = withTiming(1, { duration: 155, easing: Easing.out(Easing.cubic) });
+            titleOpacity.value = withTiming(1, { duration: 155, easing: Easing.out(Easing.cubic) });
+        }
+    }, [currentStep]);
+
+    const goToStep = useCallback(
+        (newStep: number) => {
+            titleOpacity.value = withTiming(0, { duration: 115, easing: Easing.in(Easing.cubic) });
+            stepOpacity.value = withTiming(0, { duration: 115, easing: Easing.in(Easing.cubic) },
+                (finished) => {
+                    if (finished) runOnJS(setCurrentStep)(newStep);
+                }
+            );
+        },
+        [stepOpacity, titleOpacity]
+    );
 
     const handleNext = () => {
         if (isLastStep) {
             handleSave();
         } else {
             haptics.light();
-            setCurrentStep(currentStep + 1);
+            goToStep(currentStep + 1);
         }
     };
 
@@ -332,7 +484,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
             onClose();
         } else {
             haptics.light();
-            setCurrentStep(currentStep - 1);
+            goToStep(currentStep - 1);
         }
     };
 
@@ -465,51 +617,36 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
         return (
             <View>
                 {/* Context Tags */}
-                {fieldConfig.context && (
-                    <View className="mb-2">
-                        <SectionLabel
-                            label="Context"
-                            isDark={isDark}
-                            badge={
-                                contextTags.length > 0
-                                    ? `${contextTags.length} selected`
-                                    : undefined
-                            }
-                        />
-                        <View className="flex-row flex-wrap gap-2">
-                            {contextOptions.map((ctx) => {
-                                const isSelected = contextTags.includes(ctx);
-                                const ctxColors = getCategoryColors("neutral", isSelected);
-                                return (
-                                    <Pressable
-                                        key={ctx}
-                                        onPress={() => toggleContext(ctx)}
-                                        className="px-3 py-2 rounded-xl"
-                                        style={{
-                                            backgroundColor: ctxColors.bg,
-                                            borderWidth: 1,
-                                            borderColor:
-                                                ctxColors.border ?? ctxColors.bg,
-                                            transform: [{ scale: isSelected ? 1.04 : 1 }],
-                                        }}
-                                        accessibilityRole="button"
-                                        accessibilityLabel={`Context: ${ctx}, ${
-                                            isSelected ? "selected" : "not selected"
-                                        }`}
-                                        accessibilityState={{ selected: isSelected }}
-                                    >
-                                        <Text
-                                            className="text-sm font-medium"
-                                            style={{ color: ctxColors.text }}
-                                        >
-                                            {ctx}
-                                        </Text>
-                                    </Pressable>
-                                );
-                            })}
-                        </View>
-                    </View>
-                )}
+                        {fieldConfig.context && (
+                            <View className="mb-2">
+                                <SectionLabel
+                                    label="Context"
+                                    isDark={isDark}
+                                    badge={
+                                        contextTags.length > 0
+                                            ? `${contextTags.length} selected`
+                                            : undefined
+                                    }
+                                />
+                                <View className="flex-row flex-wrap gap-2">
+                                    {contextOptions.map((ctx) => {
+                                        const isSelected = contextTags.includes(ctx);
+                                        const ctxColors = getCategoryColors("neutral", isSelected);
+                                        return (
+                                            <ContextTagChip
+                                                key={ctx}
+                                                label={ctx}
+                                                isSelected={isSelected}
+                                                bgColor={ctxColors.bg}
+                                                borderColor={ctxColors.border ?? ctxColors.bg}
+                                                textColor={ctxColors.text}
+                                                onPress={() => toggleContext(ctx)}
+                                            />
+                                        );
+                                    })}
+                                </View>
+                            </View>
+                        )}
 
                 {/* Energy */}
                 {fieldConfig.energy && (
@@ -658,22 +795,30 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                 current={currentStep}
                                 isDark={isDark}
                             />
-                            {/* Step title */}
-                            <Text
-                                style={{
-                                    ...typography.eyebrow,
-                                    textAlign: "center",
-                                    color: isDark ? "#5C4E3D" : "#B0A090",
-                                    marginTop: 6,
-                                }}
+                            {/* Step title — matches step body direction */}
+                            <Animated.Text
+                                style={[
+                                    { opacity: titleOpacity },
+                                    {
+                                        ...typography.eyebrow,
+                                        textAlign: "center",
+                                        color: isDark ? "#5C4E3D" : "#B0A090",
+                                        marginTop: 6,
+                                    },
+                                ]}
                             >
                                 {STEP_TITLES[currentStepId]}
-                            </Text>
+                            </Animated.Text>
                         </View>
                     </View>
 
                     {/* ── Step content ────────────────────────────────────── */}
-                    <View style={{ flex: 1 }}>
+                    <Animated.View
+                        style={{
+                            flex: 1,
+                            opacity: stepOpacity,
+                        }}
+                    >
                         <ScrollView
                             className="px-5 pt-5"
                             contentContainerStyle={{ paddingBottom: 28 }}
@@ -682,7 +827,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                         >
                             {renderCurrentStep()}
                         </ScrollView>
-                    </View>
+                    </Animated.View>
 
                     {/* ── Footer ──────────────────────────────────────────── */}
                     <View
@@ -702,126 +847,145 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                         {/* Primary row */}
                         <View className="flex-row gap-3">
                             {/* Back / Cancel */}
-                            <Pressable
-                                onPress={handleBack}
-                                disabled={isSaving}
-                                className="flex-1 rounded-2xl py-4 items-center flex-row justify-center gap-1.5"
-                                style={{
-                                    backgroundColor: isDark
-                                        ? "rgba(42, 37, 32, 0.8)"
-                                        : "rgba(245, 241, 232, 0.9)",
-                                    borderWidth: 1,
-                                    borderColor: isDark
-                                        ? "rgba(61, 53, 42, 0.5)"
-                                        : "rgba(229, 217, 191, 0.6)",
-                                }}
-                                accessibilityRole="button"
-                                accessibilityLabel={isFirstStep ? "Cancel" : "Go back"}
-                            >
-                                {!isFirstStep && (
-                                    <Ionicons
-                                        name="chevron-back"
-                                        size={14}
-                                        color={get("textMuted")}
-                                    />
-                                )}
-                                <Text
-                                    style={{
-                                        fontSize: 15,
-                                        fontWeight: "600",
-                                        color: get("textMuted"),
+                            <Animated.View style={{ flex: 1, transform: [{ scale: backBtnScale }] }}>
+                                <Pressable
+                                    onPress={handleBack}
+                                    onPressIn={() => {
+                                        backBtnScale.value = withSpring(0.96, { damping: 20, stiffness: 500 });
                                     }}
+                                    onPressOut={() => {
+                                        backBtnScale.value = withSpring(1, { damping: 14, stiffness: 350 });
+                                    }}
+                                    disabled={isSaving}
+                                    className="rounded-2xl py-4 items-center flex-row justify-center gap-1.5"
+                                    style={{
+                                        backgroundColor: isDark
+                                            ? "rgba(42, 37, 32, 0.8)"
+                                            : "rgba(245, 241, 232, 0.9)",
+                                        borderWidth: 1,
+                                        borderColor: isDark
+                                            ? "rgba(61, 53, 42, 0.5)"
+                                            : "rgba(229, 217, 191, 0.6)",
+                                    }}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={isFirstStep ? "Cancel" : "Go back"}
                                 >
-                                    {isFirstStep ? "Cancel" : "Back"}
-                                </Text>
-                            </Pressable>
+                                    {!isFirstStep && (
+                                        <Ionicons
+                                            name="chevron-back"
+                                            size={14}
+                                            color={get("textMuted")}
+                                        />
+                                    )}
+                                    <Text
+                                        style={{
+                                            fontSize: 15,
+                                            fontWeight: "600",
+                                            color: get("textMuted"),
+                                        }}
+                                    >
+                                        {isFirstStep ? "Cancel" : "Back"}
+                                    </Text>
+                                </Pressable>
+                            </Animated.View>
 
                             {/* Next / Save */}
-                            <Pressable
-                                onPress={handleNext}
-                                disabled={isSaving}
-                                className="flex-1 rounded-2xl py-4 items-center flex-row justify-center gap-1.5"
-                                style={{
-                                    backgroundColor: saveBgColor,
-                                    shadowColor: isDark
-                                        ? "#000"
-                                        : isDark
-                                        ? moodData.textHexDark
-                                        : moodData.textHex,
-                                    shadowOffset: { width: 0, height: 4 },
-                                    shadowOpacity: isDark ? 0.3 : 0.22,
-                                    shadowRadius: 10,
-                                    elevation: 5,
-                                }}
-                                accessibilityRole="button"
-                                accessibilityLabel={
-                                    isSaving
-                                        ? "Saving"
-                                        : isLastStep
-                                        ? "Save entry"
-                                        : "Next step"
-                                }
-                                accessibilityState={{ disabled: isSaving }}
-                                accessibilityHint={
-                                    isLastStep ? BUTTON_HINTS.save : "Proceed to next step"
-                                }
-                            >
-                                <Text
-                                    style={{
-                                        fontSize: 15,
-                                        fontWeight: "700",
-                                        color: "#FFFFFF",
+                            <Animated.View style={{ flex: 1, transform: [{ scale: nextBtnScale }] }}>
+                                <Pressable
+                                    onPress={handleNext}
+                                    onPressIn={() => {
+                                        if (!isSaving) nextBtnScale.value = withSpring(0.96, { damping: 20, stiffness: 500 });
                                     }}
+                                    onPressOut={() => {
+                                        nextBtnScale.value = withSpring(1, { damping: 14, stiffness: 350 });
+                                    }}
+                                    disabled={isSaving}
+                                    className="rounded-2xl py-4 items-center flex-row justify-center gap-1.5"
+                                    style={{
+                                        backgroundColor: saveBgColor,
+                                        shadowColor: isDark
+                                            ? "#000"
+                                            : moodData.textHex,
+                                        shadowOffset: { width: 0, height: 4 },
+                                        shadowOpacity: isDark ? 0.3 : 0.22,
+                                        shadowRadius: 10,
+                                        elevation: 5,
+                                    }}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={
+                                        isSaving
+                                            ? "Saving"
+                                            : isLastStep
+                                            ? "Save entry"
+                                            : "Next step"
+                                    }
+                                    accessibilityState={{ disabled: isSaving }}
+                                    accessibilityHint={
+                                        isLastStep ? BUTTON_HINTS.save : "Proceed to next step"
+                                    }
                                 >
-                                    {isSaving
-                                        ? "Saving…"
-                                        : isLastStep
-                                        ? "Save Entry"
-                                        : "Next"}
-                                </Text>
-                                {!isSaving && !isLastStep && (
-                                    <Ionicons
-                                        name="chevron-forward"
-                                        size={14}
-                                        color="#FFFFFF"
-                                    />
-                                )}
-                                {!isSaving && isLastStep && (
-                                    <Ionicons
-                                        name="checkmark"
-                                        size={15}
-                                        color="#FFFFFF"
-                                    />
-                                )}
-                                {isSaving && (
-                                    <Ionicons
-                                        name="hourglass"
-                                        size={14}
-                                        color="#FFFFFF"
-                                    />
-                                )}
-                            </Pressable>
+                                    <Text
+                                        style={{
+                                            fontSize: 15,
+                                            fontWeight: "700",
+                                            color: "#FFFFFF",
+                                        }}
+                                    >
+                                        {isSaving
+                                            ? "Saving…"
+                                            : isLastStep
+                                            ? "Save Entry"
+                                            : "Next"}
+                                    </Text>
+                                    {!isSaving && !isLastStep && (
+                                        <Ionicons
+                                            name="chevron-forward"
+                                            size={14}
+                                            color="#FFFFFF"
+                                        />
+                                    )}
+                                    {!isSaving && isLastStep && (
+                                        <Ionicons
+                                            name="checkmark"
+                                            size={15}
+                                            color="#FFFFFF"
+                                        />
+                                    )}
+                                    {isSaving && (
+                                        <Ionicons
+                                            name="hourglass"
+                                            size={14}
+                                            color="#FFFFFF"
+                                        />
+                                    )}
+                                </Pressable>
+                            </Animated.View>
                         </View>
 
                         {/* "Save now" shortcut — only when not on last step */}
                         {isMultiStep && !isLastStep && (
-                            <Pressable
-                                onPress={handleSave}
-                                disabled={isSaving}
-                                className="items-center mt-3"
-                                accessibilityRole="button"
-                                accessibilityLabel="Save entry now without completing all steps"
+                            <Animated.View
+                                entering={FadeIn.duration(180)}
+                                exiting={FadeIn.duration(120)}
                             >
-                                <Text
-                                    style={{
-                                        fontSize: 12,
-                                        color: isDark ? "#5C4E3D" : "#B0A090",
-                                        fontWeight: "500",
-                                    }}
+                                <Pressable
+                                    onPress={handleSave}
+                                    disabled={isSaving}
+                                    className="items-center mt-3"
+                                    accessibilityRole="button"
+                                    accessibilityLabel="Save entry now without completing all steps"
                                 >
-                                    Save now
-                                </Text>
-                            </Pressable>
+                                    <Text
+                                        style={{
+                                            fontSize: 12,
+                                            color: isDark ? "#5C4E3D" : "#B0A090",
+                                            fontWeight: "500",
+                                        }}
+                                    >
+                                        Save now
+                                    </Text>
+                                </Pressable>
+                            </Animated.View>
                         )}
                     </View>
                 </View>
