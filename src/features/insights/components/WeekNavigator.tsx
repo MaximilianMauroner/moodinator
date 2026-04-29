@@ -2,7 +2,7 @@ import React from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useColorScheme } from "nativewind";
-import { format, startOfWeek, endOfWeek, isThisWeek, isToday } from "date-fns";
+import { format, startOfWeek, endOfWeek, isThisWeek, isThisMonth } from "date-fns";
 import { TimePeriod } from "./TimePeriodSelector";
 
 interface WeekNavigatorProps {
@@ -28,13 +28,6 @@ export function WeekNavigator({
   const isDark = colorScheme === "dark";
 
   const getDateLabel = () => {
-    if (period === "day") {
-      if (isToday(currentDate)) {
-        return "Today";
-      }
-      return format(currentDate, "EEEE, MMM d");
-    }
-
     if (period === "week") {
       const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
       const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
@@ -46,12 +39,18 @@ export function WeekNavigator({
       return `${format(weekStart, "MMM d")} - ${format(weekEnd, "MMM d, yyyy")}`;
     }
 
+    if (period === "month") {
+      return format(currentDate, "MMMM yyyy");
+    }
+
     return "All Time";
   };
 
   const showNavigation = period !== "all";
   const showTodayButton =
-    period === "day" ? !isToday(currentDate) : !isThisWeek(currentDate, { weekStartsOn: 1 });
+    period === "week"
+      ? !isThisWeek(currentDate, { weekStartsOn: 1 })
+      : !isThisMonth(currentDate);
 
   // For "All Time", show a centered decorative display
   if (!showNavigation) {

@@ -2,15 +2,16 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   startOfWeek,
   endOfWeek,
-  startOfDay,
-  endOfDay,
+  startOfMonth,
+  endOfMonth,
   subWeeks,
   addWeeks,
-  subDays,
-  addDays,
+  subMonths,
+  addMonths,
   isAfter,
   isBefore,
   format,
+  startOfDay,
 } from "date-fns";
 import type { MoodEntry } from "@db/types";
 import { getAllMoods } from "@db/db";
@@ -72,9 +73,11 @@ function getMoodsInPeriod(
   if (period === "week") {
     start = startOfWeek(date, { weekStartsOn: 1 });
     end = endOfWeek(date, { weekStartsOn: 1 });
+  } else if (period === "month") {
+    start = startOfMonth(date);
+    end = endOfMonth(date);
   } else {
-    start = startOfDay(date);
-    end = endOfDay(date);
+    return moods;
   }
 
   return moods.filter((mood) => {
@@ -198,7 +201,7 @@ export function useInsightsData(): InsightsData {
     const prevDate =
       period === "week"
         ? subWeeks(currentDate, 1)
-        : subDays(currentDate, 1);
+        : subMonths(currentDate, 1);
 
     return getMoodsInPeriod(allMoods, period, prevDate);
   }, [allMoods, period, currentDate]);
@@ -211,7 +214,7 @@ export function useInsightsData(): InsightsData {
 
   // Detect patterns (only for all data or larger periods)
   const patterns = useMemo(() => {
-    if (period === "day") return [];
+    if (period === "week") return [];
     const moodsForPatterns = period === "all" ? allMoods : periodMoods;
     return detectPatterns(moodsForPatterns);
   }, [allMoods, periodMoods, period]);
@@ -223,16 +226,16 @@ export function useInsightsData(): InsightsData {
   const goToPrevious = useCallback(() => {
     if (period === "week") {
       setCurrentDate((d) => subWeeks(d, 1));
-    } else if (period === "day") {
-      setCurrentDate((d) => subDays(d, 1));
+    } else if (period === "month") {
+      setCurrentDate((d) => subMonths(d, 1));
     }
   }, [period]);
 
   const goToNext = useCallback(() => {
     if (period === "week") {
       setCurrentDate((d) => addWeeks(d, 1));
-    } else if (period === "day") {
-      setCurrentDate((d) => addDays(d, 1));
+    } else if (period === "month") {
+      setCurrentDate((d) => addMonths(d, 1));
     }
   }, [period]);
 
@@ -246,7 +249,7 @@ export function useInsightsData(): InsightsData {
     const nextDate =
       period === "week"
         ? addWeeks(currentDate, 1)
-        : addDays(currentDate, 1);
+        : addMonths(currentDate, 1);
     return !isAfter(startOfDay(nextDate), startOfDay(new Date()));
   }, [period, currentDate]);
 
@@ -260,7 +263,7 @@ export function useInsightsData(): InsightsData {
     const prevDate =
       period === "week"
         ? subWeeks(currentDate, 1)
-        : subDays(currentDate, 1);
+        : subMonths(currentDate, 1);
 
     return !isBefore(prevDate, startOfDay(oldestDate));
   }, [period, currentDate, allMoods]);

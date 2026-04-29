@@ -6,6 +6,7 @@ import { TrendIndicator, TrendDirection } from "./TrendIndicator";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { IconBadge } from "@/components/ui/IconBadge";
 import { typography } from "@/constants/typography";
+import { useThemeColors } from "@/constants/colors";
 
 type InsightCardSharedProps = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -38,6 +39,7 @@ function InsightCardBase({
 }: InsightCardBaseProps) {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === "dark";
+  const { get } = useThemeColors();
 
   // Variant-based styling for visual hierarchy
   const getVariantStyles = () => {
@@ -50,15 +52,15 @@ function InsightCardBase({
         };
       case "warm":
         return {
-          iconBg: isDark ? "#302A22" : "#F9F5ED",
-          iconColor: isDark ? "#D4C4A0" : "#7A6545",
-          accentLine: isDark ? "#BDA77D" : "#D4C4A0",
+          iconBg: isDark ? "#353126" : "#F9F5ED",
+          iconColor: isDark ? "#D7CAA4" : "#7A6545",
+          accentLine: isDark ? "#7F9564" : "#D4C4A0",
         };
       default:
         return {
           iconBg: isDark ? "#2D3D2D" : "#E8EFE8",
           iconColor: isDark ? "#A8C5A8" : "#5B8A5B",
-          accentLine: isDark ? "#3D352A" : "#E5D9BF",
+          accentLine: isDark ? "#455643" : "#E5D9BF",
         };
     }
   };
@@ -108,15 +110,18 @@ function InsightCardBase({
             className="text-paper-800 dark:text-paper-100"
             style={{
               ...(compact ? typography.metricMd : typography.metricLg),
-              color: metricColor || (isDark ? "#F5F1E8" : "#3D352A"),
+              color: metricColor || get("text"),
             }}
           >
             {metric}
           </Text>
           {metricSuffix && (
             <Text
-              className="ml-1 text-sand-500 dark:text-sand-400"
-              style={compact ? typography.bodySm : typography.bodyMd}
+              className="ml-1"
+              style={[
+                compact ? typography.bodySm : typography.bodyMd,
+                { color: get("textSubtle") },
+              ]}
             >
               {metricSuffix}
             </Text>
@@ -131,8 +136,10 @@ function InsightCardBase({
               style={{ backgroundColor: variantStyles.iconColor, opacity: 0.7 }}
             />
             <Text
-              className="text-sand-500 dark:text-sand-400"
-              style={compact ? typography.bodySm : typography.bodyMd}
+              style={[
+                compact ? typography.bodySm : typography.bodyMd,
+                { color: get("textMuted") },
+              ]}
             >
               {interpretation}
             </Text>

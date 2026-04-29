@@ -1,10 +1,13 @@
-import React, { useRef, useMemo } from "react";
+import React, { useCallback, useMemo, useRef } from "react";
 import { View, Text, Pressable } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
-  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
 } from "react-native-reanimated";
-import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable";
-import { SwipeDirection } from "../types/mood";
+import type { SwipeDirection } from "../types/mood";
 import { MoodEntry } from "@db/types";
 import { moodScale } from "@/constants/moodScale";
 import { useThemeColors, colors } from "@/constants/colors";
@@ -21,8 +24,9 @@ interface Props {
 export const DisplayMoodItem = React.memo(function DisplayMoodItem(
   { mood, onSwipeableWillOpen, onLongPress, swipeThreshold }: Props
 ) {
-    const swipeableRef = useRef<typeof Swipeable.prototype | null>(null);
+    const swipeActionPendingRef = useRef(false);
     const { isDark, get, getCategoryColors } = useThemeColors();
+    const translateX = useSharedValue(0);
 
     const moodData = useMemo(() => {
       const moodInfo = moodScale.find((m) => m.value === mood.mood);
@@ -46,21 +50,6 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
         : [];
     }, [mood.emotions]);
 
-    const handleSwipeableOpen = (direction: string) => {
-      // Haptic feedback based on swipe direction
-      if (direction === "right") {
-        haptics.destructive(); // Delete action - more prominent warning
-      } else {
-        haptics.swipeThreshold(); // Edit action - subtle confirmation
-      }
-      runOnJS(onSwipeableWillOpen)(direction as SwipeDirection, mood);
-      setTimeout(() => {
-        if (swipeableRef.current) {
-          swipeableRef.current.close();
-        }
-      }, 300);
-    };
-
     const formattedDate = new Date(mood.timestamp).toLocaleDateString([], {
       weekday: "short",
       month: "short",
@@ -71,193 +60,244 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
       minute: "2-digit",
     });
 
-    const renderRightActions = () => (
-      <Animated.View className="justify-center items-center h-full">
-        <View
-          className="h-full px-6 justify-center rounded-r-2xl"
-          style={{ backgroundColor: isDark ? colors.swipeDelete.bg.dark : colors.swipeDelete.bg.light }}
-        >
-          <Text
-            className="text-sm font-semibold"
-            style={{ color: isDark ? colors.swipeDelete.text.dark : colors.swipeDelete.text.light }}
-          >
-            Delete
-          </Text>
-        </View>
-      </Animated.View>
-    );
-
-    const renderLeftActions = () => (
-      <Animated.View className="justify-center items-start h-full">
-        <View
-          className="h-full px-6 justify-center rounded-l-2xl"
-          style={{ backgroundColor: isDark ? colors.swipeEdit.bg.dark : colors.swipeEdit.bg.light }}
-        >
-          <Text
-            className="text-sm font-semibold"
-            style={{ color: isDark ? colors.swipeEdit.text.dark : colors.swipeEdit.text.light }}
-          >
-            Edit
-          </Text>
-        </View>
-      </Animated.View>
-    );
-
     const accessibilityLabel = getMoodItemLabel(
       mood.mood,
       moodData.label,
       new Date(mood.timestamp)
     );
 
+    const triggerSwipeAction = useCallback(
+      (direction: SwipeDirection) => {
+        if (swipeActionPendingRef.current) return;
+        swipeActionPendingRef.current = true;
+
+        if (direction === "left") {
+          haptics.swipeThreshold();
+        } else {
+          haptics.destructive();
+        }
+
+        setTimeout(() => {
+          swipeActionPendingRef.current = false;
+          onSwipeableWillOpen(direction, mood);
+        }, 120);
+      },
+      [mood, onSwipeableWillOpen]
+    );
+
+    const panGesture = useMemo(
+      () =>
+        Gesture.Pan()
+          .activeOffsetX([-12, 12])
+          .failOffsetY([-12, 12])
+          .runOnJS(true)
+          .onUpdate((event) => {
+            const nextValue = Math.max(
+              -swipeThreshold,
+              Math.min(swipeThreshold, event.translationX)
+            );
+            translateX.set(nextValue);
+          })
+          .onEnd((event) => {
+            const shouldEdit = event.translationX > swipeThreshold * 0.8;
+            const shouldDelete = event.translationX < -swipeThreshold * 0.8;
+
+            if (shouldEdit) {
+              translateX.set(withTiming(0, { duration: 140 }));
+              triggerSwipeAction("left");
+              return;
+            }
+
+            if (shouldDelete) {
+              translateX.set(withTiming(0, { duration: 140 }));
+              triggerSwipeAction("right");
+              return;
+            }
+
+            translateX.set(withSpring(0, { damping: 18, stiffness: 220 }));
+          })
+          .onFinalize(() => {
+            translateX.set(withSpring(0, { damping: 18, stiffness: 220 }));
+          }),
+      [swipeThreshold, translateX, triggerSwipeAction]
+    );
+
+    const cardAnimatedStyle = useAnimatedStyle(() => ({
+      transform: [{ translateX: translateX.get() }],
+    }));
+
     return (
-      <Swipeable
-        ref={swipeableRef}
-        key={mood.id}
-        renderRightActions={renderRightActions}
-        renderLeftActions={renderLeftActions}
-        overshootLeft={false}
-        overshootRight={false}
-        friction={2}
-        containerStyle={{ borderRadius: 16, marginBottom: 12 }}
-        rightThreshold={swipeThreshold}
-        leftThreshold={swipeThreshold}
-        onSwipeableOpen={handleSwipeableOpen}
-      >
-        <Pressable
-          onLongPress={() => onLongPress?.(mood)}
-          accessibilityRole="button"
-          accessibilityLabel={accessibilityLabel}
-          accessibilityHint={getMoodItemHint()}
+      <View style={{ marginBottom: 12, borderRadius: 16, overflow: "hidden" }}>
+        <View
+          pointerEvents="none"
+          className="absolute inset-0 flex-row justify-between"
         >
           <View
-            className="rounded-2xl overflow-hidden"
-            style={{
-              backgroundColor: get("surface"),
-              shadowColor: isDark ? "#000" : colors.sand.text.light,
-              shadowOffset: { width: 0, height: isDark ? 2 : 4 },
-              shadowOpacity: isDark ? 0.25 : 0.08,
-              shadowRadius: isDark ? 4 : 12,
-              elevation: 3,
-            }}
+            className="justify-center px-6"
+            style={{ backgroundColor: isDark ? colors.swipeEdit.bg.dark : colors.swipeEdit.bg.light }}
           >
-            <View className="flex-row">
-              {/* Left accent bar - mood-colored visual indicator */}
-              <View
-                style={{
-                  width: 4,
-                  backgroundColor: moodData.textHex,
-                }}
-              />
+            <Text
+              className="text-sm font-semibold"
+              style={{ color: isDark ? colors.swipeEdit.text.dark : colors.swipeEdit.text.light }}
+            >
+              Edit
+            </Text>
+          </View>
+          <View
+            className="justify-center px-6"
+            style={{ backgroundColor: isDark ? colors.swipeDelete.bg.dark : colors.swipeDelete.bg.light }}
+          >
+            <Text
+              className="text-sm font-semibold"
+              style={{ color: isDark ? colors.swipeDelete.text.dark : colors.swipeDelete.text.light }}
+            >
+              Delete
+            </Text>
+          </View>
+        </View>
 
-              {/* Main content */}
-              <View className="flex-1 p-4">
-                {/* Header row */}
-                <View className="flex-row items-center justify-between mb-3">
-                  <View className="flex-row items-center flex-1">
-                    {/* Mood pill */}
-                    <View
-                      className="flex-row items-center px-3 py-1.5 rounded-xl mr-3"
-                      style={{ backgroundColor: moodData.bgHex }}
-                    >
+        <GestureDetector gesture={panGesture}>
+          <Animated.View style={cardAnimatedStyle}>
+            <Pressable
+              onLongPress={() => {
+                haptics.swipeThreshold();
+                onLongPress?.(mood);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={accessibilityLabel}
+              accessibilityHint={getMoodItemHint()}
+            >
+              <View
+                className="rounded-2xl overflow-hidden"
+                style={{
+                  backgroundColor: get("surface"),
+                  shadowColor: isDark ? "#000" : colors.sand.text.light,
+                  shadowOffset: { width: 0, height: isDark ? 2 : 4 },
+                  shadowOpacity: isDark ? 0.25 : 0.08,
+                  shadowRadius: isDark ? 4 : 12,
+                  elevation: 3,
+                }}
+              >
+                <View className="flex-row">
+                  {/* Left accent bar - mood-colored visual indicator */}
+                  <View
+                    style={{
+                      width: 4,
+                      backgroundColor: moodData.textHex,
+                    }}
+                  />
+
+                  {/* Main content */}
+                  <View className="flex-1 p-4">
+                    {/* Header row */}
+                    <View className="flex-row items-center justify-between mb-3">
+                      <View className="flex-row items-center flex-1">
+                        {/* Mood pill */}
+                        <View
+                          className="flex-row items-center px-3 py-1.5 rounded-xl mr-3"
+                          style={{ backgroundColor: moodData.bgHex }}
+                        >
+                          <Text
+                            className="text-lg font-bold mr-1.5"
+                            style={{ color: moodData.textHex, fontVariant: ["tabular-nums"] }}
+                          >
+                            {mood.mood}
+                          </Text>
+                          <Text
+                            className="text-sm font-semibold"
+                            style={{ color: moodData.textHex }}
+                          >
+                            {moodData.label}
+                          </Text>
+                        </View>
+
+                        {/* Energy badge */}
+                        {typeof mood.energy === "number" && (
+                          <View
+                            className="px-2 py-1 rounded-lg"
+                            style={{ backgroundColor: isDark ? colors.sand.bgHover.dark : colors.sand.bg.light }}
+                          >
+                            <Text
+                              className="text-[10px] font-semibold"
+                              style={{ color: isDark ? colors.sand.text.dark : colors.sand.text.light }}
+                            >
+                              Energy {mood.energy}/10
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+
+                      {/* Timestamp */}
                       <Text
-                        className="text-lg font-bold mr-1.5"
-                        style={{ color: moodData.textHex, fontVariant: ["tabular-nums"] }}
+                        className="text-xs"
+                        style={{ color: get("textMuted") }}
                       >
-                        {mood.mood}
-                      </Text>
-                      <Text
-                        className="text-sm font-semibold"
-                        style={{ color: moodData.textHex }}
-                      >
-                        {moodData.label}
+                        {formattedDate} · {formattedTime}
                       </Text>
                     </View>
 
-                    {/* Energy badge */}
-                    {typeof mood.energy === "number" && (
+                    {/* Note */}
+                    {mood.note ? (
                       <View
-                        className="px-2 py-1 rounded-lg"
-                        style={{ backgroundColor: isDark ? colors.sand.bgHover.dark : colors.sand.bg.light }}
+                        className="rounded-xl p-3 mb-3"
+                        style={{ backgroundColor: get("surfaceAlt") }}
                       >
                         <Text
-                          className="text-[10px] font-semibold"
-                          style={{ color: isDark ? colors.sand.text.dark : colors.sand.text.light }}
+                          className="text-sm leading-5"
+                          style={{ color: get("textSubtle") }}
+                          numberOfLines={3}
                         >
-                          Energy {mood.energy}/10
+                          {mood.note}
                         </Text>
+                      </View>
+                    ) : null}
+
+                    {/* Tags */}
+                    {(sortedEmotions.length > 0 || (mood.contextTags?.length ?? 0) > 0) && (
+                      <View className="flex-row flex-wrap gap-2">
+                        {sortedEmotions.map((emotion) => {
+                          const catColors = getCategoryColors(emotion.category);
+                          return (
+                            <View
+                              key={`${mood.id}-${emotion.name}`}
+                              className="px-2.5 py-1 rounded-lg"
+                              style={{ backgroundColor: catColors.bg }}
+                            >
+                              <Text
+                                className="text-xs font-medium"
+                                style={{ color: catColors.text }}
+                              >
+                                {emotion.name}
+                              </Text>
+                            </View>
+                          );
+                        })}
+                        {mood.contextTags?.map((ctx) => {
+                          const ctxColors = getCategoryColors("neutral");
+                          return (
+                            <View
+                              key={`${mood.id}-${ctx}`}
+                              className="px-2.5 py-1 rounded-lg"
+                              style={{ backgroundColor: ctxColors.bg }}
+                            >
+                              <Text
+                                className="text-xs font-medium"
+                                style={{ color: ctxColors.text }}
+                              >
+                                #{ctx}
+                              </Text>
+                            </View>
+                          );
+                        })}
                       </View>
                     )}
                   </View>
-
-                  {/* Timestamp */}
-                  <Text
-                    className="text-xs"
-                    style={{ color: get("textMuted") }}
-                  >
-                    {formattedDate} · {formattedTime}
-                  </Text>
                 </View>
-
-                {/* Note */}
-                {mood.note ? (
-                  <View
-                    className="rounded-xl p-3 mb-3"
-                    style={{ backgroundColor: get("surfaceAlt") }}
-                  >
-                    <Text
-                      className="text-sm leading-5"
-                      style={{ color: get("textSubtle") }}
-                      numberOfLines={3}
-                    >
-                      {mood.note}
-                    </Text>
-                  </View>
-                ) : null}
-
-                {/* Tags */}
-                {(sortedEmotions.length > 0 || (mood.contextTags?.length ?? 0) > 0) && (
-                  <View className="flex-row flex-wrap gap-2">
-                    {sortedEmotions.map((emotion) => {
-                      const catColors = getCategoryColors(emotion.category);
-                      return (
-                        <View
-                          key={`${mood.id}-${emotion.name}`}
-                          className="px-2.5 py-1 rounded-lg"
-                          style={{ backgroundColor: catColors.bg }}
-                        >
-                          <Text
-                            className="text-xs font-medium"
-                            style={{ color: catColors.text }}
-                          >
-                            {emotion.name}
-                          </Text>
-                        </View>
-                      );
-                    })}
-                    {mood.contextTags?.map((ctx) => {
-                      const ctxColors = getCategoryColors("neutral");
-                      return (
-                        <View
-                          key={`${mood.id}-${ctx}`}
-                          className="px-2.5 py-1 rounded-lg"
-                          style={{ backgroundColor: ctxColors.bg }}
-                        >
-                          <Text
-                            className="text-xs font-medium"
-                            style={{ color: ctxColors.text }}
-                          >
-                            #{ctx}
-                          </Text>
-                        </View>
-                      );
-                    })}
-                  </View>
-                )}
               </View>
-            </View>
-          </View>
-        </Pressable>
-      </Swipeable>
+            </Pressable>
+          </Animated.View>
+        </GestureDetector>
+      </View>
     );
   }
 );

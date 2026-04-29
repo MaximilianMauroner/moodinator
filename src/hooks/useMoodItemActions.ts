@@ -84,9 +84,9 @@ export function useMoodItemActions({
   const onSwipeableWillOpen = useCallback(
     (direction: SwipeDirection, mood: MoodEntry) => {
       if (direction === "left") {
-        handleDeleteMood(mood);
-      } else if (direction === "right") {
         setEditingEntry(mood);
+      } else if (direction === "right") {
+        handleDeleteMood(mood);
       }
     },
     [handleDeleteMood, setEditingEntry]

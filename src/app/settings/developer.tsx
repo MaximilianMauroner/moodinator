@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect } from "react";
 import { View, Text, ScrollView, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Notifications from "expo-notifications";
 import { clearMoods, seedMoods } from "@db/db";
 import { useSettingsStore } from "@/shared/state/settingsStore";
 import { useOnboardingStore } from "@/features/onboarding";
+import { useAppLockStore } from "@/features/appLock";
 import { SettingsPageHeader } from "@/features/settings/components/SettingsPageHeader";
 import { SettingsSection } from "@/features/settings/components/SettingsSection";
 import { SettingRow } from "@/features/settings/components/SettingRow";
@@ -14,7 +16,10 @@ export default function DeveloperSettingsScreen() {
   const hydrate = useSettingsStore((state) => state.hydrate);
   const devOptionsEnabled = useSettingsStore((state) => state.devOptionsEnabled);
   const setDevOptionsEnabled = useSettingsStore((state) => state.setDevOptionsEnabled);
+  const hydrateSettings = useSettingsStore((state) => state.hydrate);
   const resetOnboarding = useOnboardingStore((state) => state.reset);
+  const clearPin = useAppLockStore((state) => state.clearPin);
+  const hydrateAppLock = useAppLockStore((state) => state.hydrate);
 
   useEffect(() => {
     hydrate();
@@ -71,6 +76,39 @@ export default function DeveloperSettingsScreen() {
       },
     ]);
   }, []);
+
+  const handleResetEverythingToSetup = useCallback(() => {
+    if (!__DEV__) {
+      Alert.alert("Unavailable", "Full reset is only available in development builds.");
+      return;
+    }
+
+    Alert.alert(
+      "Reset App to Setup",
+      "This clears mood entries, local settings, app lock, reminders, and shows setup again. This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Reset Everything",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await Notifications.cancelAllScheduledNotificationsAsync();
+              await clearPin();
+              await clearMoods();
+              await AsyncStorage.clear();
+              await resetOnboarding();
+              await Promise.all([hydrateSettings(), hydrateAppLock()]);
+              Alert.alert("Reset Complete", "Setup is available again.");
+            } catch (error) {
+              console.error("Failed to reset app to setup:", error);
+              Alert.alert("Error", "Failed to reset app state.");
+            }
+          },
+        },
+      ]
+    );
+  }, [clearPin, hydrateAppLock, hydrateSettings, resetOnboarding]);
 
   return (
     <SafeAreaView className="flex-1 bg-paper-100 dark:bg-paper-900" edges={["top"]}>
@@ -135,6 +173,15 @@ export default function DeveloperSettingsScreen() {
             </SettingsSection>
 
             <SettingsSection title="Danger Zone">
+              {__DEV__ && (
+                <SettingRow
+                  label="Reset App to Setup"
+                  subLabel="Clear local dev state and show setup"
+                  icon="reload-circle-outline"
+                  destructive
+                  onPress={handleResetEverythingToSetup}
+                />
+              )}
               <SettingRow
                 label="Clear All Data"
                 subLabel="Permanently delete all mood entries"

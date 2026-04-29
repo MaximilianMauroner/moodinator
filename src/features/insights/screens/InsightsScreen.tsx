@@ -126,7 +126,7 @@ export function InsightsScreen() {
             width: 220,
             height: 220,
             borderRadius: 110,
-            backgroundColor: isDark ? "rgba(123, 168, 123, 0.08)" : "rgba(123, 168, 123, 0.10)",
+            backgroundColor: isDark ? "rgba(123, 168, 123, 0.11)" : "rgba(123, 168, 123, 0.10)",
           }}
         />
         <View
@@ -138,7 +138,7 @@ export function InsightsScreen() {
             width: 180,
             height: 180,
             borderRadius: 90,
-            backgroundColor: isDark ? "rgba(132, 117, 150, 0.07)" : "rgba(132, 117, 150, 0.08)",
+            backgroundColor: isDark ? "rgba(196, 187, 207, 0.05)" : "rgba(132, 117, 150, 0.08)",
           }}
         />
         {/* Header */}
@@ -156,7 +156,7 @@ export function InsightsScreen() {
                 {
                   backgroundColor: isDark ? "#231F1B" : "#FDFCFA",
                   borderWidth: 1,
-                  borderColor: isDark ? "#3D352A" : "#E5D9BF",
+                  borderColor: isDark ? "rgba(168, 197, 168, 0.16)" : "#E5D9BF",
                   padding: 10,
                   minWidth: 44,
                   minHeight: 44,
@@ -202,14 +202,14 @@ export function InsightsScreen() {
               <Ionicons
                 name="calendar"
                 size={16}
-                color={viewMode === "calendar" ? "#FFFFFF" : isDark ? "#BDA77D" : "#6B5C4A"}
+                color={viewMode === "calendar" ? "#FFFFFF" : isDark ? "#9FB39A" : "#6B5C4A"}
               />
               <Text
                 className="ml-2"
                 style={{
                   ...typography.bodyMd,
                   fontWeight: "700",
-                  color: viewMode === "calendar" ? "#FFFFFF" : isDark ? "#BDA77D" : "#6B5C4A",
+                  color: viewMode === "calendar" ? "#FFFFFF" : isDark ? "#9FB39A" : "#6B5C4A",
                 }}
               >
                 Calendar
@@ -230,14 +230,14 @@ export function InsightsScreen() {
               <Ionicons
                 name="bar-chart"
                 size={16}
-                color={viewMode === "charts" ? "#FFFFFF" : isDark ? "#BDA77D" : "#6B5C4A"}
+                color={viewMode === "charts" ? "#FFFFFF" : isDark ? "#9FB39A" : "#6B5C4A"}
               />
               <Text
                 className="ml-2"
                 style={{
                   ...typography.bodyMd,
                   fontWeight: "700",
-                  color: viewMode === "charts" ? "#FFFFFF" : isDark ? "#BDA77D" : "#6B5C4A",
+                  color: viewMode === "charts" ? "#FFFFFF" : isDark ? "#9FB39A" : "#6B5C4A",
                 }}
               >
                 Charts
@@ -337,8 +337,8 @@ export function InsightsScreen() {
                         interpretation={
                           period === "week"
                             ? "this week"
-                            : period === "day"
-                            ? "today"
+                            : period === "month"
+                            ? "this month"
                             : "total"
                         }
                         variant="warm"
@@ -385,14 +385,14 @@ export function InsightsScreen() {
                     </Animated.View>
                   )}
 
-                  {/* Streak Badge (always show for week/all view) */}
-                  {period !== "day" && (
+                  {/* Streak Badge (always show for non-week snapshots) */}
+                  {period !== "week" && (
                     <Animated.View entering={reveal(3)} className="mb-4">
                       <StreakBadge current={streak.current} longest={streak.longest} />
                     </Animated.View>
                   )}
 
-                  {/* Patterns (only for week/all view with enough data) */}
+                  {/* Patterns (only for month/all view with enough data) */}
                   {patterns.length > 0 && (
                     <Animated.View entering={reveal(4)} className="mb-4">
                       <PatternCard patterns={patterns} />
@@ -405,13 +405,23 @@ export function InsightsScreen() {
                     <SurfaceCard tone="sage" style={{ marginBottom: 4 }}>
                       <View className="flex-row items-center mb-4">
                         <IconBadge
-                          icon={period === "day" ? "time-outline" : "list-outline"}
+                          icon={
+                            period === "week"
+                              ? "time-outline"
+                              : period === "month"
+                              ? "calendar-outline"
+                              : "list-outline"
+                          }
                           tone="sage"
                           size="md"
                           style={{ marginRight: 12 }}
                         />
                         <Text className="text-paper-800 dark:text-paper-200" style={typography.bodyMd}>
-                          {period === "day" ? "Today's Entries" : "Recent Entries"}
+                          {period === "week"
+                            ? "This Week's Entries"
+                            : period === "month"
+                            ? "This Month's Entries"
+                            : "Recent Entries"}
                         </Text>
                       </View>
 
@@ -442,15 +452,15 @@ export function InsightsScreen() {
                               {getMoodLabel(mood.mood)}
                             </Text>
                             <Text className="text-sand-500 dark:text-sand-400" style={typography.bodySm}>
-                              {period === "day"
-                                ? format(new Date(mood.timestamp), "h:mm a")
+                              {period === "week"
+                                ? format(new Date(mood.timestamp), "EEE 'at' h:mm a")
                                 : format(new Date(mood.timestamp), "EEE, MMM d 'at' h:mm a")}
                             </Text>
                           </View>
                           <Ionicons
                             name="chevron-forward"
                             size={16}
-                            color={isDark ? "#6B5C4A" : "#BDA77D"}
+                            color={isDark ? "#9FB39A" : "#BDA77D"}
                           />
                         </Pressable>
                       ))}
@@ -485,8 +495,10 @@ export function InsightsScreen() {
                   tone="sand"
                   title="No entries yet"
                   description={
-                    period === "day"
-                      ? "You haven't logged any moods for this day."
+                    period === "week"
+                      ? "You haven't logged any moods for this week."
+                      : period === "month"
+                      ? "You haven't logged any moods for this month."
                       : "No mood entries for this time period."
                   }
                 />

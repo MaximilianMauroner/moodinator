@@ -17,9 +17,10 @@ export async function createMoodTable() {
         );
     `);
   await ensureMoodTableColumns(db);
-  await createIndexes(db);
+  // Tables must exist before indexes that reference them are created.
   await createEmotionsTable();
   await createMoodEmotionsTable();
+  await createIndexes(db);
 }
 
 /**

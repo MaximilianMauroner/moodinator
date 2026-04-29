@@ -6,13 +6,62 @@ export const CONTEXT_TAGS_KEY = "contextTags";
 export const QUICK_ENTRY_PREFS_KEY = "quickEntryPrefs";
 export const THERAPY_EXPORT_PREFS_KEY = "therapyExportPrefs";
 
+// Emotion list informed by:
+// - Ekman's 6 basic emotions (anger, disgust, fear, happiness, sadness, surprise)
+// - Plutchik's wheel of 8 primary emotions (joy, trust, fear, surprise, sadness, disgust, anger, anticipation)
+// - Cowen & Keltner (2017, PNAS) – 27 self-reported emotion categories
+// - PANAS-X clinical affect schedule (Watson & Clark, 1994)
+// - DBT emotion regulation skills list (Linehan)
+// - Shaver et al. (1987) prototypical emotion families
+// Goal: 40 emotions covering the full everyday range with therapy-useful
+// granularity. Each entry is meaningfully distinct on either valence,
+// arousal, social orientation, or clinical signal — no synonym pairs.
 export const DEFAULT_EMOTIONS: Emotion[] = [
-    { name: "Happy", category: "positive" },
-    { name: "Calm", category: "positive" },
-    { name: "Excited", category: "positive" },
-    { name: "Anxious", category: "negative" },
-    { name: "Sad", category: "negative" },
-    { name: "Stressed", category: "negative" },
+    // ── Positive (15) ─────────────────────────────────────────────────────────
+    { name: "Affectionate", category: "positive" },  // warmth toward others (love-out)
+    { name: "Amused",       category: "positive" },  // humour / playfulness (Cowen & Keltner)
+    { name: "Awe",          category: "positive" },  // transcendent wonder (Cowen & Keltner)
+    { name: "Confident",    category: "positive" },  // self-assurance (PANAS-X)
+    { name: "Content",      category: "positive" },  // low-arousal satisfaction
+    { name: "Energetic",    category: "positive" },  // high-arousal vitality
+    { name: "Excited",      category: "positive" },  // high-arousal anticipation / joy
+    { name: "Grateful",     category: "positive" },  // appreciation (clinically protective)
+    { name: "Happy",        category: "positive" },  // Ekman core
+    { name: "Hopeful",      category: "positive" },  // future-oriented optimism (key in CBT)
+    { name: "Inspired",     category: "positive" },  // creative spark (PANAS-X)
+    { name: "Loved",        category: "positive" },  // feeling cared for (love-in; distinct from Affectionate)
+    { name: "Motivated",    category: "positive" },  // drive / agency
+    { name: "Proud",        category: "positive" },  // self-directed positive appraisal
+    { name: "Relaxed",      category: "positive" },  // post-stress relief / serenity
+
+    // ── Negative (20) ─────────────────────────────────────────────────────────
+    { name: "Angry",        category: "negative" },  // Ekman core
+    { name: "Anxious",      category: "negative" },  // apprehension / worry (Ekman fear family)
+    { name: "Ashamed",      category: "negative" },  // self-focused moral pain (DBT/schema)
+    { name: "Disappointed", category: "negative" },  // unmet expectation
+    { name: "Disgusted",    category: "negative" },  // Ekman core; moral disgust too
+    { name: "Embarrassed",  category: "negative" },  // social/exposure pain (distinct from shame)
+    { name: "Fearful",      category: "negative" },  // acute threat response (Ekman core)
+    { name: "Frustrated",   category: "negative" },  // blocked-goal anger variant
+    { name: "Grieving",     category: "negative" },  // loss-specific sadness (distinct from Sad)
+    { name: "Guilty",       category: "negative" },  // behaviour-focused moral pain (PANAS-X)
+    { name: "Hopeless",     category: "negative" },  // core depression marker (clinically critical)
+    { name: "Hurt",         category: "negative" },  // relational emotional pain (PANAS-X)
+    { name: "Insecure",     category: "negative" },  // self-doubt / vulnerability
+    { name: "Irritable",    category: "negative" },  // low-grade anger / agitation (clinical)
+    { name: "Jealous",      category: "negative" },  // threat to relationship / status
+    { name: "Lonely",       category: "negative" },  // social disconnection
+    { name: "Numb",         category: "negative" },  // emotional blunting / dissociation
+    { name: "Overwhelmed",  category: "negative" },  // cognitive/emotional overload
+    { name: "Sad",          category: "negative" },  // Ekman core
+    { name: "Stressed",     category: "negative" },  // perceived demand > resources
+
+    // ── Neutral (5) ───────────────────────────────────────────────────────────
+    { name: "Bored",        category: "neutral" },   // low stimulation / disengagement
+    { name: "Confused",     category: "neutral" },   // cognitive uncertainty
+    { name: "Curious",      category: "neutral" },   // exploratory interest (Cowen & Keltner)
+    { name: "Surprised",    category: "neutral" },   // Ekman core; valence depends on context
+    { name: "Tired",        category: "neutral" },   // fatigue / exhaustion (PANAS-X)
 ];
 
 export const DEFAULT_CONTEXTS = [

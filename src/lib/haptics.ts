@@ -4,9 +4,27 @@
  */
 
 import { Platform, Vibration } from "react-native";
-import ReactNativeHapticFeedback, {
-  HapticFeedbackTypes,
-} from "react-native-haptic-feedback";
+
+// Lazy-load the native haptic module so the app works in Expo Go
+// (which doesn't bundle RNHapticFeedback in its binary).
+let _haptic: { default: any; HapticFeedbackTypes: any } | null = null;
+function getHapticModule() {
+  if (!_haptic) {
+    try {
+      _haptic = require("react-native-haptic-feedback");
+    } catch {
+      _haptic = { default: null, HapticFeedbackTypes: {} };
+    }
+  }
+  return _haptic!;
+}
+
+// Stable reference for type-safe usage throughout the file.
+const HapticFeedbackTypes = new Proxy({} as Record<string, string>, {
+  get(_t, key: string) {
+    return getHapticModule().HapticFeedbackTypes?.[key] ?? key;
+  },
+});
 
 const isHapticsSupported = Platform.OS !== "web";
 
@@ -90,15 +108,17 @@ function playPattern(patternName: PatternName): void {
       if (i % 2 === 0) {
         setTimeout(() => {
           if (hapticsEnabled) {
+            const mod = getHapticModule().default;
+            if (!mod) return;
             // Map duration to haptic type
             if (duration <= 15) {
-              ReactNativeHapticFeedback.trigger(HapticFeedbackTypes.soft, options);
+              mod.trigger(HapticFeedbackTypes.soft, options);
             } else if (duration <= 30) {
-              ReactNativeHapticFeedback.trigger(HapticFeedbackTypes.impactLight, options);
+              mod.trigger(HapticFeedbackTypes.impactLight, options);
             } else if (duration <= 50) {
-              ReactNativeHapticFeedback.trigger(HapticFeedbackTypes.impactMedium, options);
+              mod.trigger(HapticFeedbackTypes.impactMedium, options);
             } else {
-              ReactNativeHapticFeedback.trigger(HapticFeedbackTypes.impactHeavy, options);
+              mod.trigger(HapticFeedbackTypes.impactHeavy, options);
             }
           }
         }, delay);
@@ -115,7 +135,7 @@ function trigger(type: HapticFeedbackTypes): void {
       const duration = vibrationDurations[type] || 20;
       Vibration.vibrate(duration);
     } else {
-      ReactNativeHapticFeedback.trigger(type, options);
+      getHapticModule().default?.trigger(type, options);
     }
   }
 }
