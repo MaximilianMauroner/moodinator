@@ -19,6 +19,7 @@ import { TimePeriod } from "../components/TimePeriodSelector";
 import { detectPatterns, calculateStreak, Pattern } from "../utils/patternDetection";
 import { getTrendDirection, TrendDirection } from "../components/TrendIndicator";
 import { moodScale } from "@/constants/moodScale";
+import { getMoodHex } from "@/lib/moodPresentation";
 
 export interface PeriodStats {
   entryCount: number;
@@ -274,28 +275,7 @@ export function useInsightsData(): InsightsData {
     return mood?.label || "Unknown";
   }, []);
 
-  const getMoodColor = useCallback((value: number) => {
-    const mood = moodScale.find((m) => m.value === Math.round(value));
-    if (!mood) return "#64748b";
-
-    // Extract color from Tailwind class
-    const colorMap: Record<string, string> = {
-      "text-sky-500": "#03a9f4",
-      "text-cyan-500": "#00bcd4",
-      "text-teal-500": "#009688",
-      "text-emerald-500": "#10b981",
-      "text-green-500": "#22c55e",
-      "text-gray-500": "#64748b",
-      "text-lime-500": "#84cc16",
-      "text-yellow-500": "#eab308",
-      "text-amber-500": "#f59e0b",
-      "text-orange-600": "#ea580c",
-      "text-red-500": "#ef4444",
-      "text-red-700": "#b91c1c",
-    };
-
-    return colorMap[mood.color] || "#64748b";
-  }, []);
+  const getMoodColor = useCallback((value: number) => getMoodHex(value), []);
 
   return {
     allMoods,

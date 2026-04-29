@@ -16,12 +16,11 @@ import type { MoodEntry } from "@db/types";
 import { Circle } from "react-native-svg";
 import {
   processMoodDataForDailyChart,
-  getBaseChartConfig,
-  getColorFromTailwind,
-  getMoodInterpretation,
   sampleDataPoints,
   type DailyDataPoint,
-} from "./ChartComponents";
+} from "@/lib/moodChartData";
+import { getMoodInterpretation, getMoodHex } from "@/lib/moodPresentation";
+import { getBaseChartConfig } from "./chartConfig";
 import { moodScale } from "@/constants/moodScale";
 import type { MoodScale } from "@/types/mood";
 import { useColorScheme } from "@/hooks/useColorScheme";
@@ -218,10 +217,7 @@ export const DailyTab = ({
   }, [dailyAggregates, toggleDayExpansion]);
 
   const dotColors = useMemo(() => {
-    return sampledAggregates.map((agg) => {
-      const idx = Math.round(agg.finalAvg);
-      return getColorFromTailwind(moodScale[idx]?.color);
-    });
+    return sampledAggregates.map((agg) => getMoodHex(Math.round(agg.finalAvg)));
   }, [sampledAggregates]);
 
   const chartData = useMemo(

@@ -1,10 +1,16 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import type { Emotion } from "../../db/types";
+/**
+ * Pure defaults and parsing for entry settings.
+ *
+ * This module has no side effects: no AsyncStorage reads or writes.
+ * It exports domain types, default values, and parsing functions.
+ * All storage I/O belongs in settingsStore (via shared/storage/asyncStorage).
+ *
+ * Note: therapyExportPrefs are intentionally absent from settingsStore — they
+ * are managed locally by therapy-export.tsx which is the only subscriber.
+ * Storage helpers for that screen live in src/lib/therapyExportPrefs.ts.
+ */
 
-export const EMOTION_PRESETS_KEY = "emotionPresets";
-export const CONTEXT_TAGS_KEY = "contextTags";
-export const QUICK_ENTRY_PREFS_KEY = "quickEntryPrefs";
-export const THERAPY_EXPORT_PREFS_KEY = "therapyExportPrefs";
+import type { Emotion } from "../../db/types";
 
 // Emotion list informed by:
 // - Ekman's 6 basic emotions (anger, disgust, fear, happiness, sadness, surprise)
@@ -104,137 +110,79 @@ export const DEFAULT_THERAPY_EXPORT_PREFS: TherapyExportPrefs = {
     fields: ["timestamp", "mood", "emotions", "context", "energy", "notes"],
 };
 
-async function loadList(key: string, fallback: string[]): Promise<string[]> {
-    try {
-        const value = await AsyncStorage.getItem(key);
-        if (value) {
-            const parsed = JSON.parse(value);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-                return parsed.filter((item) => typeof item === "string" && item.trim().length > 0);
+// ── Pure parsing functions ────────────────────────────────────────────────────
+// These are called by settingsStore after reading raw JSON from AsyncStorage.
+
+function resolveEmotionCategory(name: string): Emotion["category"] {
+    const matched = DEFAULT_EMOTIONS.find(
+        (e) => e.name.toLowerCase() === name.toLowerCase()
+    );
+    return matched ? matched.category : "neutral";
+}
+
+/**
+ * Parse raw AsyncStorage JSON into a validated Emotion[].
+ * Accepts both old string-array format and current object format.
+ * Returns DEFAULT_EMOTIONS on empty or invalid input.
+ */
+export function parseEmotionList(data: unknown): Emotion[] {
+    if (!Array.isArray(data) || data.length === 0) {
+        return DEFAULT_EMOTIONS;
+    }
+
+    const emotions = data
+        .map((item): Emotion | null => {
+            if (typeof item === "string" && item.trim().length > 0) {
+                const name = item.trim();
+                return { name, category: resolveEmotionCategory(name) };
             }
-        }
-    } catch (error) {
-        console.error(`Failed to load list for ${key}:`, error);
-    }
-    return fallback;
-}
-
-async function loadEmotionList(key: string, fallback: Emotion[]): Promise<Emotion[]> {
-    try {
-        const value = await AsyncStorage.getItem(key);
-        if (value) {
-            const parsed = JSON.parse(value);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-                const resolveCategory = (name: string): Emotion["category"] => {
-                    const matched = DEFAULT_EMOTIONS.find(
-                        (emotion) => emotion.name.toLowerCase() === name.toLowerCase()
-                    );
-                    return matched ? matched.category : "neutral";
-                };
-                // Support both old format (strings) and new format (objects)
-                const emotions = parsed.map((item): Emotion | null => {
-                    if (typeof item === "string" && item.trim().length > 0) {
-                        // Migrate old string format to object format
-                        const name = item.trim();
-                        return { name, category: resolveCategory(name) };
-                    } else if (
-                        typeof item === "object" &&
-                        item !== null &&
-                        typeof item.name === "string" &&
-                        item.name.trim().length > 0
-                    ) {
-                        const name = item.name.trim();
-                        const category =
-                            item.category === "positive" ||
-                            item.category === "negative" ||
-                            item.category === "neutral"
-                                ? item.category
-                                : resolveCategory(name);
-                        return { name, category };
-                    }
-                    return null;
-                }).filter((item): item is Emotion => item !== null);
-
-                if (emotions.length > 0) {
-                    return emotions;
-                }
+            if (
+                typeof item === "object" &&
+                item !== null &&
+                typeof (item as Record<string, unknown>).name === "string" &&
+                ((item as Record<string, unknown>).name as string).trim().length > 0
+            ) {
+                const name = ((item as Record<string, unknown>).name as string).trim();
+                const category = (item as Record<string, unknown>).category;
+                const validCategory =
+                    category === "positive" || category === "negative" || category === "neutral"
+                        ? category
+                        : resolveEmotionCategory(name);
+                return { name, category: validCategory };
             }
-        }
-    } catch (error) {
-        console.error(`Failed to load emotion list for ${key}:`, error);
+            return null;
+        })
+        .filter((item): item is Emotion => item !== null);
+
+    return emotions.length > 0 ? emotions : DEFAULT_EMOTIONS;
+}
+
+/**
+ * Parse raw AsyncStorage JSON into a validated string[].
+ * Returns fallback on empty or invalid input.
+ */
+export function parseStringList(data: unknown, fallback: string[]): string[] {
+    if (!Array.isArray(data) || data.length === 0) {
+        return fallback;
     }
-    return fallback;
+    const filtered = data.filter(
+        (item) => typeof item === "string" && item.trim().length > 0
+    );
+    return filtered.length > 0 ? (filtered as string[]) : fallback;
 }
 
-export async function getEmotionPresets(): Promise<Emotion[]> {
-    return loadEmotionList(EMOTION_PRESETS_KEY, DEFAULT_EMOTIONS);
-}
-
-export async function getContextTags(): Promise<string[]> {
-    return loadList(CONTEXT_TAGS_KEY, DEFAULT_CONTEXTS);
-}
-
-export async function saveEmotionPresets(values: Emotion[]) {
-    await AsyncStorage.setItem(EMOTION_PRESETS_KEY, JSON.stringify(values));
-}
-
-export async function saveContextTags(values: string[]) {
-    await AsyncStorage.setItem(CONTEXT_TAGS_KEY, JSON.stringify(values));
-}
-
-export async function getQuickEntryPrefs(): Promise<QuickEntryPrefs> {
-    try {
-        const value = await AsyncStorage.getItem(QUICK_ENTRY_PREFS_KEY);
-        if (value) {
-            const parsed = JSON.parse(value);
-            return {
-                ...DEFAULT_QUICK_ENTRY_PREFS,
-                ...parsed,
-            };
-        }
-    } catch (error) {
-        console.error("Failed to load quick entry preferences:", error);
-    }
-    return DEFAULT_QUICK_ENTRY_PREFS;
-}
-
-export async function saveQuickEntryPrefs(prefs: QuickEntryPrefs) {
-    await AsyncStorage.setItem(QUICK_ENTRY_PREFS_KEY, JSON.stringify(prefs));
-}
-
-function sanitizeTherapyFields(value: unknown): TherapyExportField[] {
+/**
+ * Validate and filter a therapy export field list.
+ * Returns DEFAULT_THERAPY_EXPORT_PREFS.fields on empty or invalid input.
+ */
+export function sanitizeTherapyFields(value: unknown): TherapyExportField[] {
     if (!Array.isArray(value)) {
         return DEFAULT_THERAPY_EXPORT_PREFS.fields;
     }
     const allowed = new Set(DEFAULT_THERAPY_EXPORT_PREFS.fields);
-    const cleaned = value.filter((field): field is TherapyExportField => typeof field === "string" && allowed.has(field as TherapyExportField));
+    const cleaned = value.filter(
+        (field): field is TherapyExportField =>
+            typeof field === "string" && allowed.has(field as TherapyExportField)
+    );
     return cleaned.length ? cleaned : DEFAULT_THERAPY_EXPORT_PREFS.fields;
-}
-
-export async function getTherapyExportPrefs(): Promise<TherapyExportPrefs> {
-    try {
-        const value = await AsyncStorage.getItem(THERAPY_EXPORT_PREFS_KEY);
-        if (value) {
-            const parsed = JSON.parse(value);
-            return {
-                fields: sanitizeTherapyFields(parsed?.fields),
-            };
-        }
-    } catch (error) {
-        console.error("Failed to load therapy export prefs:", error);
-    }
-    return DEFAULT_THERAPY_EXPORT_PREFS;
-}
-
-export async function saveTherapyExportPrefs(prefs: TherapyExportPrefs) {
-    await AsyncStorage.setItem(THERAPY_EXPORT_PREFS_KEY, JSON.stringify(prefs));
-}
-
-export async function getEntrySettings() {
-    const [emotionPresets, contextTags, quickEntryPrefs] = await Promise.all([
-        getEmotionPresets(),
-        getContextTags(),
-        getQuickEntryPrefs(),
-    ]);
-    return { emotionPresets, contextTags, quickEntryPrefs };
 }

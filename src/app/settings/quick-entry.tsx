@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect } from "react";
+import React, { useCallback } from "react";
 import { View, Text, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -10,13 +10,8 @@ import { ToggleRow } from "@/features/settings/components/ToggleRow";
 
 export default function QuickEntrySettingsScreen() {
 
-  const hydrate = useSettingsStore((state) => state.hydrate);
   const quickEntryPrefs = useSettingsStore((state) => state.quickEntryPrefs);
   const setQuickEntryPrefs = useSettingsStore((state) => state.setQuickEntryPrefs);
-
-  useEffect(() => {
-    hydrate();
-  }, [hydrate]);
 
   const handleToggle = useCallback(
     async (key: keyof QuickEntryPrefs, value: boolean) => {

@@ -14,8 +14,16 @@ import {
   ensureDefaultEmotions,
   migrateEmotionsToTable,
   hasEmotionTableMigrated,
+  countMoodEntriesWithEmotionName,
+  renameEmotionInMoodEntries,
+  recategorizeEmotionInMoodEntries,
 } from "@db/moods/emotions";
 import { migrateEmotionsToCategories } from "@db/moods/migrations";
+import { getEmotionNamesFromMoods } from "@db/moods/repository";
+
+export interface HistoricalUpdatePreview {
+  affectedMoodEntryCount: number;
+}
 
 export interface EmotionServiceInterface {
   // CRUD operations
@@ -26,6 +34,23 @@ export interface EmotionServiceInterface {
 
   // Category management
   upsertCategory: (name: string, category: Emotion["category"]) => Promise<void>;
+
+  // Historical updates
+  previewRenameHistoricalUpdate: (
+    oldName: string,
+    newName: string
+  ) => Promise<HistoricalUpdatePreview>;
+  applyRenameHistoricalUpdate: (oldName: string, newName: string) => Promise<void>;
+  previewCategoryHistoricalUpdate: (
+    name: string,
+    category: Emotion["category"]
+  ) => Promise<HistoricalUpdatePreview>;
+  applyCategoryHistoricalUpdate: (
+    name: string,
+    category: Emotion["category"]
+  ) => Promise<void>;
+  getImportableEmotionNames: () => Promise<string[]>;
+  applyImportedEmotionAdditions: (names: string[]) => Promise<void>;
 
   // Initialization and migration
   ensureDefaults: () => Promise<void>;
@@ -68,6 +93,73 @@ export const emotionService: EmotionServiceInterface = {
    */
   async upsertCategory(name: string, category: Emotion["category"]): Promise<void> {
     return upsertEmotionCategory(name, category);
+  },
+
+  async previewRenameHistoricalUpdate(
+    oldName: string,
+    _newName: string
+  ): Promise<HistoricalUpdatePreview> {
+    return {
+      affectedMoodEntryCount: await countMoodEntriesWithEmotionName(oldName),
+    };
+  },
+
+  async applyRenameHistoricalUpdate(oldName: string, newName: string): Promise<void> {
+    const emotions = await getAllEmotions();
+    const existing = emotions.find(
+      (emotion) => emotion.name.trim().toLowerCase() === oldName.trim().toLowerCase()
+    );
+
+    if (!existing) {
+      return;
+    }
+
+    await updateEmotion(oldName, {
+      name: newName,
+      category: existing.category,
+    });
+    await renameEmotionInMoodEntries(oldName, newName);
+  },
+
+  async previewCategoryHistoricalUpdate(
+    name: string,
+    _category: Emotion["category"]
+  ): Promise<HistoricalUpdatePreview> {
+    return {
+      affectedMoodEntryCount: await countMoodEntriesWithEmotionName(name),
+    };
+  },
+
+  async applyCategoryHistoricalUpdate(
+    name: string,
+    category: Emotion["category"]
+  ): Promise<void> {
+    await recategorizeEmotionInMoodEntries(name, category);
+  },
+
+  async getImportableEmotionNames(): Promise<string[]> {
+    return getEmotionNamesFromMoods();
+  },
+
+  async applyImportedEmotionAdditions(names: string[]): Promise<void> {
+    const existing = new Set(
+      (await getAllEmotions()).map((emotion) => emotion.name.trim().toLowerCase())
+    );
+
+    for (const rawName of names) {
+      const trimmedName = rawName.trim();
+      const normalizedName = trimmedName.toLowerCase();
+
+      if (!trimmedName || existing.has(normalizedName)) {
+        continue;
+      }
+
+      await addEmotion({
+        name: trimmedName,
+        category: "neutral",
+      });
+      existing.add(normalizedName);
+    }
   },
 
   /**

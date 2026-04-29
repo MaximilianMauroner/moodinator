@@ -4,7 +4,7 @@
  */
 
 import { create } from "zustand";
-import type { DailyDataPoint, WeeklyDataPoint } from "@/components/charts/ChartComponents";
+import type { DailyDataPoint, WeeklyDataPoint } from "@/lib/moodChartData";
 
 export interface ChartCacheData {
   // Daily chart cache

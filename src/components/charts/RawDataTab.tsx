@@ -11,12 +11,9 @@ import { LineChart } from "react-native-chart-kit";
 import { format } from "date-fns";
 import type { MoodEntry } from "@db/types";
 import { Circle } from "react-native-svg";
-import {
-  getColorFromTailwind,
-  getBaseChartConfig,
-  getMoodInterpretation,
-  sampleDataPoints,
-} from "./ChartComponents";
+import { sampleDataPoints } from "@/lib/moodChartData";
+import { getMoodInterpretation, getMoodHex } from "@/lib/moodPresentation";
+import { getBaseChartConfig } from "./chartConfig";
 import { moodScale } from "@/constants/moodScale";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -165,9 +162,7 @@ export const RawDataTab = ({
         {
           data: sampledMoods.map((m) => m.mood),
           strokeWidth: 3,
-          dotColor: sampledMoods.map((m) =>
-            getColorFromTailwind(moodScale[m.mood]?.color || "text-gray-500")
-          ),
+          dotColor: sampledMoods.map((m) => getMoodHex(m.mood)),
         },
         {
           data: [0], // Min value for y-axis
@@ -357,7 +352,7 @@ export const RawDataTab = ({
             <View className="flex-row items-center flex-1">
               <View
                 className="w-4 h-4 rounded mr-3"
-                style={{ backgroundColor: getColorFromTailwind(item.color) }}
+                style={{ backgroundColor: item.textHex ?? getMoodHex(item.value) }}
               />
               <View className="flex-1">
                 <Text className="text-sm font-medium text-gray-700 dark:text-slate-300">

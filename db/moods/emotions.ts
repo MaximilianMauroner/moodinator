@@ -4,6 +4,7 @@ import type { Emotion } from "../types";
 import type { EmotionRow, MoodRow, CountResult } from "../types/rows";
 import { DEFAULT_EMOTIONS } from "../../src/lib/entrySettings";
 import { parseEmotionItem } from "./emotionUtils";
+import { serializeEmotions } from "./serialization";
 
 export async function createEmotionsTable() {
   const db = await getDb();
@@ -260,4 +261,178 @@ export async function getEmotionsForMood(moodId: number): Promise<Emotion[]> {
     name: row.name,
     category: row.category,
   }));
+}
+
+export async function countMoodEntriesWithEmotionName(name: string): Promise<number> {
+  const db = await getDb();
+  const normalizedTarget = name.trim().toLowerCase();
+
+  if (!normalizedTarget) {
+    return 0;
+  }
+
+  const rows = await db.getAllAsync<Pick<MoodRow, "id" | "emotions">>(
+    "SELECT id, emotions FROM moods;"
+  );
+
+  let affectedMoodEntryCount = 0;
+
+  for (const row of rows) {
+    if (!row.emotions || row.emotions === "[]") {
+      continue;
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(row.emotions);
+    } catch {
+      continue;
+    }
+
+    if (!Array.isArray(parsed)) {
+      continue;
+    }
+
+    const hasMatch = parsed
+      .map(parseEmotionItem)
+      .filter((emotion): emotion is Emotion => emotion !== null)
+      .some((emotion) => emotion.name.trim().toLowerCase() === normalizedTarget);
+
+    if (hasMatch) {
+      affectedMoodEntryCount++;
+    }
+  }
+
+  return affectedMoodEntryCount;
+}
+
+export async function renameEmotionInMoodEntries(
+  oldName: string,
+  newName: string
+): Promise<{ updated: number }> {
+  const db = await getDb();
+  const normalizedTarget = oldName.trim().toLowerCase();
+
+  if (!normalizedTarget) {
+    return { updated: 0 };
+  }
+
+  const rows = await db.getAllAsync<Pick<MoodRow, "id" | "emotions">>(
+    "SELECT id, emotions FROM moods;"
+  );
+
+  let updated = 0;
+
+  for (const row of rows) {
+    if (!row.emotions || row.emotions === "[]") {
+      continue;
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(row.emotions);
+    } catch {
+      continue;
+    }
+
+    if (!Array.isArray(parsed)) {
+      continue;
+    }
+
+    let changed = false;
+    const rewritten = parsed
+      .map(parseEmotionItem)
+      .filter((emotion): emotion is Emotion => emotion !== null)
+      .map((emotion) => {
+        if (emotion.name.trim().toLowerCase() !== normalizedTarget) {
+          return emotion;
+        }
+
+        changed = true;
+        return {
+          ...emotion,
+          name: newName,
+        };
+      });
+
+    if (!changed) {
+      continue;
+    }
+
+    await db.runAsync(
+      "UPDATE moods SET emotions = ? WHERE id = ?;",
+      serializeEmotions(rewritten),
+      row.id
+    );
+    updated++;
+  }
+
+  return { updated };
+}
+
+export async function recategorizeEmotionInMoodEntries(
+  name: string,
+  category: Emotion["category"]
+): Promise<{ updated: number }> {
+  const db = await getDb();
+  const normalizedTarget = name.trim().toLowerCase();
+
+  if (!normalizedTarget) {
+    return { updated: 0 };
+  }
+
+  const rows = await db.getAllAsync<Pick<MoodRow, "id" | "emotions">>(
+    "SELECT id, emotions FROM moods;"
+  );
+
+  let updated = 0;
+
+  for (const row of rows) {
+    if (!row.emotions || row.emotions === "[]") {
+      continue;
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(row.emotions);
+    } catch {
+      continue;
+    }
+
+    if (!Array.isArray(parsed)) {
+      continue;
+    }
+
+    let changed = false;
+    const rewritten = parsed
+      .map(parseEmotionItem)
+      .filter((emotion): emotion is Emotion => emotion !== null)
+      .map((emotion) => {
+        if (emotion.name.trim().toLowerCase() !== normalizedTarget) {
+          return emotion;
+        }
+        if (emotion.category === category) {
+          return emotion;
+        }
+
+        changed = true;
+        return {
+          ...emotion,
+          category,
+        };
+      });
+
+    if (!changed) {
+      continue;
+    }
+
+    await db.runAsync(
+      "UPDATE moods SET emotions = ? WHERE id = ?;",
+      serializeEmotions(rewritten),
+      row.id
+    );
+    updated++;
+  }
+
+  return { updated };
 }

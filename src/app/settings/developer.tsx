@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect } from "react";
+import React, { useCallback } from "react";
 import { View, Text, ScrollView, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -14,17 +14,14 @@ import { SettingRow } from "@/features/settings/components/SettingRow";
 import { ToggleRow } from "@/features/settings/components/ToggleRow";
 
 export default function DeveloperSettingsScreen() {
-  const hydrate = useSettingsStore((state) => state.hydrate);
   const devOptionsEnabled = useSettingsStore((state) => state.devOptionsEnabled);
   const setDevOptionsEnabled = useSettingsStore((state) => state.setDevOptionsEnabled);
+  // hydrateSettings is called explicitly after AsyncStorage.clear() in the dev
+  // reset flow — this is intentional re-hydration, not a defensive load-on-mount.
   const hydrateSettings = useSettingsStore((state) => state.hydrate);
   const resetOnboarding = useOnboardingStore((state) => state.reset);
   const clearPin = useAppLockStore((state) => state.clearPin);
   const hydrateAppLock = useAppLockStore((state) => state.hydrate);
-
-  useEffect(() => {
-    hydrate();
-  }, [hydrate]);
 
   const handleResetOnboarding = useCallback(() => {
     Alert.alert(

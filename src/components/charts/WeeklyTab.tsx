@@ -12,12 +12,9 @@ import { format, endOfWeek, startOfWeek } from "date-fns";
 import type { MoodEntry } from "@db/types";
 import { moodScale } from "@/constants/moodScale";
 import type { MoodScale } from "@/types/mood";
-import {
-  processWeeklyMoodData,
-  getBaseChartConfig,
-  getMoodInterpretation,
-  getTrendInterpretation,
-} from "./ChartComponents";
+import { processWeeklyMoodData } from "@/lib/moodChartData";
+import { getMoodInterpretation, getTrendInterpretation } from "@/lib/moodPresentation";
+import { getBaseChartConfig } from "./chartConfig";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { Ionicons } from "@expo/vector-icons";
 
