@@ -12,7 +12,7 @@ Moodinator is a personal mood tracking application that allows you to:
 
 - Record daily mood entries on a 0-10 scale
 - Tag entries with emotions and contexts
-- Attach photos, voice notes, and location data to entries
+- Add emotions, context tags, energy, and notes to entries
 - View analytics and insights about your mood patterns
 - Export your data for personal use
 
@@ -35,7 +35,7 @@ You agree not to:
 
 ### Ownership
 
-You retain full ownership of all data you create within the app, including mood entries, notes, photos, and voice recordings.
+You retain full ownership of all data you create within the app, including mood entries and notes.
 
 ### Local Storage
 

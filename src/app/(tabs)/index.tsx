@@ -40,9 +40,10 @@ import { useMoodModals } from "@/hooks/useMoodModals";
 import { useMoodItemActions } from "@/hooks/useMoodItemActions";
 import { useColorScheme } from "@/hooks/useColorScheme";
 
-import { updateMoodTimestamp, migrateEmotionsToCategories } from "@db/db";
 import type { MoodEntry } from "@db/types";
 import { Toast } from "toastify-react-native";
+import { moodService } from "@/services/moodService";
+import { emotionService } from "@/services/emotionService";
 
 const HomeErrorFallback = createScreenErrorFallback("Home");
 const COMPACT_TOP_COLLAPSE = 180;
@@ -181,7 +182,7 @@ function HomeScreenContent() {
       }
 
       console.log("Running emotion category migration...");
-      const result = await migrateEmotionsToCategories();
+      const result = await emotionService.migrateToCategories();
       console.log(`Migration complete: ${result.migrated} entries migrated, ${result.skipped} skipped`);
       await AsyncStorage.setItem(MIGRATION_KEY, "true");
       await loadAll();
@@ -222,9 +223,6 @@ function HomeScreenContent() {
       emotions: values.emotions,
       contextTags: values.contextTags,
       energy: values.energy,
-      photos: values.photos,
-      location: values.location,
-      voiceMemos: values.voiceMemos,
     });
   }, [createMood]);
 
@@ -237,9 +235,6 @@ function HomeScreenContent() {
         emotions: values.emotions,
         contextTags: values.contextTags,
         energy: values.energy,
-        photos: values.photos,
-        location: values.location,
-        voiceMemos: values.voiceMemos,
       });
     },
     [modals.editingEntry, updateMood]
@@ -247,7 +242,7 @@ function HomeScreenContent() {
 
   const handleDateTimeSave = useCallback(
     async (moodId: number, newTimestamp: number) => {
-      await updateMoodTimestamp(moodId, newTimestamp);
+      await moodService.updateTimestamp(moodId, newTimestamp);
       await loadAll();
       modals.closeDateModal();
     },

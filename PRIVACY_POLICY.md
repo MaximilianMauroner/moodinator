@@ -17,11 +17,10 @@ Moodinator collects and stores the following information that you voluntarily pr
 - **Contexts**: Context tags describing your situation (e.g., work, home, social)
 - **Photos**: Images you choose to attach to mood entries
 - **Voice Notes**: Audio recordings you attach to entries
-- **Location Data**: Optional location information if you enable this feature
 
 ### Local-Only Storage
 
-**All your data is stored locally on your device.** We do not upload, transmit, or store your personal data on any external servers. Your mood entries, photos, voice notes, and all other information remain exclusively on your device.
+**All your data is stored locally on your device.** We do not upload, transmit, or store your personal data on any external servers. Your mood entries and settings remain exclusively on your device.
 
 ### No Account Required
 

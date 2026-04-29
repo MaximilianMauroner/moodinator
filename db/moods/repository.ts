@@ -7,6 +7,7 @@ import {
   serializeArray,
   serializeEmotions,
   serializeLocation,
+  serializeMoodScale,
   toMoodEntry,
 } from "./serialization";
 import {
@@ -31,13 +32,14 @@ export async function insertMood(
   await db.execAsync("BEGIN TRANSACTION;");
   try {
     const result = await db.runAsync(
-      "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy, photos_json, location_json, voice_memos_json, based_on_entry_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
+      "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy, mood_scale_json, photos_json, location_json, voice_memos_json, based_on_entry_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
       mood,
       normalized.note,
       normalized.timestamp,
       serializeEmotions(normalized.emotions),
       serializeArray(normalized.contextTags),
       normalized.energy,
+      serializeMoodScale(normalized.moodScale),
       serializeArray(normalized.photos),
       serializeLocation(normalized.location),
       serializeArray(normalized.voiceMemos),
@@ -68,13 +70,14 @@ export async function insertMoodEntry(entry: MoodEntryInput): Promise<MoodEntry>
   await db.execAsync("BEGIN TRANSACTION;");
   try {
     const result = await db.runAsync(
-      "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy, photos_json, location_json, voice_memos_json, based_on_entry_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
+      "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy, mood_scale_json, photos_json, location_json, voice_memos_json, based_on_entry_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
       entry.mood,
       normalized.note,
       normalized.timestamp,
       serializeEmotions(normalized.emotions),
       serializeArray(normalized.contextTags),
       normalized.energy,
+      serializeMoodScale(normalized.moodScale),
       serializeArray(normalized.photos),
       serializeLocation(normalized.location),
       serializeArray(normalized.voiceMemos),
@@ -180,17 +183,9 @@ export async function updateMoodEntry(
         : Math.min(10, Math.max(0, Math.round(updates.energy)))
     );
   }
-  if (updates.photos !== undefined) {
-    fields.push("photos_json = ?");
-    params.push(serializeArray(updates.photos));
-  }
-  if (updates.location !== undefined) {
-    fields.push("location_json = ?");
-    params.push(serializeLocation(updates.location));
-  }
-  if (updates.voiceMemos !== undefined) {
-    fields.push("voice_memos_json = ?");
-    params.push(serializeArray(updates.voiceMemos));
+  if (updates.moodScale !== undefined) {
+    fields.push("mood_scale_json = ?");
+    params.push(serializeMoodScale(updates.moodScale));
   }
   if (updates.basedOnEntryId !== undefined) {
     fields.push("based_on_entry_id = ?");
@@ -284,127 +279,15 @@ export async function updateEmotionCategoryInMoods(
   emotionName: string,
   category: Emotion["category"]
 ): Promise<{ updated: number }> {
-  const db = await getDb();
-  const target = emotionName.trim().toLowerCase();
-  let updated = 0;
-
-  await db.execAsync("BEGIN TRANSACTION;");
-  try {
-    const rows = await db.getAllAsync<Pick<MoodRow, "id" | "emotions">>(
-      "SELECT id, emotions FROM moods;"
-    );
-
-    for (const row of rows) {
-      const rawEmotions = row.emotions;
-      if (!rawEmotions || rawEmotions === "[]") {
-        continue;
-      }
-
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(rawEmotions);
-      } catch {
-        continue;
-      }
-
-      if (!Array.isArray(parsed)) {
-        continue;
-      }
-
-      const normalized = parsed
-        .map(parseEmotionItem)
-        .filter((item): item is Emotion => item !== null);
-
-      let changed = false;
-      const next = normalized.map((emotion) => {
-        if (emotion.name.trim().toLowerCase() === target) {
-          if (emotion.category !== category) {
-            changed = true;
-          }
-          return { ...emotion, category };
-        }
-        return emotion;
-      });
-
-      if (!changed) {
-        continue;
-      }
-
-      await db.runAsync(
-        "UPDATE moods SET emotions = ? WHERE id = ?;",
-        serializeEmotions(next),
-        row.id
-      );
-      updated += 1;
-    }
-
-    await upsertEmotionCategory(emotionName, category);
-    await db.execAsync("COMMIT;");
-    return { updated };
-  } catch (error) {
-    await db.execAsync("ROLLBACK;");
-    throw error;
-  }
+  await upsertEmotionCategory(emotionName, category);
+  return { updated: 0 };
 }
 
 export async function removeEmotionFromMoods(
   emotionName: string
 ): Promise<{ updated: number }> {
-  const db = await getDb();
-  const target = emotionName.trim().toLowerCase();
-  let updated = 0;
-
-  await db.execAsync("BEGIN TRANSACTION;");
-  try {
-    const rows = await db.getAllAsync<Pick<MoodRow, "id" | "emotions">>(
-      "SELECT id, emotions FROM moods;"
-    );
-
-    for (const row of rows) {
-      const rawEmotions = row.emotions;
-      if (!rawEmotions || rawEmotions === "[]") {
-        continue;
-      }
-
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(rawEmotions);
-      } catch {
-        continue;
-      }
-
-      if (!Array.isArray(parsed)) {
-        continue;
-      }
-
-      const normalized = parsed
-        .map(parseEmotionItem)
-        .filter((item): item is Emotion => item !== null);
-
-      const next = normalized.filter(
-        (emotion) => emotion.name.trim().toLowerCase() !== target
-      );
-
-      if (next.length === normalized.length) {
-        continue;
-      }
-
-      await db.runAsync(
-        "UPDATE moods SET emotions = ? WHERE id = ?;",
-        serializeEmotions(next),
-        row.id
-      );
-      await linkEmotionsToMood(db, row.id, next);
-      updated += 1;
-    }
-
-    await deleteEmotion(emotionName);
-    await db.execAsync("COMMIT;");
-    return { updated };
-  } catch (error) {
-    await db.execAsync("ROLLBACK;");
-    throw error;
-  }
+  await deleteEmotion(emotionName);
+  return { updated: 0 };
 }
 
 export async function getEmotionNamesFromMoods(): Promise<string[]> {

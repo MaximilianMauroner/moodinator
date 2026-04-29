@@ -90,8 +90,6 @@ export const DateTimePickerModal: React.FC<Props> = ({
   if (!visible || !mood || !moodData) return null;
 
   const hasChanged = selectedDate.getTime() !== mood.timestamp;
-  const photoCount = mood.photos?.length ?? 0;
-  const voiceMemoCount = mood.voiceMemos?.length ?? 0;
 
   return (
     <SafeAreaView>
@@ -279,127 +277,6 @@ export const DateTimePickerModal: React.FC<Props> = ({
                         </View>
                       );
                     })}
-                  </View>
-                </View>
-              )}
-
-              {/* Location */}
-              {mood.location && (
-                <View className="mt-4">
-                  <View className="flex-row items-center mb-2">
-                    <Ionicons
-                      name="location"
-                      size={14}
-                      color={get("textMuted")}
-                    />
-                    <Text
-                      className="text-xs font-medium ml-1.5"
-                      style={{ color: get("textMuted") }}
-                    >
-                      Location
-                    </Text>
-                  </View>
-                  <View
-                    className="flex-row items-center p-3 rounded-xl"
-                    style={{ backgroundColor: get("surfaceAlt") }}
-                  >
-                    <View
-                      className="w-8 h-8 rounded-lg items-center justify-center mr-3"
-                      style={{
-                        backgroundColor: isDark
-                          ? colors.positive.bg.dark
-                          : colors.positive.bg.light,
-                      }}
-                    >
-                      <Ionicons
-                        name="navigate"
-                        size={16}
-                        color={isDark ? colors.positive.text.dark : colors.positive.text.light}
-                      />
-                    </View>
-                    <View className="flex-1">
-                      {mood.location.name ? (
-                        <>
-                          <Text
-                            className="text-sm font-semibold"
-                            style={{ color: get("text") }}
-                            numberOfLines={1}
-                          >
-                            {mood.location.name}
-                          </Text>
-                          <Text
-                            className="text-[10px]"
-                            style={{ color: get("textMuted") }}
-                          >
-                            {mood.location.latitude.toFixed(4)}, {mood.location.longitude.toFixed(4)}
-                          </Text>
-                        </>
-                      ) : (
-                        <Text
-                          className="text-sm font-medium"
-                          style={{ color: get("text") }}
-                        >
-                          {mood.location.latitude.toFixed(4)}, {mood.location.longitude.toFixed(4)}
-                        </Text>
-                      )}
-                    </View>
-                  </View>
-                </View>
-              )}
-
-              {/* Media attachments */}
-              {(photoCount > 0 || voiceMemoCount > 0) && (
-                <View className="mt-4">
-                  <View className="flex-row items-center mb-2">
-                    <Ionicons
-                      name="attach"
-                      size={14}
-                      color={get("textMuted")}
-                    />
-                    <Text
-                      className="text-xs font-medium ml-1.5"
-                      style={{ color: get("textMuted") }}
-                    >
-                      Attachments
-                    </Text>
-                  </View>
-                  <View className="flex-row gap-3">
-                    {photoCount > 0 && (
-                      <View
-                        className="flex-row items-center px-3 py-2 rounded-xl"
-                        style={{ backgroundColor: get("surfaceAlt") }}
-                      >
-                        <Ionicons
-                          name="images"
-                          size={16}
-                          color={isDark ? colors.sand.text.dark : colors.sand.text.light}
-                        />
-                        <Text
-                          className="text-xs font-medium ml-2"
-                          style={{ color: get("textSubtle") }}
-                        >
-                          {photoCount} photo{photoCount !== 1 ? "s" : ""}
-                        </Text>
-                      </View>
-                    )}
-                    {voiceMemoCount > 0 && (
-                      <View
-                        className="flex-row items-center px-3 py-2 rounded-xl"
-                        style={{ backgroundColor: get("surfaceAlt") }}
-                      >
-                        <Ionicons
-                          name="mic"
-                          size={16}
-                          color={isDark ? colors.sand.text.dark : colors.sand.text.light}
-                        />
-                        <Text
-                          className="text-xs font-medium ml-2"
-                          style={{ color: get("textSubtle") }}
-                        >
-                          {voiceMemoCount} voice memo{voiceMemoCount !== 1 ? "s" : ""}
-                        </Text>
-                      </View>
-                    )}
                   </View>
                 </View>
               )}

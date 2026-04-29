@@ -1,3 +1,5 @@
+import { vi } from "vitest";
+
 /**
  * Tests for emotion management functions.
  */
@@ -7,8 +9,8 @@ import { createMockDb } from "./mockClient";
 // Mock the database client module
 const mockDb = createMockDb();
 
-jest.mock("../../db/client", () => ({
-  getDb: jest.fn(() => Promise.resolve(mockDb)),
+vi.mock("../../db/client", () => ({
+  getDb: vi.fn(() => Promise.resolve(mockDb)),
 }));
 
 // Import after mocking
@@ -25,7 +27,7 @@ import type { Emotion } from "../../db/types";
 describe("Emotions", () => {
   beforeEach(() => {
     mockDb.__reset();
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe("getAllEmotions", () => {
@@ -162,7 +164,7 @@ describe("Emotions", () => {
 describe("linkEmotionsToMood", () => {
   beforeEach(() => {
     mockDb.__reset();
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it("clears existing links before adding new ones", async () => {

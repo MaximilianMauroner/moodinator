@@ -27,7 +27,7 @@ const options = {
   ignoreAndroidSystemSettings: true,
 };
 
-const hapticMap: Record<Exclude<HapticStyle, "none">, HapticFeedbackTypes> = {
+const hapticMap: Record<Exclude<HapticStyle, "none">, string> = {
   selection: HapticFeedbackTypes.selection,
   light: HapticFeedbackTypes.impactLight,
   medium: HapticFeedbackTypes.impactMedium,

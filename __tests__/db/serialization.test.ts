@@ -128,6 +128,7 @@ describe("toMoodEntry", () => {
       emotions: '[{"name":"Happy","category":"positive"}]',
       context_tags: '["work"]',
       energy: 8,
+      mood_scale_json: null,
       photos_json: null,
       location_json: null,
       voice_memos_json: null,
@@ -144,6 +145,12 @@ describe("toMoodEntry", () => {
       emotions: [{ name: "Happy", category: "positive" }],
       contextTags: ["work"],
       energy: 8,
+      moodScale: {
+        version: 1,
+        min: 0,
+        max: 10,
+        lowerIsBetter: true,
+      },
       photos: [],
       location: null,
       voiceMemos: [],
@@ -160,6 +167,7 @@ describe("toMoodEntry", () => {
       emotions: "[]",
       context_tags: "[]",
       energy: null,
+      mood_scale_json: null,
       photos_json: null,
       location_json: null,
       voice_memos_json: null,
@@ -179,6 +187,7 @@ describe("toMoodEntry", () => {
       emotions: "[]",
       context_tags: "[]",
       energy: null,
+      mood_scale_json: null,
       photos_json: null,
       location_json: null,
       voice_memos_json: null,
@@ -198,6 +207,7 @@ describe("toMoodEntry", () => {
       emotions: "[]",
       context_tags: "[]",
       energy: null,
+      mood_scale_json: null,
       photos_json: null,
       location_json: null,
       voice_memos_json: null,
@@ -217,6 +227,7 @@ describe("toMoodEntry", () => {
       emotions: "[]",
       context_tags: "[]",
       energy: undefined,
+      mood_scale_json: null,
       photos_json: null,
       location_json: null,
       voice_memos_json: null,
@@ -236,6 +247,7 @@ describe("toMoodEntry", () => {
       emotions: '["Happy","Sad"]',
       context_tags: "[]",
       energy: null,
+      mood_scale_json: null,
       photos_json: null,
       location_json: null,
       voice_memos_json: null,
@@ -258,6 +270,7 @@ describe("toMoodEntry", () => {
       emotions: "",
       context_tags: "[]",
       energy: null,
+      mood_scale_json: null,
       photos_json: null,
       location_json: null,
       voice_memos_json: null,
@@ -277,6 +290,7 @@ describe("toMoodEntry", () => {
       emotions: "not valid json",
       context_tags: "[]",
       energy: null,
+      mood_scale_json: null,
       photos_json: null,
       location_json: null,
       voice_memos_json: null,
@@ -296,6 +310,7 @@ describe("toMoodEntry", () => {
       emotions: "[]",
       context_tags: "[]",
       energy: null,
+      mood_scale_json: null,
       photos_json: '["file://photo1.jpg","file://photo2.jpg"]',
       location_json: '{"latitude":40.7128,"longitude":-74.006,"name":"New York"}',
       voice_memos_json: '["file://memo1.m4a"]',
@@ -327,6 +342,12 @@ describe("normalizeInput", () => {
     expect(result.emotions).toEqual([{ name: "Happy", category: "positive" }]);
     expect(result.contextTags).toEqual(["work"]);
     expect(result.energy).toBe(8);
+    expect(result.moodScale).toEqual({
+      version: 1,
+      min: 0,
+      max: 10,
+      lowerIsBetter: true,
+    });
     expect(result.timestamp).toBe(1705320000000);
   });
 

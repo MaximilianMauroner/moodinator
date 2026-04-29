@@ -7,6 +7,7 @@ import { SettingRow } from "../components/SettingRow";
 
 const APP_VERSION = "1.0.0";
 const SUPPORT_EMAIL = "support.moodinator@lab4code.com";
+const ANDROID_PACKAGE = "com.lab4code.moodinator";
 
 export function AboutSection() {
   const router = useRouter();
@@ -30,11 +31,14 @@ export function AboutSection() {
   };
 
   const handleRatePress = async () => {
-    // TODO: Replace with actual app store URLs when published
-    Alert.alert(
-      "Rate Moodinator",
-      "Thank you for wanting to rate the app! This feature will be available once the app is published to the app stores."
-    );
+    const storeUrl = `market://details?id=${ANDROID_PACKAGE}`;
+    const webUrl = `https://play.google.com/store/apps/details?id=${ANDROID_PACKAGE}`;
+    try {
+      const supported = await Linking.canOpenURL(storeUrl);
+      await Linking.openURL(supported ? storeUrl : webUrl);
+    } catch {
+      Alert.alert("Rate Moodinator", webUrl);
+    }
   };
 
   return (

@@ -2,15 +2,11 @@ import React, { useEffect } from "react";
 import { View, Text, AppState, AppStateStatus, ActivityIndicator } from "react-native";
 import { Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-// import { registerBackgroundBackupTask } from "@db/backgroundBackup";
+import { registerBackgroundBackupTask } from "@db/backgroundBackup";
 import { LockScreen, useAppLockStore } from "@/features/appLock";
 import { OnboardingScreen, useOnboardingStore } from "@/features/onboarding";
 
 import "./global.css";
-
-// Import backgroundBackup at module level to ensure task is defined before registration
-// Temporarily disabled due to expo-task-manager compatibility issue with New Architecture
-// import "@db/backgroundBackup";
 
 function AppBootSplash() {
   return (
@@ -54,9 +50,7 @@ export default function Layout() {
   }, [lock]);
 
   useEffect(() => {
-    // Background backup temporarily disabled due to expo-task-manager compatibility issue
-    // TODO: Re-enable when expo-background-task supports New Architecture
-    // registerBackgroundBackupTask();
+    registerBackgroundBackupTask();
   }, []);
 
   return (

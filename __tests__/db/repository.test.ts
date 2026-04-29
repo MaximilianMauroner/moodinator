@@ -1,3 +1,5 @@
+import { vi } from "vitest";
+
 /**
  * Tests for database repository functions.
  * These tests use a mock SQLite client to verify CRUD operations.
@@ -8,15 +10,15 @@ import { createMockDb } from "./mockClient";
 // Mock the database client module
 const mockDb = createMockDb();
 
-jest.mock("../../db/client", () => ({
-  getDb: jest.fn(() => Promise.resolve(mockDb)),
+vi.mock("../../db/client", () => ({
+  getDb: vi.fn(() => Promise.resolve(mockDb)),
 }));
 
 // Mock emotions functions to avoid circular dependencies
-jest.mock("../../db/moods/emotions", () => ({
-  linkEmotionsToMood: jest.fn(),
-  deleteEmotion: jest.fn(),
-  upsertEmotionCategory: jest.fn(),
+vi.mock("../../db/moods/emotions", () => ({
+  linkEmotionsToMood: vi.fn(),
+  deleteEmotion: vi.fn(),
+  upsertEmotionCategory: vi.fn(),
 }));
 
 // Import after mocking
@@ -30,13 +32,15 @@ import {
   updateMoodEntry,
   getMoodCount,
   hasMoodBeenLoggedToday,
+  removeEmotionFromMoods,
+  updateEmotionCategoryInMoods,
 } from "../../db/moods/repository";
 import { linkEmotionsToMood } from "../../db/moods/emotions";
 
 describe("Repository", () => {
   beforeEach(() => {
     mockDb.__reset();
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe("insertMood", () => {
@@ -103,6 +107,25 @@ describe("Repository", () => {
 
       expect(result.mood).toBe(6);
       expect(result.id).toBe(1);
+      expect(result.moodScale).toEqual({
+        version: 1,
+        min: 0,
+        max: 10,
+        lowerIsBetter: true,
+      });
+    });
+
+    it("does not persist media or location for new mood entries", async () => {
+      const result = await insertMoodEntry({
+        mood: 6,
+        photos: ["file:///photo.jpg"],
+        location: { latitude: 48.2, longitude: 16.37, name: "Vienna" },
+        voiceMemos: ["file:///memo.m4a"],
+      });
+
+      expect(result.photos).toEqual([]);
+      expect(result.location).toBeNull();
+      expect(result.voiceMemos).toEqual([]);
     });
 
     it("links emotions when provided", async () => {
@@ -263,6 +286,37 @@ describe("Repository", () => {
 
       const result = await getMoodCount();
       expect(result).toBe(3);
+    });
+  });
+
+  describe("Emotion List maintenance", () => {
+    it("does not rewrite historical mood emotions when updating an emotion category", async () => {
+      mockDb.__addMood({
+        mood: 5,
+        emotions: '[{"name":"Calm","category":"neutral"}]',
+      });
+
+      const result = await updateEmotionCategoryInMoods("Calm", "positive");
+
+      expect(result.updated).toBe(0);
+      expect(mockDb.__getMoods()[0].emotions).toBe(
+        '[{"name":"Calm","category":"neutral"}]'
+      );
+    });
+
+    it("does not remove historical mood emotions when deleting an emotion option", async () => {
+      mockDb.__addEmotion({ name: "Calm", category: "positive" });
+      mockDb.__addMood({
+        mood: 5,
+        emotions: '[{"name":"Calm","category":"positive"}]',
+      });
+
+      const result = await removeEmotionFromMoods("Calm");
+
+      expect(result.updated).toBe(0);
+      expect(mockDb.__getMoods()[0].emotions).toBe(
+        '[{"name":"Calm","category":"positive"}]'
+      );
     });
   });
 
