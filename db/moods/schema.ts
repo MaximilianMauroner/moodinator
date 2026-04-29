@@ -63,6 +63,10 @@ async function ensureMoodTableColumns(database: SQLite.SQLiteDatabase) {
       sql: "ALTER TABLE moods ADD COLUMN energy INTEGER;",
     },
     {
+      name: "mood_scale_json",
+      sql: "ALTER TABLE moods ADD COLUMN mood_scale_json TEXT;",
+    },
+    {
       name: "photos_json",
       sql: "ALTER TABLE moods ADD COLUMN photos_json TEXT DEFAULT '[]';",
     },

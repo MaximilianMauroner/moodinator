@@ -1,5 +1,12 @@
-import type { Emotion, MoodEntry, MoodEntryInput, Location } from "../types";
+import type { Emotion, MoodEntry, MoodEntryInput, Location, MoodScaleSnapshot } from "../types";
 import type { MoodRow, RawEmotionItem } from "../types/rows";
+
+export const CURRENT_MOOD_SCALE_SNAPSHOT: MoodScaleSnapshot = {
+  version: 1,
+  min: 0,
+  max: 10,
+  lowerIsBetter: true,
+};
 
 export function serializeArray(value?: string[]): string {
   if (!value || value.length === 0) {
@@ -20,6 +27,10 @@ export function serializeLocation(value?: Location | null): string | null {
     return null;
   }
   return JSON.stringify(value);
+}
+
+export function serializeMoodScale(value?: MoodScaleSnapshot): string {
+  return JSON.stringify(value ?? CURRENT_MOOD_SCALE_SNAPSHOT);
 }
 
 function deserializeArray(value: unknown): string[] {
@@ -106,6 +117,26 @@ function deserializeLocation(value: unknown): Location | null {
   }
 }
 
+function deserializeMoodScale(value: unknown): MoodScaleSnapshot {
+  if (typeof value !== "string" || value.length === 0) {
+    return CURRENT_MOOD_SCALE_SNAPSHOT;
+  }
+  try {
+    const parsed = JSON.parse(value) as Partial<MoodScaleSnapshot>;
+    if (
+      parsed.version === 1 &&
+      parsed.min === 0 &&
+      parsed.max === 10 &&
+      parsed.lowerIsBetter === true
+    ) {
+      return CURRENT_MOOD_SCALE_SNAPSHOT;
+    }
+  } catch {
+    // Fall back below.
+  }
+  return CURRENT_MOOD_SCALE_SNAPSHOT;
+}
+
 export function parseTimestamp(value: unknown): number {
   if (value instanceof Date) {
     return value.getTime();
@@ -138,6 +169,7 @@ export function toMoodEntry(row: MoodRow): MoodEntry {
       row.energy === null || row.energy === undefined
         ? null
         : Number(row.energy),
+    moodScale: deserializeMoodScale(row.mood_scale_json),
     photos: deserializeArray(row.photos_json),
     location: deserializeLocation(row.location_json),
     voiceMemos: deserializeArray(row.voice_memos_json),
@@ -154,10 +186,11 @@ export function normalizeInput(entry: MoodEntryInput) {
       entry.energy === null || entry.energy === undefined
         ? null
         : Math.min(10, Math.max(0, Math.round(entry.energy))),
+    moodScale: entry.moodScale ?? CURRENT_MOOD_SCALE_SNAPSHOT,
     timestamp: entry.timestamp ?? Date.now(),
-    photos: entry.photos ? entry.photos.slice(0, 10) : [],
-    location: entry.location ?? null,
-    voiceMemos: entry.voiceMemos ? entry.voiceMemos.slice(0, 5) : [],
+    photos: [],
+    location: null,
+    voiceMemos: [],
     basedOnEntryId: entry.basedOnEntryId ?? null,
   };
 }

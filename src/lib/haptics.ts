@@ -128,7 +128,7 @@ function playPattern(patternName: PatternName): void {
   }
 }
 
-function trigger(type: HapticFeedbackTypes): void {
+function trigger(type: string): void {
   if (isHapticsSupported && hapticsEnabled) {
     if (Platform.OS === "android") {
       // Use native Vibration API on Android as it's more reliable

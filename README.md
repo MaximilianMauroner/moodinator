@@ -8,7 +8,7 @@ A privacy-focused mood tracking app built with React Native. Track your emotiona
 - **10-point mood scale** from Elated (0) to Crisis (10)
 - **Quick entry** with tap for fast logging
 - **Detailed entry** with long-press for comprehensive records
-- Attach **emotions**, **context tags**, **photos**, **voice notes**, and **location**
+- Attach **emotions**, **context tags**, **energy**, and **notes**
 - Add personal notes to each entry
 
 ### Insights & Analytics

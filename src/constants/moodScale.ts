@@ -1,4 +1,4 @@
-import { MoodScale } from "@/types/mood";
+import type { MoodScale } from "@/types/mood";
 
 // Soft Organic aesthetic - warm, natural tones
 // Light mode: warm creams and earth tones

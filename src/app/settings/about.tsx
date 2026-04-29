@@ -12,6 +12,7 @@ import { IconBadge } from "@/components/ui/IconBadge";
 import { typography } from "@/constants/typography";
 
 const SUPPORT_EMAIL = "support.moodinator@lab4code.com";
+const ANDROID_PACKAGE = "com.lab4code.moodinator";
 
 export default function AboutSettingsScreen() {
   const { colorScheme } = useColorScheme();
@@ -42,8 +43,15 @@ export default function AboutSettingsScreen() {
     });
   };
 
-  const handleRateApp = () => {
-    Alert.alert("Rate App", "Rating feature coming soon! Thank you for your interest.");
+  const handleRateApp = async () => {
+    const storeUrl = `market://details?id=${ANDROID_PACKAGE}`;
+    const webUrl = `https://play.google.com/store/apps/details?id=${ANDROID_PACKAGE}`;
+    try {
+      const supported = await Linking.canOpenURL(storeUrl);
+      await Linking.openURL(supported ? storeUrl : webUrl);
+    } catch {
+      Alert.alert("Rate Moodinator", webUrl);
+    }
   };
 
   return (

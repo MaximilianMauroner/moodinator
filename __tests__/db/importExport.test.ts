@@ -1,3 +1,5 @@
+import { vi } from "vitest";
+
 /**
  * Tests for import/export functionality.
  */
@@ -7,13 +9,13 @@ import { createMockDb } from "./mockClient";
 // Mock the database client module
 const mockDb = createMockDb();
 
-jest.mock("../../db/client", () => ({
-  getDb: jest.fn(() => Promise.resolve(mockDb)),
+vi.mock("../../db/client", () => ({
+  getDb: vi.fn(() => Promise.resolve(mockDb)),
 }));
 
 // Mock emotions functions
-jest.mock("../../db/moods/emotions", () => ({
-  linkEmotionsToMood: jest.fn(),
+vi.mock("../../db/moods/emotions", () => ({
+  linkEmotionsToMood: vi.fn(),
 }));
 
 // Import after mocking
@@ -23,7 +25,7 @@ import { linkEmotionsToMood } from "../../db/moods/emotions";
 describe("Import/Export", () => {
   beforeEach(() => {
     mockDb.__reset();
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe("exportMoods", () => {
@@ -32,7 +34,7 @@ describe("Import/Export", () => {
       expect(JSON.parse(result)).toEqual([]);
     });
 
-    it("exports moods with correct format", async () => {
+    it("exports moods with supported launch fields", async () => {
       mockDb.__addMood({
         mood: 7,
         note: "Great day",
@@ -59,9 +61,12 @@ describe("Import/Export", () => {
         energy: 8,
         note: "Great day",
         notes: "Great day",
-        photos: ["file:///photo.jpg"],
-        location: { latitude: 48.2, longitude: 16.37, name: "Vienna" },
-        voiceMemos: ["file:///memo.m4a"],
+        moodScale: {
+          version: 1,
+          min: 0,
+          max: 10,
+          lowerIsBetter: true,
+        },
         basedOnEntryId: 12,
       });
     });
@@ -90,7 +95,7 @@ describe("Import/Export", () => {
   });
 
   describe("importMoods", () => {
-    it("imports moods from JSON", async () => {
+    it("imports supported mood fields and ignores legacy media fields", async () => {
       const data = JSON.stringify([
         {
           mood: 7,
@@ -114,9 +119,15 @@ describe("Import/Export", () => {
       const moods = mockDb.__getMoods();
       expect(moods).toHaveLength(1);
       expect(moods[0].mood).toBe(7);
-      expect(moods[0].photos_json).toBe('["file:///photo.jpg"]');
-      expect(moods[0].location_json).toBe('{"latitude":48.2,"longitude":16.37,"name":"Vienna"}');
-      expect(moods[0].voice_memos_json).toBe('["file:///memo.m4a"]');
+      expect(moods[0].photos_json).toBe("[]");
+      expect(moods[0].location_json).toBeNull();
+      expect(moods[0].voice_memos_json).toBe("[]");
+      expect(JSON.parse(moods[0].mood_scale_json!)).toEqual({
+        version: 1,
+        min: 0,
+        max: 10,
+        lowerIsBetter: true,
+      });
       expect(moods[0].based_on_entry_id).toBe(3);
     });
 
@@ -274,7 +285,7 @@ describe("Import/Export", () => {
   });
 
   describe("Round-trip import/export", () => {
-    it("preserves data through export and import cycle", async () => {
+    it("preserves supported data through export and import cycle", async () => {
       // Add some moods
       mockDb.__addMood({
         mood: 7,
@@ -291,8 +302,6 @@ describe("Import/Export", () => {
 
       // Export
       const exported = await exportMoods();
-      const parsedExport = JSON.parse(exported);
-
       // Clear and reimport
       mockDb.__reset();
       await importMoods(exported);
@@ -304,9 +313,9 @@ describe("Import/Export", () => {
       expect(moods[0].note).toBe("Great day");
       expect(moods[0].timestamp).toBe(1705320000000);
       expect(moods[0].energy).toBe(8);
-      expect(moods[0].photos_json).toBe('["file:///photo.jpg"]');
-      expect(moods[0].location_json).toBe('{"latitude":48.2,"longitude":16.37,"name":"Vienna"}');
-      expect(moods[0].voice_memos_json).toBe('["file:///memo.m4a"]');
+      expect(moods[0].photos_json).toBe("[]");
+      expect(moods[0].location_json).toBeNull();
+      expect(moods[0].voice_memos_json).toBe("[]");
       expect(moods[0].based_on_entry_id).toBe(5);
     });
 

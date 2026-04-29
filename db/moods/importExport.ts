@@ -1,4 +1,4 @@
-import type { Emotion, Location } from "../types";
+import type { Emotion } from "../types";
 import { getDb } from "../client";
 import { getMoodsWithinRange } from "./repository";
 import type { MoodDateRange } from "./range";
@@ -8,38 +8,11 @@ import {
   sanitizeImportedEmotions,
   serializeArray,
   serializeEmotions,
-  serializeLocation,
+  serializeMoodScale,
 } from "./serialization";
 import { linkEmotionsToMood } from "./emotions";
 import { parseEmotionItem } from "./emotionUtils";
 import { sanitizeMoodValue, sanitizeTimestamp } from "../validation";
-
-function sanitizeImportedLocation(value: unknown): Location | null {
-  if (typeof value !== "object" || value === null) {
-    return null;
-  }
-
-  const location = value as Record<string, unknown>;
-  const { latitude, longitude, name } = location;
-  if (
-    typeof latitude !== "number" ||
-    Number.isNaN(latitude) ||
-    typeof longitude !== "number" ||
-    Number.isNaN(longitude)
-  ) {
-    return null;
-  }
-
-  if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
-    return null;
-  }
-
-  return {
-    latitude,
-    longitude,
-    name: typeof name === "string" && name.trim().length > 0 ? name.trim() : undefined,
-  };
-}
 
 function sanitizeBasedOnEntryId(value: unknown): number | null {
   if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
@@ -61,9 +34,7 @@ export async function exportMoods(range?: MoodDateRange): Promise<string> {
       energy: entry.energy,
       note: entry.note,
       notes: entry.note,
-      photos: entry.photos,
-      location: entry.location,
-      voiceMemos: entry.voiceMemos,
+      moodScale: entry.moodScale,
       basedOnEntryId: entry.basedOnEntryId,
     }))
   );
@@ -117,22 +88,20 @@ export async function importMoods(jsonData: string): Promise<ImportResult> {
       const contextSource = rawMood?.contextTags ?? rawMood?.context ?? [];
       const contextTags = sanitizeImportedArray(contextSource);
       const energy = sanitizeEnergy(rawMood?.energy);
-      const photos = sanitizeImportedArray(rawMood?.photos);
-      const location = sanitizeImportedLocation(rawMood?.location);
-      const voiceMemos = sanitizeImportedArray(rawMood?.voiceMemos);
       const basedOnEntryId = sanitizeBasedOnEntryId(rawMood?.basedOnEntryId);
 
       const dbResult = await db.runAsync(
-        "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy, photos_json, location_json, voice_memos_json, based_on_entry_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
+        "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy, mood_scale_json, photos_json, location_json, voice_memos_json, based_on_entry_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
         moodValue,
         note,
         timestamp,
         serializeEmotions(emotions),
         serializeArray(contextTags),
         energy,
-        serializeArray(photos),
-        serializeLocation(location),
-        serializeArray(voiceMemos),
+        serializeMoodScale(),
+        "[]",
+        null,
+        "[]",
         basedOnEntryId
       );
 
@@ -193,22 +162,20 @@ export async function importOldBackup(jsonData: string): Promise<ImportResult> {
       const contextSource = mood?.contextTags ?? mood?.context ?? [];
       const contextTags = sanitizeImportedArray(contextSource);
       const energy = sanitizeEnergy(mood?.energy);
-      const photos = sanitizeImportedArray(mood?.photos);
-      const location = sanitizeImportedLocation(mood?.location);
-      const voiceMemos = sanitizeImportedArray(mood?.voiceMemos);
       const basedOnEntryId = sanitizeBasedOnEntryId(mood?.basedOnEntryId);
 
       const dbResult = await db.runAsync(
-        "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy, photos_json, location_json, voice_memos_json, based_on_entry_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
+        "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy, mood_scale_json, photos_json, location_json, voice_memos_json, based_on_entry_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
         moodValue,
         note,
         timestamp,
         serializeEmotions(emotions),
         serializeArray(contextTags),
         energy,
-        serializeArray(photos),
-        serializeLocation(location),
-        serializeArray(voiceMemos),
+        serializeMoodScale(),
+        "[]",
+        null,
+        "[]",
         basedOnEntryId
       );
 
