@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect } from "react";
 import { View, Text, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import { useSettingsStore } from "@/shared/state/settingsStore";
 import type { QuickEntryPrefs } from "@/lib/entrySettings";
 import { SettingsPageHeader } from "@/features/settings/components/SettingsPageHeader";
@@ -48,9 +49,12 @@ export default function QuickEntrySettingsScreen() {
         {/* Info banner */}
         <View className="mx-4 mb-4 p-4 rounded-2xl bg-sand-100 dark:bg-sand-800">
           <View className="flex-row items-center mb-2">
-            <Text className="text-2xl mr-2">
-              {activeCount === 4 ? "🎯" : activeCount >= 2 ? "⚡" : "💨"}
-            </Text>
+            <Ionicons
+              name={activeCount === 4 ? "checkmark-circle-outline" : activeCount >= 2 ? "flash-outline" : "water-outline"}
+              size={20}
+              color="#9D8660"
+              style={{ marginRight: 8 }}
+            />
             <Text className="text-base font-bold text-sand-600 dark:text-sand-400">
               {activeCount} of 4 fields enabled
             </Text>

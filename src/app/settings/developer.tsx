@@ -2,6 +2,7 @@ import React, { useCallback, useEffect } from "react";
 import { View, Text, ScrollView, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Ionicons } from "@expo/vector-icons";
 import * as Notifications from "expo-notifications";
 import { clearMoods, seedMoods } from "@db/db";
 import { useSettingsStore } from "@/shared/state/settingsStore";
@@ -127,7 +128,7 @@ export default function DeveloperSettingsScreen() {
         {/* Warning banner */}
         <View className="mx-4 mb-4 p-4 rounded-2xl bg-sand-100 dark:bg-sand-800">
           <View className="flex-row items-center mb-2">
-            <Text className="text-2xl mr-2">⚠️</Text>
+            <Ionicons name="warning-outline" size={22} color="#9D8660" style={{ marginRight: 8 }} />
             <Text className="text-base font-bold text-sand-600 dark:text-sand-400">
               Advanced Options
             </Text>
@@ -196,7 +197,7 @@ export default function DeveloperSettingsScreen() {
 
         {!devOptionsEnabled && (
           <View className="mx-4 mt-4 p-6 items-center">
-            <Text className="text-4xl mb-3">🔒</Text>
+            <Ionicons name="lock-closed-outline" size={36} color="#9D8660" style={{ marginBottom: 12 }} />
             <Text className="text-sm text-sand-500 dark:text-sand-400 text-center">
               Enable Developer Mode above to access testing and advanced options.
             </Text>

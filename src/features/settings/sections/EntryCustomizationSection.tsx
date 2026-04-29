@@ -45,7 +45,7 @@ export function EntryCustomizationSection({
 }) {
   return (
     <>
-      <SectionHeader title="Quick Entry" icon="⚡" />
+      <SectionHeader title="Quick Entry" icon="flash-outline" />
       <SettingCard>
         <ToggleRow
           title="Emotions"
@@ -78,7 +78,7 @@ export function EntryCustomizationSection({
         />
       </SettingCard>
 
-      <SectionHeader title="Customize" icon="✨" />
+      <SectionHeader title="Customize" icon="sparkles-outline" />
       <SettingCard>
         <EmotionListEditor
           title="Emotions"

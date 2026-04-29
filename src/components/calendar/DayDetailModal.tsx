@@ -113,7 +113,7 @@ export function DayDetailModal({
                   className="w-16 h-16 rounded-2xl items-center justify-center mb-4"
                   style={{ backgroundColor: get("surfaceAlt") }}
                 >
-                  <Text className="text-3xl">📭</Text>
+                  <Ionicons name="mail-open-outline" size={30} color={get("textMuted")} />
                 </View>
                 <Text
                   className="text-base font-semibold mb-2"

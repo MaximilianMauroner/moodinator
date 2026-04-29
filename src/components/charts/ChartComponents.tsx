@@ -535,7 +535,7 @@ export const getTrendInterpretation = (trend: number) => {
     return {
       color: "green",
       text: "Trending Better",
-      emoji: "🎉",
+      iconName: "trending-up-outline" as const,
       textClass: "text-emerald-600",
       bgClass: "bg-emerald-100 dark:bg-emerald-900/30",
     };
@@ -543,7 +543,7 @@ export const getTrendInterpretation = (trend: number) => {
     return {
       color: "blue",
       text: "Improving",
-      emoji: "📈",
+      iconName: "arrow-up-outline" as const,
       textClass: "text-blue-600",
       bgClass: "bg-blue-100 dark:bg-blue-900/30",
     };
@@ -551,7 +551,7 @@ export const getTrendInterpretation = (trend: number) => {
     return {
       color: "red",
       text: "Declining",
-      emoji: "📉",
+      iconName: "trending-down-outline" as const,
       textClass: "text-red-600",
       bgClass: "bg-red-100 dark:bg-red-900/30",
     };
@@ -559,14 +559,14 @@ export const getTrendInterpretation = (trend: number) => {
     return {
       color: "orange",
       text: "Slight Dip",
-      emoji: "📊",
+      iconName: "arrow-down-outline" as const,
       textClass: "text-amber-600",
       bgClass: "bg-amber-100 dark:bg-amber-900/30",
     };
   return {
     color: "gray",
     text: "Steady",
-    emoji: "➡️",
+    iconName: "remove-outline" as const,
     textClass: "text-slate-600",
     bgClass: "bg-slate-100 dark:bg-slate-800",
   };

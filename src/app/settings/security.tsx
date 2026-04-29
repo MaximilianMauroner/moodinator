@@ -1,7 +1,9 @@
 import React, { useEffect, useCallback } from "react";
 import { View, Text, ScrollView, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { useColorScheme } from "nativewind";
 import { useAppLockStore, useBiometrics } from "@/features/appLock";
 import { SettingsPageHeader } from "@/features/settings/components/SettingsPageHeader";
 import { SettingsSection } from "@/features/settings/components/SettingsSection";
@@ -9,6 +11,9 @@ import { SettingRow } from "@/features/settings/components/SettingRow";
 import { ToggleRow } from "@/features/settings/components/ToggleRow";
 
 export default function SecuritySettingsScreen() {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === "dark";
+
   const {
     hydrated,
     hydrate,
@@ -99,7 +104,7 @@ export default function SecuritySettingsScreen() {
         {/* Info banner */}
         <View className="mx-4 mb-4 p-4 rounded-2xl bg-sage-100 dark:bg-sage-800/30">
           <View className="flex-row items-center mb-2">
-            <Text className="text-2xl mr-2">🔒</Text>
+            <Ionicons name="lock-closed-outline" size={20} color={isDark ? "#A8C5A8" : "#5B8A5B"} style={{ marginRight: 8 }} />
             <Text className="text-base font-bold text-sage-600 dark:text-sage-400">
               Protect Your Data
             </Text>
@@ -152,7 +157,7 @@ export default function SecuritySettingsScreen() {
         {!canUseBiometrics && (
           <View className="mx-4 mt-4 p-4 rounded-2xl bg-sand-100 dark:bg-sand-800/30">
             <View className="flex-row items-center mb-2">
-              <Text className="text-xl mr-2">ℹ️</Text>
+              <Ionicons name="information-circle-outline" size={20} color="#9D8660" style={{ marginRight: 8 }} />
               <Text className="text-sm font-semibold text-sand-600 dark:text-sand-400">
                 Biometrics Not Available
               </Text>

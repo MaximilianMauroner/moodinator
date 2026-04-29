@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useColorScheme } from "nativewind";
 
+
 interface ProfileCardProps {
   entryCount: number;
   daysTracking: number;
@@ -28,7 +29,7 @@ export function ProfileCard({ entryCount, daysTracking }: ProfileCardProps) {
             <View className="w-16 h-16 rounded-2xl items-center justify-center bg-sage-100 dark:bg-sage-600/20">
               {/* Subtle inner glow effect */}
               <View className="absolute w-12 h-12 rounded-xl bg-sage-500/10 dark:bg-sage-300/15" />
-              <Text className="text-3xl">🌿</Text>
+              <Ionicons name="leaf-outline" size={30} color={isDark ? "#A8C5A8" : "#5B8A5B"} />
             </View>
           </View>
 

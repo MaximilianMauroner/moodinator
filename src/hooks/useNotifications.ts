@@ -9,7 +9,7 @@ const NOTIFICATION_SCHEDULED_ID_KEY = 'moodReminderScheduledId';
 const NOTIFICATIONS_LIST_KEY = 'notificationsList';
 
 // Constants to identify our app's reminder notifications
-const MOOD_REMINDER_TITLE = '👋 How are you feeling?';
+const MOOD_REMINDER_TITLE = 'How are you feeling?';
 const MOOD_REMINDER_TAG = 'mood-reminder';
 
 export interface NotificationConfig {

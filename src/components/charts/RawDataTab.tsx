@@ -6,6 +6,7 @@ import {
   useWindowDimensions,
   RefreshControl,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { LineChart } from "react-native-chart-kit";
 import { format } from "date-fns";
 import type { MoodEntry } from "@db/types";
@@ -250,9 +251,12 @@ export const RawDataTab = ({
         <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
       }
     >
-      <Text className="text-xl font-semibold text-center mb-4 text-purple-600 dark:text-purple-400 mx-4">
-        🔬 Raw Mood Data Analysis
-      </Text>
+      <View className="flex-row items-center justify-center mb-4 mx-4 gap-2">
+        <Ionicons name="flask-outline" size={20} color={isDark ? "#c084fc" : "#9333ea"} />
+        <Text className="text-xl font-semibold text-purple-600 dark:text-purple-400">
+          Raw Mood Data Analysis
+        </Text>
+      </View>
 
       {/* Raw Data Statistics */}
       <View className="mx-4 mb-6 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-xl shadow-sm">

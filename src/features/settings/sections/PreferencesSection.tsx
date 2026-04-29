@@ -15,7 +15,7 @@ export function PreferencesSection({
 }) {
   return (
     <>
-      <SectionHeader title="Display" icon="🎨" />
+      <SectionHeader title="Display" icon="color-palette-outline" />
       <SettingCard>
         <ToggleRow
           title="Detailed Labels"
@@ -26,7 +26,7 @@ export function PreferencesSection({
         />
       </SettingCard>
 
-      <SectionHeader title="Notifications" icon="🔔" />
+      <SectionHeader title="Notifications" icon="notifications-outline" />
       <SettingCard>
         <SettingRow
           label="Notification Settings"

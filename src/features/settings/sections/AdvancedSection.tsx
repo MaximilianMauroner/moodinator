@@ -19,7 +19,7 @@ export function AdvancedSection({
 }) {
   return (
     <>
-      <SectionHeader title="Developer" icon="🛠️" />
+      <SectionHeader title="Developer" icon="construct-outline" />
       <SettingCard>
         <ToggleRow
           title="Developer Mode"

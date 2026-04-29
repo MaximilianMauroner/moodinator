@@ -62,15 +62,17 @@ export const OverviewTab = ({
             <Text className="text-lg font-bold text-slate-800 dark:text-slate-100">
             Weekly Pulse
             </Text>
-            <View className={`px-3 py-1 rounded-full ${trendInterpretation.bgClass}`}>
-            <Text
-                className={`text-xs font-bold ${trendInterpretation.textClass.replace(
-                "500",
-                "700"
-                )}`}
-            >
-                {trendInterpretation.emoji} {trendInterpretation.text}
-            </Text>
+            <View className={`flex-row items-center px-3 py-1 rounded-full gap-1 ${trendInterpretation.bgClass}`}>
+              <Ionicons
+                name={trendInterpretation.iconName}
+                size={12}
+                color={trendInterpretation.textClass.includes("emerald") ? "#059669" : trendInterpretation.textClass.includes("blue") ? "#2563eb" : trendInterpretation.textClass.includes("red") ? "#dc2626" : trendInterpretation.textClass.includes("amber") ? "#d97706" : "#64748b"}
+              />
+              <Text
+                className={`text-xs font-bold ${trendInterpretation.textClass.replace("500", "700")}`}
+              >
+                {trendInterpretation.text}
+              </Text>
             </View>
         </View>
 
