@@ -4,6 +4,7 @@
  */
 
 import type { Emotion, MoodEntry } from "../../db/types";
+import { vi } from "vitest";
 
 export type MockRow = {
   id: number;
@@ -13,6 +14,7 @@ export type MockRow = {
   emotions: string;
   context_tags: string;
   energy: number | null;
+  mood_scale_json: string | null;
   photos_json: string | null;
   location_json: string | null;
   voice_memos_json: string | null;
@@ -42,10 +44,10 @@ export function createMockDb() {
 
   const mockDb = {
     // Transaction methods
-    execAsync: jest.fn().mockResolvedValue(undefined),
+    execAsync: vi.fn().mockResolvedValue(undefined),
 
     // Insert/Update/Delete
-    runAsync: jest.fn(async (sql: string, ...params: any[]) => {
+    runAsync: vi.fn(async (sql: string, ...params: any[]) => {
       // Handle INSERT INTO moods
       if (sql.includes("INSERT INTO moods")) {
         const id = nextMoodId++;
@@ -57,10 +59,11 @@ export function createMockDb() {
           emotions: params[3],
           context_tags: params[4],
           energy: params[5],
-          photos_json: params[6] ?? "[]",
-          location_json: params[7] ?? null,
-          voice_memos_json: params[8] ?? "[]",
-          based_on_entry_id: params[9] ?? null,
+          mood_scale_json: params[6] ?? null,
+          photos_json: params[7] ?? "[]",
+          location_json: params[8] ?? null,
+          voice_memos_json: params[9] ?? "[]",
+          based_on_entry_id: params[10] ?? null,
         };
         moodRows.push(newRow);
         return { lastInsertRowId: id, changes: 1 };
@@ -98,6 +101,9 @@ export function createMockDb() {
                 break;
               case "energy":
                 moodRows[rowIndex].energy = value;
+                break;
+              case "mood_scale_json":
+                moodRows[rowIndex].mood_scale_json = value;
                 break;
               case "photos_json":
                 moodRows[rowIndex].photos_json = value;
@@ -204,7 +210,7 @@ export function createMockDb() {
     }),
 
     // Query single row
-    getFirstAsync: jest.fn(async (sql: string, ...params: any[]) => {
+    getFirstAsync: vi.fn(async (sql: string, ...params: any[]) => {
       // Handle SELECT * FROM moods WHERE id = ?
       if (sql.includes("SELECT * FROM moods WHERE id")) {
         const id = params[0];
@@ -248,7 +254,7 @@ export function createMockDb() {
     }),
 
     // Query multiple rows
-    getAllAsync: jest.fn(async (sql: string, ...params: any[]) => {
+    getAllAsync: vi.fn(async (sql: string, ...params: any[]) => {
       // Handle SELECT * FROM moods ORDER BY timestamp DESC
       if (sql.includes("SELECT * FROM moods") && sql.includes("ORDER BY")) {
         let result = [...moodRows];
@@ -310,6 +316,7 @@ export function createMockDb() {
         emotions: mood.emotions ?? "[]",
         context_tags: mood.context_tags ?? "[]",
         energy: mood.energy ?? null,
+        mood_scale_json: mood.mood_scale_json ?? null,
         photos_json: mood.photos_json ?? "[]",
         location_json: mood.location_json ?? null,
         voice_memos_json: mood.voice_memos_json ?? "[]",
@@ -345,6 +352,7 @@ export function createMockMoodEntry(overrides?: Partial<MoodEntry>): MoodEntry {
     emotions: [],
     contextTags: [],
     energy: null,
+    moodScale: { version: 1, min: 0, max: 10, lowerIsBetter: true },
     photos: [],
     location: null,
     voiceMemos: [],

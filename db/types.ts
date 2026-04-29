@@ -15,6 +15,13 @@ export type Location = {
     name?: string;
 };
 
+export type MoodScaleSnapshot = {
+    version: 1;
+    min: 0;
+    max: 10;
+    lowerIsBetter: true;
+};
+
 /**
  * Represents a single mood entry in the database.
  */
@@ -26,6 +33,7 @@ export type MoodEntry = {
     emotions: Emotion[];
     contextTags: string[];
     energy: number | null;
+    moodScale: MoodScaleSnapshot;
     photos: string[];              // Array of file URIs
     location: Location | null;     // Location coordinates
     voiceMemos: string[];          // Array of audio file URIs
@@ -49,6 +57,7 @@ export type MoodEntryInput = {
     emotions?: Emotion[];
     contextTags?: string[];
     energy?: number | null;
+    moodScale?: MoodScaleSnapshot;
     photos?: string[];
     location?: Location | null;
     voiceMemos?: string[];

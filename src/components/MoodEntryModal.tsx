@@ -14,8 +14,8 @@ import { moodScale } from "@/constants/moodScale";
 import { HapticTab } from "./HapticTab";
 import { useThemeColors, colors } from "@/constants/colors";
 import { typography } from "@/constants/typography";
-import type { Emotion, Location, MoodEntry } from "../../db/types";
-import { PhotoAttachment, LocationPicker, VoiceMemoRecorder, SameAsYesterdayButton } from "./entry";
+import type { Emotion, MoodEntry } from "../../db/types";
+import { SameAsYesterdayButton } from "./entry";
 import { EmotionPicker } from "./entry/EmotionPicker";
 import { EnergySlider } from "./entry/EnergySlider";
 import {
@@ -30,9 +30,6 @@ export type MoodEntryFormValues = {
     contextTags: string[];
     energy: number | null;
     note: string;
-    photos: string[];
-    location: Location | null;
-    voiceMemos: string[];
     basedOnEntryId: number | null;
 };
 
@@ -41,9 +38,6 @@ export type MoodEntryFieldConfig = {
     context: boolean;
     energy: boolean;
     notes: boolean;
-    photos?: boolean;
-    location?: boolean;
-    voiceMemos?: boolean;
 };
 
 type StepId = "mood" | "emotions" | "details";
@@ -278,9 +272,6 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     const [contextTags, setContextTags] = useState<string[]>([]);
     const [energy, setEnergy] = useState<number | null>(null);
     const [note, setNote] = useState("");
-    const [photos, setPhotos] = useState<string[]>([]);
-    const [location, setLocation] = useState<Location | null>(null);
-    const [voiceMemos, setVoiceMemos] = useState<string[]>([]);
     const [basedOnEntryId, setBasedOnEntryId] = useState<number | null>(null);
     const [isSaving, setIsSaving] = useState(false);
 
@@ -295,10 +286,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
         const hasDetails =
             fieldConfig.context ||
             fieldConfig.energy ||
-            fieldConfig.notes ||
-            fieldConfig.photos ||
-            fieldConfig.location ||
-            fieldConfig.voiceMemos;
+            fieldConfig.notes;
         if (hasDetails) s.push("details");
         return s.length ? s : ["details"];
     }, [showMoodSelector, fieldConfig]);
@@ -323,9 +311,6 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                     : null
             );
             setNote(initialValues?.note ?? "");
-            setPhotos(initialValues?.photos ?? []);
-            setLocation(initialValues?.location ?? null);
-            setVoiceMemos(initialValues?.voiceMemos ?? []);
             setBasedOnEntryId(initialValues?.basedOnEntryId ?? null);
             setIsSaving(false);
             setCurrentStep(0);
@@ -362,9 +347,6 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                 contextTags: fieldConfig.context ? contextTags : [],
                 energy: fieldConfig.energy ? energy : null,
                 note: fieldConfig.notes ? note.trim() : "",
-                photos: fieldConfig.photos ? photos : [],
-                location: fieldConfig.location ? location : null,
-                voiceMemos: fieldConfig.voiceMemos ? voiceMemos : [],
                 basedOnEntryId,
             });
             haptics.moodLogged();
@@ -480,11 +462,6 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     );
 
     const renderDetailsStep = () => {
-        const hasMedia =
-            fieldConfig.photos || fieldConfig.location || fieldConfig.voiceMemos;
-        const attachmentCount =
-            photos.length + voiceMemos.length + (location ? 1 : 0);
-
         return (
             <View>
                 {/* Context Tags */}
@@ -593,41 +570,6 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                     </>
                 )}
 
-                {/* Media attachments */}
-                {hasMedia && (
-                    <>
-                        <Separator isDark={isDark} />
-                        <SectionLabel
-                            label="Capture the moment"
-                            isDark={isDark}
-                            badge={
-                                attachmentCount > 0
-                                    ? `${attachmentCount} attached`
-                                    : undefined
-                            }
-                        />
-                        <View className="gap-3">
-                            {fieldConfig.photos && (
-                                <PhotoAttachment
-                                    photos={photos}
-                                    onChange={setPhotos}
-                                />
-                            )}
-                            {fieldConfig.voiceMemos && (
-                                <VoiceMemoRecorder
-                                    memos={voiceMemos}
-                                    onChange={setVoiceMemos}
-                                />
-                            )}
-                            {fieldConfig.location && (
-                                <LocationPicker
-                                    location={location}
-                                    onChange={setLocation}
-                                />
-                            )}
-                        </View>
-                    </>
-                )}
             </View>
         );
     };

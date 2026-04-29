@@ -47,9 +47,6 @@ export function useMoodItemActions({
               emotions: mood.emotions,
               contextTags: mood.contextTags,
               energy: mood.energy,
-              photos: mood.photos,
-              location: mood.location,
-              voiceMemos: mood.voiceMemos,
               basedOnEntryId: mood.basedOnEntryId,
             });
 

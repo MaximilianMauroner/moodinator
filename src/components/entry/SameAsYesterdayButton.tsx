@@ -431,35 +431,6 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
                       </View>
                     )}
 
-                    {/* Media indicators */}
-                    {(previewEntry.photos.length > 0 || previewEntry.voiceMemos.length > 0 || previewEntry.location) && (
-                      <View className="flex-row gap-3 pt-2 border-t mt-2" style={{ borderTopColor: get("border") }}>
-                        {previewEntry.photos.length > 0 && (
-                          <View className="flex-row items-center">
-                            <Ionicons name="image" size={12} color={get("textMuted")} />
-                            <Text className="text-xs ml-1" style={{ color: get("textMuted") }}>
-                              {previewEntry.photos.length}
-                            </Text>
-                          </View>
-                        )}
-                        {previewEntry.voiceMemos.length > 0 && (
-                          <View className="flex-row items-center">
-                            <Ionicons name="mic" size={12} color={get("textMuted")} />
-                            <Text className="text-xs ml-1" style={{ color: get("textMuted") }}>
-                              {previewEntry.voiceMemos.length}
-                            </Text>
-                          </View>
-                        )}
-                        {previewEntry.location && (
-                          <View className="flex-row items-center">
-                            <Ionicons name="location" size={12} color={get("textMuted")} />
-                            <Text className="text-xs ml-1" style={{ color: get("textMuted") }} numberOfLines={1}>
-                              {previewEntry.location.name || "Tagged"}
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                    )}
                   </ScrollView>
 
                   {/* Footer actions */}

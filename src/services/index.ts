@@ -12,3 +12,4 @@ export {
   type DailyChartData,
   type WeeklyChartData,
 } from "./analyticsService";
+export { dataPortabilityService } from "./dataPortabilityService";

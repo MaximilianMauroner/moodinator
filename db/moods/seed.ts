@@ -8,6 +8,7 @@ import {
   sanitizeEnergy,
   sanitizeImportedArray,
   sanitizeImportedEmotions,
+  serializeMoodScale,
 } from "./serialization";
 import { clearMoods } from "./seedUtils";
 import { linkEmotionsToMood } from "./emotions";
@@ -182,13 +183,14 @@ export async function seedMoods() {
       await db.withTransactionAsync(async () => {
         for (const entry of batch) {
           const result = await db.runAsync(
-            "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy) VALUES (?, ?, ?, ?, ?, ?);",
+            "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy, mood_scale_json) VALUES (?, ?, ?, ?, ?, ?, ?);",
             entry.mood,
             entry.note,
             entry.timestamp,
             serializeEmotions(entry.emotions),
             serializeArray(entry.contextTags),
-            entry.energy
+            entry.energy,
+            serializeMoodScale()
           );
 
           if (entry.emotions.length > 0) {
@@ -232,13 +234,14 @@ export async function seedMoodsFromFile(): Promise<{
           const energy = sanitizeEnergy((mood as any)?.energy);
           const timestamp = parseTimestamp((mood as any)?.timestamp);
           const result = await db.runAsync(
-            "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy) VALUES (?, ?, ?, ?, ?, ?);",
+            "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy, mood_scale_json) VALUES (?, ?, ?, ?, ?, ?, ?);",
             mood.mood,
             note,
             timestamp,
             serializeEmotions(emotions),
             serializeArray(contextTags),
-            energy
+            energy,
+            serializeMoodScale()
           );
 
           if (emotions.length > 0) {
