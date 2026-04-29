@@ -50,8 +50,8 @@ export function OnboardingPage({ page, isActive }: OnboardingPageProps) {
 
   const iconAnimatedStyle = useAnimatedStyle(() => ({
     transform: [
-      { translateY },
-      { scale },
+      { translateY: translateY.value },
+      { scale: scale.value },
     ],
   }));
 
