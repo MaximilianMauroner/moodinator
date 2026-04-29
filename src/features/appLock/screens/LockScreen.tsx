@@ -80,7 +80,7 @@ export function LockScreen() {
   }, [iconScale]);
 
   const iconAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: iconScale.value }],
+    transform: [{ scale: iconScale }],
   }));
 
   const finalizeSuccessfulAuth = useCallback(() => {
