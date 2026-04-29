@@ -307,14 +307,14 @@ function HomeScreenContent() {
     () => ({
       height:
         expandedTopSectionHeight -
-        Math.min(topSectionScrollY, topCollapseDistance),
+        Math.min(topSectionScrollY.value, topCollapseDistance),
     }),
     [expandedTopSectionHeight, topCollapseDistance]
   );
 
   const topSectionContentAnimatedStyle = useAnimatedStyle(
     () => {
-      const collapsedOffset = Math.min(topSectionScrollY, topCollapseDistance);
+      const collapsedOffset = Math.min(topSectionScrollY.value, topCollapseDistance);
 
       return {
         opacity: interpolate(

@@ -39,7 +39,7 @@ export function BiometricButton({ onPress, label, icon, disabled }: BiometricBut
   }, [scale]);
 
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale }],
+    transform: [{ scale: scale.value }],
   }));
 
   const handlePress = () => {
