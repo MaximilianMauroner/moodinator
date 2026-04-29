@@ -1,95 +1,45 @@
-import { useState, useCallback, useMemo } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useFocusEffect } from "@react-navigation/native";
-import {
-  DEFAULT_CONTEXTS,
-  DEFAULT_EMOTIONS,
-  DEFAULT_QUICK_ENTRY_PREFS,
-  getContextTags,
-  getEmotionPresets,
-  getQuickEntryPrefs,
-  QuickEntryPrefs,
-} from "@/lib/entrySettings";
-import type { Emotion } from "@db/types";
+import { useMemo } from "react";
+import { useSettingsStore } from "@/shared/state/settingsStore";
 
-const SHOW_LABELS_KEY = "showLabelsPreference";
+// detailedFieldConfig never changes — all fields are always shown in
+// detailed mode. Module-level constant avoids re-creating it each render.
+const detailedFieldConfig = {
+    emotions: true,
+    context: true,
+    energy: true,
+    notes: true,
+} as const;
 
 /**
- * Hook for managing entry settings and preferences.
- * Handles emotion options, context options, quick entry prefs, and label visibility.
+ * Selector hook for entry form settings.
+ *
+ * Reads from useSettingsStore — no AsyncStorage reads, no focus effects.
+ * The store is guaranteed hydrated before any screen mounts (see _layout.tsx).
  */
 export function useEntrySettings() {
-  const [showDetailedLabels, setShowDetailedLabels] = useState(false);
-  const [emotionOptions, setEmotionOptions] = useState<Emotion[]>(DEFAULT_EMOTIONS);
-  const [contextOptions, setContextOptions] = useState<string[]>(DEFAULT_CONTEXTS);
-  const [quickEntryPrefs, setQuickEntryPrefs] = useState<QuickEntryPrefs>(
-    DEFAULT_QUICK_ENTRY_PREFS
-  );
+    const emotions = useSettingsStore((state) => state.emotions);
+    const contexts = useSettingsStore((state) => state.contexts);
+    const quickEntryPrefs = useSettingsStore((state) => state.quickEntryPrefs);
+    const showDetailedLabels = useSettingsStore((state) => state.showDetailedLabels);
 
-  const loadShowLabelsPreference = useCallback(async () => {
-    try {
-      const value = await AsyncStorage.getItem(SHOW_LABELS_KEY);
-      if (value !== null) {
-        setShowDetailedLabels(value === "true");
-      }
-    } catch (error) {
-      console.error("Failed to load label preference:", error);
-    }
-  }, []);
+    const quickEntryFieldConfig = useMemo(
+        () => ({
+            emotions: quickEntryPrefs.showEmotions,
+            context: quickEntryPrefs.showContext,
+            energy: quickEntryPrefs.showEnergy,
+            notes: quickEntryPrefs.showNotes,
+        }),
+        [quickEntryPrefs]
+    );
 
-  const loadEntrySettings = useCallback(async () => {
-    try {
-      const [emotionList, contextList, prefs] = await Promise.all([
-        getEmotionPresets(),
-        getContextTags(),
-        getQuickEntryPrefs(),
-      ]);
-      setEmotionOptions(emotionList);
-      setContextOptions(contextList);
-      setQuickEntryPrefs(prefs);
-    } catch (error) {
-      console.error("Failed to load entry settings:", error);
-    }
-  }, []);
-
-  // Load preferences on mount
-  useFocusEffect(
-    useCallback(() => {
-      loadShowLabelsPreference();
-      loadEntrySettings();
-    }, [loadShowLabelsPreference, loadEntrySettings])
-  );
-
-  const quickEntryFieldConfig = useMemo(
-    () => ({
-      emotions: quickEntryPrefs.showEmotions,
-      context: quickEntryPrefs.showContext,
-      energy: quickEntryPrefs.showEnergy,
-      notes: quickEntryPrefs.showNotes,
-    }),
-    [quickEntryPrefs]
-  );
-
-  const detailedFieldConfig = useMemo(
-    () => ({
-      emotions: true,
-      context: true,
-      energy: true,
-      notes: true,
-    }),
-    []
-  );
-
-  return {
-    showDetailedLabels,
-    emotionOptions,
-    contextOptions,
-    quickEntryPrefs,
-    quickEntryFieldConfig,
-    detailedFieldConfig,
-    loadShowLabelsPreference,
-    loadEntrySettings,
-  };
+    return {
+        showDetailedLabels,
+        emotionOptions: emotions,
+        contextOptions: contexts,
+        quickEntryPrefs,
+        quickEntryFieldConfig,
+        detailedFieldConfig,
+    };
 }
 
 export default useEntrySettings;

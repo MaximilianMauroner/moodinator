@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSettingsStore } from "@/shared/state/settingsStore";
@@ -7,15 +7,10 @@ import { SettingsSection } from "@/features/settings/components/SettingsSection"
 import { ToggleRow } from "@/features/settings/components/ToggleRow";
 
 export default function DisplaySettingsScreen() {
-  const hydrate = useSettingsStore((state) => state.hydrate);
   const showDetailedLabels = useSettingsStore((state) => state.showDetailedLabels);
   const setShowDetailedLabels = useSettingsStore((state) => state.setShowDetailedLabels);
   const hapticsEnabled = useSettingsStore((state) => state.hapticsEnabled);
   const setHapticsEnabled = useSettingsStore((state) => state.setHapticsEnabled);
-
-  useEffect(() => {
-    hydrate();
-  }, [hydrate]);
 
   return (
     <SafeAreaView className="flex-1 bg-paper-100 dark:bg-paper-900" edges={["top"]}>

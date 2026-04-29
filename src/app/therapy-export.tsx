@@ -21,10 +21,12 @@ import * as Sharing from "expo-sharing";
 import * as Clipboard from "expo-clipboard";
 import {
   DEFAULT_THERAPY_EXPORT_PREFS,
-  TherapyExportField,
+  type TherapyExportField,
+} from "@/lib/entrySettings";
+import {
   getTherapyExportPrefs,
   saveTherapyExportPrefs,
-} from "@/lib/entrySettings";
+} from "@/lib/therapyExportPrefs";
 import { MoodDateRange, MoodRangePreset, getMoodsWithinRange } from "@db/db";
 
 type RangeOption = MoodRangePreset | "custom";

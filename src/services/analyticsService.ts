@@ -10,7 +10,7 @@ import {
   processWeeklyMoodData,
   type DailyDataPoint,
   type WeeklyDataPoint,
-} from "@/components/charts/ChartComponents";
+} from "@/lib/moodChartData";
 import { moodService } from "./moodService";
 
 export interface MoodStats {

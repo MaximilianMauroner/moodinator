@@ -2,12 +2,9 @@ import React, { useMemo } from "react";
 import { View, Text, ScrollView, RefreshControl } from "react-native";
 import { endOfWeek, format } from "date-fns";
 import type { MoodEntry } from "@db/types";
-import {
-  processWeeklyMoodData,
-  MiniWeeklyChart,
-  getMoodInterpretation,
-  getTrendInterpretation,
-} from "./ChartComponents";
+import { processWeeklyMoodData } from "@/lib/moodChartData";
+import { getMoodInterpretation, getTrendInterpretation } from "@/lib/moodPresentation";
+import { MiniWeeklyChart } from "./ChartComponents";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { Ionicons } from "@expo/vector-icons";
 

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 import { View, Text, ScrollView, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSettingsStore } from "@/shared/state/settingsStore";
@@ -8,20 +8,15 @@ import { SettingsPageHeader } from "@/features/settings/components/SettingsPageH
 import { SettingsSection } from "@/features/settings/components/SettingsSection";
 import { SettingRow } from "@/features/settings/components/SettingRow";
 import { EmotionListEditor } from "@/features/settings/components/EmotionListEditor";
-import { moodService } from "@/services/moodService";
+import { emotionService } from "@/services/emotionService";
 
 export default function EmotionsSettingsScreen() {
 
-  const hydrate = useSettingsStore((state) => state.hydrate);
   const emotions = useSettingsStore((state) => state.emotions);
   const setEmotions = useSettingsStore((state) => state.setEmotions);
 
   const [newEmotion, setNewEmotion] = useState("");
   const [newEmotionCategory, setNewEmotionCategory] = useState<Emotion["category"]>("neutral");
-
-  useEffect(() => {
-    hydrate();
-  }, [hydrate]);
 
   const handleAddEmotion = useCallback(async () => {
     const trimmed = newEmotion.trim();
@@ -47,11 +42,43 @@ export default function EmotionsSettingsScreen() {
       );
       if (!changed) return;
       await setEmotions(updated);
+
       try {
-        await moodService.updateEmotionCategory(name, category);
+        const preview = await emotionService.previewCategoryHistoricalUpdate(name, category);
+        if (preview.affectedMoodEntryCount === 0) {
+          return;
+        }
+
+        Alert.alert(
+          "Update Past Mood Entries?",
+          `Apply this category change to ${preview.affectedMoodEntryCount} past Mood ${preview.affectedMoodEntryCount === 1 ? "Entry" : "Entries"} that use ${name}?`,
+          [
+            {
+              text: "Future Only",
+              style: "cancel",
+            },
+            {
+              text: "Update Past Entries",
+              onPress: async () => {
+                try {
+                  await emotionService.applyCategoryHistoricalUpdate(name, category);
+                } catch (error) {
+                  console.error("Failed to apply historical category update:", error);
+                  Alert.alert(
+                    "Historical Update Failed",
+                    "The category was saved for future selection only."
+                  );
+                }
+              },
+            },
+          ]
+        );
       } catch (error) {
-        console.error("Failed to update emotion option:", error);
-        Alert.alert("Update Failed", "Emotion category could not be updated.");
+        console.error("Failed to preview historical category update:", error);
+        Alert.alert(
+          "Category Saved",
+          "The category was updated for future selection, but we couldn't preview past Mood Entries."
+        );
       }
     },
     [emotions, setEmotions]
@@ -67,11 +94,6 @@ export default function EmotionsSettingsScreen() {
           onPress: async () => {
             const updated = emotions.filter((item) => item.name !== value);
             await setEmotions(updated.length > 0 ? updated : DEFAULT_EMOTIONS);
-            try {
-              await moodService.removeEmotion(value);
-            } catch (error) {
-              console.error("Failed to remove emotion option:", error);
-            }
           },
         },
       ]);
@@ -81,7 +103,7 @@ export default function EmotionsSettingsScreen() {
 
   const handleImportFromEntries = useCallback(async () => {
     try {
-      const names = await moodService.getEmotionNames();
+      const names = await emotionService.getImportableEmotionNames();
       if (names.length === 0) {
         Alert.alert("No Emotions Found", "No emotions were found in past entries.");
         return;

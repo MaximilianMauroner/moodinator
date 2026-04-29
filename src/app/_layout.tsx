@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { registerBackgroundBackupTask } from "@db/backgroundBackup";
 import { LockScreen, useAppLockStore } from "@/features/appLock";
 import { OnboardingScreen, useOnboardingStore } from "@/features/onboarding";
+import { useSettingsStore } from "@/shared/state/settingsStore";
 
 import "./global.css";
 
@@ -28,14 +29,17 @@ function AppBootSplash() {
 export default function Layout() {
   const { hydrated: lockHydrated, hydrate: hydrateLock, isEnabled, isLocked, lock } = useAppLockStore();
   const { hydrated: onboardingHydrated, hydrate: hydrateOnboarding, hasCompletedOnboarding } = useOnboardingStore();
+  const { hydrated: settingsHydrated, hydrate: hydrateSettings } = useSettingsStore();
 
-  // Hydrate stores on mount
+  // Hydrate all stores on mount before any screen renders.
+  // AppBootSplash is shown until all three resolve.
   useEffect(() => {
     hydrateLock();
     hydrateOnboarding();
-  }, [hydrateLock, hydrateOnboarding]);
+    hydrateSettings();
+  }, [hydrateLock, hydrateOnboarding, hydrateSettings]);
 
-  const hydrated = lockHydrated && onboardingHydrated;
+  const hydrated = lockHydrated && onboardingHydrated && settingsHydrated;
 
   // Lock app when it goes to background
   useEffect(() => {

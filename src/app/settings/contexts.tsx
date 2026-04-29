@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 import { View, Text, ScrollView, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -9,15 +9,10 @@ import { SettingsSection } from "@/features/settings/components/SettingsSection"
 import { ListEditor } from "@/features/settings/components/ListEditor";
 
 export default function ContextsSettingsScreen() {
-  const hydrate = useSettingsStore((state) => state.hydrate);
   const contexts = useSettingsStore((state) => state.contexts);
   const setContexts = useSettingsStore((state) => state.setContexts);
 
   const [newContext, setNewContext] = useState("");
-
-  useEffect(() => {
-    hydrate();
-  }, [hydrate]);
 
   const handleAddContext = useCallback(async () => {
     const trimmed = newContext.trim();
