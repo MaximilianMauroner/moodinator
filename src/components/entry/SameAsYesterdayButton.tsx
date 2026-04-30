@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import Animated, {
   useSharedValue,
+  useAnimatedStyle,
   withTiming,
   withSpring,
   Easing,
@@ -59,6 +60,24 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
   const overlayOpacity = useSharedValue(0);
   const cardScale = useSharedValue(0.92);
   const cardOpacity = useSharedValue(0);
+
+  const overlayAnimatedStyle = useAnimatedStyle(() => ({
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.5)",
+    opacity: overlayOpacity.value,
+  }));
+
+  const cardAnimatedStyle = useAnimatedStyle(
+    () => ({
+      width: windowWidth - 48,
+      maxWidth: 360,
+      opacity: cardOpacity.value,
+      transform: [{ scale: cardScale.value }],
+    }),
+    [windowWidth]
+  );
 
   const fetchLastEntry = async (): Promise<MoodEntry | null> => {
     try {
@@ -214,31 +233,12 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
         animationType="none"
         onRequestClose={handleClosePreview}
       >
-        <Animated.View
-          style={[
-            {
-              flex: 1,
-              justifyContent: "center",
-              alignItems: "center",
-              backgroundColor: "rgba(0,0,0,0.5)",
-              opacity: overlayOpacity,
-            },
-          ]}
-        >
+        <Animated.View style={overlayAnimatedStyle}>
           <Pressable
             style={{ flex: 1, width: "100%", justifyContent: "center", alignItems: "center" }}
             onPress={handleClosePreview}
           >
-          <Animated.View
-            style={[
-              {
-                width: windowWidth - 48,
-                maxWidth: 360,
-                opacity: cardOpacity,
-                transform: [{ scale: cardScale }],
-              },
-            ]}
-          >
+          <Animated.View style={cardAnimatedStyle}>
             <Pressable
               className="rounded-2xl overflow-hidden"
               style={{
