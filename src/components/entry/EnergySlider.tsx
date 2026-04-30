@@ -2,6 +2,7 @@ import React, { useEffect } from "react";
 import { View, Text, Pressable } from "react-native";
 import Animated, {
     useSharedValue,
+    useAnimatedStyle,
     withSpring,
     FadeIn,
     FadeOut,
@@ -78,6 +79,10 @@ const EnergySegment: React.FC<{
         });
     }, [isSelected]);
 
+    const segmentAnimatedStyle = useAnimatedStyle(() => ({
+        transform: [{ scaleY: scaleY.value }],
+    }));
+
     return (
         <Animated.View
             style={[
@@ -97,8 +102,8 @@ const EnergySegment: React.FC<{
                     shadowOpacity: isDark ? 0.4 : 0.3,
                     shadowRadius: 4,
                     elevation: isSelected ? 3 : 0,
-                    transform: [{ scaleY }],
                 },
+                segmentAnimatedStyle,
             ]}
         >
             <Pressable

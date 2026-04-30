@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import Animated, {
     useSharedValue,
+    useAnimatedStyle,
     withTiming,
     withSpring,
     withSequence,
@@ -153,10 +154,20 @@ const MoodAdjustRow: React.FC<{
     const decScale = useSharedValue(1);
     const incScale = useSharedValue(1);
 
+    const pillAnimatedStyle = useAnimatedStyle(() => ({
+        transform: [{ scale: pillScale.value }],
+    }));
+    const decAnimatedStyle = useAnimatedStyle(() => ({
+        transform: [{ scale: decScale.value }],
+    }));
+    const incAnimatedStyle = useAnimatedStyle(() => ({
+        transform: [{ scale: incScale.value }],
+    }));
+
     return (
         <View className="flex-row items-center justify-center gap-3 py-2">
             {/* Decrease (better) */}
-            <Animated.View style={{ transform: [{ scale: decScale }] }}>
+            <Animated.View style={decAnimatedStyle}>
                 <HapticTab
                     onPress={() => canDecrease && onAdjust(mood - 1)}
                     onPressIn={() => {
@@ -204,7 +215,7 @@ const MoodAdjustRow: React.FC<{
                         shadowRadius: 8,
                         elevation: 4,
                     },
-                    { transform: [{ scale: pillScale }] },
+                    pillAnimatedStyle,
                 ]}
             >
                 <Text
@@ -231,7 +242,7 @@ const MoodAdjustRow: React.FC<{
             </Animated.View>
 
             {/* Increase (worse) */}
-            <Animated.View style={{ transform: [{ scale: incScale }] }}>
+            <Animated.View style={incAnimatedStyle}>
                 <HapticTab
                     onPress={() => canIncrease && onAdjust(mood + 1)}
                     onPressIn={() => {
@@ -283,6 +294,11 @@ const AnimatedDot: React.FC<{ isActive: boolean; isDark: boolean }> = ({
         opacity.value = withTiming(isActive ? 1 : 0.35, { duration: 200 });
     }, [isActive]);
 
+    const animatedStyle = useAnimatedStyle(() => ({
+        width: width.value,
+        opacity: opacity.value,
+    }));
+
     return (
         <Animated.View
             style={[
@@ -293,7 +309,7 @@ const AnimatedDot: React.FC<{ isActive: boolean; isDark: boolean }> = ({
                         ? colors.primary.dark
                         : colors.primary.light,
                 },
-                { width, opacity },
+                animatedStyle,
             ]}
         />
     );
@@ -334,8 +350,12 @@ const ContextTagChip: React.FC<{
         });
     }, [isSelected]);
 
+    const chipAnimatedStyle = useAnimatedStyle(() => ({
+        transform: [{ scale: scale.value }],
+    }));
+
     return (
-        <Animated.View style={{ transform: [{ scale }] }}>
+        <Animated.View style={chipAnimatedStyle}>
             <Pressable
                 onPress={onPress}
                 onPressIn={() => {
@@ -400,6 +420,21 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     // ── Footer button press feedback
     const nextBtnScale = useSharedValue(1);
     const backBtnScale = useSharedValue(1);
+
+    const titleOpacityStyle = useAnimatedStyle(() => ({
+        opacity: titleOpacity.value,
+    }));
+    const stepOpacityStyle = useAnimatedStyle(() => ({
+        opacity: stepOpacity.value,
+    }));
+    const backBtnAnimatedStyle = useAnimatedStyle(() => ({
+        flex: 1,
+        transform: [{ scale: backBtnScale.value }],
+    }));
+    const nextBtnAnimatedStyle = useAnimatedStyle(() => ({
+        flex: 1,
+        transform: [{ scale: nextBtnScale.value }],
+    }));
 
     // ── Compute steps
     const steps = useMemo<StepId[]>(() => {
@@ -798,7 +833,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                             {/* Step title — matches step body direction */}
                             <Animated.Text
                                 style={[
-                                    { opacity: titleOpacity },
+                                    titleOpacityStyle,
                                     {
                                         ...typography.eyebrow,
                                         textAlign: "center",
@@ -813,12 +848,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                     </View>
 
                     {/* ── Step content ────────────────────────────────────── */}
-                    <Animated.View
-                        style={{
-                            flex: 1,
-                            opacity: stepOpacity,
-                        }}
-                    >
+                    <Animated.View style={[{ flex: 1 }, stepOpacityStyle]}>
                         <ScrollView
                             className="px-5 pt-5"
                             contentContainerStyle={{ paddingBottom: 28 }}
@@ -847,7 +877,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                         {/* Primary row */}
                         <View className="flex-row gap-3">
                             {/* Back / Cancel */}
-                            <Animated.View style={{ flex: 1, transform: [{ scale: backBtnScale }] }}>
+                            <Animated.View style={backBtnAnimatedStyle}>
                                 <Pressable
                                     onPress={handleBack}
                                     onPressIn={() => {
@@ -890,7 +920,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                             </Animated.View>
 
                             {/* Next / Save */}
-                            <Animated.View style={{ flex: 1, transform: [{ scale: nextBtnScale }] }}>
+                            <Animated.View style={nextBtnAnimatedStyle}>
                                 <Pressable
                                     onPress={handleNext}
                                     onPressIn={() => {

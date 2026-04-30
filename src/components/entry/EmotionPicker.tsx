@@ -2,6 +2,7 @@ import React, { useMemo, useCallback, useEffect } from "react";
 import { View, Text, Pressable, ScrollView } from "react-native";
 import Animated, {
     useSharedValue,
+    useAnimatedStyle,
     withSpring,
     FadeIn,
 } from "react-native-reanimated";
@@ -54,8 +55,12 @@ const EmotionChip: React.FC<EmotionChipProps> = ({
         });
     }, [isSelected]);
 
+    const chipAnimatedStyle = useAnimatedStyle(() => ({
+        transform: [{ scale: scale.value }],
+    }));
+
     return (
-        <Animated.View style={{ transform: [{ scale }] }}>
+        <Animated.View style={chipAnimatedStyle}>
             <Pressable
                 onPress={onPress}
                 onPressIn={() => {
@@ -110,8 +115,12 @@ const SelectedChip: React.FC<{
         scale.value = withSpring(1, { damping: 16, stiffness: 300 });
     }, []);
 
+    const selectedChipAnimatedStyle = useAnimatedStyle(() => ({
+        transform: [{ scale: scale.value }],
+    }));
+
     return (
-        <Animated.View style={{ transform: [{ scale }] }}>
+        <Animated.View style={selectedChipAnimatedStyle}>
             <Pressable
                 onPress={onRemove}
                 className="flex-row items-center px-2.5 py-1.5 rounded-full gap-1"

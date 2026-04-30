@@ -123,7 +123,7 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
     );
 
     const cardAnimatedStyle = useAnimatedStyle(() => ({
-      transform: [{ translateX: translateX.get() }],
+      transform: [{ translateX: translateX.value }],
     }));
 
     return (
