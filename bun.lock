@@ -59,8 +59,9 @@
         "react-native-web": "^0.21.0",
         "react-native-webview": "13.16.0",
         "react-native-worklets": "0.7.2",
+        "sonner": "^2.0.7",
+        "sonner-native": "^0.25.0",
         "tailwindcss": "^3.4.17",
-        "toastify-react-native": "^7.2.0",
         "zustand": "^5.0.9",
       },
       "devDependencies": {
@@ -1878,6 +1879,10 @@
 
     "slugify": ["slugify@1.6.6", "", {}, "sha512-h+z7HKHYXj6wJU+AnS/+IH8Uh9fdcX1Lrhg1/VMdf9PwoBQXFcXiAdsy2tSK0P6gKwJLXp02r90ahUCqHk9rrw=="],
 
+    "sonner": ["sonner@2.0.7", "", { "peerDependencies": { "react": "^18.0.0 || ^19.0.0 || ^19.0.0-rc", "react-dom": "^18.0.0 || ^19.0.0 || ^19.0.0-rc" } }, "sha512-W6ZN4p58k8aDKA4XPcx2hpIQXBRAgyiWVkYhT7CvK6D3iAu7xjvVyhQHg2/iaKJZ1XVJ4r7XuwGL+WGEK37i9w=="],
+
+    "sonner-native": ["sonner-native@0.25.0", "", { "peerDependencies": { "react": "*", "react-native": "*", "react-native-gesture-handler": "^2.28.0", "react-native-reanimated": "^4.1.1", "react-native-safe-area-context": "^5.6.0", "react-native-screens": "^4.16.0", "react-native-svg": "^15.12.1", "react-native-worklets": "^0.6.1 || ^0.7.0" } }, "sha512-WJGsBCYRTHA0/L7L7nZOxsIPqbtv7hCNognh3vj5LE6Pw4RZkIfjUUQAqM4b69qOSYFTNsw4dPI3XPhQKyhrsQ=="],
+
     "source-map": ["source-map@0.5.7", "", {}, "sha512-LbrmJOMUSdEVxIKvdcJzQC+nQhe8FUZQTXQy6+I75skNgn3OoQ0DZA8YnFa7gp8tqtL3KPf1kmo0R5DoApeSGQ=="],
 
     "source-map-js": ["source-map-js@1.2.1", "", {}, "sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA=="],
@@ -1975,8 +1980,6 @@
     "tmpl": ["tmpl@1.0.5", "", {}, "sha512-3f0uOEAQwIqGuWW2MVzYg8fV/QNnc/IpuJNG837rLuczAaLVHslWHZQj4IGiEl5Hs3kkbhwL9Ab7Hrsmuj+Smw=="],
 
     "to-regex-range": ["to-regex-range@5.0.1", "", { "dependencies": { "is-number": "^7.0.0" } }, "sha512-65P7iz6X5yEr1cwcgvQxbbIw7Uk3gOy5dIdtZ4rDveLqhrdJP+Li/Hx6tyK0NEb+2GCyneCMJiGqrADCSNk8sQ=="],
-
-    "toastify-react-native": ["toastify-react-native@7.2.0", "", { "dependencies": { "react-native-vector-icons": "*" }, "peerDependencies": { "react": "*", "react-native": "*" } }, "sha512-IncKBhm/5FRGiJ+PHjwBXDaRPD2O3AV4/LGz4BwRB5g4xC4XrDiqh/UiqlR0Xyt040WNE9qsDLUJgrQRJcMRmQ=="],
 
     "toidentifier": ["toidentifier@1.0.1", "", {}, "sha512-o5sSPKEkg/DIQNmH43V0/uerLrpzVedkUh8tGNvaeXpfpuwjKenlSox/2O/BTlZUtEe+JG7s5YhEz608PlAHRA=="],
 

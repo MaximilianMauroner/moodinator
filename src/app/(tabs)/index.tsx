@@ -69,6 +69,57 @@ const MIN_COLLAPSE_DISTANCE = 80;
 const SNAP_VELOCITY = 900;
 const REFRESH_PULL_DISTANCE = 86;
 
+function UndoToastAction({
+  isDark,
+  onPress,
+}: {
+  isDark: boolean;
+  onPress: () => void;
+}) {
+  const progress = useSharedValue(0);
+
+  useEffect(() => {
+    progress.value = withSpring(1, {
+      damping: 16,
+      stiffness: 220,
+      mass: 0.8,
+    });
+  }, [progress]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: progress.value,
+    transform: [
+      { translateX: interpolate(progress.value, [0, 1], [10, 0], Extrapolation.CLAMP) },
+      { scale: interpolate(progress.value, [0, 1], [0.92, 1], Extrapolation.CLAMP) },
+    ],
+  }));
+
+  return (
+    <HapticTab onPress={onPress}>
+      <Animated.View
+        style={animatedStyle}
+        className="ml-2 rounded-xl px-3 py-2"
+      >
+        <View
+          className="rounded-xl px-3 py-2"
+          style={{
+            backgroundColor: isDark ? "#2D3D2D" : "#E8EFE8",
+            borderWidth: 1,
+            borderColor: isDark ? "#5E7C69" : "#B7CDB7",
+          }}
+        >
+          <Text
+            className="font-semibold text-sm"
+            style={{ color: isDark ? "#A8C5A8" : "#5B8A5B" }}
+          >
+            Undo
+          </Text>
+        </View>
+      </Animated.View>
+    </HapticTab>
+  );
+}
+
 // Toast config with theme support
 const createToastConfig = (isDark: boolean) => ({
   success: ({
@@ -120,19 +171,7 @@ const createToastConfig = (isDark: boolean) => ({
             </Text>
           ) : null}
         </View>
-        <HapticTab onPress={onPress}>
-          <View
-            className="px-3 py-2 rounded-xl ml-2"
-            style={{ backgroundColor: isDark ? "#2D3D2D" : "#E8EFE8" }}
-          >
-            <Text
-              className="font-semibold text-sm"
-              style={{ color: isDark ? "#A8C5A8" : "#5B8A5B" }}
-            >
-              Undo
-            </Text>
-          </View>
-        </HapticTab>
+        <UndoToastAction isDark={isDark} onPress={onPress} />
       </View>
       <HapticTab onPress={hide} className="ml-2">
         <IconSymbol name="xmark" size={18} color={isDark ? "#8AAE98" : "#7A6B55"} />

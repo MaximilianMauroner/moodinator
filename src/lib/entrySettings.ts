@@ -87,6 +87,8 @@ export type QuickEntryPrefs = {
     showNotes: boolean;
 };
 
+export type HistoryCardStyle = "minimal" | "compact";
+
 export type TherapyExportField =
     | "timestamp"
     | "mood"
@@ -105,6 +107,8 @@ export const DEFAULT_QUICK_ENTRY_PREFS: QuickEntryPrefs = {
     showEnergy: true,
     showNotes: false,
 };
+
+export const DEFAULT_HISTORY_CARD_STYLE: HistoryCardStyle = "minimal";
 
 export const DEFAULT_THERAPY_EXPORT_PREFS: TherapyExportPrefs = {
     fields: ["timestamp", "mood", "emotions", "context", "energy", "notes"],
@@ -185,4 +189,8 @@ export function sanitizeTherapyFields(value: unknown): TherapyExportField[] {
             typeof field === "string" && allowed.has(field as TherapyExportField)
     );
     return cleaned.length ? cleaned : DEFAULT_THERAPY_EXPORT_PREFS.fields;
+}
+
+export function sanitizeHistoryCardStyle(value: unknown): HistoryCardStyle {
+    return value === "compact" ? "compact" : DEFAULT_HISTORY_CARD_STYLE;
 }

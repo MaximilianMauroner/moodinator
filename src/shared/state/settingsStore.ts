@@ -2,9 +2,12 @@ import { create } from "zustand";
 import {
     DEFAULT_CONTEXTS,
     DEFAULT_EMOTIONS,
+    DEFAULT_HISTORY_CARD_STYLE,
     DEFAULT_QUICK_ENTRY_PREFS,
     parseEmotionList,
     parseStringList,
+    sanitizeHistoryCardStyle,
+    type HistoryCardStyle,
     type QuickEntryPrefs,
 } from "@/lib/entrySettings";
 import type { Emotion } from "@db/types";
@@ -14,13 +17,16 @@ import {
     CONTEXT_TAGS_KEY,
     QUICK_ENTRY_PREFS_KEY,
     HAPTICS_ENABLED_KEY,
+    HISTORY_CARD_STYLE_KEY,
     SHOW_LABELS_KEY,
 } from "@/shared/storage/keys";
 import {
     getBoolean,
     setBoolean,
     getJson,
+    getString,
     setJson,
+    setString,
 } from "@/shared/storage/asyncStorage";
 import { setHapticsEnabled as setHapticsEnabledGlobal } from "@/lib/haptics";
 
@@ -33,6 +39,7 @@ export type SettingsStore = {
     showDetailedLabels: boolean;
     devOptionsEnabled: boolean;
     hapticsEnabled: boolean;
+    historyCardStyle: HistoryCardStyle;
 
     emotions: Emotion[];
     contexts: string[];
@@ -42,6 +49,7 @@ export type SettingsStore = {
     setShowDetailedLabels: (value: boolean) => Promise<void>;
     setDevOptionsEnabled: (value: boolean) => Promise<void>;
     setHapticsEnabled: (value: boolean) => Promise<void>;
+    setHistoryCardStyle: (value: HistoryCardStyle) => Promise<void>;
 
     setEmotions: (values: Emotion[]) => Promise<void>;
     setContexts: (values: string[]) => Promise<void>;
@@ -54,6 +62,7 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
     showDetailedLabels: false,
     devOptionsEnabled: false,
     hapticsEnabled: true,
+    historyCardStyle: DEFAULT_HISTORY_CARD_STYLE,
 
     emotions: DEFAULT_EMOTIONS,
     contexts: DEFAULT_CONTEXTS,
@@ -64,6 +73,7 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
             showDetailedLabels,
             devOptionsEnabled,
             hapticsEnabled,
+            historyCardStyle,
             emotionsRaw,
             contextsRaw,
             quickEntryPrefsRaw,
@@ -71,6 +81,7 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
             getBoolean(SHOW_LABELS_KEY),
             getBoolean(DEV_OPTIONS_KEY),
             getBoolean(HAPTICS_ENABLED_KEY),
+            getString(HISTORY_CARD_STYLE_KEY),
             getJson<unknown>(EMOTION_PRESETS_KEY),
             getJson<unknown>(CONTEXT_TAGS_KEY),
             getJson<Partial<QuickEntryPrefs>>(QUICK_ENTRY_PREFS_KEY),
@@ -84,6 +95,7 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
             showDetailedLabels: showDetailedLabels ?? false,
             devOptionsEnabled: devOptionsEnabled ?? false,
             hapticsEnabled: hapticsValue,
+            historyCardStyle: sanitizeHistoryCardStyle(historyCardStyle),
             emotions: parseEmotionList(emotionsRaw),
             contexts: parseStringList(contextsRaw, DEFAULT_CONTEXTS),
             quickEntryPrefs: quickEntryPrefsRaw
@@ -111,6 +123,11 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
         setHapticsEnabledGlobal(value);
         set({ hapticsEnabled: value });
         void setBoolean(HAPTICS_ENABLED_KEY, value);
+    },
+
+    setHistoryCardStyle: async (value) => {
+        set({ historyCardStyle: value });
+        void setString(HISTORY_CARD_STYLE_KEY, value);
     },
 
     setEmotions: async (values) => {

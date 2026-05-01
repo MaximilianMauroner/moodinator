@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import {
   DEFAULT_CONTEXTS,
   DEFAULT_EMOTIONS,
+  DEFAULT_HISTORY_CARD_STYLE,
   DEFAULT_QUICK_ENTRY_PREFS,
 } from "../../../src/lib/entrySettings";
 import {
@@ -10,6 +11,7 @@ import {
   DEV_OPTIONS_KEY,
   EMOTION_PRESETS_KEY,
   HAPTICS_ENABLED_KEY,
+  HISTORY_CARD_STYLE_KEY,
   QUICK_ENTRY_PREFS_KEY,
   SHOW_LABELS_KEY,
 } from "../../../src/shared/storage/keys";
@@ -30,6 +32,7 @@ const resetStore = () => {
     showDetailedLabels: false,
     devOptionsEnabled: false,
     hapticsEnabled: true,
+    historyCardStyle: DEFAULT_HISTORY_CARD_STYLE,
     emotions: DEFAULT_EMOTIONS,
     contexts: DEFAULT_CONTEXTS,
     quickEntryPrefs: DEFAULT_QUICK_ENTRY_PREFS,
@@ -47,6 +50,7 @@ describe("useSettingsStore", () => {
     await AsyncStorage.setItem(SHOW_LABELS_KEY, "true");
     await AsyncStorage.setItem(DEV_OPTIONS_KEY, "true");
     await AsyncStorage.setItem(HAPTICS_ENABLED_KEY, "false");
+    await AsyncStorage.setItem(HISTORY_CARD_STYLE_KEY, "compact");
     await AsyncStorage.setItem(
       EMOTION_PRESETS_KEY,
       JSON.stringify(["Happy", "Unknown"])
@@ -67,6 +71,7 @@ describe("useSettingsStore", () => {
       showDetailedLabels: true,
       devOptionsEnabled: true,
       hapticsEnabled: false,
+      historyCardStyle: "compact",
       emotions: [
         { name: "Happy", category: "positive" },
         { name: "Unknown", category: "neutral" },
@@ -91,6 +96,7 @@ describe("useSettingsStore", () => {
       showDetailedLabels: false,
       devOptionsEnabled: false,
       hapticsEnabled: true,
+      historyCardStyle: DEFAULT_HISTORY_CARD_STYLE,
       emotions: DEFAULT_EMOTIONS,
       contexts: DEFAULT_CONTEXTS,
       quickEntryPrefs: DEFAULT_QUICK_ENTRY_PREFS,
@@ -125,6 +131,12 @@ describe("useSettingsStore", () => {
     expect(setHapticsEnabledGlobal).toHaveBeenLastCalledWith(false);
     await hapticsPromise;
     expect(await AsyncStorage.getItem(HAPTICS_ENABLED_KEY)).toBe("false");
+
+    const historyCardStylePromise =
+      useSettingsStore.getState().setHistoryCardStyle("compact");
+    expect(useSettingsStore.getState().historyCardStyle).toBe("compact");
+    await historyCardStylePromise;
+    expect(await AsyncStorage.getItem(HISTORY_CARD_STYLE_KEY)).toBe("compact");
 
     const emotionsPromise = useSettingsStore.getState().setEmotions(nextEmotions);
     expect(useSettingsStore.getState().emotions).toEqual(nextEmotions);
