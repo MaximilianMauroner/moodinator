@@ -1,7 +1,17 @@
-import React, { useEffect, useCallback, useMemo, useState } from "react";
-import { View, Text, RefreshControl, type LayoutChangeEvent } from "react-native";
+import React, { useEffect, useCallback, useMemo, useRef, useState } from "react";
+import {
+  View,
+  Text,
+  ScrollView,
+  RefreshControl,
+  type LayoutChangeEvent,
+} from "react-native";
 import { FlashList } from "@shopify/flash-list";
-import { GestureHandlerRootView } from "react-native-gesture-handler";
+import {
+  Gesture,
+  GestureDetector,
+  GestureHandlerRootView,
+} from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import ToastManager from "toastify-react-native";
@@ -9,8 +19,11 @@ import { Ionicons } from "@expo/vector-icons";
 import Animated, {
   Extrapolation,
   interpolate,
+  runOnJS,
+  useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
+  withSpring,
 } from "react-native-reanimated";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -44,10 +57,15 @@ import type { MoodEntry } from "@db/types";
 import { Toast } from "toastify-react-native";
 import { moodService } from "@/services/moodService";
 import { emotionService } from "@/services/emotionService";
+import { moodScale } from "@/constants/moodScale";
 
 const HomeErrorFallback = createScreenErrorFallback("Home");
-const COMPACT_TOP_COLLAPSE = 180;
-const DETAILED_TOP_COLLAPSE = 220;
+const COLLAPSED_SELECTOR_HEIGHT = 76;
+const DEFAULT_COMPACT_PANEL_HEIGHT = 212;
+const DEFAULT_DETAILED_PANEL_HEIGHT = 524;
+const MIN_COLLAPSE_DISTANCE = 80;
+const SNAP_VELOCITY = 900;
+const REFRESH_PULL_DISTANCE = 86;
 
 // Toast config with theme support
 const createToastConfig = (isDark: boolean) => ({
@@ -65,7 +83,7 @@ const createToastConfig = (isDark: boolean) => ({
     <View
       className="flex-row items-center rounded-2xl px-4 py-3 m-3"
       style={{
-        backgroundColor: isDark ? "#231F1B" : "#FDFCFA",
+        backgroundColor: isDark ? "#2C4038" : "#FDFCFA",
         shadowColor: isDark ? "#000" : "#9D8660",
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: isDark ? 0.3 : 0.15,
@@ -115,7 +133,7 @@ const createToastConfig = (isDark: boolean) => ({
         </HapticTab>
       </View>
       <HapticTab onPress={hide} className="ml-2">
-        <IconSymbol name="xmark" size={18} color={isDark ? "#6B5C4A" : "#7A6B55"} />
+        <IconSymbol name="xmark" size={18} color={isDark ? "#8AAE98" : "#7A6B55"} />
       </HapticTab>
     </View>
   ),
@@ -138,8 +156,11 @@ function HomeScreenContent() {
 
   const loading = status === "loading";
   const refreshing = status === "refreshing";
-  const [topSectionHeight, setTopSectionHeight] = useState(0);
-  const topSectionScrollY = useSharedValue(0);
+  const [expandedPanelHeight, setExpandedPanelHeight] = useState(0);
+  const [entriesScrollEnabled, setEntriesScrollEnabled] = useState(false);
+  const collapseProgress = useSharedValue(0);
+  const dragStartProgress = useSharedValue(0);
+  const listY = useSharedValue(0);
 
   // Wrapper for setMoods that supports function updaters
   const setMoods = useCallback(
@@ -270,21 +291,20 @@ function HomeScreenContent() {
     [handleMoodItemLongPress, itemActions.SWIPE_THRESHOLD, itemActions.onSwipeableWillOpen]
   );
 
-  const estimatedTopSectionHeight = entrySettings.showDetailedLabels ? 560 : 440;
-  const expandedTopSectionHeight = topSectionHeight || estimatedTopSectionHeight;
-  const maxTopCollapse = entrySettings.showDetailedLabels
-    ? DETAILED_TOP_COLLAPSE
-    : COMPACT_TOP_COLLAPSE;
-  const topCollapseDistance = Math.min(
-    maxTopCollapse,
-    Math.max(expandedTopSectionHeight - 160, 0)
+  const estimatedExpandedPanelHeight = entrySettings.showDetailedLabels
+    ? DEFAULT_DETAILED_PANEL_HEIGHT
+    : DEFAULT_COMPACT_PANEL_HEIGHT;
+  const currentExpandedPanelHeight = expandedPanelHeight || estimatedExpandedPanelHeight;
+  const collapseDistance = Math.max(
+    currentExpandedPanelHeight - COLLAPSED_SELECTOR_HEIGHT,
+    MIN_COLLAPSE_DISTANCE
   );
 
-  const handleTopSectionLayout = useCallback(
+  const handleExpandedSelectorLayout = useCallback(
     ({ nativeEvent }: LayoutChangeEvent) => {
       const measuredHeight = Math.ceil(nativeEvent.layout.height);
 
-      setTopSectionHeight((currentHeight) =>
+      setExpandedPanelHeight((currentHeight) =>
         currentHeight === measuredHeight ? currentHeight : measuredHeight
       );
     },
@@ -293,44 +313,175 @@ function HomeScreenContent() {
 
   const handleListScroll = useCallback(
     (event: { nativeEvent: { contentOffset: { y: number } } }) => {
-      topSectionScrollY.value = Math.max(event.nativeEvent.contentOffset.y, 0);
+      listY.value = Math.max(event.nativeEvent.contentOffset.y, 0);
     },
-    [topSectionScrollY]
+    [listY]
   );
 
-  const topSectionAnimatedStyle = useAnimatedStyle(
+  const triggerExpandedRefresh = useCallback(() => {
+    if (!refreshing) {
+      refreshMoods();
+    }
+  }, [refreshMoods, refreshing]);
+
+  useAnimatedReaction(
+    () => collapseProgress.value >= 0.995,
+    (isCollapsed, wasCollapsed) => {
+      if (isCollapsed !== wasCollapsed) {
+        runOnJS(setEntriesScrollEnabled)(isCollapsed);
+      }
+    },
+    []
+  );
+
+  const resolveSnap = useCallback((progress: number, velocityY: number) => {
+    "worklet";
+
+    if (velocityY < -SNAP_VELOCITY) return 1;
+    if (velocityY > SNAP_VELOCITY) return 0;
+    if (progress < 0.38) return 0;
+    if (progress > 0.62) return 1;
+
+    return velocityY < 0 ? 1 : 0;
+  }, []);
+
+  // Native gesture proxy for the entries FlashList — declared once so we can
+  // mark the parent Pan as simultaneous with it. Without this, the parent Pan
+  // claims vertical drags after `activeOffsetY`, suppressing the native
+  // RefreshControl on the FlashList.
+  const entriesNativeGesture = useMemo(() => Gesture.Native(), []);
+
+  const handoffGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .activeOffsetY([-8, 8])
+        .simultaneousWithExternalGesture(entriesNativeGesture)
+        .onBegin(() => {
+          dragStartProgress.value = collapseProgress.value;
+        })
+        .onUpdate((event) => {
+          const draggingDown = event.translationY > 0;
+
+          // In collapsed mode (entries take the full height), pulling down at
+          // the top of the list is pull-to-refresh — let the native
+          // RefreshControl handle it instead of re-expanding the panel.
+          if (dragStartProgress.value >= 0.999 && draggingDown) {
+            return;
+          }
+
+          if (draggingDown && listY.value > 0) {
+            return;
+          }
+
+          const nextProgress =
+            dragStartProgress.value - event.translationY / collapseDistance;
+
+          collapseProgress.value = Math.min(Math.max(nextProgress, 0), 1);
+        })
+        .onEnd((event) => {
+          const shouldRefresh =
+            collapseProgress.value <= 0.001 &&
+            dragStartProgress.value <= 0.001 &&
+            event.translationY > REFRESH_PULL_DISTANCE &&
+            event.velocityY > 0;
+
+          if (shouldRefresh) {
+            runOnJS(triggerExpandedRefresh)();
+          }
+
+          const target = resolveSnap(collapseProgress.value, event.velocityY);
+          collapseProgress.value = withSpring(target, {
+            damping: 24,
+            stiffness: 220,
+            mass: 0.9,
+          });
+        }),
+    [
+      collapseDistance,
+      collapseProgress,
+      dragStartProgress,
+      entriesNativeGesture,
+      listY,
+      resolveSnap,
+      triggerExpandedRefresh,
+    ]
+  );
+
+  const panelAnimatedStyle = useAnimatedStyle(
     () => ({
-      height:
-        expandedTopSectionHeight -
-        Math.min(topSectionScrollY.value, topCollapseDistance),
+      height: interpolate(
+        collapseProgress.value,
+        [0, 1],
+        [currentExpandedPanelHeight, COLLAPSED_SELECTOR_HEIGHT],
+        Extrapolation.CLAMP
+      ),
+      borderRadius: interpolate(collapseProgress.value, [0, 1], [28, 20]),
+      overflow: "hidden",
     }),
-    [expandedTopSectionHeight, topCollapseDistance]
+    [currentExpandedPanelHeight]
   );
 
-  const topSectionContentAnimatedStyle = useAnimatedStyle(
+  const expandedSelectorAnimatedStyle = useAnimatedStyle(
     () => {
-      const collapsedOffset = Math.min(topSectionScrollY.value, topCollapseDistance);
+      const easedProgress = interpolate(
+        collapseProgress.value,
+        [0, 0.5, 1],
+        [0, 0.72, 1],
+        Extrapolation.CLAMP
+      );
 
       return {
         opacity: interpolate(
-          collapsedOffset,
-          [0, topCollapseDistance],
-          [1, 0.96],
+          easedProgress,
+          [0, 0.55, 1],
+          [1, 0.35, 0],
           Extrapolation.CLAMP
         ),
         transform: [
           {
             translateY: interpolate(
-              collapsedOffset,
-              [0, topCollapseDistance],
-              [0, -topCollapseDistance * 0.55],
+              easedProgress,
+              [0, 1],
+              [0, -32],
               Extrapolation.CLAMP
             ),
+          },
+          {
+            scale: interpolate(easedProgress, [0, 1], [1, 0.96], Extrapolation.CLAMP),
           },
         ],
       };
     },
-    [topCollapseDistance]
+    []
+  );
+
+  const collapsedSelectorAnimatedStyle = useAnimatedStyle(
+    () => {
+      const easedProgress = interpolate(
+        collapseProgress.value,
+        [0, 0.5, 1],
+        [0, 0.72, 1],
+        Extrapolation.CLAMP
+      );
+
+      return {
+        opacity: interpolate(easedProgress, [0.35, 1], [0, 1], Extrapolation.CLAMP),
+        transform: [
+          {
+            translateY: interpolate(
+              easedProgress,
+              [0, 1],
+              [18, 0],
+              Extrapolation.CLAMP
+            ),
+          },
+          {
+            scale: interpolate(easedProgress, [0, 1], [0.98, 1], Extrapolation.CLAMP),
+          },
+        ],
+      };
+    },
+    []
   );
 
   const listEmptyComponent = useMemo(
@@ -348,18 +499,6 @@ function HomeScreenContent() {
     [loading]
   );
 
-  const listRefreshControl = useMemo(
-    () => (
-      <RefreshControl
-        refreshing={refreshing}
-        onRefresh={refreshMoods}
-        colors={[isDark ? "#7BA87B" : "#5B8A5B"]}
-        tintColor={isDark ? "#7BA87B" : "#5B8A5B"}
-      />
-    ),
-    [isDark, refreshMoods, refreshing]
-  );
-
   const listContentContainerStyle = useMemo(
     () => ({
       paddingBottom: 100,
@@ -371,48 +510,81 @@ function HomeScreenContent() {
     <>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaView
-          className="flex-1"
-          style={{ backgroundColor: isDark ? "#1C1916" : "#FAF8F4" }}
+          className="flex-1 bg-paper-100 dark:bg-paper-900"
         >
-          <View className="flex-1 px-4 pt-4">
-            <Animated.View
-              style={[topSectionAnimatedStyle, { overflow: "hidden" }]}
-            >
-              <Animated.View
-                onLayout={handleTopSectionLayout}
-                style={topSectionContentAnimatedStyle}
-              >
-                <HomeHeader lastTracked={lastTracked} />
-                {entrySettings.showDetailedLabels ? (
-                  <DetailedMoodButtonSelector
+          <GestureDetector gesture={handoffGesture}>
+            <Animated.View className="flex-1 px-4 pt-4">
+              <HomeHeader lastTracked={lastTracked} />
+
+              <Animated.View style={panelAnimatedStyle}>
+                <Animated.View
+                  pointerEvents={entriesScrollEnabled ? "none" : "auto"}
+                  onLayout={handleExpandedSelectorLayout}
+                  style={expandedSelectorAnimatedStyle}
+                >
+                  {entrySettings.showDetailedLabels ? (
+                    <DetailedMoodButtonSelector
+                      onMoodPress={modals.handleMoodPress}
+                      onLongPress={modals.handleLongPress}
+                    />
+                  ) : (
+                    <CompactMoodButtonSelector
+                      onMoodPress={modals.handleMoodPress}
+                      onLongPress={modals.handleLongPress}
+                    />
+                  )}
+                </Animated.View>
+
+                <Animated.View
+                  pointerEvents={entriesScrollEnabled ? "auto" : "none"}
+                  style={[
+                    collapsedSelectorAnimatedStyle,
+                    {
+                      bottom: 0,
+                      height: COLLAPSED_SELECTOR_HEIGHT,
+                      justifyContent: "center",
+                      left: 0,
+                      position: "absolute",
+                      right: 0,
+                    },
+                  ]}
+                >
+                  <CollapsedMoodSelector
+                    isDark={isDark}
                     onMoodPress={modals.handleMoodPress}
                     onLongPress={modals.handleLongPress}
                   />
-                ) : (
-                  <CompactMoodButtonSelector
-                    onMoodPress={modals.handleMoodPress}
-                    onLongPress={modals.handleLongPress}
+                </Animated.View>
+              </Animated.View>
+
+              <Animated.View className="flex-1 mt-4">
+                <HistoryListHeader moodCount={moods.length} />
+                <GestureDetector gesture={entriesNativeGesture}>
+                  <FlashList
+                    data={moods}
+                    keyExtractor={keyExtractor}
+                    renderItem={renderMoodItem}
+                    ListEmptyComponent={listEmptyComponent}
+                    refreshControl={
+                      <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={refreshMoods}
+                        tintColor={isDark ? "#A8C5A8" : "#5B8A5B"}
+                        colors={[isDark ? "#A8C5A8" : "#5B8A5B"]}
+                        progressBackgroundColor={isDark ? "#2C4038" : "#FDFCFA"}
+                      />
+                    }
+                    contentInsetAdjustmentBehavior="automatic"
+                    showsVerticalScrollIndicator={entriesScrollEnabled}
+                    contentContainerStyle={listContentContainerStyle}
+                    onScroll={handleListScroll}
+                    scrollEnabled={entriesScrollEnabled}
+                    scrollEventThrottle={16}
                   />
-                )}
+                </GestureDetector>
               </Animated.View>
             </Animated.View>
-
-            <View className="flex-1 mt-4">
-              <HistoryListHeader moodCount={moods.length} />
-              <FlashList
-                data={moods}
-                keyExtractor={keyExtractor}
-                renderItem={renderMoodItem}
-                ListEmptyComponent={listEmptyComponent}
-                refreshControl={listRefreshControl}
-                contentInsetAdjustmentBehavior="automatic"
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={listContentContainerStyle}
-                onScroll={handleListScroll}
-                scrollEventThrottle={16}
-              />
-            </View>
-          </View>
+          </GestureDetector>
         </SafeAreaView>
       </GestureHandlerRootView>
 
@@ -455,6 +627,121 @@ function HomeScreenContent() {
       />
       <ToastManager config={toastConfig} useModal={false} />
     </>
+  );
+}
+
+interface CollapsedMoodSelectorProps {
+  isDark: boolean;
+  onMoodPress: (mood: number) => void;
+  onLongPress: (mood: number) => void;
+}
+
+// Pill geometry — wider than before so each touch target breathes,
+// at the cost of overflowing on narrow screens (handled by ScrollView).
+const PILL_WIDTH = 56;
+const PILL_HEIGHT = 52;
+const PILL_GAP = 6;
+const TRACK_PADDING_X = 8;
+const CENTER_INDEX = 5; // mood 5 — the midpoint of the 0–10 scale
+
+function CollapsedMoodSelector({
+  isDark,
+  onMoodPress,
+  onLongPress,
+}: CollapsedMoodSelectorProps) {
+  const scrollRef = useRef<ScrollView>(null);
+  const [trackWidth, setTrackWidth] = useState(0);
+
+  const contentWidth =
+    TRACK_PADDING_X * 2 +
+    moodScale.length * PILL_WIDTH +
+    (moodScale.length - 1) * PILL_GAP;
+
+  // Center on mood 5 once we know the viewport width. If everything fits,
+  // `flexGrow + justifyContent: center` on the contentContainer handles
+  // visual centering; the scrollTo is a no-op (clamped to 0).
+  useEffect(() => {
+    if (trackWidth <= 0) return;
+    if (contentWidth <= trackWidth) return;
+
+    const targetCenter =
+      TRACK_PADDING_X +
+      CENTER_INDEX * (PILL_WIDTH + PILL_GAP) +
+      PILL_WIDTH / 2;
+    const maxScroll = contentWidth - trackWidth;
+    const x = Math.max(0, Math.min(maxScroll, targetCenter - trackWidth / 2));
+
+    // Defer one frame so the ScrollView has its content laid out.
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({ x, y: 0, animated: false });
+    });
+  }, [trackWidth, contentWidth]);
+
+  const fitsWithoutScroll = contentWidth <= trackWidth;
+
+  return (
+    <View
+      onLayout={(e: LayoutChangeEvent) =>
+        setTrackWidth(e.nativeEvent.layout.width)
+      }
+      className="rounded-3xl"
+      style={{
+        backgroundColor: isDark ? "#2C4038" : "#FDFCFA",
+        borderWidth: 1,
+        borderColor: isDark ? "#3A5448" : "#E5D9BF",
+        shadowColor: isDark ? "#000" : "#9D8660",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: isDark ? 0.28 : 0.1,
+        shadowRadius: 12,
+        elevation: 4,
+        overflow: "hidden",
+      }}
+    >
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        decelerationRate="fast"
+        // When content fits, center it; when it overflows, allow free scroll.
+        contentContainerStyle={{
+          flexGrow: fitsWithoutScroll ? 1 : undefined,
+          justifyContent: fitsWithoutScroll ? "center" : "flex-start",
+          alignItems: "center",
+          paddingHorizontal: TRACK_PADDING_X,
+          paddingVertical: 8,
+          gap: PILL_GAP,
+        }}
+      >
+        {moodScale.map((mood) => {
+          const backgroundColor = isDark ? mood.bgHexDark : mood.bgHex;
+          const color = isDark ? mood.textHexDark : mood.textHex;
+
+          return (
+            <HapticTab
+              key={mood.value}
+              className="items-center justify-center rounded-2xl"
+              style={{
+                width: PILL_WIDTH,
+                height: PILL_HEIGHT,
+                backgroundColor,
+              }}
+              onPress={() => onMoodPress(mood.value)}
+              onLongPress={() => onLongPress(mood.value)}
+              delayLongPress={500}
+              accessibilityRole="button"
+              accessibilityLabel={`Log ${mood.label}, mood ${mood.value}`}
+            >
+              <Text
+                className="text-base font-bold"
+                style={{ color, fontVariant: ["tabular-nums"] }}
+              >
+                {mood.value}
+              </Text>
+            </HapticTab>
+          );
+        })}
+      </ScrollView>
+    </View>
   );
 }
 

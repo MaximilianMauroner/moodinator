@@ -32,7 +32,7 @@ function StreakBadgeBase({ current, longest, compact }: StreakBadgeBaseProps) {
 
   // Muted colors for inactive
   const inactiveColors = {
-    primary: isDark ? "#6B5C4A" : "#9D8660",
+    primary: isDark ? "#8AAE98" : "#9D8660",
     secondary: isDark ? "#4A4035" : "#BDA77D",
   };
 
@@ -47,7 +47,7 @@ function StreakBadgeBase({ current, longest, compact }: StreakBadgeBaseProps) {
               ? "rgba(245, 158, 11, 0.15)"
               : "#FEF3C7"
             : isDark
-            ? "#2A2520"
+            ? "#364C44"
             : "#F5F1E8",
         }}
       >
@@ -91,7 +91,7 @@ function StreakBadgeBase({ current, longest, compact }: StreakBadgeBaseProps) {
                     ? "rgba(245, 158, 11, 0.2)"
                     : "#FEF3C7"
                   : isDark
-                  ? "#2A2520"
+                  ? "#364C44"
                   : "#F5F1E8",
               }}
             >

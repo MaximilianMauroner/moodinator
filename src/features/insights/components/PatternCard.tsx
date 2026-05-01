@@ -60,7 +60,7 @@ function PatternItem({ pattern, isLast }: { pattern: Pattern; isLast: boolean })
         };
       case "emotion":
         return {
-          bg: isDark ? "#3D2822" : "#FDE8E4",
+          bg: isDark ? "#3C1A14" : "#FDE8E4",
           color: isDark ? "#F5A899" : "#E06B55",
         };
       case "context":

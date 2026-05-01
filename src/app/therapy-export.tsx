@@ -463,7 +463,7 @@ export default function TherapyExportScreen() {
                             {customStartDate.toLocaleDateString()}
                           </Text>
                         </View>
-                        <Ionicons name="chevron-down" size={20} color={isDark ? "#6B5C4A" : "#9D8660"} />
+                        <Ionicons name="chevron-down" size={20} color={isDark ? "#8AAE98" : "#9D8660"} />
                       </Pressable>
                       {showStartPicker && (
                         <DateTimePicker
@@ -519,7 +519,7 @@ export default function TherapyExportScreen() {
                             {customEndDate.toLocaleDateString()}
                           </Text>
                         </View>
-                        <Ionicons name="chevron-down" size={20} color={isDark ? "#6B5C4A" : "#9D8660"} />
+                        <Ionicons name="chevron-down" size={20} color={isDark ? "#8AAE98" : "#9D8660"} />
                       </Pressable>
                       {showEndPicker && (
                         <DateTimePicker

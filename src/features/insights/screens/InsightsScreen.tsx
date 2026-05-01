@@ -98,7 +98,7 @@ export function InsightsScreen() {
     return (
       <View
         className="flex-1 justify-center items-center"
-        style={{ backgroundColor: isDark ? "#1C1916" : "#FAF8F4" }}
+        style={{ backgroundColor: isDark ? "#1E2D26" : "#FAF8F4" }}
       >
         <LoadingSpinner message="Loading insights..." />
       </View>
@@ -114,7 +114,7 @@ export function InsightsScreen() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaView
         className="flex-1"
-        style={{ backgroundColor: isDark ? "#1C1916" : "#FAF8F4" }}
+        style={{ backgroundColor: isDark ? "#1E2D26" : "#FAF8F4" }}
         edges={["top"]}
       >
         <View
@@ -154,9 +154,9 @@ export function InsightsScreen() {
               className="rounded-2xl"
               style={({ pressed }) => [
                 {
-                  backgroundColor: isDark ? "#231F1B" : "#FDFCFA",
+                  backgroundColor: isDark ? "#2C4038" : "#FDFCFA",
                   borderWidth: 1,
-                  borderColor: isDark ? "rgba(168, 197, 168, 0.16)" : "#E5D9BF",
+                  borderColor: isDark ? "rgba(168, 197, 168, 0.20)" : "#E5D9BF",
                   padding: 10,
                   minWidth: 44,
                   minHeight: 44,
@@ -185,7 +185,7 @@ export function InsightsScreen() {
         {/* View Mode Toggle */}
         {hasData && (
           <View className="flex-row mx-4 mb-4 p-1 rounded-2xl" style={{
-            backgroundColor: isDark ? "#231F1B" : "#F5F1E8",
+            backgroundColor: isDark ? "#2C4038" : "#F5F1E8",
           }}>
             <Pressable
               onPress={() => handleViewModeChange("calendar")}

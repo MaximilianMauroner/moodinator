@@ -39,14 +39,14 @@ export function ScreenErrorFallback({
     <SafeAreaView
       style={{
         flex: 1,
-        backgroundColor: isDark ? "#1C1916" : "#FAF8F4",
+        backgroundColor: isDark ? "#1E2D26" : "#FAF8F4",
       }}
     >
       <View className="flex-1 justify-center items-center p-8">
         <View
           className="w-full max-w-sm rounded-3xl p-6"
           style={{
-            backgroundColor: isDark ? "#231F1B" : "#FDFCFA",
+            backgroundColor: isDark ? "#2C4038" : "#FDFCFA",
             shadowColor: isDark ? "#000" : "#9D8660",
             shadowOffset: { width: 0, height: 8 },
             shadowOpacity: isDark ? 0.3 : 0.1,
@@ -57,7 +57,7 @@ export function ScreenErrorFallback({
           {/* Error Icon */}
           <View
             className="w-16 h-16 rounded-2xl items-center justify-center self-center mb-4"
-            style={{ backgroundColor: isDark ? "#3D2822" : "#FDE8E4" }}
+            style={{ backgroundColor: isDark ? "#3C1A14" : "#FDE8E4" }}
           >
             <Ionicons name="warning-outline" size={30} color={isDark ? "#F5A899" : "#C75441"} />
           </View>
@@ -84,7 +84,7 @@ export function ScreenErrorFallback({
           {__DEV__ && (
             <View
               className="rounded-xl p-3 mb-4"
-              style={{ backgroundColor: isDark ? "#2A2520" : "#F9F5ED" }}
+              style={{ backgroundColor: isDark ? "#364C44" : "#F9F5ED" }}
             >
               <Text
                 className="text-xs font-mono"
@@ -128,7 +128,7 @@ export function ScreenErrorFallback({
             <Pressable
               onPress={handleGoBack}
               className="rounded-2xl py-4 items-center"
-              style={{ backgroundColor: isDark ? "#2A2520" : "#F5F1E8" }}
+              style={{ backgroundColor: isDark ? "#364C44" : "#F5F1E8" }}
             >
               <Text
                 className="text-base font-semibold"

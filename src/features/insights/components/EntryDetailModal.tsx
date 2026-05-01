@@ -44,12 +44,12 @@ export function EntryDetailModal({
     >
       <View
         className="flex-1"
-        style={{ backgroundColor: isDark ? "#1C1916" : "#FAF8F4" }}
+        style={{ backgroundColor: isDark ? "#1E2D26" : "#FAF8F4" }}
       >
         {/* Header */}
         <View
           className="flex-row items-center justify-between px-5 py-4 border-b"
-          style={{ borderColor: isDark ? "#2A2520" : "#E5D9BF" }}
+          style={{ borderColor: isDark ? "#2E4438" : "#E5D9BF" }}
         >
           <View className="w-10" />
           <Text
@@ -61,7 +61,7 @@ export function EntryDetailModal({
           <TouchableOpacity
             onPress={onClose}
             className="w-10 h-10 items-center justify-center rounded-full"
-            style={{ backgroundColor: isDark ? "#2A2520" : "#F0EBE0" }}
+            style={{ backgroundColor: isDark ? "#364C44" : "#F0EBE0" }}
           >
             <Ionicons
               name="close"
@@ -82,7 +82,7 @@ export function EntryDetailModal({
           <View
             className="rounded-3xl p-6 mb-5"
             style={{
-              backgroundColor: isDark ? "#231F1B" : "#FDFCFA",
+              backgroundColor: isDark ? "#2C4038" : "#FDFCFA",
               shadowColor: isDark ? "#000" : "#9D8660",
               shadowOffset: { width: 0, height: 4 },
               shadowOpacity: isDark ? 0.25 : 0.08,
@@ -130,7 +130,7 @@ export function EntryDetailModal({
             <View
               className="rounded-3xl p-5 mb-5"
               style={{
-                backgroundColor: isDark ? "#231F1B" : "#FDFCFA",
+                backgroundColor: isDark ? "#2C4038" : "#FDFCFA",
                 shadowColor: isDark ? "#000" : "#9D8660",
                 shadowOffset: { width: 0, height: 4 },
                 shadowOpacity: isDark ? 0.25 : 0.08,
@@ -159,7 +159,7 @@ export function EntryDetailModal({
               <View className="flex-row items-center">
                 <View
                   className="flex-1 h-3 rounded-full mr-3"
-                  style={{ backgroundColor: isDark ? "#2A2520" : "#E5D9BF" }}
+                  style={{ backgroundColor: isDark ? "#364C44" : "#E5D9BF" }}
                 >
                   <View
                     className="h-3 rounded-full"
@@ -184,7 +184,7 @@ export function EntryDetailModal({
             <View
               className="rounded-3xl p-5 mb-5"
               style={{
-                backgroundColor: isDark ? "#231F1B" : "#FDFCFA",
+                backgroundColor: isDark ? "#2C4038" : "#FDFCFA",
                 shadowColor: isDark ? "#000" : "#9D8660",
                 shadowOffset: { width: 0, height: 4 },
                 shadowOpacity: isDark ? 0.25 : 0.08,
@@ -195,7 +195,7 @@ export function EntryDetailModal({
               <View className="flex-row items-center mb-3">
                 <View
                   className="w-8 h-8 rounded-xl items-center justify-center mr-3"
-                  style={{ backgroundColor: isDark ? "#3D2D2D" : "#F5E8E8" }}
+                  style={{ backgroundColor: isDark ? "#3C1A14" : "#F5E8E8" }}
                 >
                   <Ionicons
                     name="heart"
@@ -214,7 +214,7 @@ export function EntryDetailModal({
                 {entry.emotions.map((emotion, index) => {
                   const categoryColors = {
                     positive: { bg: isDark ? "#2D3D2D" : "#E8EFE8", text: isDark ? "#A8C5A8" : "#5B8A5B" },
-                    negative: { bg: isDark ? "#3D2D2D" : "#F5E8E8", text: isDark ? "#C5A8A8" : "#8A5B5B" },
+                    negative: { bg: isDark ? "#3C1A14" : "#F5E8E8", text: isDark ? "#C5A8A8" : "#8A5B5B" },
                     neutral: { bg: isDark ? "#2D2D3D" : "#E8E8F5", text: isDark ? "#A8A8C5" : "#5B5B8A" },
                   };
                   const colors = categoryColors[emotion.category] || categoryColors.neutral;
@@ -242,7 +242,7 @@ export function EntryDetailModal({
             <View
               className="rounded-3xl p-5 mb-5"
               style={{
-                backgroundColor: isDark ? "#231F1B" : "#FDFCFA",
+                backgroundColor: isDark ? "#2C4038" : "#FDFCFA",
                 shadowColor: isDark ? "#000" : "#9D8660",
                 shadowOffset: { width: 0, height: 4 },
                 shadowOpacity: isDark ? 0.25 : 0.08,
@@ -273,7 +273,7 @@ export function EntryDetailModal({
                   <View
                     key={index}
                     className="px-3 py-2 rounded-xl"
-                    style={{ backgroundColor: isDark ? "#2A2520" : "#F0EBE0" }}
+                    style={{ backgroundColor: isDark ? "#364C44" : "#F0EBE0" }}
                   >
                     <Text
                       className="text-sm font-medium"
@@ -292,7 +292,7 @@ export function EntryDetailModal({
             <View
               className="rounded-3xl p-5"
               style={{
-                backgroundColor: isDark ? "#231F1B" : "#FDFCFA",
+                backgroundColor: isDark ? "#2C4038" : "#FDFCFA",
                 shadowColor: isDark ? "#000" : "#9D8660",
                 shadowOffset: { width: 0, height: 4 },
                 shadowOpacity: isDark ? 0.25 : 0.08,
@@ -303,7 +303,7 @@ export function EntryDetailModal({
               <View className="flex-row items-center mb-3">
                 <View
                   className="w-8 h-8 rounded-xl items-center justify-center mr-3"
-                  style={{ backgroundColor: isDark ? "#2A2520" : "#F0EBE0" }}
+                  style={{ backgroundColor: isDark ? "#364C44" : "#F0EBE0" }}
                 >
                   <Ionicons
                     name="document-text"
@@ -332,7 +332,7 @@ export function EntryDetailModal({
             <View
               className="rounded-3xl p-8 items-center"
               style={{
-                backgroundColor: isDark ? "#231F1B" : "#FDFCFA",
+                backgroundColor: isDark ? "#2C4038" : "#FDFCFA",
                 shadowColor: isDark ? "#000" : "#9D8660",
                 shadowOffset: { width: 0, height: 4 },
                 shadowOpacity: isDark ? 0.25 : 0.08,
