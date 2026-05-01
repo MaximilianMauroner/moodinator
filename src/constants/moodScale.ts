@@ -1,8 +1,10 @@
 import type { MoodScale } from "@/types/mood";
 
 // Soft Organic aesthetic - warm, natural tones
-// Light mode: warm creams and earth tones
-// Dark mode: deep warm browns
+// Light mode: warm creams and earth tones - watercolor washes on paper
+// Dark mode: lifted sage canvas with hue-identity cards - watercolor on moonlit forest
+//   Each family preserves its character (sage / dusk / sand / coral) at low luminance
+//   with enough chroma to read as distinct washes, not muddy variations.
 export const moodScale: MoodScale[] = [
     {
         value: 0,
@@ -13,8 +15,9 @@ export const moodScale: MoodScale[] = [
         borderColor: "#A8C5A8",
         bgHex: "#E8EFE8",
         textHex: "#476D47",
-        bgHexDark: "#344E36",
-        textHexDark: "#A8C5A8",
+        // Dark: very dark sage bg → pale sage text (contrast ~9:1)
+        bgHexDark: "#132316",
+        textHexDark: "#C8EEC8",
     },
     {
         value: 1,
@@ -25,8 +28,8 @@ export const moodScale: MoodScale[] = [
         borderColor: "#D1DFD1",
         bgHex: "#F4F7F4",
         textHex: "#476D47",
-        bgHexDark: "#2E4838",
-        textHexDark: "#7BA87B",
+        bgHexDark: "#162518",
+        textHexDark: "#C0E8C0",
     },
     {
         value: 2,
@@ -37,8 +40,8 @@ export const moodScale: MoodScale[] = [
         borderColor: "#D1DFD1",
         bgHex: "#F4F7F4",
         textHex: "#5B8A5B",
-        bgHexDark: "#2C4534",
-        textHexDark: "#A8C5A8",
+        bgHexDark: "#18271A",
+        textHexDark: "#BAE4BA",
     },
     {
         value: 3,
@@ -49,8 +52,9 @@ export const moodScale: MoodScale[] = [
         borderColor: "#DDD8E5",
         bgHex: "#EFECF2",
         textHex: "#695C78",
-        bgHexDark: "#383648",
-        textHexDark: "#C4BBCF",
+        // Dark: very dark dusk/purple → pale lavender (contrast ~8:1)
+        bgHexDark: "#1C1835",
+        textHexDark: "#D4CCF4",
     },
     {
         value: 4,
@@ -61,8 +65,8 @@ export const moodScale: MoodScale[] = [
         borderColor: "#EFECF2",
         bgHex: "#F8F7F9",
         textHex: "#6B5C7A",
-        bgHexDark: "#353244",
-        textHexDark: "#A396B3",
+        bgHexDark: "#1A162F",
+        textHexDark: "#CABEEC",
     },
     {
         value: 5,
@@ -73,8 +77,9 @@ export const moodScale: MoodScale[] = [
         borderColor: "#E5D9BF",
         bgHex: "#F9F5ED",
         textHex: "#7A6545",
-        bgHexDark: "#3E3E30",
-        textHexDark: "#D4C4A0",
+        // Dark: very dark sand/amber → pale gold (contrast ~8:1)
+        bgHexDark: "#2C1C0C",
+        textHexDark: "#F2D898",
     },
     {
         value: 6,
@@ -85,8 +90,8 @@ export const moodScale: MoodScale[] = [
         borderColor: "#F2EBD9",
         bgHex: "#FDFBF7",
         textHex: "#8B7352",
-        bgHexDark: "#42382E",
-        textHexDark: "#D4C4A0",
+        bgHexDark: "#32180A",
+        textHexDark: "#EDCF8E",
     },
     {
         value: 7,
@@ -97,8 +102,9 @@ export const moodScale: MoodScale[] = [
         borderColor: "#FACFC7",
         bgHex: "#FDE8E4",
         textHex: "#E06B55",
-        bgHexDark: "#4A3430",
-        textHexDark: "#F5A899",
+        // Dark: very dark coral/crimson → pale blush (contrast ~8:1)
+        bgHexDark: "#3C1008",
+        textHexDark: "#FFBCB0",
     },
     {
         value: 8,
@@ -109,8 +115,8 @@ export const moodScale: MoodScale[] = [
         borderColor: "#FDE8E4",
         bgHex: "#FEF6F4",
         textHex: "#E06B55",
-        bgHexDark: "#48302E",
-        textHexDark: "#ED8370",
+        bgHexDark: "#3E0E08",
+        textHexDark: "#FFB8AA",
     },
     {
         value: 9,
@@ -121,8 +127,8 @@ export const moodScale: MoodScale[] = [
         borderColor: "#FACFC7",
         bgHex: "#FDE8E4",
         textHex: "#C75441",
-        bgHexDark: "#4A2D2A",
-        textHexDark: "#E06B55",
+        bgHexDark: "#400C06",
+        textHexDark: "#FFA898",
     },
     {
         value: 10,
@@ -133,7 +139,7 @@ export const moodScale: MoodScale[] = [
         borderColor: "#F5A899",
         bgHex: "#FACFC7",
         textHex: "#C75441",
-        bgHexDark: "#4E2A28",
-        textHexDark: "#ED8370",
+        bgHexDark: "#440A06",
+        textHexDark: "#FFA898",
     },
 ];

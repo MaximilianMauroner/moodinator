@@ -18,11 +18,11 @@ module.exports = {
           200: "#F5F1E8",
           300: "#EDE7DA",
           400: "#DDD4C4",
-          // Dark mode variants — botanical night: sage-green undertone
-          800: "#34443E",
-          850: "#2C3C34",
-          900: "#24302A",
-          950: "#181E1A",
+          // Dark mode variants — deeper botanical night for stronger card elevation contrast
+          800: "#3E5649",
+          850: "#304840",
+          900: "#1E2D26",
+          950: "#141E1A",
         },
         sage: {
           50: "#F4F7F4",

@@ -171,11 +171,13 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
                 className="rounded-2xl overflow-hidden"
                 style={{
                   backgroundColor: get("surface"),
+                  borderWidth: isDark ? 1 : 0,
+                  borderColor: isDark ? "rgba(168, 197, 168, 0.14)" : "transparent",
                   shadowColor: isDark ? "#000" : colors.sand.text.light,
-                  shadowOffset: { width: 0, height: isDark ? 2 : 4 },
-                  shadowOpacity: isDark ? 0.25 : 0.08,
-                  shadowRadius: isDark ? 4 : 12,
-                  elevation: 3,
+                  shadowOffset: { width: 0, height: isDark ? 3 : 4 },
+                  shadowOpacity: isDark ? 0.35 : 0.08,
+                  shadowRadius: isDark ? 8 : 12,
+                  elevation: isDark ? 4 : 3,
                 }}
               >
                 <View className="flex-row">

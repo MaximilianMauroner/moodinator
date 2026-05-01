@@ -53,7 +53,7 @@ export const ListEditor = memo(function ListEditor({
           value={newValue}
           onChangeText={onChangeNewValue}
           placeholder={placeholder}
-          placeholderTextColor={isDark ? "#6B5C4A" : "#BDA77D"}
+          placeholderTextColor={isDark ? "#8AAE98" : "#BDA77D"}
           className="flex-1 rounded-xl px-4 py-2.5 bg-paper-200 dark:bg-paper-800 text-paper-800 dark:text-paper-200 border border-sand-300 dark:border-sand-800"
           blurOnSubmit={false}
           returnKeyType="done"
@@ -85,7 +85,7 @@ export const ListEditor = memo(function ListEditor({
             <Text className="text-sm font-medium mr-1 text-sand-600 dark:text-sand-400">
               {item}
             </Text>
-            <Ionicons name="close-circle" size={16} color={isDark ? "#6B5C4A" : "#BDA77D"} />
+            <Ionicons name="close-circle" size={16} color={isDark ? "#8AAE98" : "#BDA77D"} />
           </TouchableOpacity>
         ))}
         {items.length === 0 && (

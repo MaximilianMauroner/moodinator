@@ -257,7 +257,7 @@ function NotificationsScreenContent() {
                         false: isDark ? "#3D352A" : "#E5D9BF",
                         true: isDark ? "#3D5D3D" : "#A8C5A8",
                       }}
-                      thumbColor={notification.enabled ? get("primary") : (isDark ? "#6B5C4A" : "#BDA77D")}
+                      thumbColor={notification.enabled ? get("primary") : (isDark ? "#8AAE98" : "#BDA77D")}
                       ios_backgroundColor={isDark ? "#3D352A" : "#E5D9BF"}
                     />
                   </View>
@@ -311,7 +311,7 @@ function NotificationsScreenContent() {
                         handleDelete(notification.id, notification.title)
                       }
                       className="flex-1 rounded-xl py-2.5 items-center flex-row justify-center"
-                      style={{ backgroundColor: isDark ? "#3D2822" : "#FDE8E4" }}
+                      style={{ backgroundColor: isDark ? "#3C1A14" : "#FDE8E4" }}
                     >
                       <IconSymbol
                         name="trash"

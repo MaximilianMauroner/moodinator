@@ -57,7 +57,7 @@ export function AccordionSection({
       accentLine: isDark ? "#BDA77D" : "#D4C4A0",
     },
     coral: {
-      iconBg: isDark ? "#3D2822" : "#FDE8E4",
+      iconBg: isDark ? "#3C1A14" : "#FDE8E4",
       iconColor: isDark ? "#F5A899" : "#E06B55",
       accentLine: isDark ? "#E06B55" : "#F5A899",
     },
@@ -135,13 +135,13 @@ export function AccordionSection({
           <View
             className="w-8 h-8 rounded-xl items-center justify-center"
             style={{
-              backgroundColor: isDark ? "#2A2520" : "#F5F1E8",
+              backgroundColor: isDark ? "#364C44" : "#F5F1E8",
             }}
           >
             <Ionicons
               name={expanded ? "chevron-up" : "chevron-down"}
               size={18}
-              color={isDark ? "#6B5C4A" : "#7A6B55"}
+              color={isDark ? "#8AAE98" : "#7A6B55"}
             />
           </View>
         </View>

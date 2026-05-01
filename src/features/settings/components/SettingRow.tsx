@@ -84,7 +84,7 @@ export function SettingRow({
         <Ionicons
           name="chevron-forward"
           size={20}
-          color={isDark ? "#6B5C4A" : "#BDA77D"}
+          color={isDark ? "#8AAE98" : "#BDA77D"}
         />
       )}
     </Pressable>

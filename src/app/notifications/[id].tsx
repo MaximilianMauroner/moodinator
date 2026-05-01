@@ -420,7 +420,7 @@ export default function NotificationDetailScreen() {
                   false: isDark ? "#3D352A" : "#E5D9BF",
                   true: isDark ? "#3D5D3D" : "#A8C5A8",
                 }}
-                thumbColor={enabled ? get("primary") : (isDark ? "#6B5C4A" : "#BDA77D")}
+                thumbColor={enabled ? get("primary") : (isDark ? "#8AAE98" : "#BDA77D")}
                 ios_backgroundColor={isDark ? "#3D352A" : "#E5D9BF"}
               />
             </View>

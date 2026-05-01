@@ -7,10 +7,10 @@ import { useColorScheme } from "@/hooks/useColorScheme";
 
 export const colors = {
   // Background colors
-  background: { light: "#FAF8F4", dark: "#24302A" },
-  surface: { light: "#FDFCFA", dark: "#2C3C34" },
-  surfaceAlt: { light: "#F5F1E8", dark: "#34443E" },
-  surfaceElevated: { light: "#F9F5ED", dark: "#3C4E46" },
+  background: { light: "#FAF8F4", dark: "#1E2D26" },
+  surface: { light: "#FDFCFA", dark: "#2C4038" },
+  surfaceAlt: { light: "#F5F1E8", dark: "#364C44" },
+  surfaceElevated: { light: "#F9F5ED", dark: "#3E564E" },
 
   // Text colors
   text: { light: "#3D352A", dark: "#F0EDE6" },
@@ -25,8 +25,8 @@ export const colors = {
   primaryBgHover: { light: "#D1DFD1", dark: "#385440" },
 
   // Border colors
-  border: { light: "#E5D9BF", dark: "#425C50" },
-  borderSubtle: { light: "#F2EBD9", dark: "#34443E" },
+  border: { light: "#E5D9BF", dark: "#3A5448" },
+  borderSubtle: { light: "#F2EBD9", dark: "#2E4438" },
 
   // Overlay
   overlay: "rgba(0,0,0,0.4)",
@@ -59,10 +59,10 @@ export const colors = {
   sand: {
     bg: { light: "#F9F5ED", dark: "#3E3E30" },
     bgSelected: { light: "#9D8660", dark: "#BDA77D" },
-    bgHover: { light: "#FDF8EF", dark: "#484840" },
+    bgHover: { light: "#FDF8EF", dark: "#3E5448" },
     border: { light: "#E5D9BF", dark: "#425C50" },
     text: { light: "#7A6B55", dark: "#D4C4A0" },
-    textMuted: { light: "#8C7A60", dark: "#8A8060" },
+    textMuted: { light: "#8C7A60", dark: "#AAA080" },
   },
 
   // Dusk/purple tones (for context tags)

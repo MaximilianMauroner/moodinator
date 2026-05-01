@@ -25,7 +25,7 @@ export function TimePeriodSelector({ value, onChange }: TimePeriodSelectorProps)
       className="mx-4 mb-4 rounded-2xl p-1.5 flex-row"
       style={[
         {
-          backgroundColor: isDark ? "#2A2520" : "#F5F1E8",
+          backgroundColor: isDark ? "#364C44" : "#F5F1E8",
         },
         isDark ? styles.containerShadowDark : styles.containerShadowLight,
       ]}

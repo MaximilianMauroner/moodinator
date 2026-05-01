@@ -59,7 +59,7 @@ export function WeekNavigator({
         <View
           className="flex-row items-center justify-center py-3 px-5 rounded-2xl"
           style={{
-            backgroundColor: isDark ? "#231F1B" : "#FDFCFA",
+            backgroundColor: isDark ? "#2C4038" : "#FDFCFA",
             ...styles.navContainerLight,
           }}
         >
@@ -90,7 +90,7 @@ export function WeekNavigator({
           className="w-11 h-11 rounded-2xl items-center justify-center"
           style={({ pressed }) => [
             {
-              backgroundColor: isDark ? "#231F1B" : "#FDFCFA",
+              backgroundColor: isDark ? "#2C4038" : "#FDFCFA",
               opacity: !canGoPrevious ? 0.4 : pressed ? 0.7 : 1,
             },
             isDark ? styles.navButtonDark : styles.navButtonLight,
@@ -110,7 +110,7 @@ export function WeekNavigator({
           <View
             className="px-4 py-2 rounded-xl"
             style={{
-              backgroundColor: isDark ? "#231F1B" : "#FDFCFA",
+              backgroundColor: isDark ? "#2C4038" : "#FDFCFA",
             }}
           >
             <Text
@@ -154,7 +154,7 @@ export function WeekNavigator({
             className="w-11 h-11 rounded-2xl items-center justify-center"
             style={({ pressed }) => [
               {
-                backgroundColor: isDark ? "#231F1B" : "#FDFCFA",
+                backgroundColor: isDark ? "#2C4038" : "#FDFCFA",
                 opacity: !canGoNext ? 0.4 : pressed ? 0.7 : 1,
               },
               isDark ? styles.navButtonDark : styles.navButtonLight,

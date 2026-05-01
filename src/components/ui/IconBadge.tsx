@@ -17,7 +17,7 @@ const tonePalette = {
   },
   coral: {
     light: { bg: "#FDE8E4", fg: "#E06B55", ring: "rgba(224, 107, 85, 0.16)" },
-    dark: { bg: "#3D2822", fg: "#F5A899", ring: "rgba(245, 168, 153, 0.16)" },
+    dark: { bg: "#3C1A14", fg: "#F5A899", ring: "rgba(245, 168, 153, 0.16)" },
   },
   dusk: {
     light: { bg: "#EFECF2", fg: "#847596", ring: "rgba(132, 117, 150, 0.16)" },
@@ -25,7 +25,7 @@ const tonePalette = {
   },
   neutral: {
     light: { bg: "#F5F1E8", fg: "#6B5C4A", ring: "rgba(157, 134, 96, 0.14)" },
-    dark: { bg: "#2A2520", fg: "#BDA77D", ring: "rgba(189, 167, 125, 0.14)" },
+    dark: { bg: "#364C44", fg: "#BDA77D", ring: "rgba(189, 167, 125, 0.14)" },
   },
 } as const;
 
