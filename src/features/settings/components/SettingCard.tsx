@@ -8,7 +8,7 @@ export function SettingCard({ children }: { children: React.ReactNode }) {
 
   return (
     <View
-      className="rounded-3xl overflow-hidden bg-paper-50 dark:bg-paper-850"
+      className="rounded-3xl overflow-hidden border border-paper-200 bg-paper-50 dark:border-paper-800 dark:bg-paper-800"
       style={isDark ? styles.cardShadowDark : styles.cardShadowLight}
     >
       {children}

@@ -71,7 +71,7 @@ export const EmotionListEditor = memo(function EmotionListEditor({
       <Text className="text-base font-medium mb-1 text-paper-800 dark:text-paper-200">
         {title}
       </Text>
-      <Text className="text-sm mb-3 text-sand-500 dark:text-sand-800">
+      <Text className="text-sm mb-3 text-sand-600 dark:text-paper-400">
         {description}
       </Text>
 
@@ -216,7 +216,7 @@ export const EmotionListEditor = memo(function EmotionListEditor({
           );
         })}
         {emotions.length === 0 && (
-          <Text className="text-sm italic p-1 text-sand-500 dark:text-sand-800">
+          <Text className="text-sm italic p-1 text-sand-600 dark:text-paper-400">
             No emotions added yet.
           </Text>
         )}

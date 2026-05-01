@@ -15,7 +15,7 @@ export function ProfileCard({ entryCount, daysTracking }: ProfileCardProps) {
 
   return (
     <View
-      className="mb-6 rounded-3xl bg-paper-50 dark:bg-paper-850 overflow-hidden"
+      className="mb-6 rounded-3xl border border-paper-200 bg-paper-50 dark:border-paper-800 dark:bg-paper-800 overflow-hidden"
       style={isDark ? styles.cardShadowDark : styles.cardShadowLight}
     >
       {/* Decorative sage accent bar */}
@@ -38,7 +38,7 @@ export function ProfileCard({ entryCount, daysTracking }: ProfileCardProps) {
             <Text className="text-xl font-bold text-paper-800 dark:text-paper-200 tracking-tight">
               Moodinator
             </Text>
-            <Text className="text-sm text-sand-500 dark:text-sand-400 mt-0.5">
+            <Text className="text-sm text-sand-600 dark:text-paper-400 mt-0.5">
               Your wellness companion
             </Text>
           </View>
@@ -75,7 +75,7 @@ export function ProfileCard({ entryCount, daysTracking }: ProfileCardProps) {
                   color={isDark ? "#D4C4A0" : "#9D8660"}
                 />
               </View>
-              <Text className="text-xs font-medium uppercase tracking-wider text-sand-500 dark:text-sand-400">
+              <Text className="text-xs font-medium uppercase tracking-wider text-sand-600 dark:text-paper-400">
                 Days
               </Text>
             </View>

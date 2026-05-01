@@ -72,7 +72,7 @@ export function AccordionSection({
 
   return (
     <View
-      className="mb-3 rounded-3xl bg-paper-50 dark:bg-paper-850 overflow-hidden"
+      className="mb-3 rounded-3xl border border-paper-200 bg-paper-50 dark:border-paper-800 dark:bg-paper-800 overflow-hidden"
       style={isDark ? styles.cardShadowDark : styles.cardShadowLight}
     >
       {/* Accent line at top */}
@@ -125,7 +125,7 @@ export function AccordionSection({
               )}
             </View>
             {description && (
-              <Text className="text-xs text-sand-500 dark:text-sand-400 mt-0.5">
+              <Text className="text-xs text-sand-600 dark:text-paper-400 mt-0.5">
                 {description}
               </Text>
             )}

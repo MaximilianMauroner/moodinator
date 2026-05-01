@@ -198,7 +198,7 @@ export function ExportModal({
                   className={`text-center font-medium capitalize ${
                     exportRange === opt
                       ? "text-paper-800 dark:text-paper-200"
-                      : "text-sand-500 dark:text-sand-800"
+                      : "text-sand-600 dark:text-paper-400"
                   }`}
                 >
                   {opt === "week"
@@ -219,9 +219,9 @@ export function ExportModal({
                 onPress={() => setShowStartDatePicker(true)}
                 className="flex-1 p-3 rounded-xl bg-paper-200 dark:bg-paper-800 border border-sand-300 dark:border-sand-800"
               >
-                <Text className="text-xs mb-1 text-sand-500 dark:text-sand-800">
-                  From
-                </Text>
+                    <Text className="text-xs mb-1 text-sand-600 dark:text-paper-400">
+                      From
+                    </Text>
                 <Text className="text-base font-medium text-paper-800 dark:text-paper-200">
                   {customStartDate.toLocaleDateString()}
                 </Text>
@@ -230,9 +230,9 @@ export function ExportModal({
                 onPress={() => setShowEndDatePicker(true)}
                 className="flex-1 p-3 rounded-xl bg-paper-200 dark:bg-paper-800 border border-sand-300 dark:border-sand-800"
               >
-                <Text className="text-xs mb-1 text-sand-500 dark:text-sand-800">
-                  To
-                </Text>
+                    <Text className="text-xs mb-1 text-sand-600 dark:text-paper-400">
+                      To
+                    </Text>
                 <Text className="text-base font-medium text-paper-800 dark:text-paper-200">
                   {customEndDate.toLocaleDateString()}
                 </Text>

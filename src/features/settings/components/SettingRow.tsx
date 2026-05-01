@@ -73,7 +73,7 @@ export function SettingRow({
             {label}
           </Text>
           {subLabel && (
-            <Text className="text-sm mt-0.5 leading-5 text-sand-500 dark:text-sand-800">
+            <Text className="text-sm mt-0.5 leading-5 text-sand-600 dark:text-paper-400">
               {subLabel}
             </Text>
           )}
