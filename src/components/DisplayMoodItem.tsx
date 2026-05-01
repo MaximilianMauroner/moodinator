@@ -13,6 +13,7 @@ import { moodScale } from "@/constants/moodScale";
 import { useThemeColors, colors } from "@/constants/colors";
 import { getMoodItemLabel, getMoodItemHint } from "@/constants/accessibility";
 import { haptics } from "@/lib/haptics";
+import { useSettingsStore } from "@/shared/state/settingsStore";
 
 interface Props {
   mood: MoodEntry;
@@ -21,11 +22,72 @@ interface Props {
   swipeThreshold: number;
 }
 
+function MoodTag({
+  label,
+  backgroundColor,
+  textColor,
+}: {
+  label: string;
+  backgroundColor: string;
+  textColor: string;
+}) {
+  return (
+    <View
+      className="rounded-lg px-2.5 py-1"
+      style={{ backgroundColor }}
+    >
+      <Text className="text-xs font-medium" style={{ color: textColor }}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+function CommentBlock({
+  note,
+  get,
+  variant,
+}: {
+  note: string | null;
+  get: ReturnType<typeof useThemeColors>["get"];
+  variant: "minimal" | "compact";
+}) {
+  if (!note) {
+    return null;
+  }
+
+  return (
+    <View
+      className={variant === "compact" ? "mt-3 rounded-xl px-3 py-2.5" : "mb-3 rounded-xl p-3"}
+      style={{
+        backgroundColor: get("surfaceAlt"),
+        borderWidth: variant === "minimal" ? 1 : 0,
+        borderColor: get("borderSubtle"),
+      }}
+    >
+      <Text
+        className="mb-2 text-[10px] font-bold uppercase tracking-wide"
+        style={{ color: get("textMuted") }}
+      >
+        Comments
+      </Text>
+      <Text
+        className="text-sm leading-5"
+        style={{ color: get("textSubtle") }}
+        numberOfLines={variant === "compact" ? 3 : 4}
+      >
+        {note}
+      </Text>
+    </View>
+  );
+}
+
 export const DisplayMoodItem = React.memo(function DisplayMoodItem(
   { mood, onSwipeableWillOpen, onLongPress, swipeThreshold }: Props
 ) {
     const swipeActionPendingRef = useRef(false);
     const { isDark, get, getCategoryColors } = useThemeColors();
+    const historyCardStyle = useSettingsStore((state) => state.historyCardStyle);
     const translateX = useSharedValue(0);
 
     const moodData = useMemo(() => {
@@ -49,6 +111,21 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
         ? [...mood.emotions].sort((a, b) => a.name.localeCompare(b.name))
         : [];
     }, [mood.emotions]);
+    const allCompactTags = useMemo(
+      () => [
+        ...sortedEmotions.map((emotion) => ({
+          key: `${mood.id}-${emotion.name}`,
+          label: emotion.name,
+          colorSet: getCategoryColors(emotion.category),
+        })),
+        ...(mood.contextTags?.map((ctx) => ({
+          key: `${mood.id}-${ctx}`,
+          label: `#${ctx}`,
+          colorSet: getCategoryColors("neutral"),
+        })) ?? []),
+      ],
+      [getCategoryColors, mood.contextTags, mood.id, sortedEmotions]
+    );
 
     const formattedDate = new Date(mood.timestamp).toLocaleDateString([], {
       weekday: "short",
@@ -170,131 +247,139 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
               <View
                 className="rounded-2xl overflow-hidden"
                 style={{
-                  backgroundColor: get("surface"),
-                  borderWidth: isDark ? 1 : 0,
-                  borderColor: isDark ? "rgba(168, 197, 168, 0.14)" : "transparent",
-                  shadowColor: isDark ? "#000" : colors.sand.text.light,
+                  backgroundColor:
+                    historyCardStyle === "compact" ? get("surfaceAlt") : get("background"),
+                  borderWidth: historyCardStyle === "compact" ? (isDark ? 1 : 0) : 1,
+                  borderColor:
+                    historyCardStyle === "compact"
+                      ? isDark ? "rgba(168, 197, 168, 0.14)" : "transparent"
+                      : isDark ? `${moodData.textHex}40` : `${moodData.textHex}35`,
+                  shadowColor: historyCardStyle === "compact"
+                    ? (isDark ? "#000" : colors.sand.text.light)
+                    : "transparent",
                   shadowOffset: { width: 0, height: isDark ? 3 : 4 },
-                  shadowOpacity: isDark ? 0.35 : 0.08,
-                  shadowRadius: isDark ? 8 : 12,
-                  elevation: isDark ? 4 : 3,
+                  shadowOpacity: historyCardStyle === "compact" ? (isDark ? 0.28 : 0.06) : 0,
+                  shadowRadius: historyCardStyle === "compact" ? (isDark ? 8 : 10) : 0,
+                  elevation: historyCardStyle === "compact" ? (isDark ? 4 : 3) : 0,
                 }}
               >
-                <View className="flex-row">
-                  {/* Left accent bar - mood-colored visual indicator */}
-                  <View
-                    style={{
-                      width: 4,
-                      backgroundColor: moodData.textHex,
-                    }}
-                  />
-
-                  {/* Main content */}
-                  <View className="flex-1 p-4">
-                    {/* Header row */}
-                    <View className="flex-row items-center justify-between mb-3">
-                      <View className="flex-row items-center flex-1">
-                        {/* Mood pill */}
-                        <View
-                          className="flex-row items-center px-3 py-1.5 rounded-xl mr-3"
-                          style={{ backgroundColor: moodData.bgHex }}
+                {historyCardStyle === "compact" ? (
+                  <View className="px-4 py-3">
+                    <View className="flex-row items-center gap-3">
+                      <View
+                        className="h-8 w-8 items-center justify-center rounded-full"
+                        style={{ backgroundColor: moodData.textHex }}
+                      >
+                        <Text
+                          className="text-sm font-bold"
+                          style={{ color: get("textInverse"), fontVariant: ["tabular-nums"] }}
                         >
-                          <Text
-                            className="text-lg font-bold mr-1.5"
-                            style={{ color: moodData.textHex, fontVariant: ["tabular-nums"] }}
-                          >
-                            {mood.mood}
-                          </Text>
-                          <Text
-                            className="text-sm font-semibold"
-                            style={{ color: moodData.textHex }}
-                          >
-                            {moodData.label}
-                          </Text>
-                        </View>
-
-                        {/* Energy badge */}
-                        {typeof mood.energy === "number" && (
-                          <View
-                            className="px-2 py-1 rounded-lg"
-                            style={{ backgroundColor: isDark ? colors.sand.bgHover.dark : colors.sand.bg.light }}
-                          >
-                            <Text
-                              className="text-[10px] font-semibold"
-                              style={{ color: isDark ? colors.sand.text.dark : colors.sand.text.light }}
-                            >
-                              Energy {mood.energy}/10
-                            </Text>
-                          </View>
-                        )}
+                          {mood.mood}
+                        </Text>
                       </View>
 
-                      {/* Timestamp */}
-                      <Text
-                        className="text-xs"
-                        style={{ color: get("textMuted") }}
-                      >
-                        {formattedDate} · {formattedTime}
+                      <View className="flex-1">
+                        <View className="flex-row flex-wrap items-center gap-1.5">
+                          <Text className="text-sm font-semibold" style={{ color: get("text") }}>
+                            {moodData.label}
+                          </Text>
+                          {allCompactTags.map((tag) => (
+                            <MoodTag
+                              key={tag.key}
+                              label={tag.label}
+                              backgroundColor={tag.colorSet.bg}
+                              textColor={tag.colorSet.text}
+                            />
+                          ))}
+                        </View>
+                      </View>
+
+                      <View className="items-end">
+                        <Text className="text-xs font-medium" style={{ color: get("textMuted") }}>
+                          {formattedTime}
+                        </Text>
+                        {typeof mood.energy === "number" ? (
+                          <Text className="text-[10px]" style={{ color: get("textMuted") }}>
+                            Energy {mood.energy}/10
+                          </Text>
+                        ) : null}
+                      </View>
+                    </View>
+
+                    <CommentBlock note={mood.note} get={get} variant="compact" />
+                  </View>
+                ) : (
+                  <View className="p-4">
+                    <View className="mb-2 flex-row items-baseline justify-between">
+                      <View className="flex-row items-baseline gap-2">
+                        <Text
+                          style={{
+                            fontSize: 36,
+                            fontWeight: "900",
+                            color: moodData.textHex,
+                            fontVariant: ["tabular-nums"],
+                            lineHeight: 38,
+                          }}
+                        >
+                          {mood.mood}
+                        </Text>
+                        <Text
+                          className="text-sm font-semibold uppercase tracking-wide"
+                          style={{ color: `${moodData.textHex}BB` }}
+                        >
+                          {moodData.label}
+                        </Text>
+                      </View>
+                      <Text className="text-xs" style={{ color: get("textMuted") }}>
+                        {formattedTime}
                       </Text>
                     </View>
 
-                    {/* Note */}
-                    {mood.note ? (
-                      <View
-                        className="rounded-xl p-3 mb-3"
-                        style={{ backgroundColor: get("surfaceAlt") }}
-                      >
-                        <Text
-                          className="text-sm leading-5"
-                          style={{ color: get("textSubtle") }}
-                          numberOfLines={3}
-                        >
-                          {mood.note}
-                        </Text>
-                      </View>
-                    ) : null}
+                    <View
+                      className="mb-3 h-px"
+                      style={{
+                        backgroundColor:
+                          isDark ? "rgba(168,197,168,0.12)" : "rgba(61,53,42,0.08)",
+                      }}
+                    />
 
-                    {/* Tags */}
+                    <Text className="mb-3 text-xs" style={{ color: get("textMuted") }}>
+                      {formattedDate}
+                      {typeof mood.energy === "number" ? ` · Energy ${mood.energy}/10` : ""}
+                    </Text>
+
+                    <CommentBlock note={mood.note} get={get} variant="minimal" />
+
                     {(sortedEmotions.length > 0 || (mood.contextTags?.length ?? 0) > 0) && (
                       <View className="flex-row flex-wrap gap-2">
                         {sortedEmotions.map((emotion) => {
                           const catColors = getCategoryColors(emotion.category);
+
                           return (
-                            <View
+                            <MoodTag
                               key={`${mood.id}-${emotion.name}`}
-                              className="px-2.5 py-1 rounded-lg"
-                              style={{ backgroundColor: catColors.bg }}
-                            >
-                              <Text
-                                className="text-xs font-medium"
-                                style={{ color: catColors.text }}
-                              >
-                                {emotion.name}
-                              </Text>
-                            </View>
+                              label={emotion.name}
+                              backgroundColor={catColors.bg}
+                              textColor={catColors.text}
+                            />
                           );
                         })}
                         {mood.contextTags?.map((ctx) => {
                           const ctxColors = getCategoryColors("neutral");
+
                           return (
-                            <View
+                            <MoodTag
                               key={`${mood.id}-${ctx}`}
-                              className="px-2.5 py-1 rounded-lg"
-                              style={{ backgroundColor: ctxColors.bg }}
-                            >
-                              <Text
-                                className="text-xs font-medium"
-                                style={{ color: ctxColors.text }}
-                              >
-                                #{ctx}
-                              </Text>
-                            </View>
+                              label={`#${ctx}`}
+                              backgroundColor={ctxColors.bg}
+                              textColor={ctxColors.text}
+                            />
                           );
                         })}
                       </View>
                     )}
                   </View>
-                </View>
+                )}
               </View>
             </Pressable>
           </Animated.View>

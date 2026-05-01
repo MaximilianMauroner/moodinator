@@ -3,6 +3,7 @@ import { View, Text, ScrollView, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import * as Notifications from "expo-notifications";
 import { clearMoods, seedMoods } from "@db/db";
 import { useSettingsStore } from "@/shared/state/settingsStore";
@@ -14,6 +15,7 @@ import { SettingRow } from "@/features/settings/components/SettingRow";
 import { ToggleRow } from "@/features/settings/components/ToggleRow";
 
 export default function DeveloperSettingsScreen() {
+  const router = useRouter();
   const devOptionsEnabled = useSettingsStore((state) => state.devOptionsEnabled);
   const setDevOptionsEnabled = useSettingsStore((state) => state.setDevOptionsEnabled);
   // hydrateSettings is called explicitly after AsyncStorage.clear() in the dev
@@ -149,6 +151,12 @@ export default function DeveloperSettingsScreen() {
         {devOptionsEnabled && (
           <>
             <SettingsSection title="Testing">
+              <SettingRow
+                label="Preview Card Variants"
+                subLabel="Open the mood entry card design showcase"
+                icon="color-wand-outline"
+                onPress={() => router.push("/settings/card-variants")}
+              />
               <SettingRow
                 label="Add Sample Data"
                 subLabel="Generate test mood entries"

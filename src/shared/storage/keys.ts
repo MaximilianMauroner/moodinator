@@ -2,6 +2,7 @@
 export const SHOW_LABELS_KEY = "showLabelsPreference";
 export const DEV_OPTIONS_KEY = "devOptionsEnabled";
 export const HAPTICS_ENABLED_KEY = "hapticsEnabled";
+export const HISTORY_CARD_STYLE_KEY = "historyCardStyle";
 
 // Entry settings
 export const EMOTION_PRESETS_KEY = "emotionPresets";
@@ -16,4 +17,3 @@ export const APP_LOCK_PIN_LENGTH_KEY = "appLockPinLength";
 
 // Onboarding
 export const ONBOARDING_COMPLETED_KEY = "onboardingCompleted";
-
