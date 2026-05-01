@@ -60,7 +60,7 @@ import { emotionService } from "@/services/emotionService";
 import { moodScale } from "@/constants/moodScale";
 
 const HomeErrorFallback = createScreenErrorFallback("Home");
-const COLLAPSED_SELECTOR_HEIGHT = 76;
+const COLLAPSED_SELECTOR_HEIGHT = 60;
 const DEFAULT_COMPACT_PANEL_HEIGHT = 212;
 const DEFAULT_DETAILED_PANEL_HEIGHT = 524;
 const MIN_COLLAPSE_DISTANCE = 80;
@@ -157,8 +157,8 @@ function HomeScreenContent() {
   const loading = status === "loading";
   const refreshing = status === "refreshing";
   const [expandedPanelHeight, setExpandedPanelHeight] = useState(0);
-  const [entriesScrollEnabled, setEntriesScrollEnabled] = useState(false);
-  const collapseProgress = useSharedValue(0);
+  const [selectorCollapsed, setSelectorCollapsed] = useState(true);
+  const collapseProgress = useSharedValue(1);
   const dragStartProgress = useSharedValue(0);
   const listY = useSharedValue(0);
 
@@ -328,7 +328,7 @@ function HomeScreenContent() {
     () => collapseProgress.value >= 0.995,
     (isCollapsed, wasCollapsed) => {
       if (isCollapsed !== wasCollapsed) {
-        runOnJS(setEntriesScrollEnabled)(isCollapsed);
+        runOnJS(setSelectorCollapsed)(isCollapsed);
       }
     },
     []
@@ -345,10 +345,6 @@ function HomeScreenContent() {
     return velocityY < 0 ? 1 : 0;
   }, []);
 
-  // Native gesture proxy for the entries FlashList — declared once so we can
-  // mark the parent Pan as simultaneous with it. Without this, the parent Pan
-  // claims vertical drags after `activeOffsetY`, suppressing the native
-  // RefreshControl on the FlashList.
   const entriesNativeGesture = useMemo(() => Gesture.Native(), []);
 
   const handoffGesture = useMemo(
@@ -361,11 +357,12 @@ function HomeScreenContent() {
         })
         .onUpdate((event) => {
           const draggingDown = event.translationY > 0;
+          const draggingUp = event.translationY < 0;
 
-          // In collapsed mode (entries take the full height), pulling down at
-          // the top of the list is pull-to-refresh — let the native
-          // RefreshControl handle it instead of re-expanding the panel.
-          if (dragStartProgress.value >= 0.999 && draggingDown) {
+          // While collapsed, regular upward scrolling belongs to the list.
+          // The selector only opens from a downward edge pull when the list is
+          // already at the top and cannot move further.
+          if (dragStartProgress.value >= 0.999 && draggingUp) {
             return;
           }
 
@@ -415,7 +412,7 @@ function HomeScreenContent() {
         [currentExpandedPanelHeight, COLLAPSED_SELECTOR_HEIGHT],
         Extrapolation.CLAMP
       ),
-      borderRadius: interpolate(collapseProgress.value, [0, 1], [28, 20]),
+      borderRadius: interpolate(collapseProgress.value, [0, 1], [28, 18]),
       overflow: "hidden",
     }),
     [currentExpandedPanelHeight]
@@ -518,7 +515,7 @@ function HomeScreenContent() {
 
               <Animated.View style={panelAnimatedStyle}>
                 <Animated.View
-                  pointerEvents={entriesScrollEnabled ? "none" : "auto"}
+                  pointerEvents={selectorCollapsed ? "none" : "auto"}
                   onLayout={handleExpandedSelectorLayout}
                   style={expandedSelectorAnimatedStyle}
                 >
@@ -536,7 +533,7 @@ function HomeScreenContent() {
                 </Animated.View>
 
                 <Animated.View
-                  pointerEvents={entriesScrollEnabled ? "auto" : "none"}
+                  pointerEvents={selectorCollapsed ? "auto" : "none"}
                   style={[
                     collapsedSelectorAnimatedStyle,
                     {
@@ -575,10 +572,9 @@ function HomeScreenContent() {
                       />
                     }
                     contentInsetAdjustmentBehavior="automatic"
-                    showsVerticalScrollIndicator={entriesScrollEnabled}
+                    showsVerticalScrollIndicator
                     contentContainerStyle={listContentContainerStyle}
                     onScroll={handleListScroll}
-                    scrollEnabled={entriesScrollEnabled}
                     scrollEventThrottle={16}
                   />
                 </GestureDetector>
@@ -636,11 +632,9 @@ interface CollapsedMoodSelectorProps {
   onLongPress: (mood: number) => void;
 }
 
-// Pill geometry — wider than before so each touch target breathes,
-// at the cost of overflowing on narrow screens (handled by ScrollView).
-const PILL_WIDTH = 56;
-const PILL_HEIGHT = 52;
-const PILL_GAP = 6;
+const PILL_WIDTH = 52;
+const PILL_HEIGHT = 38;
+const PILL_GAP = 5;
 const TRACK_PADDING_X = 8;
 const CENTER_INDEX = 5; // mood 5 — the midpoint of the 0–10 scale
 
@@ -684,16 +678,16 @@ function CollapsedMoodSelector({
       onLayout={(e: LayoutChangeEvent) =>
         setTrackWidth(e.nativeEvent.layout.width)
       }
-      className="rounded-3xl"
       style={{
         backgroundColor: isDark ? "#2C4038" : "#FDFCFA",
         borderWidth: 1,
         borderColor: isDark ? "#3A5448" : "#E5D9BF",
+        borderRadius: 18,
         shadowColor: isDark ? "#000" : "#9D8660",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: isDark ? 0.28 : 0.1,
-        shadowRadius: 12,
-        elevation: 4,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: isDark ? 0.22 : 0.08,
+        shadowRadius: 8,
+        elevation: 3,
         overflow: "hidden",
       }}
     >
@@ -708,7 +702,7 @@ function CollapsedMoodSelector({
           justifyContent: fitsWithoutScroll ? "center" : "flex-start",
           alignItems: "center",
           paddingHorizontal: TRACK_PADDING_X,
-          paddingVertical: 8,
+          paddingVertical: 6,
           gap: PILL_GAP,
         }}
       >
@@ -719,11 +713,12 @@ function CollapsedMoodSelector({
           return (
             <HapticTab
               key={mood.value}
-              className="items-center justify-center rounded-2xl"
+              className="items-center justify-center"
               style={{
                 width: PILL_WIDTH,
                 height: PILL_HEIGHT,
                 backgroundColor,
+                borderRadius: 12,
               }}
               onPress={() => onMoodPress(mood.value)}
               onLongPress={() => onLongPress(mood.value)}
@@ -732,8 +727,13 @@ function CollapsedMoodSelector({
               accessibilityLabel={`Log ${mood.label}, mood ${mood.value}`}
             >
               <Text
-                className="text-base font-bold"
-                style={{ color, fontVariant: ["tabular-nums"] }}
+                style={{
+                  color,
+                  fontSize: 14,
+                  fontWeight: "700",
+                  fontVariant: ["tabular-nums"],
+                  letterSpacing: -0.2,
+                }}
               >
                 {mood.value}
               </Text>
