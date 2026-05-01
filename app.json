@@ -47,7 +47,7 @@
           "backgroundColor": "#FAF8F4",
           "dark": {
             "image": "./assets/images/app-icons/splash-icon-dark.png",
-            "backgroundColor": "#1C1916"
+            "backgroundColor": "#24302A"
           }
         }
       ],

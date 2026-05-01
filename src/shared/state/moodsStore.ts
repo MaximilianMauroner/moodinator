@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { MoodEntry, MoodEntryInput } from "@db/types";
-import { moodService, type PaginatedResult } from "@/services/moodService";
+import { moodService } from "@/services/moodService";
 
 type LoadStatus = "idle" | "loading" | "error" | "refreshing";
 
@@ -9,6 +9,7 @@ export type MoodsStore = {
   status: LoadStatus;
   error: string | null;
   lastLoadedAt: number | null;
+  isStale: boolean;
   lastTracked: Date | null;
 
   // Pagination state
@@ -20,6 +21,8 @@ export type MoodsStore = {
   loadAll: () => Promise<void>;
   loadMore: (pageSize?: number) => Promise<void>;
   refreshMoods: () => Promise<void>;
+  invalidate: () => void;
+  ensureFresh: () => Promise<void>;
   create: (entry: MoodEntryInput) => Promise<MoodEntry>;
   update: (
     id: number,
@@ -50,6 +53,7 @@ export const useMoodsStore = create<MoodsStore>((set, get) => ({
   status: "idle",
   error: null,
   lastLoadedAt: null,
+  isStale: true,
   lastTracked: null,
   totalCount: 0,
   hasMore: false,
@@ -58,6 +62,7 @@ export const useMoodsStore = create<MoodsStore>((set, get) => ({
   setLocal: (moods) =>
     set({
       moods,
+      isStale: false,
       lastTracked: computeLastTracked(moods),
     }),
 
@@ -69,6 +74,7 @@ export const useMoodsStore = create<MoodsStore>((set, get) => ({
         moods,
         status: "idle",
         lastLoadedAt: Date.now(),
+        isStale: false,
         lastTracked: computeLastTracked(moods),
         totalCount: moods.length,
         hasMore: false,
@@ -114,6 +120,7 @@ export const useMoodsStore = create<MoodsStore>((set, get) => ({
         moods,
         status: "idle",
         lastLoadedAt: Date.now(),
+        isStale: false,
         lastTracked: computeLastTracked(moods),
         totalCount: moods.length,
         hasMore: false,
@@ -125,12 +132,24 @@ export const useMoodsStore = create<MoodsStore>((set, get) => ({
     }
   },
 
+  invalidate: () => set({ isStale: true }),
+
+  ensureFresh: async () => {
+    const { isStale, status, loadAll } = get();
+    if (!isStale || status === "loading" || status === "refreshing") {
+      return;
+    }
+
+    await loadAll();
+  },
+
   create: async (entry) => {
     const created = await moodService.create(entry);
     set((state) => {
       const newMoods = [created, ...state.moods.filter((m) => m.id !== created.id)];
       return {
         moods: newMoods,
+        isStale: false,
         lastTracked: computeLastTracked(newMoods),
       };
     });
@@ -146,6 +165,7 @@ export const useMoodsStore = create<MoodsStore>((set, get) => ({
       const newMoods = state.moods.map((m) => (m.id === id ? updated : m));
       return {
         moods: newMoods,
+        isStale: false,
         lastTracked: computeLastTracked(newMoods),
       };
     });
@@ -159,6 +179,7 @@ export const useMoodsStore = create<MoodsStore>((set, get) => ({
       const newMoods = state.moods.filter((m) => m.id !== id);
       return {
         moods: newMoods,
+        isStale: false,
         lastTracked: computeLastTracked(newMoods),
       };
     });
@@ -171,6 +192,7 @@ export const useMoodsStore = create<MoodsStore>((set, get) => ({
       const newMoods = [restored, ...state.moods.filter((m) => m.id !== restored.id)];
       return {
         moods: newMoods,
+        isStale: false,
         lastTracked: computeLastTracked(newMoods),
       };
     });
@@ -181,4 +203,3 @@ export const useMoodsStore = create<MoodsStore>((set, get) => ({
   getMoodById: (id) => get().moods.find((m) => m.id === id),
   getMoodCount: () => get().moods.length,
 }));
-

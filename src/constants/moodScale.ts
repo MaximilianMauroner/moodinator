@@ -13,7 +13,7 @@ export const moodScale: MoodScale[] = [
         borderColor: "#A8C5A8",
         bgHex: "#E8EFE8",
         textHex: "#476D47",
-        bgHexDark: "#2D3D2D",
+        bgHexDark: "#344E36",
         textHexDark: "#A8C5A8",
     },
     {
@@ -25,7 +25,7 @@ export const moodScale: MoodScale[] = [
         borderColor: "#D1DFD1",
         bgHex: "#F4F7F4",
         textHex: "#476D47",
-        bgHexDark: "#283328",
+        bgHexDark: "#2E4838",
         textHexDark: "#7BA87B",
     },
     {
@@ -37,7 +37,7 @@ export const moodScale: MoodScale[] = [
         borderColor: "#D1DFD1",
         bgHex: "#F4F7F4",
         textHex: "#5B8A5B",
-        bgHexDark: "#252D25",
+        bgHexDark: "#2C4534",
         textHexDark: "#A8C5A8",
     },
     {
@@ -49,7 +49,7 @@ export const moodScale: MoodScale[] = [
         borderColor: "#DDD8E5",
         bgHex: "#EFECF2",
         textHex: "#695C78",
-        bgHexDark: "#2D2A33",
+        bgHexDark: "#383648",
         textHexDark: "#C4BBCF",
     },
     {
@@ -61,7 +61,7 @@ export const moodScale: MoodScale[] = [
         borderColor: "#EFECF2",
         bgHex: "#F8F7F9",
         textHex: "#6B5C7A",
-        bgHexDark: "#28252D",
+        bgHexDark: "#353244",
         textHexDark: "#A396B3",
     },
     {
@@ -73,7 +73,7 @@ export const moodScale: MoodScale[] = [
         borderColor: "#E5D9BF",
         bgHex: "#F9F5ED",
         textHex: "#7A6545",
-        bgHexDark: "#302A22",
+        bgHexDark: "#3E3E30",
         textHexDark: "#D4C4A0",
     },
     {
@@ -85,7 +85,7 @@ export const moodScale: MoodScale[] = [
         borderColor: "#F2EBD9",
         bgHex: "#FDFBF7",
         textHex: "#8B7352",
-        bgHexDark: "#352D22",
+        bgHexDark: "#42382E",
         textHexDark: "#D4C4A0",
     },
     {
@@ -97,7 +97,7 @@ export const moodScale: MoodScale[] = [
         borderColor: "#FACFC7",
         bgHex: "#FDE8E4",
         textHex: "#E06B55",
-        bgHexDark: "#3D2822",
+        bgHexDark: "#4A3430",
         textHexDark: "#F5A899",
     },
     {
@@ -109,7 +109,7 @@ export const moodScale: MoodScale[] = [
         borderColor: "#FDE8E4",
         bgHex: "#FEF6F4",
         textHex: "#E06B55",
-        bgHexDark: "#3A2520",
+        bgHexDark: "#48302E",
         textHexDark: "#ED8370",
     },
     {
@@ -121,7 +121,7 @@ export const moodScale: MoodScale[] = [
         borderColor: "#FACFC7",
         bgHex: "#FDE8E4",
         textHex: "#C75441",
-        bgHexDark: "#3D221D",
+        bgHexDark: "#4A2D2A",
         textHexDark: "#E06B55",
     },
     {
@@ -133,7 +133,7 @@ export const moodScale: MoodScale[] = [
         borderColor: "#F5A899",
         bgHex: "#FACFC7",
         textHex: "#C75441",
-        bgHexDark: "#401F1A",
+        bgHexDark: "#4E2A28",
         textHexDark: "#ED8370",
     },
 ];
