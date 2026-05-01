@@ -173,6 +173,14 @@ export function SettingsScreen() {
 
         <View className="gap-3">
           <SettingsCategoryCard
+            title="Card Variants"
+            description="Visual design explorations for mood entry cards"
+            icon="albums-outline"
+            href="/card-variants"
+            accentColor="dusk"
+          />
+
+          <SettingsCategoryCard
             title="Developer"
             description="Advanced options and testing"
             icon="code-slash-outline"
