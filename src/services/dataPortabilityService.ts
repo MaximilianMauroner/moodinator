@@ -6,6 +6,7 @@ import {
   type BackupResult,
 } from "@db/backup";
 import { importMoods, type ImportResult } from "@db/db";
+import { useMoodsStore } from "@/shared/state/moodsStore";
 
 export type BackupInfoSummary = {
   count: number;
@@ -14,7 +15,10 @@ export type BackupInfoSummary = {
 
 export const dataPortabilityService = {
   async importData(jsonData: string): Promise<ImportResult> {
-    return importMoods(jsonData);
+    const result = await importMoods(jsonData);
+    useMoodsStore.getState().invalidate();
+    void useMoodsStore.getState().ensureFresh();
+    return result;
   },
 
   async createBackup(): Promise<BackupResult<string>> {

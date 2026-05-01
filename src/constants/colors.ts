@@ -7,69 +7,69 @@ import { useColorScheme } from "@/hooks/useColorScheme";
 
 export const colors = {
   // Background colors
-  background: { light: "#FAF8F4", dark: "#1C1916" },
-  surface: { light: "#FDFCFA", dark: "#231F1B" },
-  surfaceAlt: { light: "#F5F1E8", dark: "#2A2520" },
-  surfaceElevated: { light: "#F9F5ED", dark: "#302A22" },
+  background: { light: "#FAF8F4", dark: "#24302A" },
+  surface: { light: "#FDFCFA", dark: "#2C3C34" },
+  surfaceAlt: { light: "#F5F1E8", dark: "#34443E" },
+  surfaceElevated: { light: "#F9F5ED", dark: "#3C4E46" },
 
   // Text colors
-  text: { light: "#3D352A", dark: "#F5F1E8" },
-  textMuted: { light: "#5C4E3D", dark: "#BDA77D" },
-  textSubtle: { light: "#7A6B55", dark: "#D4C4A0" },
+  text: { light: "#3D352A", dark: "#F0EDE6" },
+  textMuted: { light: "#5C4E3D", dark: "#C4AA80" },
+  textSubtle: { light: "#7A6B55", dark: "#D4C49C" },
   textInverse: { light: "#FFFFFF", dark: "#FFFFFF" },
 
   // Primary accent (sage green)
-  primary: { light: "#5B8A5B", dark: "#5B8A5B" },
-  primaryMuted: { light: "#7BA87B", dark: "#7BA87B" },
-  primaryBg: { light: "#E8EFE8", dark: "#2D3D2D" },
-  primaryBgHover: { light: "#D1DFD1", dark: "#3D4D3D" },
+  primary: { light: "#5B8A5B", dark: "#7BA87B" },
+  primaryMuted: { light: "#7BA87B", dark: "#A8C5A8" },
+  primaryBg: { light: "#E8EFE8", dark: "#2C4A34" },
+  primaryBgHover: { light: "#D1DFD1", dark: "#385440" },
 
   // Border colors
-  border: { light: "#E5D9BF", dark: "#3D352A" },
-  borderSubtle: { light: "#F2EBD9", dark: "#2A2520" },
+  border: { light: "#E5D9BF", dark: "#425C50" },
+  borderSubtle: { light: "#F2EBD9", dark: "#34443E" },
 
   // Overlay
   overlay: "rgba(0,0,0,0.4)",
 
   // Category colors - for emotions and tags
   positive: {
-    bg: { light: "#E8EFE8", dark: "#2D3D2D" },
+    bg: { light: "#E8EFE8", dark: "#2C4A34" },
     bgSelected: { light: "#5B8A5B", dark: "#5B8A5B" },
-    border: { light: "#D1DFD1", dark: "#3D4D3D" },
+    border: { light: "#D1DFD1", dark: "#3A5A42" },
     text: { light: "#5B8A5B", dark: "#A8C5A8" },
     textSelected: { light: "#FFFFFF", dark: "#FFFFFF" },
     textDark: { light: "#476D47", dark: "#A8C5A8" },
   },
   negative: {
-    bg: { light: "#FDE8E4", dark: "#3D2822" },
+    bg: { light: "#FDE8E4", dark: "#472E2A" },
     bgSelected: { light: "#E06B55", dark: "#C75441" },
-    border: { light: "#FACFC7", dark: "#4D3832" },
+    border: { light: "#FACFC7", dark: "#573A36" },
     text: { light: "#C75441", dark: "#F5A899" },
     textSelected: { light: "#FFFFFF", dark: "#FFFFFF" },
   },
   neutral: {
-    bg: { light: "#EFECF2", dark: "#2D2A33" },
+    bg: { light: "#EFECF2", dark: "#36344A" },
     bgSelected: { light: "#847596", dark: "#695C78" },
-    border: { light: "#DDD8E5", dark: "#3D3A43" },
+    border: { light: "#DDD8E5", dark: "#44425A" },
     text: { light: "#695C78", dark: "#C4BBCF" },
     textSelected: { light: "#FFFFFF", dark: "#FFFFFF" },
   },
 
   // Sand/warm tones (for energy, timestamps, etc.)
   sand: {
-    bg: { light: "#F9F5ED", dark: "#302A22" },
+    bg: { light: "#F9F5ED", dark: "#3E3E30" },
     bgSelected: { light: "#9D8660", dark: "#BDA77D" },
-    bgHover: { light: "#FDF8EF", dark: "#3D352A" },
-    border: { light: "#E5D9BF", dark: "#3D352A" },
+    bgHover: { light: "#FDF8EF", dark: "#484840" },
+    border: { light: "#E5D9BF", dark: "#425C50" },
     text: { light: "#7A6B55", dark: "#D4C4A0" },
-    textMuted: { light: "#8C7A60", dark: "#6B5C4A" },
+    textMuted: { light: "#8C7A60", dark: "#8A8060" },
   },
 
   // Dusk/purple tones (for context tags)
   dusk: {
-    bg: { light: "#EFECF2", dark: "#2D2A33" },
+    bg: { light: "#EFECF2", dark: "#36344A" },
     bgSelected: { light: "#847596", dark: "#695C78" },
-    border: { light: "#DDD8E5", dark: "#3D3A43" },
+    border: { light: "#DDD8E5", dark: "#44425A" },
     text: { light: "#695C78", dark: "#C4BBCF" },
   },
 
@@ -89,11 +89,11 @@ export const colors = {
 
   // Swipe action colors
   swipeDelete: {
-    bg: { light: "#FDE8E4", dark: "#3D2822" },
+    bg: { light: "#FDE8E4", dark: "#472E2A" },
     text: { light: "#C75441", dark: "#F5A899" },
   },
   swipeEdit: {
-    bg: { light: "#E8EFE8", dark: "#2D3D2D" },
+    bg: { light: "#E8EFE8", dark: "#2C4A34" },
     text: { light: "#5B8A5B", dark: "#A8C5A8" },
   },
 } as const;
@@ -112,11 +112,11 @@ export const chartColors = {
   fillOpacity: 0.14,
 
   // Grid and axis
-  gridLine: { light: "#EDE7DA", dark: "#3D352A" },
-  axisLabel: { light: "#7A6B55", dark: "#BDA77D" },
+  gridLine: { light: "#EDE7DA", dark: "#425C50" },
+  axisLabel: { light: "#7A6B55", dark: "#C4AA80" },
 
   // Background
-  chartBg: { light: "#FDFCFA", dark: "#231F1B" },
+  chartBg: { light: "#FDFCFA", dark: "#2C3C34" },
 
   // Dot styling
   dotStroke: "#ffffff",
