@@ -44,7 +44,7 @@ export const ListEditor = memo(function ListEditor({
       <Text className="text-base font-medium mb-1 text-paper-800 dark:text-paper-200">
         {title}
       </Text>
-      <Text className="text-sm mb-3 text-sand-500 dark:text-sand-800">
+      <Text className="text-sm mb-3 text-sand-600 dark:text-paper-400">
         {description}
       </Text>
 
@@ -82,14 +82,14 @@ export const ListEditor = memo(function ListEditor({
             accessibilityLabel={`Remove ${item}`}
             accessibilityHint="Tap to remove this item"
           >
-            <Text className="text-sm font-medium mr-1 text-sand-600 dark:text-sand-400">
+            <Text className="text-sm font-medium mr-1 text-sand-600 dark:text-paper-300">
               {item}
             </Text>
             <Ionicons name="close-circle" size={16} color={isDark ? "#8AAE98" : "#BDA77D"} />
           </TouchableOpacity>
         ))}
         {items.length === 0 && (
-          <Text className="text-sm italic p-1 text-sand-500 dark:text-sand-800">
+          <Text className="text-sm italic p-1 text-sand-600 dark:text-paper-400">
             No items added yet.
           </Text>
         )}
@@ -97,4 +97,3 @@ export const ListEditor = memo(function ListEditor({
     </View>
   );
 });
-

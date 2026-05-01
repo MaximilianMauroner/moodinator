@@ -70,7 +70,7 @@ export function SettingsCategoryCard({
       accessibilityLabel={`${title} settings`}
     >
       <View
-        className="rounded-3xl bg-paper-50 dark:bg-paper-850 overflow-hidden"
+        className="rounded-3xl border border-paper-200 bg-paper-50 dark:border-paper-800 dark:bg-paper-800 overflow-hidden"
         style={isDark ? styles.cardShadowDark : styles.cardShadowLight}
       >
         {/* Left accent bar */}
@@ -113,7 +113,7 @@ export function SettingsCategoryCard({
                   )}
                 </View>
                 <Text
-                  className="text-xs text-sand-500 dark:text-sand-400"
+                  className="text-xs text-sand-600 dark:text-paper-400"
                   numberOfLines={1}
                 >
                   {description}

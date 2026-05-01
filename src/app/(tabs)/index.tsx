@@ -45,6 +45,8 @@ import {
   DetailedMoodButtonSelector,
   HomeHeader,
   HistoryListHeader,
+  UnifiedMoodSelector,
+  UNIFIED_COMPACT_EXPANDED_HEIGHT,
 } from "@/components/home";
 
 import { useMoodsStore } from "@/shared/state/moodsStore";
@@ -293,7 +295,7 @@ function HomeScreenContent() {
 
   const estimatedExpandedPanelHeight = entrySettings.showDetailedLabels
     ? DEFAULT_DETAILED_PANEL_HEIGHT
-    : DEFAULT_COMPACT_PANEL_HEIGHT;
+    : UNIFIED_COMPACT_EXPANDED_HEIGHT;
   const currentExpandedPanelHeight = expandedPanelHeight || estimatedExpandedPanelHeight;
   const collapseDistance = Math.max(
     currentExpandedPanelHeight - COLLAPSED_SELECTOR_HEIGHT,
@@ -514,44 +516,47 @@ function HomeScreenContent() {
               <HomeHeader lastTracked={lastTracked} />
 
               <Animated.View style={panelAnimatedStyle}>
-                <Animated.View
-                  pointerEvents={selectorCollapsed ? "none" : "auto"}
-                  onLayout={handleExpandedSelectorLayout}
-                  style={expandedSelectorAnimatedStyle}
-                >
-                  {entrySettings.showDetailedLabels ? (
-                    <DetailedMoodButtonSelector
-                      onMoodPress={modals.handleMoodPress}
-                      onLongPress={modals.handleLongPress}
-                    />
-                  ) : (
-                    <CompactMoodButtonSelector
-                      onMoodPress={modals.handleMoodPress}
-                      onLongPress={modals.handleLongPress}
-                    />
-                  )}
-                </Animated.View>
-
-                <Animated.View
-                  pointerEvents={selectorCollapsed ? "auto" : "none"}
-                  style={[
-                    collapsedSelectorAnimatedStyle,
-                    {
-                      bottom: 0,
-                      height: COLLAPSED_SELECTOR_HEIGHT,
-                      justifyContent: "center",
-                      left: 0,
-                      position: "absolute",
-                      right: 0,
-                    },
-                  ]}
-                >
-                  <CollapsedMoodSelector
+                {entrySettings.showDetailedLabels ? (
+                  <>
+                    <Animated.View
+                      pointerEvents={selectorCollapsed ? "none" : "auto"}
+                      onLayout={handleExpandedSelectorLayout}
+                      style={expandedSelectorAnimatedStyle}
+                    >
+                      <DetailedMoodButtonSelector
+                        onMoodPress={modals.handleMoodPress}
+                        onLongPress={modals.handleLongPress}
+                      />
+                    </Animated.View>
+                    <Animated.View
+                      pointerEvents={selectorCollapsed ? "auto" : "none"}
+                      style={[
+                        collapsedSelectorAnimatedStyle,
+                        {
+                          bottom: 0,
+                          height: COLLAPSED_SELECTOR_HEIGHT,
+                          justifyContent: "center",
+                          left: 0,
+                          position: "absolute",
+                          right: 0,
+                        },
+                      ]}
+                    >
+                      <CollapsedMoodSelector
+                        isDark={isDark}
+                        onMoodPress={modals.handleMoodPress}
+                        onLongPress={modals.handleLongPress}
+                      />
+                    </Animated.View>
+                  </>
+                ) : (
+                  <UnifiedMoodSelector
+                    collapseProgress={collapseProgress}
                     isDark={isDark}
                     onMoodPress={modals.handleMoodPress}
                     onLongPress={modals.handleLongPress}
                   />
-                </Animated.View>
+                )}
               </Animated.View>
 
               <Animated.View className="flex-1 mt-4">

@@ -81,7 +81,7 @@ export function SettingsScreen() {
         <ProfileCard entryCount={entryCount} daysTracking={daysTracking} />
 
         {/* Categories */}
-        <Text className="text-xs font-semibold uppercase tracking-wider text-sand-500 dark:text-sand-400 mb-3 mt-2 ml-1">
+        <Text className="text-xs font-semibold uppercase tracking-wider text-sand-600 dark:text-paper-400 mb-3 mt-2 ml-1">
           Preferences
         </Text>
 
@@ -120,7 +120,7 @@ export function SettingsScreen() {
           />
         </View>
 
-        <Text className="text-xs font-semibold uppercase tracking-wider text-sand-500 dark:text-sand-400 mb-3 mt-6 ml-1">
+        <Text className="text-xs font-semibold uppercase tracking-wider text-sand-600 dark:text-paper-400 mb-3 mt-6 ml-1">
           Customization
         </Text>
 
@@ -144,7 +144,7 @@ export function SettingsScreen() {
           />
         </View>
 
-        <Text className="text-xs font-semibold uppercase tracking-wider text-sand-500 dark:text-sand-400 mb-3 mt-6 ml-1">
+        <Text className="text-xs font-semibold uppercase tracking-wider text-sand-600 dark:text-paper-400 mb-3 mt-6 ml-1">
           Data
         </Text>
 
@@ -167,7 +167,7 @@ export function SettingsScreen() {
           />
         </View>
 
-        <Text className="text-xs font-semibold uppercase tracking-wider text-sand-500 dark:text-sand-400 mb-3 mt-6 ml-1">
+        <Text className="text-xs font-semibold uppercase tracking-wider text-sand-600 dark:text-paper-400 mb-3 mt-6 ml-1">
           More
         </Text>
 

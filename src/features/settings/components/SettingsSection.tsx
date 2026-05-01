@@ -14,12 +14,12 @@ export function SettingsSection({ title, children }: SettingsSectionProps) {
   return (
     <View className="mx-4 mb-4">
       {title && (
-        <Text className="text-xs font-semibold uppercase tracking-wider text-sand-500 dark:text-sand-400 mb-2 ml-1">
+        <Text className="text-xs font-semibold uppercase tracking-wider text-sand-600 dark:text-paper-400 mb-2 ml-1">
           {title}
         </Text>
       )}
       <View
-        className="rounded-2xl bg-paper-50 dark:bg-paper-850 overflow-hidden"
+        className="rounded-2xl border border-paper-200 bg-paper-50 dark:border-paper-800 dark:bg-paper-800 overflow-hidden"
         style={isDark ? styles.sectionShadowDark : styles.sectionShadowLight}
       >
         {children}
