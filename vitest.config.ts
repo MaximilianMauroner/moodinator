@@ -7,10 +7,6 @@ export default defineConfig({
       "@": path.resolve(__dirname, "src"),
       "@db": path.resolve(__dirname, "db"),
       "@assets": path.resolve(__dirname, "assets"),
-      "toastify-react-native": path.resolve(
-        __dirname,
-        "src/types/toastify-react-native"
-      ),
     },
   },
   test: {

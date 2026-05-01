@@ -2,9 +2,11 @@ import React, { useEffect } from "react";
 import { View, Text, AppState, AppStateStatus, ActivityIndicator } from "react-native";
 import { Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { registerBackgroundBackupTask } from "@db/backgroundBackup";
 import { LockScreen, useAppLockStore } from "@/features/appLock";
 import { OnboardingScreen, useOnboardingStore } from "@/features/onboarding";
+import { AppToaster } from "@/components/ui/AppToaster";
 import { useSettingsStore } from "@/shared/state/settingsStore";
 
 import "./global.css";
@@ -58,33 +60,37 @@ export default function Layout() {
   }, []);
 
   return (
-    <View className="flex-1 bg-white dark:bg-slate-950">
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: {
-            backgroundColor: "transparent",
-          },
-        }}
-      />
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <View className="flex-1 bg-white dark:bg-slate-950">
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: {
+              backgroundColor: "transparent",
+            },
+          }}
+        />
 
-      {!hydrated && (
-        <View className="absolute inset-0">
-          <AppBootSplash />
-        </View>
-      )}
+        {!hydrated && (
+          <View className="absolute inset-0">
+            <AppBootSplash />
+          </View>
+        )}
 
-      {hydrated && !hasCompletedOnboarding && (
-        <View className="absolute inset-0">
-          <OnboardingScreen />
-        </View>
-      )}
+        {hydrated && !hasCompletedOnboarding && (
+          <View className="absolute inset-0">
+            <OnboardingScreen />
+          </View>
+        )}
 
-      {hydrated && hasCompletedOnboarding && isEnabled && isLocked && (
-        <View className="absolute inset-0">
-          <LockScreen />
-        </View>
-      )}
-    </View>
+        {hydrated && hasCompletedOnboarding && isEnabled && isLocked && (
+          <View className="absolute inset-0">
+            <LockScreen />
+          </View>
+        )}
+
+        <AppToaster />
+      </View>
+    </GestureHandlerRootView>
   );
 }
