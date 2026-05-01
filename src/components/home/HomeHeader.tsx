@@ -4,7 +4,6 @@ import { useColorScheme } from "@/hooks/useColorScheme";
 import { typography } from "@/constants/typography";
 import { useMoodsStore } from "@/shared/state/moodsStore";
 import { calculateStreak } from "@/features/insights/utils/patternDetection";
-import { moodScale } from "@/constants/moodScale";
 
 interface HomeHeaderProps {
   lastTracked: Date | null;
@@ -57,18 +56,6 @@ export function HomeHeader({ lastTracked }: HomeHeaderProps) {
   const moods = useMoodsStore((s) => s.moods);
   const streak = useMemo(() => calculateStreak(moods), [moods]);
 
-  // Find the actual last-entry mood by matching its timestamp,
-  // since the moods array isn't guaranteed to be sorted.
-  const lastMood = useMemo(() => {
-    if (!lastTracked) return null;
-    const ts = lastTracked.getTime();
-    return moods.find((m) => m.timestamp === ts) ?? null;
-  }, [moods, lastTracked]);
-
-  const lastMoodLabel = lastMood
-    ? moodScale.find((m) => m.value === lastMood.mood)?.label ?? null
-    : null;
-
   const now = new Date();
   const greeting = getGreeting(now);
   const dateLabel = now
@@ -102,13 +89,12 @@ export function HomeHeader({ lastTracked }: HomeHeaderProps) {
           >
             {greeting}
           </Text>
-          {lastTracked && lastMoodLabel ? (
+          {lastTracked ? (
             <Text
               className="text-sand-600 dark:text-sand-400 mt-1"
               style={typography.bodySm}
             >
-              Last entry — {formatRelative(lastTracked, now)} ·{" "}
-              <Text style={{ color: accent, fontWeight: "600" }}>{lastMoodLabel}</Text>
+              Last entry — {formatRelative(lastTracked, now)}
             </Text>
           ) : (
             <Text
