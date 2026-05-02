@@ -6,8 +6,8 @@ import { DEFAULT_EMOTIONS } from "../../src/lib/entrySettings";
 import { parseEmotionItem } from "./emotionUtils";
 import { serializeEmotions } from "./serialization";
 
-export async function createEmotionsTable() {
-  const db = await getDb();
+export async function createEmotionsTable(database?: SQLite.SQLiteDatabase) {
+  const db = database ?? (await getDb());
   await db.execAsync(`
         CREATE TABLE IF NOT EXISTS emotions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -17,8 +17,8 @@ export async function createEmotionsTable() {
     `);
 }
 
-export async function createMoodEmotionsTable() {
-  const db = await getDb();
+export async function createMoodEmotionsTable(database?: SQLite.SQLiteDatabase) {
+  const db = database ?? (await getDb());
   await db.execAsync(`
         CREATE TABLE IF NOT EXISTS mood_emotions (
             mood_id INTEGER NOT NULL,
@@ -144,8 +144,10 @@ export async function linkEmotionsToMood(
   }
 }
 
-export async function migrateEmotionsToTable(): Promise<{ migrated: number }> {
-  const db = await getDb();
+export async function migrateEmotionsToTable(
+  database?: SQLite.SQLiteDatabase
+): Promise<{ migrated: number }> {
+  const db = database ?? (await getDb());
   let migrated = 0;
   const emotionIds = new Map<string, number>();
 
@@ -208,8 +210,10 @@ export async function migrateEmotionsToTable(): Promise<{ migrated: number }> {
   }
 }
 
-export async function hasEmotionTableMigrated(): Promise<boolean> {
-  const db = await getDb();
+export async function hasEmotionTableMigrated(
+  database?: SQLite.SQLiteDatabase
+): Promise<boolean> {
+  const db = database ?? (await getDb());
   const emotionCount = await db.getFirstAsync<CountResult>(
     "SELECT COUNT(*) as count FROM emotions;"
   );

@@ -36,23 +36,3 @@ export {
   hasEmotionTableMigrated,
   getEmotionsForMood,
 } from "./moods/emotions";
-
-import { createMoodTable } from "./moods/schema";
-import { hasEmotionTableMigrated, migrateEmotionsToTable } from "./moods/emotions";
-
-// Initialize database on module load
-async function initializeDatabase() {
-  await createMoodTable();
-
-  // Run emotion migration if not already done
-  const migrated = await hasEmotionTableMigrated();
-  if (!migrated) {
-    try {
-      await migrateEmotionsToTable();
-    } catch (error) {
-      console.error("Failed to migrate emotions to table:", error);
-    }
-  }
-}
-
-void initializeDatabase();
