@@ -2,9 +2,11 @@ import React, { useEffect, useCallback, useMemo, useRef, useState } from "react"
 import {
   View,
   Text,
-  ScrollView,
+  ScrollView as RNScrollView,
   RefreshControl,
+  Platform,
   type LayoutChangeEvent,
+  type ScrollViewProps,
 } from "react-native";
 import { FlashList } from "@shopify/flash-list";
 import {
@@ -63,10 +65,12 @@ const DEFAULT_DETAILED_PANEL_HEIGHT = 484;
 const MIN_COLLAPSE_DISTANCE = 80;
 const SNAP_VELOCITY = 900;
 const REFRESH_PULL_DISTANCE = 86;
+const HANDOFF_ACTIVATION_DISTANCE = 8;
 
 function HomeScreenContent() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
+  const isAndroid = Platform.OS === "android";
 
   // Zustand store for mood data
   const moods = useMoodsStore((state) => state.moods);
@@ -83,6 +87,7 @@ function HomeScreenContent() {
   const [selectorCollapsed, setSelectorCollapsed] = useState(true);
   const collapseProgress = useSharedValue(1);
   const dragStartProgress = useSharedValue(0);
+  const handoffTouchStartY = useSharedValue(0);
   const listY = useSharedValue(0);
 
   // Wrapper for setMoods that supports function updaters
@@ -267,17 +272,41 @@ function HomeScreenContent() {
     return velocityY < 0 ? 1 : 0;
   }, []);
 
-  const entriesNativeGesture = useMemo(() => Gesture.Native(), []);
+  const entriesNativeGesture = useMemo(() => {
+    const gesture = Gesture.Native();
+
+    if (isAndroid) {
+      gesture.shouldActivateOnStart(true);
+    }
+
+    return gesture;
+  }, [isAndroid]);
+
+  const renderMoodListScrollComponent = useCallback(
+    (props: ScrollViewProps & { ref?: React.Ref<RNScrollView> }) => (
+      <GestureDetector gesture={entriesNativeGesture}>
+        <RNScrollView {...props} />
+      </GestureDetector>
+    ),
+    [entriesNativeGesture]
+  );
 
   const handoffGesture = useMemo(
-    () =>
-      Gesture.Pan()
-        .activeOffsetY([-8, 8])
+    () => {
+      const gesture = Gesture.Pan()
+        .activeOffsetY([
+          -HANDOFF_ACTIVATION_DISTANCE,
+          HANDOFF_ACTIVATION_DISTANCE,
+        ])
         .simultaneousWithExternalGesture(entriesNativeGesture)
         .onBegin(() => {
+          "worklet";
+
           dragStartProgress.value = collapseProgress.value;
         })
         .onUpdate((event) => {
+          "worklet";
+
           const draggingDown = event.translationY > 0;
           const draggingUp = event.translationY < 0;
 
@@ -298,10 +327,12 @@ function HomeScreenContent() {
           collapseProgress.value = Math.min(Math.max(nextProgress, 0), 1);
         })
         .onEnd((event) => {
+          "worklet";
+
           const shouldRefresh =
             collapseProgress.value <= 0.001 &&
-            dragStartProgress.value <= 0.001 &&
-            event.translationY > REFRESH_PULL_DISTANCE &&
+            event.translationY >
+              dragStartProgress.value * collapseDistance + REFRESH_PULL_DISTANCE &&
             event.velocityY > 0;
 
           if (shouldRefresh) {
@@ -314,12 +345,64 @@ function HomeScreenContent() {
             stiffness: 220,
             mass: 0.9,
           });
-        }),
+        });
+
+      // Android can let this parent pan preempt FlashList unless it fails
+      // before activation when the drag should be native list scrolling.
+      if (isAndroid) {
+        gesture
+          .manualActivation(true)
+          .onTouchesDown((event) => {
+            "worklet";
+
+            const touch = event.allTouches[0];
+
+            if (!touch) {
+              return;
+            }
+
+            handoffTouchStartY.value = touch.absoluteY;
+            dragStartProgress.value = collapseProgress.value;
+          })
+          .onTouchesMove((event, stateManager) => {
+            "worklet";
+
+            const touch = event.allTouches[0];
+
+            if (!touch) {
+              return;
+            }
+
+            const translationY = touch.absoluteY - handoffTouchStartY.value;
+            const draggingDown = translationY > HANDOFF_ACTIVATION_DISTANCE;
+            const draggingUp = translationY < -HANDOFF_ACTIVATION_DISTANCE;
+
+            if (!draggingDown && !draggingUp) {
+              return;
+            }
+
+            const listShouldOwnDrag =
+              (dragStartProgress.value >= 0.999 && draggingUp) ||
+              (draggingDown && listY.value > 0);
+
+            if (listShouldOwnDrag) {
+              stateManager.fail();
+              return;
+            }
+
+            stateManager.activate();
+          });
+      }
+
+      return gesture;
+    },
     [
       collapseDistance,
       collapseProgress,
       dragStartProgress,
       entriesNativeGesture,
+      handoffTouchStartY,
+      isAndroid,
       listY,
       resolveSnap,
       triggerExpandedRefresh,
@@ -425,6 +508,90 @@ function HomeScreenContent() {
     []
   );
 
+  const selectorPanel = (
+    <>
+      <HomeHeader />
+
+      <Animated.View style={panelAnimatedStyle}>
+        {entrySettings.showDetailedLabels ? (
+          <>
+            <Animated.View
+              pointerEvents={selectorCollapsed ? "none" : "auto"}
+              onLayout={handleExpandedSelectorLayout}
+              style={expandedSelectorAnimatedStyle}
+            >
+              <DetailedMoodButtonSelector
+                onMoodPress={modals.handleMoodPress}
+                onLongPress={modals.handleLongPress}
+              />
+            </Animated.View>
+            <Animated.View
+              pointerEvents={selectorCollapsed ? "auto" : "none"}
+              style={[
+                collapsedSelectorAnimatedStyle,
+                {
+                  bottom: 0,
+                  height: COLLAPSED_SELECTOR_HEIGHT,
+                  justifyContent: "center",
+                  left: 0,
+                  position: "absolute",
+                  right: 0,
+                },
+              ]}
+            >
+              <CollapsedMoodSelector
+                isDark={isDark}
+                onMoodPress={modals.handleMoodPress}
+                onLongPress={modals.handleLongPress}
+              />
+            </Animated.View>
+          </>
+        ) : (
+          <UnifiedMoodSelector
+            collapseProgress={collapseProgress}
+            isDark={isDark}
+            onMoodPress={modals.handleMoodPress}
+            onLongPress={modals.handleLongPress}
+          />
+        )}
+      </Animated.View>
+    </>
+  );
+
+  const moodList = (
+    <FlashList
+      data={moods}
+      keyExtractor={keyExtractor}
+      renderItem={renderMoodItem}
+      ListEmptyComponent={listEmptyComponent}
+      refreshControl={
+        <RefreshControl
+          enabled={!selectorCollapsed}
+          refreshing={refreshing}
+          onRefresh={refreshMoods}
+          tintColor={isDark ? "#A8C5A8" : "#5B8A5B"}
+          colors={[isDark ? "#A8C5A8" : "#5B8A5B"]}
+          progressBackgroundColor={isDark ? "#2C4038" : "#FDFCFA"}
+        />
+      }
+      style={{ flex: 1 }}
+      contentInsetAdjustmentBehavior="automatic"
+      nestedScrollEnabled
+      showsVerticalScrollIndicator
+      contentContainerStyle={listContentContainerStyle}
+      onScroll={handleListScroll}
+      scrollEventThrottle={16}
+      renderScrollComponent={renderMoodListScrollComponent}
+    />
+  );
+
+  const historyList = (
+    <Animated.View className="flex-1 mt-4">
+      <HistoryListHeader moodCount={moods.length} />
+      {moodList}
+    </Animated.View>
+  );
+
   return (
     <>
       <GestureHandlerRootView style={{ flex: 1 }}>
@@ -433,77 +600,8 @@ function HomeScreenContent() {
         >
           <GestureDetector gesture={handoffGesture}>
             <Animated.View className="flex-1 px-4 pt-4">
-              <HomeHeader />
-
-              <Animated.View style={panelAnimatedStyle}>
-                {entrySettings.showDetailedLabels ? (
-                  <>
-                    <Animated.View
-                      pointerEvents={selectorCollapsed ? "none" : "auto"}
-                      onLayout={handleExpandedSelectorLayout}
-                      style={expandedSelectorAnimatedStyle}
-                    >
-                      <DetailedMoodButtonSelector
-                        onMoodPress={modals.handleMoodPress}
-                        onLongPress={modals.handleLongPress}
-                      />
-                    </Animated.View>
-                    <Animated.View
-                      pointerEvents={selectorCollapsed ? "auto" : "none"}
-                      style={[
-                        collapsedSelectorAnimatedStyle,
-                        {
-                          bottom: 0,
-                          height: COLLAPSED_SELECTOR_HEIGHT,
-                          justifyContent: "center",
-                          left: 0,
-                          position: "absolute",
-                          right: 0,
-                        },
-                      ]}
-                    >
-                      <CollapsedMoodSelector
-                        isDark={isDark}
-                        onMoodPress={modals.handleMoodPress}
-                        onLongPress={modals.handleLongPress}
-                      />
-                    </Animated.View>
-                  </>
-                ) : (
-                  <UnifiedMoodSelector
-                    collapseProgress={collapseProgress}
-                    isDark={isDark}
-                    onMoodPress={modals.handleMoodPress}
-                    onLongPress={modals.handleLongPress}
-                  />
-                )}
-              </Animated.View>
-
-              <Animated.View className="flex-1 mt-4">
-                <HistoryListHeader moodCount={moods.length} />
-                <GestureDetector gesture={entriesNativeGesture}>
-                  <FlashList
-                    data={moods}
-                    keyExtractor={keyExtractor}
-                    renderItem={renderMoodItem}
-                    ListEmptyComponent={listEmptyComponent}
-                    refreshControl={
-                      <RefreshControl
-                        refreshing={refreshing}
-                        onRefresh={refreshMoods}
-                        tintColor={isDark ? "#A8C5A8" : "#5B8A5B"}
-                        colors={[isDark ? "#A8C5A8" : "#5B8A5B"]}
-                        progressBackgroundColor={isDark ? "#2C4038" : "#FDFCFA"}
-                      />
-                    }
-                    contentInsetAdjustmentBehavior="automatic"
-                    showsVerticalScrollIndicator
-                    contentContainerStyle={listContentContainerStyle}
-                    onScroll={handleListScroll}
-                    scrollEventThrottle={16}
-                  />
-                </GestureDetector>
-              </Animated.View>
+              {selectorPanel}
+              {historyList}
             </Animated.View>
           </GestureDetector>
         </SafeAreaView>
@@ -567,7 +665,7 @@ function CollapsedMoodSelector({
   onMoodPress,
   onLongPress,
 }: CollapsedMoodSelectorProps) {
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<RNScrollView>(null);
   const [trackWidth, setTrackWidth] = useState(0);
 
   const contentWidth =
@@ -615,7 +713,7 @@ function CollapsedMoodSelector({
         overflow: "hidden",
       }}
     >
-      <ScrollView
+      <RNScrollView
         ref={scrollRef}
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -664,7 +762,7 @@ function CollapsedMoodSelector({
             </HapticTab>
           );
         })}
-      </ScrollView>
+      </RNScrollView>
     </View>
   );
 }
