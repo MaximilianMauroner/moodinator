@@ -3,8 +3,8 @@ import { getDb } from "../client";
 import type { ColumnInfo } from "../types/rows";
 import { createEmotionsTable, createMoodEmotionsTable } from "./emotions";
 
-export async function createMoodTable() {
-  const db = await getDb();
+export async function createMoodTable(database?: SQLite.SQLiteDatabase) {
+  const db = database ?? (await getDb());
   await db.execAsync(`
         CREATE TABLE IF NOT EXISTS moods (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -15,11 +15,11 @@ export async function createMoodTable() {
             context_tags TEXT DEFAULT '[]',
             energy INTEGER
         );
-    `);
+  `);
   await ensureMoodTableColumns(db);
   // Tables must exist before indexes that reference them are created.
-  await createEmotionsTable();
-  await createMoodEmotionsTable();
+  await createEmotionsTable(db);
+  await createMoodEmotionsTable(db);
   await createIndexes(db);
 }
 
@@ -49,7 +49,7 @@ async function ensureMoodTableColumns(database: SQLite.SQLiteDatabase) {
   const columns = await database.getAllAsync<ColumnInfo>("PRAGMA table_info(moods);");
   const existing = new Set(columns.map((col) => col.name));
 
-  const migrations: Array<{ name: string; sql: string }> = [
+  const migrations: { name: string; sql: string }[] = [
     {
       name: "emotions",
       sql: "ALTER TABLE moods ADD COLUMN emotions TEXT DEFAULT '[]';",

@@ -1,4 +1,5 @@
 import type { Emotion } from "../types";
+import type * as SQLite from "expo-sqlite";
 import { getDb } from "../client";
 import { DEFAULT_CONTEXTS, DEFAULT_EMOTIONS } from "../../src/lib/entrySettings";
 import {
@@ -76,14 +77,14 @@ export async function seedMoods() {
     "Having mixed feelings",
   ];
 
-  const entries: Array<{
+  const entries: {
     mood: number;
     note: string | null;
     timestamp: number;
     emotions: Emotion[];
     contextTags: string[];
     energy: number;
-  }> = [];
+  }[] = [];
 
   for (let i = 0; i < days; i++) {
     let entriesCount: number;
@@ -180,9 +181,9 @@ export async function seedMoods() {
   try {
     for (let i = 0; i < entries.length; i += BATCH_SIZE) {
       const batch = entries.slice(i, i + BATCH_SIZE);
-      await db.withTransactionAsync(async () => {
+      await db.withExclusiveTransactionAsync(async (tx) => {
         for (const entry of batch) {
-          const result = await db.runAsync(
+          const result = await tx.runAsync(
             "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy, mood_scale_json) VALUES (?, ?, ?, ?, ?, ?, ?);",
             entry.mood,
             entry.note,
@@ -194,7 +195,11 @@ export async function seedMoods() {
           );
 
           if (entry.emotions.length > 0) {
-            await linkEmotionsToMood(db, result.lastInsertRowId, entry.emotions);
+            await linkEmotionsToMood(
+              tx as SQLite.SQLiteDatabase,
+              result.lastInsertRowId,
+              entry.emotions
+            );
           }
 
           insertedCount++;

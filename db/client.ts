@@ -2,6 +2,11 @@ import * as SQLite from "expo-sqlite";
 import * as SecureStore from "expo-secure-store";
 import * as Crypto from "expo-crypto";
 import { Platform } from "react-native";
+import { createMoodTable } from "./moods/schema";
+import {
+  hasEmotionTableMigrated,
+  migrateEmotionsToTable,
+} from "./moods/emotions";
 
 let db: SQLite.SQLiteDatabase | null = null;
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
@@ -79,6 +84,21 @@ async function configureDatabaseEncryption(database: SQLite.SQLiteDatabase): Pro
   }
 }
 
+async function initializeDatabase(database: SQLite.SQLiteDatabase): Promise<void> {
+  await createMoodTable(database);
+
+  const migrated = await hasEmotionTableMigrated(database);
+  if (migrated) {
+    return;
+  }
+
+  try {
+    await migrateEmotionsToTable(database);
+  } catch (error) {
+    console.error("Failed to migrate emotions to table:", error);
+  }
+}
+
 export async function getDb(): Promise<SQLite.SQLiteDatabase> {
   if (db) {
     return db;
@@ -92,6 +112,7 @@ export async function getDb(): Promise<SQLite.SQLiteDatabase> {
       });
 
       await configureDatabaseEncryption(openedDb);
+      await initializeDatabase(openedDb);
       db = openedDb;
       return openedDb;
     })().catch((error) => {
