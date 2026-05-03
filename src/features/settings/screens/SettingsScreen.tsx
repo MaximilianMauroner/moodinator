@@ -1,56 +1,53 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { View, Text, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "expo-router";
-import { getAllMoods } from "@db/db";
-import { getBackupInfo } from "@db/backup";
+import { dataPortabilityService } from "@/services/dataPortabilityService";
 import { useSettingsStore } from "@/shared/state/settingsStore";
+import { useMoodsStore } from "@/shared/state/moodsStore";
 
 import { ProfileCard } from "../components/ProfileCard";
 import { SettingsCategoryCard } from "../components/SettingsCategoryCard";
 
 export function SettingsScreen() {
-  const [entryCount, setEntryCount] = useState(0);
-  const [daysTracking, setDaysTracking] = useState(0);
   const [backupCount, setBackupCount] = useState(0);
 
+  const moods = useMoodsStore((state) => state.moods);
+  const ensureFresh = useMoodsStore((state) => state.ensureFresh);
   const emotions = useSettingsStore((state) => state.emotions);
   const contexts = useSettingsStore((state) => state.contexts);
   const quickEntryPrefs = useSettingsStore((state) => state.quickEntryPrefs);
-  const hydrate = useSettingsStore((state) => state.hydrate);
-
-  useEffect(() => {
-    hydrate();
-  }, [hydrate]);
 
   const loadStats = useCallback(async () => {
     try {
-      const moods = await getAllMoods();
-      setEntryCount(moods.length);
-      setDaysTracking(0);
-      if (moods.length > 0) {
-        const uniqueDays = new Set(
-          moods.map((mood) => {
-            const date = new Date(mood.timestamp);
-            return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
-          })
-        );
-        setDaysTracking(uniqueDays.size);
-      }
-
-      const backupInfo = await getBackupInfo();
+      await ensureFresh();
+      const backupInfo = await dataPortabilityService.getBackupInfo();
       setBackupCount(backupInfo.count);
     } catch (error) {
       console.error("Failed to load stats:", error);
     }
-  }, []);
+  }, [ensureFresh]);
 
   // Reload stats when screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      loadStats();
+      void loadStats();
     }, [loadStats])
   );
+
+  const entryCount = moods.length;
+  const daysTracking = useMemo(() => {
+    if (moods.length === 0) {
+      return 0;
+    }
+
+    return new Set(
+      moods.map((mood) => {
+        const date = new Date(mood.timestamp);
+        return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+      })
+    ).size;
+  }, [moods]);
 
   // Count active quick entry fields
   const activeQuickEntryFields = [
@@ -82,29 +79,13 @@ export function SettingsScreen() {
 
         {/* Categories */}
         <Text className="text-xs font-semibold uppercase tracking-wider text-sand-600 dark:text-paper-400 mb-3 mt-2 ml-1">
-          Preferences
+          Mood Tracking
         </Text>
 
         <View className="gap-3">
           <SettingsCategoryCard
-            title="Security"
-            description="App lock and privacy settings"
-            icon="shield-checkmark-outline"
-            href="/settings/security"
-            accentColor="sage"
-          />
-
-          <SettingsCategoryCard
-            title="Display"
-            description="Labels, charts, and visual options"
-            icon="eye-outline"
-            href="/settings/display"
-            accentColor="sage"
-          />
-
-          <SettingsCategoryCard
             title="Quick Entry"
-            description="Customize what appears in quick entry"
+            description="Choose fields shown while logging"
             icon="flash-outline"
             href="/settings/quick-entry"
             accentColor="sand"
@@ -112,23 +93,9 @@ export function SettingsScreen() {
           />
 
           <SettingsCategoryCard
-            title="Notifications"
-            description="Manage your reminders"
-            icon="notifications-outline"
-            href="/notifications"
-            accentColor="sage"
-          />
-        </View>
-
-        <Text className="text-xs font-semibold uppercase tracking-wider text-sand-600 dark:text-paper-400 mb-3 mt-6 ml-1">
-          Customization
-        </Text>
-
-        <View className="gap-3">
-          <SettingsCategoryCard
             title="Emotions"
             description="Manage your emotion presets"
-            icon="happy-outline"
+            icon="heart-outline"
             href="/settings/emotions"
             accentColor="coral"
             badge={emotions.length}
@@ -136,7 +103,7 @@ export function SettingsScreen() {
 
           <SettingsCategoryCard
             title="Context Tags"
-            description="Tags for where, who, and what"
+            description="Places, people, and recurring situations"
             icon="pricetag-outline"
             href="/settings/contexts"
             accentColor="dusk"
@@ -145,13 +112,43 @@ export function SettingsScreen() {
         </View>
 
         <Text className="text-xs font-semibold uppercase tracking-wider text-sand-600 dark:text-paper-400 mb-3 mt-6 ml-1">
-          Data
+          App Experience
         </Text>
 
         <View className="gap-3">
           <SettingsCategoryCard
+            title="Notifications"
+            description="Manage check-in reminders"
+            icon="notifications-outline"
+            href="/notifications"
+            accentColor="sage"
+          />
+
+          <SettingsCategoryCard
+            title="Display"
+            description="Labels, charts, and history cards"
+            icon="eye-outline"
+            href="/settings/display"
+            accentColor="sage"
+          />
+        </View>
+
+        <Text className="text-xs font-semibold uppercase tracking-wider text-sand-600 dark:text-paper-400 mb-3 mt-6 ml-1">
+          Privacy & Data
+        </Text>
+
+        <View className="gap-3">
+          <SettingsCategoryCard
+            title="Security"
+            description="App lock and local privacy controls"
+            icon="lock-closed-outline"
+            href="/settings/security"
+            accentColor="sand"
+          />
+
+          <SettingsCategoryCard
             title="Data & Backups"
-            description="Export, import, and backup your data"
+            description="Data export, import, and backups"
             icon="cloud-outline"
             href="/settings/data"
             accentColor="sage"
@@ -168,24 +165,24 @@ export function SettingsScreen() {
         </View>
 
         <Text className="text-xs font-semibold uppercase tracking-wider text-sand-600 dark:text-paper-400 mb-3 mt-6 ml-1">
-          More
+          Support & Advanced
         </Text>
 
         <View className="gap-3">
+          <SettingsCategoryCard
+            title="About"
+            description="App info, support, and legal"
+            icon="information-circle-outline"
+            href="/settings/about"
+            accentColor="dusk"
+          />
+
           <SettingsCategoryCard
             title="Developer"
             description="Advanced options and testing"
             icon="code-slash-outline"
             href="/settings/developer"
             accentColor="sand"
-          />
-
-          <SettingsCategoryCard
-            title="About"
-            description="App info and support"
-            icon="information-circle-outline"
-            href="/settings/about"
-            accentColor="dusk"
           />
         </View>
       </ScrollView>

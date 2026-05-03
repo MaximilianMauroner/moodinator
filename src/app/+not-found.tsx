@@ -11,7 +11,7 @@ export default function NotFoundScreen() {
           <Ionicons name="search-outline" size={40} color="#64748b" />
         </View>
         <Text className="text-xl font-semibold text-slate-800 dark:text-slate-100 mb-2">
-          This screen doesn't exist.
+          {"This screen doesn't exist."}
         </Text>
         <Link href="/">
           <Text className="text-blue-600 dark:text-blue-400 font-semibold mt-2">

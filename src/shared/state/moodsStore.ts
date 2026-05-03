@@ -29,7 +29,8 @@ export type MoodsStore = {
     updates: Partial<MoodEntryInput & { mood: number }>
   ) => Promise<MoodEntry | null>;
   remove: (id: number) => Promise<MoodEntry | null>;
-  restore: (entry: Omit<MoodEntry, "id">) => Promise<MoodEntry>;
+  restore: (entry: MoodEntryInput) => Promise<MoodEntry>;
+  updateTimestamp: (id: number, timestamp: number) => Promise<MoodEntry | null>;
   setLocal: (moods: MoodEntry[]) => void;
 
   // Selectors
@@ -48,6 +49,16 @@ function computeLastTracked(moods: MoodEntry[]): Date | null {
 
 const DEFAULT_PAGE_SIZE = 50;
 
+function applyCollectionState(moods: MoodEntry[]) {
+  return {
+    moods,
+    lastTracked: computeLastTracked(moods),
+    totalCount: moods.length,
+    hasMore: false,
+    currentOffset: moods.length,
+  };
+}
+
 export const useMoodsStore = create<MoodsStore>((set, get) => ({
   moods: [],
   status: "idle",
@@ -61,9 +72,8 @@ export const useMoodsStore = create<MoodsStore>((set, get) => ({
 
   setLocal: (moods) =>
     set({
-      moods,
       isStale: false,
-      lastTracked: computeLastTracked(moods),
+      ...applyCollectionState(moods),
     }),
 
   loadAll: async () => {
@@ -135,12 +145,41 @@ export const useMoodsStore = create<MoodsStore>((set, get) => ({
   invalidate: () => set({ isStale: true }),
 
   ensureFresh: async () => {
-    const { isStale, status, loadAll } = get();
+    const { isStale, status, lastLoadedAt, moods, loadAll, refreshMoods } = get();
     if (!isStale || status === "loading" || status === "refreshing") {
       return;
     }
 
+    if (lastLoadedAt !== null || moods.length > 0) {
+      await refreshMoods();
+      return;
+    }
+
     await loadAll();
+  },
+
+  updateTimestamp: async (id, timestamp) => {
+    const updated = await moodService.updateTimestamp(id, timestamp);
+    if (!updated) {
+      return null;
+    }
+
+    set((state) => {
+      const newMoods = [...state.moods]
+        .map((mood) => (mood.id === id ? updated : mood))
+        .sort((a, b) => b.timestamp - a.timestamp);
+
+      return {
+        ...applyCollectionState(newMoods),
+        isStale: true,
+      };
+    });
+
+    queueMicrotask(() => {
+      void get().ensureFresh();
+    });
+
+    return updated;
   },
 
   create: async (entry) => {
@@ -148,11 +187,15 @@ export const useMoodsStore = create<MoodsStore>((set, get) => ({
     set((state) => {
       const newMoods = [created, ...state.moods.filter((m) => m.id !== created.id)];
       return {
-        moods: newMoods,
-        isStale: false,
-        lastTracked: computeLastTracked(newMoods),
+        ...applyCollectionState(newMoods),
+        isStale: true,
       };
     });
+
+    queueMicrotask(() => {
+      void get().ensureFresh();
+    });
+
     return created;
   },
 
@@ -164,11 +207,15 @@ export const useMoodsStore = create<MoodsStore>((set, get) => ({
     set((state) => {
       const newMoods = state.moods.map((m) => (m.id === id ? updated : m));
       return {
-        moods: newMoods,
-        isStale: false,
-        lastTracked: computeLastTracked(newMoods),
+        ...applyCollectionState(newMoods),
+        isStale: true,
       };
     });
+
+    queueMicrotask(() => {
+      void get().ensureFresh();
+    });
+
     return updated;
   },
 
@@ -178,11 +225,15 @@ export const useMoodsStore = create<MoodsStore>((set, get) => ({
     set((state) => {
       const newMoods = state.moods.filter((m) => m.id !== id);
       return {
-        moods: newMoods,
-        isStale: false,
-        lastTracked: computeLastTracked(newMoods),
+        ...applyCollectionState(newMoods),
+        isStale: true,
       };
     });
+
+    queueMicrotask(() => {
+      void get().ensureFresh();
+    });
+
     return existing;
   },
 
@@ -191,11 +242,15 @@ export const useMoodsStore = create<MoodsStore>((set, get) => ({
     set((state) => {
       const newMoods = [restored, ...state.moods.filter((m) => m.id !== restored.id)];
       return {
-        moods: newMoods,
-        isStale: false,
-        lastTracked: computeLastTracked(newMoods),
+        ...applyCollectionState(newMoods),
+        isStale: true,
       };
     });
+
+    queueMicrotask(() => {
+      void get().ensureFresh();
+    });
+
     return restored;
   },
 

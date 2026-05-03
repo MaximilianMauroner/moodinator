@@ -103,7 +103,7 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
         haptics.warning();
         setTimeout(() => setNoEntry(false), 3000);
       }
-    } catch (error) {
+    } catch {
       haptics.error();
     } finally {
       setLoading(false);

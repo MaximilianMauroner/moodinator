@@ -9,9 +9,12 @@ import {
 } from "../../src/lib/entrySettings";
 
 describe("parseEmotionList", () => {
-  test("returns defaults for non-array or empty input", () => {
+  test("returns defaults for non-array input", () => {
     expect(parseEmotionList(null)).toBe(DEFAULT_EMOTIONS);
-    expect(parseEmotionList([])).toBe(DEFAULT_EMOTIONS);
+  });
+
+  test("preserves an explicit empty array", () => {
+    expect(parseEmotionList([])).toEqual([]);
   });
 
   test("parses legacy string arrays and resolves categories from defaults", () => {
@@ -39,12 +42,15 @@ describe("parseEmotionList", () => {
 });
 
 describe("parseStringList", () => {
-  test("returns fallback for non-array, empty, or fully invalid input", () => {
+  test("returns fallback for non-array or fully invalid input", () => {
     expect(parseStringList(null, DEFAULT_CONTEXTS)).toBe(DEFAULT_CONTEXTS);
-    expect(parseStringList([], DEFAULT_CONTEXTS)).toBe(DEFAULT_CONTEXTS);
     expect(parseStringList([null, "", "   "], DEFAULT_CONTEXTS)).toBe(
       DEFAULT_CONTEXTS
     );
+  });
+
+  test("preserves an explicit empty array", () => {
+    expect(parseStringList([], DEFAULT_CONTEXTS)).toEqual([]);
   });
 
   test("keeps only non-empty strings", () => {

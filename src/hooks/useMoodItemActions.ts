@@ -2,8 +2,8 @@ import { useCallback } from "react";
 import type { MoodEntry } from "@db/types";
 import type { SwipeDirection } from "@/types/mood";
 import { haptics } from "@/lib/haptics";
-import { moodService } from "@/services/moodService";
 import { toastService } from "@/services/toastService";
+import { useMoodsStore } from "@/shared/state/moodsStore";
 
 type MoodsSetter =
   | React.Dispatch<React.SetStateAction<MoodEntry[]>>
@@ -24,21 +24,27 @@ export function useMoodItemActions({
   setEditingEntry,
 }: UseMoodItemActionsParams) {
   const SWIPE_THRESHOLD = 100;
+  const removeMood = useMoodsStore((state) => state.remove);
+  const restoreMood = useMoodsStore((state) => state.restore);
 
   const handleDeleteMood = useCallback(
     async (mood: MoodEntry) => {
       haptics.warning(); // Haptic feedback for delete action
-      await moodService.delete(mood.id);
+      await removeMood(mood.id);
       setMoods((prev) => prev.filter((m) => m.id !== mood.id));
       toastService.showDeletedMood(mood, async (deletedMood) => {
         haptics.success(); // Haptic feedback for undo/restore
-        const restoredMood = await moodService.create({
+        const restoredMood = await restoreMood({
           mood: deletedMood.mood,
           note: deletedMood.note,
           timestamp: deletedMood.timestamp,
           emotions: deletedMood.emotions,
           contextTags: deletedMood.contextTags,
           energy: deletedMood.energy,
+          moodScale: deletedMood.moodScale,
+          photos: deletedMood.photos,
+          location: deletedMood.location,
+          voiceMemos: deletedMood.voiceMemos,
           basedOnEntryId: deletedMood.basedOnEntryId,
         });
 
@@ -62,7 +68,7 @@ export function useMoodItemActions({
         });
       });
     },
-    [setMoods, setLastTracked]
+    [removeMood, restoreMood, setMoods, setLastTracked]
   );
 
   const onSwipeableWillOpen = useCallback(

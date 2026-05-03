@@ -5,7 +5,8 @@ import {
   setBackupFolder,
   type BackupResult,
 } from "@db/backup";
-import { importMoods, type ImportResult } from "@db/db";
+import { exportMoods, importMoods, type ImportResult } from "@db/db";
+import type { MoodDateRange } from "@db/moods/range";
 import { useMoodsStore } from "@/shared/state/moodsStore";
 
 export type BackupInfoSummary = {
@@ -14,6 +15,10 @@ export type BackupInfoSummary = {
 };
 
 export const dataPortabilityService = {
+  async exportData(range?: MoodDateRange): Promise<string> {
+    return exportMoods(range);
+  },
+
   async importData(jsonData: string): Promise<ImportResult> {
     const result = await importMoods(jsonData);
     useMoodsStore.getState().invalidate();

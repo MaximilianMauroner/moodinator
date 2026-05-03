@@ -209,6 +209,15 @@ These are release-blocking or release-sensitive issues to resolve before submitt
 
 ## 13. Align Expo SDK Package Versions
 
+**Status: Resolved on 2026-05-03.**
+
+Updated the Expo SDK 55 package set in `package.json` and `bun.lock`, then rebuilt `node_modules` from the refreshed lockfile. Verification now passes:
+
+- `bunx expo install --check`
+- `bunx expo-doctor`
+- `bun run lint`
+- `bunx tsc --noEmit`
+
 **Files**
 
 - `package.json`
@@ -217,6 +226,199 @@ These are release-blocking or release-sensitive issues to resolve before submitt
 - `eas.json`
 
 **Problem**
+
+# Local Build Report
+
+Generated from a successful local Android preview build on 2026-05-02.
+
+Artifact:
+
+- `build-1777724151485.apk`
+
+## Build Outcome
+
+- Build succeeded.
+- No terminal errors were reported at the end of the build.
+
+## Build Warnings
+
+### 1. Expo Doctor dependency mismatch check failed
+
+**Problem**
+
+`expo doctor` reported `17/18` checks passed and failed `Check that packages match versions required by installed Expo SDK`. It listed 29 outdated packages, including `expo`, many `expo-*` modules, `react-native`, and `react-native-worklets`.
+
+**Impact**
+
+The APK still built successfully, but the project is drifting from the SDK 55 expected patch set. That increases risk of runtime bugs, build instability, and future upgrade friction.
+
+**Suggested fix**
+
+Run `npx expo install --check`, then align the reported packages to the versions expected by the installed Expo SDK.
+
+### 2. Deprecated Android status bar config
+
+**Problem**
+
+Expo prebuild warned that `androidStatusBar.translucent` is deprecated due to Android edge-to-edge enforcement and has no effect.
+
+**Files**
+
+- `app.json`
+
+**Impact**
+
+No current build failure, but the config is dead and will be removed in a future Expo release.
+
+**Suggested fix**
+
+Remove `androidStatusBar.translucent` from app config and rely on current edge-to-edge patterns.
+
+### 3. Missing environment configuration during build
+
+**Problem**
+
+The build reported:
+
+- no preview EAS environment variables configured
+- `ANDROID_NDK_HOME` not set
+- `NODE_ENV` not set, so Expo continued without mode-specific `.env`
+
+**Impact**
+
+These did not block the build, but they make the build environment less explicit and can hide configuration drift between local, CI, and release builds.
+
+**Suggested fix**
+
+- Define preview env vars in EAS if they are expected.
+- Set `NODE_ENV` explicitly for local build scripts if env-dependent config matters.
+- Only set `ANDROID_NDK_HOME` if the project needs a fixed local NDK path outside the SDK-managed flow.
+
+### 4. Gradle deprecation warning
+
+**Problem**
+
+Gradle reported:
+
+- `Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.`
+
+It also emitted a problems report during the temporary EAS build at:
+
+- `android/build/reports/problems/problems-report.html` inside the temporary build directory
+
+**Impact**
+
+The current build works, but future Gradle upgrades may break the project or its plugins.
+
+**Suggested fix**
+
+Run a build with `--warning-mode all` in the Android project and triage whether the deprecations come from app code, Expo tooling, or third-party dependencies.
+
+### 5. Android manifest merge warnings in app module
+
+**Problem**
+
+At the end of the Gradle run, the app manifest emitted:
+
+- `provider#expo.modules.filesystem.FileSystemFileProvider@android:authorities was tagged ... to replace other declarations but no other declaration present`
+- `activity#expo.modules.imagepicker.ExpoCropImageActivity@android:exported was tagged ... to replace other declarations but no other declaration present`
+
+**Impact**
+
+These did not fail the build, but they indicate manifest override directives that are not currently replacing anything. That can signal stale or unnecessary manifest merge config.
+
+**Suggested fix**
+
+Inspect the generated Android manifest merge inputs and remove or simplify redundant `tools:replace` usage if it is not needed.
+
+### 6. Third-party Android manifest namespace warnings
+
+**Problem**
+
+Several dependencies emitted warnings that `package="..."` in source `AndroidManifest.xml` is no longer used to define namespace, including:
+
+- `@react-native-async-storage/async-storage`
+- `react-native-haptic-feedback`
+- `react-native-safe-area-context`
+- `react-native-vector-icons`
+- `@shopify/react-native-skia`
+
+**Impact**
+
+These are dependency-level warnings, not app-code failures. They indicate ecosystem lag against newer Android Gradle Plugin expectations.
+
+**Suggested fix**
+
+Track upstream package releases and upgrade when patched versions remove these manifest warnings.
+
+### 7. Third-party Kotlin/Java deprecation noise
+
+**Problem**
+
+The build emitted many deprecation and unchecked-operation warnings from dependencies, especially:
+
+- `react-native-pager-view`
+- `react-native-safe-area-context`
+- `react-native-webview`
+- `react-native-screens`
+- `react-native-gesture-handler`
+- `react-native-worklets`
+- `react-native-reanimated`
+- `expo-modules-core`
+- `expo`
+- `expo-constants`
+- `@shopify/react-native-skia`
+
+Common warning themes:
+
+- deprecated React Native Android APIs
+- deprecated Android platform APIs
+- deprecated Kotlin interop patterns
+- unchecked casts / unsafe operations
+
+**Impact**
+
+No immediate build breakage, but these warnings make future RN/AGP/Gradle upgrades riskier and make real regressions harder to spot in build logs.
+
+**Suggested fix**
+
+Prefer package upgrades first. Only patch locally if a dependency warning becomes release-blocking.
+
+### 8. Repeated NO_COLOR / FORCE_COLOR warning
+
+**Problem**
+
+Node repeatedly logged:
+
+- `The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.`
+
+**Impact**
+
+Harmless, but noisy.
+
+**Suggested fix**
+
+Normalize local build environment variables so only one of `NO_COLOR` or `FORCE_COLOR` is set.
+
+### 9. Bundler cache cold-start warning
+
+**Problem**
+
+During Gradle asset bundling, Metro reported:
+
+- `warning: Bundler cache is empty, rebuilding (this may take a minute)`
+
+**Impact**
+
+Not a correctness issue. It only affects build time.
+
+**Suggested fix**
+
+None required unless local build performance becomes a problem.
+
+## Side Effects Observed
+
+- Running `bun run build` also ran the `prebuild` script and bumped the app version from `1.2.0` to `1.3.0`.
 
 `npx expo-doctor` fails because many Expo SDK 55 packages are behind the versions expected by the installed SDK. This includes core runtime/build packages such as `expo`, `react-native`, `expo-router`, `expo-notifications`, `expo-sqlite`, `expo-file-system`, and `jest-expo`.
 
@@ -253,6 +455,10 @@ Either re-enable and verify background backup registration on Android release bu
 The app does not overpromise data recovery behavior, and the backup feature can be trusted in a privacy-sensitive product.
 
 ## 19. Clean Release Verification Warnings
+
+**Status: Resolved on 2026-05-03.**
+
+`bun run lint` now completes without warnings after the current release-cleanup changes. TypeScript also passes with `bunx tsc --noEmit`.
 
 **Files**
 

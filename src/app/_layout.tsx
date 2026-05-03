@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { View, Text, AppState, AppStateStatus, ActivityIndicator } from "react-native";
+import { View, Text, AppState, AppStateStatus, ActivityIndicator, LogBox } from "react-native";
 import { Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -10,6 +10,10 @@ import { AppToaster } from "@/components/ui/AppToaster";
 import { useSettingsStore } from "@/shared/state/settingsStore";
 
 import "./global.css";
+
+LogBox.ignoreLogs([
+  "SafeAreaView has been deprecated and will be removed in a future release.",
+]);
 
 function AppBootSplash() {
   return (

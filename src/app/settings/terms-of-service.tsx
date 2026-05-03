@@ -66,7 +66,7 @@ export default function TermsOfServiceScreen() {
 
           <Subtitle>No Recovery</Subtitle>
           <Paragraph>
-            Since we do not store your data on any servers, we cannot recover lost data. We strongly recommend using the app's export and backup features regularly.
+            {"Since we do not store your data on any servers, we cannot recover lost data. We strongly recommend using the app's export and backup features regularly."}
           </Paragraph>
         </Section>
 
@@ -90,7 +90,7 @@ export default function TermsOfServiceScreen() {
 
         <Section title="Disclaimers">
           <Paragraph>
-            The app is provided "as is" and "as available" without warranties of any kind. We do not guarantee that the app will meet your specific requirements, be uninterrupted or error-free, or that any errors will be corrected.
+            {'The app is provided "as is" and "as available" without warranties of any kind. We do not guarantee that the app will meet your specific requirements, be uninterrupted or error-free, or that any errors will be corrected.'}
           </Paragraph>
         </Section>
 

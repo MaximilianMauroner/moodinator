@@ -104,6 +104,16 @@ describe("useSettingsStore", () => {
     expect(setHapticsEnabledGlobal).toHaveBeenCalledWith(true);
   });
 
+  test("preserves explicitly empty emotion and context lists", async () => {
+    await AsyncStorage.setItem(EMOTION_PRESETS_KEY, JSON.stringify([]));
+    await AsyncStorage.setItem(CONTEXT_TAGS_KEY, JSON.stringify([]));
+
+    await useSettingsStore.getState().hydrate();
+
+    expect(useSettingsStore.getState().emotions).toEqual([]);
+    expect(useSettingsStore.getState().contexts).toEqual([]);
+  });
+
   test("setters update state optimistically and persist values", async () => {
     const nextEmotions = [{ name: "Calm", category: "positive" as const }];
     const nextContexts = ["Home", "Outside"];

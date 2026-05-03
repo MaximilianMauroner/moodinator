@@ -8,7 +8,7 @@ import {
   type LayoutChangeEvent,
   type ScrollViewProps,
 } from "react-native";
-import { FlashList } from "@shopify/flash-list";
+import { FlashList, type FlashListRef } from "@shopify/flash-list";
 import {
   Gesture,
   GestureDetector,
@@ -54,7 +54,6 @@ import { useMoodItemActions } from "@/hooks/useMoodItemActions";
 import { useColorScheme } from "@/hooks/useColorScheme";
 
 import type { MoodEntry } from "@db/types";
-import { moodService } from "@/services/moodService";
 import { emotionService } from "@/services/emotionService";
 import { toastService } from "@/services/toastService";
 import { moodScale } from "@/constants/moodScale";
@@ -66,6 +65,29 @@ const MIN_COLLAPSE_DISTANCE = 80;
 const SNAP_VELOCITY = 900;
 const REFRESH_PULL_DISTANCE = 86;
 const HANDOFF_ACTIVATION_DISTANCE = 8;
+
+function clamp(value: number, min: number, max: number) {
+  "worklet";
+  return Math.min(Math.max(value, min), max);
+}
+
+function getCollapseOverflow(
+  translationY: number,
+  dragStartProgress: number,
+  collapseDistance: number
+) {
+  "worklet";
+  return Math.max(0, -translationY - (1 - dragStartProgress) * collapseDistance);
+}
+
+function getExpandOverflow(
+  translationY: number,
+  dragStartProgress: number,
+  collapseDistance: number
+) {
+  "worklet";
+  return Math.max(0, translationY - dragStartProgress * collapseDistance);
+}
 
 function HomeScreenContent() {
   const colorScheme = useColorScheme();
@@ -79,7 +101,9 @@ function HomeScreenContent() {
   const refreshMoods = useMoodsStore((state) => state.refreshMoods);
   const createMood = useMoodsStore((state) => state.create);
   const updateMood = useMoodsStore((state) => state.update);
+  const updateMoodTimestamp = useMoodsStore((state) => state.updateTimestamp);
   const setLocal = useMoodsStore((state) => state.setLocal);
+  const listRef = useRef<FlashListRef<MoodEntry>>(null);
 
   const loading = status === "loading";
   const refreshing = status === "refreshing";
@@ -88,6 +112,8 @@ function HomeScreenContent() {
   const collapseProgress = useSharedValue(1);
   const dragStartProgress = useSharedValue(0);
   const handoffTouchStartY = useSharedValue(0);
+  const gestureStartListY = useSharedValue(0);
+  const gestureRefreshTriggered = useSharedValue(false);
   const listY = useSharedValue(0);
 
   // Wrapper for setMoods that supports function updaters
@@ -190,11 +216,10 @@ function HomeScreenContent() {
 
   const handleDateTimeSave = useCallback(
     async (moodId: number, newTimestamp: number) => {
-      await moodService.updateTimestamp(moodId, newTimestamp);
-      await loadAll();
+      await updateMoodTimestamp(moodId, newTimestamp);
       modals.closeDateModal();
     },
-    [loadAll, modals]
+    [modals, updateMoodTimestamp]
   );
 
   const handleMoodItemLongPress = useCallback(
@@ -247,9 +272,16 @@ function HomeScreenContent() {
 
   const triggerExpandedRefresh = useCallback(() => {
     if (!refreshing) {
-      refreshMoods();
+      void refreshMoods();
     }
   }, [refreshMoods, refreshing]);
+
+  const setGestureListOffset = useCallback((offset: number) => {
+    listRef.current?.scrollToOffset({
+      offset: Math.max(offset, 0),
+      animated: false,
+    });
+  }, []);
 
   useAnimatedReaction(
     () => collapseProgress.value >= 0.995,
@@ -303,6 +335,8 @@ function HomeScreenContent() {
           "worklet";
 
           dragStartProgress.value = collapseProgress.value;
+          gestureStartListY.value = listY.value;
+          gestureRefreshTriggered.value = false;
         })
         .onUpdate((event) => {
           "worklet";
@@ -321,10 +355,43 @@ function HomeScreenContent() {
             return;
           }
 
-          const nextProgress =
-            dragStartProgress.value - event.translationY / collapseDistance;
+          const nextProgress = clamp(
+            dragStartProgress.value - event.translationY / collapseDistance,
+            0,
+            1
+          );
 
-          collapseProgress.value = Math.min(Math.max(nextProgress, 0), 1);
+          collapseProgress.value = nextProgress;
+
+          if (draggingUp && nextProgress >= 0.999) {
+            const overflow = getCollapseOverflow(
+              event.translationY,
+              dragStartProgress.value,
+              collapseDistance
+            );
+            const nextOffset = gestureStartListY.value + overflow;
+
+            listY.value = nextOffset;
+            runOnJS(setGestureListOffset)(nextOffset);
+            return;
+          }
+
+          if (
+            draggingDown &&
+            nextProgress <= 0.001 &&
+            !gestureRefreshTriggered.value
+          ) {
+            const overflow = getExpandOverflow(
+              event.translationY,
+              dragStartProgress.value,
+              collapseDistance
+            );
+
+            if (overflow >= REFRESH_PULL_DISTANCE) {
+              gestureRefreshTriggered.value = true;
+              runOnJS(triggerExpandedRefresh)();
+            }
+          }
         })
         .onEnd((event) => {
           "worklet";
@@ -363,6 +430,8 @@ function HomeScreenContent() {
 
             handoffTouchStartY.value = touch.absoluteY;
             dragStartProgress.value = collapseProgress.value;
+            gestureStartListY.value = listY.value;
+            gestureRefreshTriggered.value = false;
           })
           .onTouchesMove((event, stateManager) => {
             "worklet";
@@ -401,10 +470,13 @@ function HomeScreenContent() {
       collapseProgress,
       dragStartProgress,
       entriesNativeGesture,
+      gestureRefreshTriggered,
+      gestureStartListY,
       handoffTouchStartY,
       isAndroid,
       listY,
       resolveSnap,
+      setGestureListOffset,
       triggerExpandedRefresh,
     ]
   );
@@ -561,6 +633,7 @@ function HomeScreenContent() {
   const moodList = (
     <FlashList
       data={moods}
+      ref={listRef}
       keyExtractor={keyExtractor}
       renderItem={renderMoodItem}
       ListEmptyComponent={listEmptyComponent}

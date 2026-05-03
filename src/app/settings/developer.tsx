@@ -3,10 +3,10 @@ import { View, Text, ScrollView, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
 import * as Notifications from "expo-notifications";
-import { clearMoods, seedMoods } from "@db/db";
+import { moodService } from "@/services/moodService";
 import { useSettingsStore } from "@/shared/state/settingsStore";
+import { useMoodsStore } from "@/shared/state/moodsStore";
 import { useOnboardingStore } from "@/features/onboarding";
 import { useAppLockStore } from "@/features/appLock";
 import { SettingsPageHeader } from "@/features/settings/components/SettingsPageHeader";
@@ -15,7 +15,6 @@ import { SettingRow } from "@/features/settings/components/SettingRow";
 import { ToggleRow } from "@/features/settings/components/ToggleRow";
 
 export default function DeveloperSettingsScreen() {
-  const router = useRouter();
   const devOptionsEnabled = useSettingsStore((state) => state.devOptionsEnabled);
   const setDevOptionsEnabled = useSettingsStore((state) => state.setDevOptionsEnabled);
   // hydrateSettings is called explicitly after AsyncStorage.clear() in the dev
@@ -24,6 +23,8 @@ export default function DeveloperSettingsScreen() {
   const resetOnboarding = useOnboardingStore((state) => state.reset);
   const clearPin = useAppLockStore((state) => state.clearPin);
   const hydrateAppLock = useAppLockStore((state) => state.hydrate);
+  const invalidateMoods = useMoodsStore((state) => state.invalidate);
+  const ensureFreshMoods = useMoodsStore((state) => state.ensureFresh);
 
   const handleResetOnboarding = useCallback(() => {
     Alert.alert(
@@ -44,12 +45,14 @@ export default function DeveloperSettingsScreen() {
 
   const handleSeedMoods = useCallback(async () => {
     try {
-      const result = await seedMoods();
+      const result = await moodService.seedSampleData();
+      invalidateMoods();
+      await ensureFreshMoods();
       Alert.alert("Sample Data Added", `Successfully added ${result} sample mood entries.`);
     } catch {
       Alert.alert("Error", "Failed to add sample data");
     }
-  }, []);
+  }, [ensureFreshMoods, invalidateMoods]);
 
   const handleTestNotification = useCallback(async () => {
     await Notifications.scheduleNotificationAsync({
@@ -67,7 +70,9 @@ export default function DeveloperSettingsScreen() {
         style: "destructive",
         onPress: async () => {
           try {
-            await clearMoods();
+            await moodService.clearAll();
+            invalidateMoods();
+            await ensureFreshMoods();
             Alert.alert("Success", "All mood data has been cleared.");
           } catch {
             Alert.alert("Error", "Failed to clear mood data");
@@ -75,7 +80,7 @@ export default function DeveloperSettingsScreen() {
         },
       },
     ]);
-  }, []);
+  }, [ensureFreshMoods, invalidateMoods]);
 
   const handleResetEverythingToSetup = useCallback(() => {
     if (!__DEV__) {
@@ -95,10 +100,15 @@ export default function DeveloperSettingsScreen() {
             try {
               await Notifications.cancelAllScheduledNotificationsAsync();
               await clearPin();
-              await clearMoods();
+              await moodService.clearAll();
               await AsyncStorage.clear();
               await resetOnboarding();
-              await Promise.all([hydrateSettings(), hydrateAppLock()]);
+              invalidateMoods();
+              await Promise.all([
+                hydrateSettings(),
+                hydrateAppLock(),
+                ensureFreshMoods(),
+              ]);
               Alert.alert("Reset Complete", "Setup is available again.");
             } catch (error) {
               console.error("Failed to reset app to setup:", error);
@@ -108,7 +118,14 @@ export default function DeveloperSettingsScreen() {
         },
       ]
     );
-  }, [clearPin, hydrateAppLock, hydrateSettings, resetOnboarding]);
+  }, [
+    clearPin,
+    ensureFreshMoods,
+    hydrateAppLock,
+    hydrateSettings,
+    invalidateMoods,
+    resetOnboarding,
+  ]);
 
   return (
     <SafeAreaView className="flex-1 bg-paper-100 dark:bg-paper-900" edges={["top"]}>
@@ -151,12 +168,6 @@ export default function DeveloperSettingsScreen() {
         {devOptionsEnabled && (
           <>
             <SettingsSection title="Testing">
-              <SettingRow
-                label="Preview Card Variants"
-                subLabel="Open the mood entry card design showcase"
-                icon="color-wand-outline"
-                onPress={() => router.push("/settings/card-variants")}
-              />
               <SettingRow
                 label="Add Sample Data"
                 subLabel="Generate test mood entries"

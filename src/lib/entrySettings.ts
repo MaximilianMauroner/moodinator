@@ -130,8 +130,12 @@ function resolveEmotionCategory(name: string): Emotion["category"] {
  * Returns DEFAULT_EMOTIONS on empty or invalid input.
  */
 export function parseEmotionList(data: unknown): Emotion[] {
-    if (!Array.isArray(data) || data.length === 0) {
+    if (!Array.isArray(data)) {
         return DEFAULT_EMOTIONS;
+    }
+
+    if (data.length === 0) {
+        return [];
     }
 
     const emotions = data
@@ -166,8 +170,12 @@ export function parseEmotionList(data: unknown): Emotion[] {
  * Returns fallback on empty or invalid input.
  */
 export function parseStringList(data: unknown, fallback: string[]): string[] {
-    if (!Array.isArray(data) || data.length === 0) {
+    if (!Array.isArray(data)) {
         return fallback;
+    }
+
+    if (data.length === 0) {
+        return [];
     }
     const filtered = data.filter(
         (item) => typeof item === "string" && item.trim().length > 0

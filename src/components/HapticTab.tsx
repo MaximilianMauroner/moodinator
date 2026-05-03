@@ -6,7 +6,10 @@ import { Platform, Vibration } from "react-native";
 let _hapticMod: any = null;
 function getHaptic() {
   if (!_hapticMod) {
-    try { _hapticMod = require("react-native-haptic-feedback"); }
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      _hapticMod = require("react-native-haptic-feedback");
+    }
     catch { _hapticMod = { default: null, HapticFeedbackTypes: {} }; }
   }
   return _hapticMod as { default: any; HapticFeedbackTypes: Record<string, string> };

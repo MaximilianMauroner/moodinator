@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "moodinator",
+    "name": "Moodinator",
     "slug": "moodinator",
-    "version": "1.2.0",
+    "version": "1.3.0",
     "orientation": "portrait",
     "icon": "./assets/images/app-icons/app-icon.png",
     "scheme": "myapp",

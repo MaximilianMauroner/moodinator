@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { getMoodsByMonth } from "@db/db";
 import type { MoodEntry } from "@db/types";
 import { moodScale } from "@/constants/moodScale";
+import { moodService } from "@/services/moodService";
 
 export type CalendarDayData = {
   day: number;
@@ -36,7 +36,7 @@ export function useCalendarData(initialYear?: number, initialMonth?: number) {
     const requestId = ++latestRequestIdRef.current;
     setLoading(true);
     try {
-      const moodsByDay = await getMoodsByMonth(year, month);
+      const moodsByDay = await moodService.getByMonth(year, month);
 
       // Calculate days in month and first day of week
       const firstDay = new Date(year, month, 1);

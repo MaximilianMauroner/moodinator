@@ -11,12 +11,23 @@ const MAPPING = {
   // See SF Symbols in the SF Symbols app on Mac.
   "house.fill": "home",
   "paperplane.fill": "send",
+  "chevron.left": "chevron-left",
   "chevron.left.forwardslash.chevron.right": "code",
   "chevron.right": "chevron-right",
   "chart.bar": "pie-chart-outline",
   "camera.fill": "photo-camera",
   "camera.aperture": "cameraswitch",
+  "clock.fill": "access-time-filled",
+  "bell.fill": "notifications",
+  "bell.slash.fill": "notifications-off",
+  "plus.circle.fill": "add-circle",
+  "checkmark.circle.fill": "check-circle",
   gear: "settings",
+  plus: "add",
+  pencil: "edit",
+  trash: "delete-outline",
+  xmark: "close",
+  checkmark: "check",
 } as Partial<
   Record<
     Extract<import("expo-symbols").SymbolViewProps["name"], string>,

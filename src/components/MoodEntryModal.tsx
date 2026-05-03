@@ -148,7 +148,7 @@ const MoodAdjustRow: React.FC<{
                 withSpring(1, { damping: 18, stiffness: 350 })
             );
         }
-    }, [mood]);
+    }, [mood, pillScale]);
 
     // Press feedback for chevron buttons
     const decScale = useSharedValue(1);
@@ -292,7 +292,7 @@ const AnimatedDot: React.FC<{ isActive: boolean; isDark: boolean }> = ({
             overshootClamping: true,
         });
         opacity.value = withTiming(isActive ? 1 : 0.35, { duration: 200 });
-    }, [isActive]);
+    }, [isActive, opacity, width]);
 
     const animatedStyle = useAnimatedStyle(() => ({
         width: width.value,
@@ -348,7 +348,7 @@ const ContextTagChip: React.FC<{
             stiffness: 380,
             overshootClamping: true,
         });
-    }, [isSelected]);
+    }, [isSelected, scale]);
 
     const chipAnimatedStyle = useAnimatedStyle(() => ({
         transform: [{ scale: scale.value }],
@@ -476,7 +476,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
             stepOpacity.value = 1;
             titleOpacity.value = 1;
         }
-    }, [visible, initialMood, initialValues]);
+    }, [visible, initialMood, initialValues, stepOpacity, titleOpacity]);
 
     // ── Animated step navigation (opacity dissolve only)
     // Horizontal slide + dense grids (emotion chips) reads as “chips streaming away”.
@@ -490,7 +490,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
             stepOpacity.value = withTiming(1, { duration: 155, easing: Easing.out(Easing.cubic) });
             titleOpacity.value = withTiming(1, { duration: 155, easing: Easing.out(Easing.cubic) });
         }
-    }, [currentStep]);
+    }, [currentStep, stepOpacity, titleOpacity]);
 
     const goToStep = useCallback(
         (newStep: number) => {
