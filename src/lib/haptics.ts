@@ -11,6 +11,7 @@ let _haptic: { default: any; HapticFeedbackTypes: any } | null = null;
 function getHapticModule() {
   if (!_haptic) {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       _haptic = require("react-native-haptic-feedback");
     } catch {
       _haptic = { default: null, HapticFeedbackTypes: {} };

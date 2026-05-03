@@ -53,7 +53,7 @@ const EmotionChip: React.FC<EmotionChipProps> = ({
             stiffness: 380,
             overshootClamping: true,
         });
-    }, [isSelected]);
+    }, [isSelected, scale]);
 
     const chipAnimatedStyle = useAnimatedStyle(() => ({
         transform: [{ scale: scale.value }],
@@ -113,7 +113,7 @@ const SelectedChip: React.FC<{
 
     useEffect(() => {
         scale.value = withSpring(1, { damping: 16, stiffness: 300 });
-    }, []);
+    }, [scale]);
 
     const selectedChipAnimatedStyle = useAnimatedStyle(() => ({
         transform: [{ scale: scale.value }],

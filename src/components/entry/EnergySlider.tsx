@@ -77,7 +77,7 @@ const EnergySegment: React.FC<{
             stiffness: 420,
             overshootClamping: true,
         });
-    }, [isSelected]);
+    }, [isSelected, scaleY]);
 
     const segmentAnimatedStyle = useAnimatedStyle(() => ({
         transform: [{ scaleY: scaleY.value }],

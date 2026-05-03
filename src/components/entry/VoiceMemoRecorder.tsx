@@ -84,7 +84,7 @@ export const VoiceMemoRecorder: React.FC<VoiceMemoRecorderProps> = ({
 
       setRecording(newRecording);
       setIsRecording(true);
-    } catch (error) {
+    } catch {
       haptics.error();
       Alert.alert("Error", "Unable to start recording. Please try again.");
     }
@@ -108,7 +108,7 @@ export const VoiceMemoRecorder: React.FC<VoiceMemoRecorderProps> = ({
       }
 
       setRecording(null);
-    } catch (error) {
+    } catch {
       haptics.error();
       Alert.alert("Error", "Unable to save recording. Please try again.");
     }
@@ -141,7 +141,7 @@ export const VoiceMemoRecorder: React.FC<VoiceMemoRecorderProps> = ({
           setPlayingIndex(null);
         }
       });
-    } catch (error) {
+    } catch {
       haptics.error();
       Alert.alert("Error", "Unable to play voice memo.");
     }

@@ -16,16 +16,20 @@ import {
   getMoodCount,
   getMoodsWithinRange,
   getMoodsPaginated,
+  getMoodsByMonth,
   hasMoodBeenLoggedToday,
   updateEmotionCategoryInMoods,
   removeEmotionFromMoods,
   getEmotionNamesFromMoods,
+  clearMoods,
+  seedMoods,
   type PaginationOptions,
   type PaginatedResult,
 } from "@db/db";
-import type { MoodDateRange } from "@db/moods/range";
+import type { MoodDateRange, MoodRangePreset } from "@db/moods/range";
 
 export type { PaginationOptions, PaginatedResult };
+export type { MoodDateRange, MoodRangePreset };
 
 export interface MoodServiceInterface {
   // CRUD operations
@@ -37,11 +41,14 @@ export interface MoodServiceInterface {
   getAll: () => Promise<MoodEntry[]>;
   getPaginated: (options: PaginationOptions) => Promise<PaginatedResult<MoodEntry>>;
   getInRange: (range?: MoodDateRange) => Promise<MoodEntry[]>;
+  getByMonth: (year: number, month: number) => Promise<Map<number, MoodEntry[]>>;
   getToday: () => Promise<MoodEntry | null>;
   getYesterday: () => Promise<MoodEntry | null>;
   getLastEntry: () => Promise<MoodEntry | null>;
   getCount: () => Promise<number>;
   hasLoggedToday: () => Promise<boolean>;
+  clearAll: () => Promise<void>;
+  seedSampleData: () => Promise<number>;
 
   // Note & timestamp updates
   updateNote: (id: number, note: string) => Promise<MoodEntry | undefined>;
@@ -147,6 +154,10 @@ export const moodService: MoodServiceInterface = {
     return getMoodsWithinRange(range);
   },
 
+  async getByMonth(year: number, month: number): Promise<Map<number, MoodEntry[]>> {
+    return getMoodsByMonth(year, month);
+  },
+
   /**
    * Get the most recent mood entry from today
    */
@@ -189,6 +200,14 @@ export const moodService: MoodServiceInterface = {
    */
   async hasLoggedToday(): Promise<boolean> {
     return hasMoodBeenLoggedToday();
+  },
+
+  async clearAll(): Promise<void> {
+    await clearMoods();
+  },
+
+  async seedSampleData(): Promise<number> {
+    return seedMoods();
   },
 
   /**

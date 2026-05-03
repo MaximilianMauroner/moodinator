@@ -62,7 +62,7 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
         longitude: currentLocation.coords.longitude,
         name: locationName,
       });
-    } catch (error) {
+    } catch {
       haptics.error();
       Alert.alert("Error", "Unable to get your location. Please try again.");
     } finally {

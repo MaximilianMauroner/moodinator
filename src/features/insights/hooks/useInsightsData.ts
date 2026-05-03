@@ -13,13 +13,14 @@ import {
   format,
   startOfDay,
 } from "date-fns";
+import { useFocusEffect } from "expo-router";
 import type { MoodEntry } from "@db/types";
-import { getAllMoods } from "@db/db";
 import { TimePeriod } from "../components/TimePeriodSelector";
 import { detectPatterns, calculateStreak, Pattern } from "../utils/patternDetection";
 import { getTrendDirection, TrendDirection } from "../components/TrendIndicator";
 import { moodScale } from "@/constants/moodScale";
 import { getMoodHex } from "@/lib/moodPresentation";
+import { useMoodsStore } from "@/shared/state/moodsStore";
 
 export interface PeriodStats {
   entryCount: number;
@@ -167,27 +168,35 @@ function calculatePeriodStats(
 }
 
 export function useInsightsData(): InsightsData {
-  const [allMoods, setAllMoods] = useState<MoodEntry[]>([]);
-  const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<TimePeriod>("week");
   const [currentDate, setCurrentDate] = useState(new Date());
+  const allMoods = useMoodsStore((state) => state.moods);
+  const status = useMoodsStore((state) => state.status);
+  const isStale = useMoodsStore((state) => state.isStale);
+  const ensureFresh = useMoodsStore((state) => state.ensureFresh);
+  const refreshMoods = useMoodsStore((state) => state.refreshMoods);
+  const loading =
+    status === "loading" ||
+    (status === "refreshing" && allMoods.length === 0) ||
+    (allMoods.length === 0 && isStale);
 
-  // Load all moods
   const loadMoods = useCallback(async () => {
     try {
-      setLoading(true);
-      const moods = await getAllMoods();
-      setAllMoods(moods);
+      await ensureFresh();
     } catch (error) {
       console.error("Failed to load moods:", error);
-    } finally {
-      setLoading(false);
     }
-  }, []);
+  }, [ensureFresh]);
 
   useEffect(() => {
-    loadMoods();
+    void loadMoods();
   }, [loadMoods]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void ensureFresh();
+    }, [ensureFresh])
+  );
 
   // Get moods for current period
   const periodMoods = useMemo(
@@ -294,6 +303,6 @@ export function useInsightsData(): InsightsData {
     streak,
     getMoodLabel,
     getMoodColor,
-    refresh: loadMoods,
+    refresh: refreshMoods,
   };
 }

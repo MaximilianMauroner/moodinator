@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -18,7 +18,6 @@ import {
   getAllNotifications,
   addNotification,
   updateNotification,
-  NotificationConfig,
 } from "@/hooks/useNotifications";
 import { IconSymbol } from "@/components/ui/IconSymbol";
 import { Ionicons } from "@expo/vector-icons";
@@ -40,13 +39,7 @@ export default function NotificationDetailScreen() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (!isNew) {
-      loadNotification();
-    }
-  }, [id]);
-
-  const loadNotification = async () => {
+  const loadNotification = useCallback(async () => {
     try {
       setLoading(true);
       const notifications = await getAllNotifications();
@@ -68,7 +61,13 @@ export default function NotificationDetailScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, router]);
+
+  useEffect(() => {
+    if (!isNew) {
+      void loadNotification();
+    }
+  }, [isNew, loadNotification]);
 
   const handleTimeChange = (event: any, selectedDate?: Date) => {
     if (Platform.OS === "android") {
@@ -469,4 +468,3 @@ export default function NotificationDetailScreen() {
     </SafeAreaView>
   );
 }
-

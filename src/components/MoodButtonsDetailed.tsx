@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text } from "react-native";
+import { View, Text, type ViewStyle } from "react-native";
 import { HapticTab } from "./HapticTab";
 import { moodScale } from "@/constants/moodScale";
 import {
@@ -42,22 +42,25 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
 
 	const renderMoodCard = (
 		mood: (typeof moodData)[number],
-		width: string,
+		width: ViewStyle["width"],
 		height: number,
-	) => (
+	) => {
+		const cardStyle: ViewStyle = {
+			width,
+			height,
+			backgroundColor: mood.bgHex || "#F1F5F9",
+			shadowColor: mood.textHex || "#64748B",
+			shadowOffset: { width: 0, height: 4 },
+			shadowOpacity: 0.15,
+			shadowRadius: 8,
+			elevation: 4,
+		};
+
+		return (
 		<HapticTab
 			key={mood.value}
 			className="items-center justify-center rounded-2xl"
-			style={{
-				width,
-				height,
-				backgroundColor: mood.bgHex || "#F1F5F9",
-				shadowColor: mood.textHex || "#64748B",
-				shadowOffset: { width: 0, height: 4 },
-				shadowOpacity: 0.15,
-				shadowRadius: 8,
-				elevation: 4,
-			}}
+			style={cardStyle}
 			onPress={() => onMoodPress(mood.value)}
 			onLongPress={() => onLongPress(mood.value)}
 			delayLongPress={500}
@@ -86,7 +89,8 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
 				{mood.description}
 			</Text>
 		</HapticTab>
-	);
+		);
+	};
 
 	return (
 		<View className="mb-2">

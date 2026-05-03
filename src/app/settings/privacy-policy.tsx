@@ -84,7 +84,7 @@ export default function PrivacyPolicyScreen() {
 
         <Section title="Data Security">
           <Paragraph>
-            Your data is protected by your device's security features. We recommend using a device passcode or biometric lock, keeping your device updated, and not sharing your unlocked device with others.
+            {"Your data is protected by your device's security features. We recommend using a device passcode or biometric lock, keeping your device updated, and not sharing your unlocked device with others."}
           </Paragraph>
         </Section>
 
@@ -96,7 +96,7 @@ export default function PrivacyPolicyScreen() {
 
         <Section title="Changes to This Policy">
           <Paragraph>
-            We may update this Privacy Policy from time to time. We will notify you of any changes by updating the "Last Updated" date at the top of this policy.
+            {'We may update this Privacy Policy from time to time. We will notify you of any changes by updating the "Last Updated" date at the top of this policy.'}
           </Paragraph>
         </Section>
 

@@ -15,7 +15,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import * as Clipboard from "expo-clipboard";
 import { Ionicons } from "@expo/vector-icons";
-import { exportMoods } from "@db/db";
+import { dataPortabilityService } from "@/services/dataPortabilityService";
 
 type ExportRange = "week" | "month" | "custom" | "full";
 type ExportRangePayload =
@@ -157,7 +157,7 @@ export function ExportModal({
     }
     try {
       setLoading(true);
-      const jsonData = await exportMoods(rangePayload);
+      const jsonData = await dataPortabilityService.exportData(rangePayload);
       await shareJsonData(jsonData, exportRange, customStartDate, customEndDate);
       onClose();
     } catch (error) {

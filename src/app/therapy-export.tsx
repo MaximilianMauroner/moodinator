@@ -27,7 +27,12 @@ import {
   getTherapyExportPrefs,
   saveTherapyExportPrefs,
 } from "@/lib/therapyExportPrefs";
-import { MoodDateRange, MoodRangePreset, getMoodsWithinRange } from "@db/db";
+import type { MoodEntry } from "@db/types";
+import {
+  moodService,
+  type MoodDateRange,
+  type MoodRangePreset,
+} from "@/services/moodService";
 
 type RangeOption = MoodRangePreset | "custom";
 
@@ -123,7 +128,7 @@ function formatDateSlug(date: Date) {
 }
 
 function buildCsv(
-  rows: Awaited<ReturnType<typeof getMoodsWithinRange>>,
+  rows: MoodEntry[],
   fields: TherapyExportField[]
 ) {
   const header = fields.map((field) => {
@@ -240,7 +245,7 @@ export default function TherapyExportScreen() {
 
     try {
       setLoading(true);
-      const rows = await getMoodsWithinRange(rangePayload);
+      const rows = await moodService.getInRange(rangePayload);
       if (!rows.length) {
         Alert.alert("No entries", "No mood entries found for this range.");
         return;
