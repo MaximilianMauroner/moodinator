@@ -35,7 +35,7 @@ export default function DataSettingsScreen() {
     loadBackupInfo();
   }, [loadBackupInfo]);
 
-  const handleManualBackup = useCallback(async () => {
+  const handleRunBackupNow = useCallback(async () => {
     try {
       setLoading("backup");
       const backupResult = await dataPortabilityService.createBackup();
@@ -217,7 +217,7 @@ export default function DataSettingsScreen() {
             icon="cloud-done-outline"
             isLast
             action={
-              <TouchableOpacity onPress={handleManualBackup} disabled={loading === "backup"}>
+              <TouchableOpacity onPress={handleRunBackupNow} disabled={loading === "backup"}>
                 <View className="px-3 py-1.5 rounded-full bg-sage-100 dark:bg-sage-600/20">
                   {loading === "backup" ? (
                     <ActivityIndicator size="small" color={isDark ? "#A8C5A8" : "#5B8A5B"} />

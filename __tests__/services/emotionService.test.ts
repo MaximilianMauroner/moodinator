@@ -30,6 +30,48 @@ describe("emotionService", () => {
     );
   });
 
+  it("renames an emotion in future selection without rewriting past mood entries (future-only default)", async () => {
+    mockDb.__addEmotion({ name: "Happy", category: "positive" });
+    mockDb.__addMood({
+      emotions: JSON.stringify([{ name: "Happy", category: "positive" }]),
+    });
+    mockDb.__addMood({
+      emotions: JSON.stringify([
+        { name: "happy", category: "positive" },
+        { name: "Calm", category: "neutral" },
+      ]),
+    });
+
+    await emotionService.update("Happy", { name: "Joyful", category: "positive" });
+
+    expect(mockDb.__getEmotions()).toEqual([
+      { id: 1, name: "Joyful", category: "positive" },
+    ]);
+    expect(mockDb.__getMoods().map((mood) => mood.emotions)).toEqual([
+      JSON.stringify([{ name: "Happy", category: "positive" }]),
+      JSON.stringify([
+        { name: "happy", category: "positive" },
+        { name: "Calm", category: "neutral" },
+      ]),
+    ]);
+  });
+
+  it("recategorizing via update() does not mutate past mood snapshots (future-only default)", async () => {
+    mockDb.__addEmotion({ name: "Calm", category: "neutral" });
+    mockDb.__addMood({
+      emotions: JSON.stringify([{ name: "Calm", category: "neutral" }]),
+    });
+
+    await emotionService.update("Calm", { name: "Calm", category: "positive" });
+
+    expect(mockDb.__getEmotions()).toEqual([
+      { id: 1, name: "Calm", category: "positive" },
+    ]);
+    expect(mockDb.__getMoods()[0]?.emotions).toBe(
+      JSON.stringify([{ name: "Calm", category: "neutral" }])
+    );
+  });
+
   it("previews a rename historical update with an exact count across all matching snapshots", async () => {
     mockDb.__addEmotion({ name: "Happy", category: "positive" });
     mockDb.__addMood({

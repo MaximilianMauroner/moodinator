@@ -7,6 +7,7 @@ import {
   hasEmotionTableMigrated,
   migrateEmotionsToTable,
 } from "./moods/emotions";
+import { backfillMoodScaleJson } from "./moods/migrations";
 
 let db: SQLite.SQLiteDatabase | null = null;
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
@@ -86,6 +87,12 @@ async function configureDatabaseEncryption(database: SQLite.SQLiteDatabase): Pro
 
 async function initializeDatabase(database: SQLite.SQLiteDatabase): Promise<void> {
   await createMoodTable(database);
+
+  try {
+    await backfillMoodScaleJson(database);
+  } catch (error) {
+    console.error("Failed to backfill mood_scale_json:", error);
+  }
 
   const migrated = await hasEmotionTableMigrated(database);
   if (migrated) {

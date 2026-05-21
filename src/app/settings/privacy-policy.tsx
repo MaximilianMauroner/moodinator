@@ -19,7 +19,7 @@ export default function PrivacyPolicyScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Text className="text-xs text-sand-500 dark:text-sand-400 mb-4">
-          Last Updated: February 2, 2026
+          Last Updated: May 21, 2026
         </Text>
 
         <Section title="Introduction">
@@ -70,9 +70,9 @@ export default function PrivacyPolicyScreen() {
             You have complete control over your data:
           </Paragraph>
           <BulletList items={[
-            "Export: Export your data anytime from Settings > Data",
+            "Data Export: Export your data anytime from Settings > Data",
             "Delete: Delete individual entries or all data",
-            "Backup: Create local backups stored on your device",
+            "Backup: Periodic local backups for recovery; you can also trigger one on demand",
           ]} />
         </Section>
 

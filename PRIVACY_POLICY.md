@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last Updated: February 2, 2026**
+**Last Updated: May 21, 2026**
 
 ## Introduction
 
@@ -39,9 +39,9 @@ Moodinator does not require you to create an account. There is no registration, 
 
 You have complete control over your data:
 
-- **Export**: You can export your data at any time from Settings > Data
+- **Data Export**: You can export your data at any time from Settings > Data
 - **Delete**: You can delete individual entries or all data from the app
-- **Backup**: You can create local backups stored on your device
+- **Backup**: Periodic backups are stored locally for recovery; you can also trigger one on demand
 
 ## Third-Party Services
 

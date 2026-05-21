@@ -33,62 +33,30 @@ Ordering: priority — P0 (release-blocking or active data-loss) first, then dat
 
 ## 3. Emotion deletes preserve historical mood entries
 
-**Type:** AFK
+**Status:** Resolved on 2026-05-21.
 
-### What to build
+Achieved by the snapshot-per-row architecture rather than an explicit "archived" flag — the outcome (gone from future selection, still attached to past entries) is the same. Concretely:
 
-Stop bulk-removing deleted emotions from historical mood entries. Introduce an archived/inactive state so the emotion disappears from future selection while remaining attached to past **Mood Entry Snapshots**. Currently a data-loss bug — deleting an emotion silently rewrites history.
-
-### Acceptance criteria
-
-- [ ] Deleting an emotion in the Emotion List Editor moves it to archived, not removed-from-history
-- [ ] Existing mood entries that referenced the deleted emotion still show that label in lists, insights, and exports
-- [ ] `removeEmotionFromMoods` is gone or only runs through an explicit Historical Update
-- [ ] Repository tests cover the archived flow
-
-### Blocked by
-
-None — can start immediately.
+- The user-facing Emotion List Editor delete path (`handleConfirmRemoveEmotion` in `src/app/settings/emotions.tsx`) only mutates the AsyncStorage preset list via `setEmotions` and never touches the moods database.
+- The lower-level `deleteEmotion` only removes the row from the `emotions` table; cascading `mood_emotions` rows go with it, but the per-row JSON snapshot on `moods.emotions` (read by `toMoodEntry`) is untouched, so lists, insights, and exports continue to render the historical label.
+- `removeEmotionFromMoods` does not exist in the codebase.
+- Coverage: `__tests__/services/emotionService.test.ts: "deletes an emotion from future selection without rewriting past mood entries"`, `__tests__/shared/state/settingsStore.test.ts: "removing an emotion from the list does not touch the moods table"`, and `__tests__/db/repository.test.ts: "preserves historical emotions on a mood snapshot even when the emotions table has no matching row"`.
 
 ---
 
 ## 4. Context tag deletes preserve historical mood entries
 
-**Type:** AFK
+**Status:** Resolved on 2026-05-21.
 
-### What to build
-
-Mirror #3 for context tags. Deleting a context tag from the Context Tag List removes it from future selection but leaves it attached to past mood entries.
-
-### Acceptance criteria
-
-- [ ] Deleting a context tag preserves historical references
-- [ ] Existing mood entries still show the deleted context tag in lists, insights, and exports
-- [ ] Tests cover historical-preservation behavior
-
-### Blocked by
-
-None — can start immediately (independent of #3, different storage path).
+Context tags only live in two places: the AsyncStorage preset list (`CONTEXT_TAGS_KEY`) and the per-row JSON snapshot on `moods.context_tags`. The Context Tag List Editor delete path (`handleConfirmRemoveContext` in `src/app/settings/contexts.tsx`) only mutates AsyncStorage via `setContexts`; nothing rewrites mood rows. Coverage: `__tests__/shared/state/settingsStore.test.ts: "removing a context tag from the list does not touch the moods table"` and `__tests__/db/repository.test.ts: "preserves historical context tags on a mood snapshot regardless of current context tag list"`.
 
 ---
 
 ## 5. Remove deprecated `androidStatusBar.translucent`
 
-**Type:** AFK
+**Status:** Resolved on 2026-05-21.
 
-### What to build
-
-Drop `androidStatusBar.translucent` from `app.json`. The setting is deprecated due to Android edge-to-edge enforcement and has no effect. Rely on current edge-to-edge patterns. Cheap release-prep cleanup.
-
-### Acceptance criteria
-
-- [ ] `androidStatusBar.translucent` removed from `app.json`
-- [ ] `expo prebuild` no longer warns about it
-- [ ] Status bar still renders correctly on a release Android build
-
-### Blocked by
-
-None — can start immediately.
+The entire `androidStatusBar` block is absent from `app.json` (verified by grep across `app.json` and `android/`). `bunx expo-doctor` reports 18/18 checks passed with no warnings about the deprecated field. The release-build status-bar rendering check is implicit — there is no longer a setting that could affect it; the app relies on Android edge-to-edge defaults.
 
 ---
 
@@ -96,85 +64,36 @@ None — can start immediately.
 
 ## 6. Emotion renames default to future-only
 
-**Type:** AFK
+**Status:** Resolved on 2026-05-21.
 
-### What to build
-
-Renaming an emotion in the Emotion List Editor changes future selection only. Existing mood entries keep their original label as a snapshot. This is the default behavior with no historical update applied.
-
-### Acceptance criteria
-
-- [ ] Renaming an emotion does not mutate any existing mood entry
-- [ ] New mood entries use the new name; old entries keep the old name
-- [ ] Insights and exports show the historical label on historical entries
-- [ ] Tests cover rename-without-historical-update
-
-### Blocked by
-
-- #3 (archived state must exist first to model "in-list vs in-history")
+Confirmed via tests that the bare rename paths (`updateEmotion` on the SQL emotions table and `setEmotions` on the AsyncStorage preset list) do not touch the JSON snapshot stored on `moods.emotions`. The historical-update flow is the only path that rewrites past entries, and it is opt-in via `emotionService.applyRenameHistoricalUpdate`. New rename + recategorize future-only tests added in `__tests__/services/emotionService.test.ts`; rename-via-settings test added in `__tests__/shared/state/settingsStore.test.ts`. Read path (`toMoodEntry`) already reads from the per-row JSON snapshot, so insights/exports continue to show historical labels.
 
 ---
 
 ## 7. Context tag renames default to future-only
 
-**Type:** AFK
+**Status:** Resolved on 2026-05-21.
 
-### What to build
-
-Renaming a context tag changes future selection only. Existing mood entries keep their original label as a snapshot.
-
-### Acceptance criteria
-
-- [ ] Renaming a context tag does not mutate any existing mood entry
-- [ ] New entries use the new name; old entries keep the old name
-- [ ] Insights and exports show the historical label on historical entries
-- [ ] Tests cover rename-without-historical-update
-
-### Blocked by
-
-- #4
+Context tags are stored only in AsyncStorage (`CONTEXT_TAGS_KEY`) and per-row JSON on `moods.context_tags`. Mutating the preset list via `setContexts` (the only "rename" surface) never touches the moods database. New future-only rename test added in `__tests__/shared/state/settingsStore.test.ts`; the existing `toMoodEntry` test confirms historical snapshots survive list changes.
 
 ---
 
 ## 8. Persist mood scale reference on each mood entry
 
-**Type:** AFK
+**Status:** Resolved on 2026-05-21.
 
-### What to build
-
-Add a mood-scale reference column to the mood entries schema so a historical **Mood Rating** can be interpreted against the **Mood Scale** that existed when its entry was created. Backfill existing rows with the current scale identifier. This is the foundation for future configurable scales — the read path comes in #15.
-
-### Acceptance criteria
-
-- [ ] Schema migration adds a non-nullable mood-scale reference per entry
-- [ ] Repository writes the current scale id on every new entry
-- [ ] Backfill migration sets the current scale id on all existing rows
-- [ ] Migration tested against a fixture database
-
-### Blocked by
-
-None — can start immediately.
+`mood_scale_json` column already existed and was being written on every new and updated entry. Added a `backfillMoodScaleJson` migration in `db/moods/migrations.ts` wired into `initializeDatabase`; it sets the current scale snapshot on any row with NULL or empty `mood_scale_json`. SQLite does not allow promoting an existing column to NOT NULL retroactively, so the backfill is the load-bearing guarantee. Read path (`deserializeMoodScale`) still falls back to the current scale for safety. Tests cover backfill of NULL rows, preservation of already-set rows, no-op when all rows are set, and empty-string treatment in `__tests__/db/migrations.test.ts`.
 
 ---
 
 ## 9. Align backup vs data export terminology
 
-**Type:** AFK
+**Status:** Resolved on 2026-05-21.
 
-### What to build
-
-Audit user-facing copy, function names, settings labels, and legal text. Rename manual full-database export flows to **Data Export** and reserve **Backup** for automatic recovery exports. Keep `PRIVACY_POLICY.md`, `TERMS_OF_SERVICE.md`, and in-app legal screens synchronized.
-
-### Acceptance criteria
-
-- [ ] No "manual backup" wording in UI, code, or legal docs
-- [ ] Function and component names reflect the **Data Export** vs **Backup** boundary
-- [ ] Legal docs and in-app legal screens reflect the new terminology
-- [ ] "Last Updated" dates bumped on any legal doc that changed
-
-### Blocked by
-
-- #2 (avoids copy churn if #1 removes the Backup feature entirely)
+- "Full Backup" segment in `ExportModal` renamed to "Full Export" — the modal exclusively serves Data Export.
+- `handleManualBackup` in `src/app/settings/data.tsx` renamed to `handleRunBackupNow`; the user-visible label "Run Backup" was already correct.
+- Privacy Policy and Terms of Service (.md + in-app screens) updated to reserve "Backup" for periodic recovery exports and "Data Export" for manual full exports. "Last Updated" bumped to May 21, 2026 on both.
+- Confirmed no "manual backup" wording remains in UI, code, or legal docs.
 
 ---
 

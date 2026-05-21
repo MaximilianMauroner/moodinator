@@ -207,7 +207,7 @@ export function ExportModal({
                       ? "30 Days"
                       : opt === "custom"
                         ? "Custom"
-                        : "Full Backup"}
+                        : "Full Export"}
                 </Text>
               </Pressable>
             ))}
