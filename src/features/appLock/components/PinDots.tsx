@@ -44,8 +44,8 @@ type PinDotProps = {
 function PinDot({ filled, error, isDark, primaryColor, borderColor }: PinDotProps) {
   const animatedStyle = useAnimatedStyle(() => {
     const scale = filled
-      ? withSpring(1, { damping: 15, stiffness: 300 })
-      : withSpring(0.8, { damping: 15 });
+      ? withSpring(1, { damping: 22, stiffness: 320, overshootClamping: true })
+      : withSpring(0.8, { damping: 22, stiffness: 320, overshootClamping: true });
 
     const translateX = error
       ? withSequence(

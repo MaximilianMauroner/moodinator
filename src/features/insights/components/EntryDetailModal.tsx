@@ -10,7 +10,13 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useColorScheme } from "nativewind";
 import { format } from "date-fns";
+import Animated, { FadeInUp } from "react-native-reanimated";
 import type { MoodEntry } from "@db/types";
+import { getEnergySegmentColor } from "@/constants/colors";
+import { motion } from "@/constants/motion";
+
+const sectionReveal = (index: number) =>
+  FadeInUp.duration(motion.duration.normal).delay(index * motion.stagger.tight);
 
 interface EntryDetailModalProps {
   entry: MoodEntry | null;
@@ -79,7 +85,8 @@ export function EntryDetailModal({
           }}
         >
           {/* Mood Display */}
-          <View
+          <Animated.View
+            entering={sectionReveal(0)}
             className="rounded-3xl p-6 mb-5"
             style={{
               backgroundColor: isDark ? "#2C4038" : "#FDFCFA",
@@ -123,11 +130,12 @@ export function EntryDetailModal({
                 </Text>
               </View>
             </View>
-          </View>
+          </Animated.View>
 
           {/* Energy Level */}
           {hasEnergy && (
-            <View
+            <Animated.View
+              entering={sectionReveal(1)}
               className="rounded-3xl p-5 mb-5"
               style={{
                 backgroundColor: isDark ? "#2C4038" : "#FDFCFA",
@@ -165,7 +173,7 @@ export function EntryDetailModal({
                     className="h-3 rounded-full"
                     style={{
                       width: `${(entry.energy! / 10) * 100}%`,
-                      backgroundColor: isDark ? "#A8C5A8" : "#5B8A5B",
+                      backgroundColor: getEnergySegmentColor(entry.energy!, isDark),
                     }}
                   />
                 </View>
@@ -176,12 +184,13 @@ export function EntryDetailModal({
                   {entry.energy}/10
                 </Text>
               </View>
-            </View>
+            </Animated.View>
           )}
 
           {/* Emotions */}
           {hasEmotions && (
-            <View
+            <Animated.View
+              entering={sectionReveal(2)}
               className="rounded-3xl p-5 mb-5"
               style={{
                 backgroundColor: isDark ? "#2C4038" : "#FDFCFA",
@@ -234,12 +243,13 @@ export function EntryDetailModal({
                   );
                 })}
               </View>
-            </View>
+            </Animated.View>
           )}
 
           {/* Context Tags */}
           {hasContextTags && (
-            <View
+            <Animated.View
+              entering={sectionReveal(3)}
               className="rounded-3xl p-5 mb-5"
               style={{
                 backgroundColor: isDark ? "#2C4038" : "#FDFCFA",
@@ -284,12 +294,13 @@ export function EntryDetailModal({
                   </View>
                 ))}
               </View>
-            </View>
+            </Animated.View>
           )}
 
           {/* Note */}
           {hasNote && (
-            <View
+            <Animated.View
+              entering={sectionReveal(4)}
               className="rounded-3xl p-5"
               style={{
                 backgroundColor: isDark ? "#2C4038" : "#FDFCFA",
@@ -324,12 +335,13 @@ export function EntryDetailModal({
               >
                 {entry.note}
               </Text>
-            </View>
+            </Animated.View>
           )}
 
           {/* Empty state if no additional details */}
           {!hasEmotions && !hasContextTags && !hasNote && !hasEnergy && (
-            <View
+            <Animated.View
+              entering={sectionReveal(1)}
               className="rounded-3xl p-8 items-center"
               style={{
                 backgroundColor: isDark ? "#2C4038" : "#FDFCFA",
@@ -346,7 +358,7 @@ export function EntryDetailModal({
               >
                 No additional details for this entry.
               </Text>
-            </View>
+            </Animated.View>
           )}
         </ScrollView>
       </View>

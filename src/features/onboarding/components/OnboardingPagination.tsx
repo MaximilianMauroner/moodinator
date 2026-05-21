@@ -1,8 +1,10 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { View } from "react-native";
 import Animated, {
   useAnimatedStyle,
-  withSpring,
+  useSharedValue,
+  withTiming,
+  Easing,
 } from "react-native-reanimated";
 import { useThemeColors } from "@/constants/colors";
 
@@ -35,10 +37,18 @@ type PaginationDotProps = {
 };
 
 function PaginationDot({ isActive, activeColor, inactiveColor }: PaginationDotProps) {
+  const scaleX = useSharedValue(isActive ? 2 : 2 / 3);
+  const opacity = useSharedValue(isActive ? 1 : 0.85);
+
+  useEffect(() => {
+    const config = { duration: 220, easing: Easing.out(Easing.cubic) };
+    scaleX.value = withTiming(isActive ? 2 : 2 / 3, config);
+    opacity.value = withTiming(isActive ? 1 : 0.85, config);
+  }, [isActive, opacity, scaleX]);
+
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scaleX: withSpring(isActive ? 2 : 2 / 3, { damping: 15 }) }],
-    backgroundColor: isActive ? activeColor : inactiveColor,
-    opacity: withSpring(isActive ? 1 : 0.85, { damping: 15 }),
+    transform: [{ scaleX: scaleX.value }],
+    opacity: opacity.value,
   }));
 
   return (
@@ -48,6 +58,7 @@ function PaginationDot({ isActive, activeColor, inactiveColor }: PaginationDotPr
           width: 12,
           height: 8,
           borderRadius: 4,
+          backgroundColor: isActive ? activeColor : inactiveColor,
         },
         animatedStyle,
       ]}

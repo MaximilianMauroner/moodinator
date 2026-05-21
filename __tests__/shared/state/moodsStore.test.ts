@@ -241,4 +241,33 @@ describe("useMoodsStore", () => {
     expect(useMoodsStore.getState().moods.map((mood) => mood.id)).toEqual([1, 2]);
     expect(useMoodsStore.getState().isStale).toBe(false);
   });
+
+  test("refreshMoods reuses an in-flight refresh request", async () => {
+    const moods = [makeMood(1, 100)];
+    let resolveRefresh: ((value: MoodEntry[]) => void) | null = null;
+
+    moodServiceMock.getAll.mockReturnValue(
+      new Promise<MoodEntry[]>((resolve) => {
+        resolveRefresh = resolve;
+      })
+    );
+
+    const firstRefresh = useMoodsStore.getState().refreshMoods();
+    const secondRefresh = useMoodsStore.getState().refreshMoods();
+
+    expect(firstRefresh).toBe(secondRefresh);
+    expect(moodServiceMock.getAll).toHaveBeenCalledTimes(1);
+    expect(useMoodsStore.getState().status).toBe("refreshing");
+
+    resolveRefresh?.(moods);
+    await Promise.all([firstRefresh, secondRefresh]);
+
+    expect(useMoodsStore.getState()).toMatchObject({
+      moods,
+      status: "idle",
+      isStale: false,
+      totalCount: 1,
+      currentOffset: 1,
+    });
+  });
 });

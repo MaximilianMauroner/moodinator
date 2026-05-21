@@ -3,6 +3,8 @@ import { View, Text, Pressable, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useColorScheme } from "nativewind";
 import { format, startOfWeek, endOfWeek, isThisWeek, isThisMonth } from "date-fns";
+import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
+import { motion } from "@/constants/motion";
 import { TimePeriod } from "./TimePeriodSelector";
 
 interface WeekNavigatorProps {
@@ -51,6 +53,7 @@ export function WeekNavigator({
     period === "week"
       ? !isThisWeek(currentDate, { weekStartsOn: 1 })
       : !isThisMonth(currentDate);
+  const dateLabel = getDateLabel();
 
   // For "All Time", show a centered decorative display
   if (!showNavigation) {
@@ -73,7 +76,7 @@ export function WeekNavigator({
             className="text-base font-bold text-paper-800 dark:text-paper-200"
             style={{ letterSpacing: -0.3 }}
           >
-            {getDateLabel()}
+            {dateLabel}
           </Text>
         </View>
       </View>
@@ -113,13 +116,16 @@ export function WeekNavigator({
               backgroundColor: isDark ? "#2C4038" : "#FDFCFA",
             }}
           >
-            <Text
+            <Animated.Text
+              key={dateLabel}
+              entering={FadeIn.duration(motion.duration.fast)}
+              exiting={FadeOut.duration(motion.duration.fast)}
               className="text-base font-bold text-paper-800 dark:text-paper-200 text-center"
               style={{ letterSpacing: -0.3 }}
               numberOfLines={1}
             >
-              {getDateLabel()}
-            </Text>
+              {dateLabel}
+            </Animated.Text>
           </View>
         </View>
 

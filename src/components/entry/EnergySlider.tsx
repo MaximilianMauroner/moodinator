@@ -28,34 +28,6 @@ const ENERGY_LABELS: Record<number, string> = {
     10: "Wired",
 };
 
-const FILL_COLORS_LIGHT = [
-    "#B8CDD5",
-    "#AECAD3",
-    "#A8C5D0",
-    "#B8C8BA",
-    "#C8BFA0",
-    "#BDA77D",
-    "#D4A574",
-    "#E09B5A",
-    "#E08860",
-    "#D47845",
-    "#C47040",
-];
-
-const FILL_COLORS_DARK = [
-    "#2D4855",
-    "#2A4552",
-    "#284250",
-    "#3D3D2A",
-    "#4D3D22",
-    "#5C4228",
-    "#6B4A28",
-    "#7A5030",
-    "#855535",
-    "#8A5030",
-    "#7D4528",
-];
-
 // ─── Individual animated segment ────────────────────────────────────────────
 const EnergySegment: React.FC<{
     index: number;
@@ -124,8 +96,10 @@ const EnergySegment: React.FC<{
 };
 
 export const EnergySlider: React.FC<EnergySliderProps> = ({ value, onChange }) => {
-    const { isDark, get } = useThemeColors();
-    const fillColors = isDark ? FILL_COLORS_DARK : FILL_COLORS_LIGHT;
+    const { isDark, get, colors } = useThemeColors();
+    const fillColors = isDark
+        ? colors.energySegmentColors.dark
+        : colors.energySegmentColors.light;
 
     return (
         <View>

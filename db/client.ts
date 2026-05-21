@@ -74,7 +74,7 @@ async function configureDatabaseEncryption(database: SQLite.SQLiteDatabase): Pro
     }
   } catch (error) {
     if (isSqlCipherUnavailableError(error)) {
-      console.warn(
+      console.info(
         "SQLCipher is unavailable in the current iOS build; continuing with the local SQLite database."
       );
       return;

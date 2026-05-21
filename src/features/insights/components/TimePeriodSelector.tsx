@@ -1,7 +1,13 @@
-import React from "react";
-import { View, Text, Pressable, StyleSheet } from "react-native";
+import React, { useEffect, useState } from "react";
+import { View, Text, Pressable, StyleSheet, LayoutChangeEvent } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useColorScheme } from "nativewind";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+  Easing,
+} from "react-native-reanimated";
 
 export type TimePeriod = "week" | "month" | "all";
 
@@ -20,6 +26,28 @@ export function TimePeriodSelector({ value, onChange }: TimePeriodSelectorProps)
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === "dark";
 
+  const [trackWidth, setTrackWidth] = useState(0);
+  const segmentWidth = trackWidth / periods.length;
+  const activeIndex = periods.findIndex((p) => p.id === value);
+
+  const translateX = useSharedValue(0);
+
+  useEffect(() => {
+    translateX.value = withTiming(activeIndex * segmentWidth, {
+      duration: 260,
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [activeIndex, segmentWidth, translateX]);
+
+  const pillStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+    width: segmentWidth,
+  }));
+
+  const onTrackLayout = (event: LayoutChangeEvent) => {
+    setTrackWidth(event.nativeEvent.layout.width);
+  };
+
   return (
     <View
       className="mx-4 mb-4 rounded-2xl p-1.5 flex-row"
@@ -29,7 +57,25 @@ export function TimePeriodSelector({ value, onChange }: TimePeriodSelectorProps)
         },
         isDark ? styles.containerShadowDark : styles.containerShadowLight,
       ]}
+      onLayout={onTrackLayout}
     >
+      {trackWidth > 0 && (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            {
+              position: "absolute",
+              top: 6,
+              bottom: 6,
+              left: 6,
+              borderRadius: 12,
+              backgroundColor: isDark ? "#1E1B17" : "#FDFCFA",
+            },
+            isDark ? styles.activeShadowDark : styles.activeShadowLight,
+            pillStyle,
+          ]}
+        />
+      )}
       {periods.map((period) => {
         const isActive = value === period.id;
 
@@ -38,15 +84,7 @@ export function TimePeriodSelector({ value, onChange }: TimePeriodSelectorProps)
             key={period.id}
             onPress={() => onChange(period.id)}
             className="flex-1 flex-row items-center justify-center py-3 rounded-xl"
-            style={({ pressed }) => [
-              isActive
-                ? {
-                    backgroundColor: isDark ? "#1E1B17" : "#FDFCFA",
-                  }
-                : null,
-              isActive ? (isDark ? styles.activeShadowDark : styles.activeShadowLight) : null,
-              pressed ? { opacity: 0.8 } : null,
-            ]}
+            style={({ pressed }) => [pressed ? { opacity: 0.8 } : null]}
             accessibilityRole="tab"
             accessibilityLabel={`${period.label} view`}
             accessibilityState={{ selected: isActive }}

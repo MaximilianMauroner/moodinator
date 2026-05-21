@@ -2,6 +2,8 @@ import React, { useCallback, useMemo, useRef } from "react";
 import { View, Text, Pressable } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
+  FadeInUp,
+  LinearTransition,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
@@ -12,6 +14,7 @@ import { MoodEntry } from "@db/types";
 import { moodScale } from "@/constants/moodScale";
 import { useThemeColors, colors } from "@/constants/colors";
 import { getMoodItemLabel, getMoodItemHint } from "@/constants/accessibility";
+import { motion, springs } from "@/constants/motion";
 import { haptics } from "@/lib/haptics";
 import { useSettingsStore } from "@/shared/state/settingsStore";
 
@@ -89,6 +92,7 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
     const { isDark, get, getCategoryColors } = useThemeColors();
     const historyCardStyle = useSettingsStore((state) => state.historyCardStyle);
     const translateX = useSharedValue(0);
+    const pressScale = useSharedValue(1);
 
     const moodData = useMemo(() => {
       const moodInfo = moodScale.find((m) => m.value === mood.mood);
@@ -180,31 +184,35 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
             const shouldDelete = event.translationX < -swipeThreshold * 0.8;
 
             if (shouldEdit) {
-              translateX.set(withTiming(0, { duration: 140 }));
+              translateX.set(withTiming(0, { duration: motion.duration.fast }));
               triggerSwipeAction("left");
               return;
             }
 
             if (shouldDelete) {
-              translateX.set(withTiming(0, { duration: 140 }));
+              translateX.set(withTiming(0, { duration: motion.duration.fast }));
               triggerSwipeAction("right");
               return;
             }
 
-            translateX.set(withSpring(0, { damping: 18, stiffness: 220 }));
+            translateX.set(withSpring(0, springs.gentle));
           })
           .onFinalize(() => {
-            translateX.set(withSpring(0, { damping: 18, stiffness: 220 }));
+            translateX.set(withSpring(0, springs.gentle));
           }),
       [swipeThreshold, translateX, triggerSwipeAction]
     );
 
     const cardAnimatedStyle = useAnimatedStyle(() => ({
-      transform: [{ translateX: translateX.value }],
+      transform: [{ translateX: translateX.value }, { scale: pressScale.value }],
     }));
 
     return (
-      <View style={{ marginBottom: 12, borderRadius: 16, overflow: "hidden" }}>
+      <Animated.View
+        entering={FadeInUp.duration(motion.duration.normal)}
+        layout={LinearTransition.duration(motion.duration.normal)}
+        style={{ marginBottom: 12, borderRadius: 16, overflow: "hidden" }}
+      >
         <View
           pointerEvents="none"
           className="absolute inset-0 flex-row justify-between"
@@ -236,6 +244,12 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
         <GestureDetector gesture={panGesture}>
           <Animated.View style={cardAnimatedStyle}>
             <Pressable
+              onPressIn={() => {
+                pressScale.value = withSpring(0.985, springs.snap);
+              }}
+              onPressOut={() => {
+                pressScale.value = withSpring(1, springs.gentle);
+              }}
               onLongPress={() => {
                 haptics.swipeThreshold();
                 onLongPress?.(mood);
@@ -384,7 +398,7 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
             </Pressable>
           </Animated.View>
         </GestureDetector>
-      </View>
+      </Animated.View>
     );
   }
 );
