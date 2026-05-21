@@ -25,7 +25,7 @@
     "@shopify/react-native-skia": "2.4.18",
     "date-fns": "^4.1.0",
     "date-fns-tz": "^3.2.0",
-    "expo": "~55.0.25",
+    "expo": "~55.0.26",
     "expo-av": "~16.0.8",
     "expo-background-task": "~55.0.18",
     "expo-blur": "~55.0.14",
@@ -34,18 +34,18 @@
     "expo-constants": "~55.0.16",
     "expo-crypto": "~55.0.15",
     "expo-document-picker": "~55.0.13",
-    "expo-file-system": "~55.0.21",
+    "expo-file-system": "~55.0.22",
     "expo-font": "~55.0.8",
-    "expo-image-manipulator": "~55.0.16",
+    "expo-image-manipulator": "~55.0.17",
     "expo-image-picker": "~55.0.20",
     "expo-linking": "~55.0.15",
     "expo-local-authentication": "~55.0.14",
     "expo-localization": "~55.0.15",
     "expo-location": "~55.1.10",
     "expo-notifications": "~55.0.23",
-    "expo-router": "~55.0.15",
+    "expo-router": "~55.0.16",
     "expo-secure-store": "~55.0.14",
-    "expo-sharing": "~55.0.19",
+    "expo-sharing": "~55.0.20",
     "expo-splash-screen": "~55.0.21",
     "expo-sqlite": "~55.0.16",
     "expo-status-bar": "~55.0.6",
@@ -102,6 +102,9 @@
   "trustedDependencies": [
     "@shopify/react-native-skia"
   ],
+  "overrides": {
+    "expo-image-loader": "55.0.1"
+  },
   "patchedDependencies": {
     "expo-av@16.0.8": "patches/expo-av@16.0.8.patch"
   }
