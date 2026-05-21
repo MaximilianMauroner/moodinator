@@ -20,13 +20,15 @@ export function AppToaster() {
       toastOptions={{
         duration: 4000,
         style: {
-          borderRadius: 22,
+          width: "calc(100vw - 32px)",
+          maxWidth: 520,
+          borderRadius: 18,
           border: `1px solid ${isDark ? colors.border.dark : colors.border.light}`,
           background: isDark ? colors.surface.dark : colors.surface.light,
           color: isDark ? colors.text.dark : colors.text.light,
           boxShadow: isDark
-            ? "0 8px 20px rgba(0, 0, 0, 0.24)"
-            : "0 8px 20px rgba(157, 134, 96, 0.1)",
+            ? "0 6px 18px rgba(20, 30, 26, 0.26)"
+            : "0 6px 18px rgba(157, 134, 96, 0.09)",
         },
       }}
     />

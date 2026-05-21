@@ -12,7 +12,25 @@ interface DeletedMoodToastProps {
   onUndo: () => void;
 }
 
-export function DeletedMoodToast({ entry, onUndo }: DeletedMoodToastProps) {
+interface MoodChangeToastProps {
+  entry: MoodEntry;
+  title: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  iconColor: string;
+  action?: {
+    label: string;
+    accessibilityLabel: string;
+    onPress: () => void;
+  };
+}
+
+function MoodChangeToast({
+  entry,
+  title,
+  icon,
+  iconColor,
+  action,
+}: MoodChangeToastProps) {
   const { get, isDark } = useThemeColors();
 
   const mood = useMemo(
@@ -32,11 +50,13 @@ export function DeletedMoodToast({ entry, onUndo }: DeletedMoodToastProps) {
   );
 
   const moodLabel = mood?.label ?? "Mood";
-  const moodChipBg =
-    isDark ? mood?.bgHexDark ?? get("surfaceElevated") : mood?.bgHex ?? get("surfaceElevated");
-  const moodChipText =
-    isDark ? mood?.textHexDark ?? get("textMuted") : mood?.textHex ?? get("textMuted");
-  const moodChipBorder = mood?.borderColor ?? get("border");
+  const moodChipBg = isDark
+    ? mood?.bgHexDark ?? get("surfaceElevated")
+    : mood?.bgHex ?? get("surfaceElevated");
+  const moodChipText = isDark
+    ? mood?.textHexDark ?? get("textMuted")
+    : mood?.textHex ?? get("textMuted");
+  const moodChipBorder = isDark ? get("borderSubtle") : mood?.borderColor ?? get("border");
 
   return (
     <View style={styles.frame}>
@@ -50,36 +70,21 @@ export function DeletedMoodToast({ entry, onUndo }: DeletedMoodToastProps) {
           },
         ]}
       >
-        <View
-          style={[
-            styles.accent,
-            { backgroundColor: isDark ? "#A86A5F" : "#E7B8AE" },
-          ]}
-        />
         <View style={styles.content}>
-          <View
-            style={[
-              styles.iconBadge,
-              {
-                backgroundColor: isDark ? "#472E2A" : "#FDE8E4",
-                borderColor: isDark ? "#5F3E38" : "#FACFC7",
-              },
-            ]}
-          >
-            <Ionicons name="heart" size={16} color="#E06B55" />
-          </View>
-
           <View style={styles.copy}>
-            <Text
-              numberOfLines={1}
-              style={[
-                typography.bodyMd,
-                styles.title,
-                { color: get("text"), fontFamily: fontFamilies.bodyMedium },
-              ]}
-            >
-              Entry removed
-            </Text>
+            <View style={styles.titleRow}>
+              <Ionicons name={icon} size={15} color={iconColor} />
+              <Text
+                numberOfLines={1}
+                style={[
+                  typography.bodyMd,
+                  styles.title,
+                  { color: get("text"), fontFamily: fontFamilies.bodyMedium },
+                ]}
+              >
+                {title}
+              </Text>
+            </View>
 
             <View style={styles.metaRow}>
               <View
@@ -115,73 +120,97 @@ export function DeletedMoodToast({ entry, onUndo }: DeletedMoodToastProps) {
             </View>
           </View>
 
-          <Pressable
-            onPress={onUndo}
-            style={({ pressed }) => [
-              styles.undoButton,
-              {
-                backgroundColor: get("primaryBg"),
-                borderColor: isDark ? "#4A6653" : "#D1DFD1",
-              },
-              pressed ? styles.undoButtonPressed : null,
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel="Undo delete"
-          >
-            <Text
-              style={[
-                typography.bodySm,
-                styles.undoLabel,
+          {action ? (
+            <Pressable
+              onPress={action.onPress}
+              style={({ pressed }) => [
+                styles.undoButton,
                 {
-                  color: isDark ? "#C8EEC8" : "#476D47",
-                  fontFamily: fontFamilies.bodyMedium,
+                  backgroundColor: get("primaryBg"),
+                  borderColor: isDark ? "#4A6653" : "#D1DFD1",
                 },
+                pressed ? styles.undoButtonPressed : null,
               ]}
+              accessibilityRole="button"
+              accessibilityLabel={action.accessibilityLabel}
             >
-              Undo
-            </Text>
-          </Pressable>
+              <Text
+                style={[
+                  typography.bodySm,
+                  styles.undoLabel,
+                  {
+                    color: isDark ? "#C8EEC8" : "#476D47",
+                    fontFamily: fontFamilies.bodyMedium,
+                  },
+                ]}
+              >
+                {action.label}
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       </View>
     </View>
   );
 }
 
+export function DeletedMoodToast({ entry, onUndo }: DeletedMoodToastProps) {
+  const { isDark } = useThemeColors();
+
+  return (
+    <MoodChangeToast
+      entry={entry}
+      title="Entry removed"
+      icon="heart"
+      iconColor={isDark ? "#F5A899" : "#E06B55"}
+      action={{
+        label: "Undo",
+        accessibilityLabel: "Undo delete",
+        onPress: onUndo,
+      }}
+    />
+  );
+}
+
+export function RestoredMoodToast({ entry }: { entry: MoodEntry }) {
+  const { isDark } = useThemeColors();
+
+  return (
+    <MoodChangeToast
+      entry={entry}
+      title="Entry restored"
+      icon="leaf"
+      iconColor={isDark ? "#A8C5A8" : "#5B8A5B"}
+    />
+  );
+}
+
 const styles = StyleSheet.create({
   frame: {
     width: "100%",
-    maxWidth: 364,
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
   },
   card: {
     overflow: "hidden",
     borderWidth: 1,
-    borderRadius: 22,
-  },
-  accent: {
-    height: 3,
-    opacity: 0.9,
+    borderRadius: 18,
   },
   content: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-  },
-  iconBadge: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
   copy: {
     flex: 1,
     minWidth: 0,
-    gap: 6,
+    gap: 5,
+  },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
   },
   title: {
     fontSize: 15,
@@ -191,14 +220,17 @@ const styles = StyleSheet.create({
   metaRow: {
     flexDirection: "row",
     alignItems: "center",
-    flexWrap: "wrap",
     gap: 6,
+    minWidth: 0,
   },
   moodChip: {
-    borderRadius: 999,
+    alignSelf: "flex-start",
+    borderRadius: 12,
     borderWidth: 1,
     paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingVertical: 1,
+    maxWidth: 112,
+    flexShrink: 1,
   },
   moodChipText: {
     fontSize: 12,
@@ -208,10 +240,12 @@ const styles = StyleSheet.create({
   timestamp: {
     fontSize: 12,
     lineHeight: 16,
+    flexShrink: 1,
   },
   undoButton: {
-    minHeight: 36,
-    paddingHorizontal: 14,
+    minWidth: 54,
+    minHeight: 44,
+    paddingHorizontal: 10,
     borderRadius: 14,
     borderWidth: 1,
     alignItems: "center",
@@ -227,18 +261,18 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   shadowLight: {
-    elevation: 4,
+    elevation: 3,
     shadowColor: "#9D8660",
-    shadowOpacity: 0.08,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.07,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 3 },
   },
   shadowDark: {
-    elevation: 4,
-    shadowColor: "#000000",
-    shadowOpacity: 0.22,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+    shadowColor: "#1E2D26",
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 3 },
   },
 });
 

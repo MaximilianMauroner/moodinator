@@ -42,23 +42,22 @@ export function AppToaster() {
       swipeToDismissDirection="up"
       toastOptions={{
         style: {
-          borderRadius: 22,
+          borderRadius: 18,
           borderWidth: 1,
           backgroundColor: isDark ? colors.surface.dark : colors.surface.light,
           borderColor: isDark ? colors.border.dark : colors.border.light,
-          shadowColor: isDark ? "#000000" : "#9D8660",
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: isDark ? 0.2 : 0.08,
-          shadowRadius: 14,
-          elevation: 4,
+          shadowColor: isDark ? colors.background.dark : "#9D8660",
+          shadowOffset: { width: 0, height: 3 },
+          shadowOpacity: isDark ? 0.18 : 0.07,
+          shadowRadius: 12,
+          elevation: 3,
         },
         toastContainerStyle: {
           width: "100%",
-          maxWidth: 364,
-          paddingHorizontal: 12,
+          paddingHorizontal: 16,
         },
         textContainerStyle: {
-          rowGap: 3,
+          rowGap: 2,
         },
         titleStyle: {
           ...typography.bodyMd,
@@ -79,8 +78,9 @@ export function AppToaster() {
           borderWidth: 1,
           borderColor: isDark ? "#4A6653" : "#D1DFD1",
           borderRadius: 14,
+          minHeight: 36,
           paddingHorizontal: 12,
-          paddingVertical: 7,
+          paddingVertical: 6,
         },
         actionButtonTextStyle: {
           ...typography.bodySm,
@@ -93,8 +93,9 @@ export function AppToaster() {
           borderWidth: 1,
           borderColor: isDark ? colors.border.dark : colors.border.light,
           borderRadius: 14,
+          minHeight: 36,
           paddingHorizontal: 12,
-          paddingVertical: 7,
+          paddingVertical: 6,
         },
         cancelButtonTextStyle: {
           ...typography.bodySm,
