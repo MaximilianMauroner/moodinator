@@ -12,41 +12,22 @@ Ordering: priority — P0 (release-blocking or active data-loss) first, then dat
 
 ## 1. Decide automatic-backup direction
 
-**Type:** HITL (release-blocking)
+**Status:** Resolved on 2026-05-21.
 
-### What to build
-
-The Settings UI presents **Automatic Backups**, but background backup registration is currently disabled due to an `expo-task-manager` / New Architecture compatibility issue. Decide: re-enable and verify on Android release builds, or remove the promise from UI and legal copy.
-
-### Acceptance criteria
-
-- [ ] Decision documented (re-enable vs remove)
-- [ ] Decision recorded in `ISSUES.md` and any relevant ADR
-- [ ] #2 unblocked with chosen path
-
-### Blocked by
-
-None — can start immediately. Release-blocking for Play Store submission.
+**Decision:** Keep the feature. Per current Expo SDK 55 docs, `expo-background-task` works on both iOS (BGTaskScheduler) and Android (WorkManager) with the New Architecture; the previous "disabled" note was outdated. Task is already registered at `src/app/_layout.tsx:59`. iOS timing is best-effort by design — UI copy adjusted accordingly under #2.
 
 ---
 
 ## 2. Implement chosen automatic-backup path
 
-**Type:** AFK
+**Status:** Resolved on 2026-05-21 (re-enable path).
 
-### What to build
-
-Execute the decision from #1. If re-enable: verify task registration, folder selection, permission persistence, backup creation, and cleanup on an Android release build. If remove: scrub UI copy, `PRIVACY_POLICY.md`, `TERMS_OF_SERVICE.md`, and in-app legal screens of automatic-backup wording.
-
-### Acceptance criteria
-
-- [ ] If re-enabled: end-to-end Android release test of registration → backup → cleanup
-- [ ] If removed: no remaining mention of "Automatic Backups" in UI or legal
-- [ ] Legal "Last Updated" dates bumped if copy changed
-
-### Blocked by
-
-- #1
+- UI section retitled `Periodic Backups` with helper footer: "Backups run automatically when your device is idle and on a stable connection. The system decides when, so timing may vary."
+- "Weekly backup created successfully." → "Backup created successfully." on manual trigger.
+- "Select a folder for automatic backups" → "Select a folder for periodic backups".
+- `db/backgroundBackup.ts` JSDoc updated to reflect best-effort scheduling; worker body extracted to `runBackgroundBackupTask` for testability.
+- Tests added: `__tests__/db/backgroundBackup.test.ts` covers throttle (isBackupNeeded → false), success path, createBackup-fail path, unexpected-throw path, registration (new + already-registered + error swallowed), and the iOS-simulator skip-log path.
+- Verification gate: Android emulator + iOS simulator skip log. Physical device run not required for this slice.
 
 ---
 

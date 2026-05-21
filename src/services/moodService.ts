@@ -19,7 +19,6 @@ import {
   getMoodsByMonth,
   hasMoodBeenLoggedToday,
   updateEmotionCategoryInMoods,
-  removeEmotionFromMoods,
   getEmotionNamesFromMoods,
   clearMoods,
   seedMoods,
@@ -66,7 +65,6 @@ export interface MoodServiceInterface {
     emotionName: string,
     category: Emotion["category"]
   ) => Promise<{ updated: number }>;
-  removeEmotion: (emotionName: string) => Promise<{ updated: number }>;
   getEmotionNames: () => Promise<string[]>;
 }
 
@@ -246,13 +244,6 @@ export const moodService: MoodServiceInterface = {
     category: Emotion["category"]
   ): Promise<{ updated: number }> {
     return updateEmotionCategoryInMoods(emotionName, category);
-  },
-
-  /**
-   * Remove an emotion from all moods
-   */
-  async removeEmotion(emotionName: string): Promise<{ updated: number }> {
-    return removeEmotionFromMoods(emotionName);
   },
 
   /**

@@ -2,36 +2,31 @@ import * as BackgroundTask from "expo-background-task";
 import Constants from "expo-constants";
 import * as TaskManager from "expo-task-manager";
 import { Platform } from "react-native";
-import { createBackup, isBackupNeeded, cleanupOldBackups } from "./backup";
+import { createBackup, isBackupNeeded } from "./backup";
 
 export const BACKGROUND_BACKUP_TASK = "MOODINATOR_WEEKLY_BACKUP";
 
 /**
- * Registers the background backup task with TaskManager.
- * This must be called at the top level (outside of components).
+ * Worker body for the periodic backup task. Exported for direct testing —
+ * the TaskManager.defineTask registration below just delegates here.
  */
-TaskManager.defineTask(BACKGROUND_BACKUP_TASK, async () => {
+export async function runBackgroundBackupTask(): Promise<BackgroundTask.BackgroundTaskResult> {
   try {
     console.log("[BackgroundBackup] Task started");
 
-    // Check if backup is actually needed
     if (!(await isBackupNeeded())) {
       console.log("[BackgroundBackup] Backup not needed yet");
-      return BackgroundTask.BackgroundTaskResult.Success; // Task ran successfully, just no backup needed
+      return BackgroundTask.BackgroundTaskResult.Success;
     }
 
     console.log("[BackgroundBackup] Creating backup...");
+    // createBackup() runs cleanupOldBackups() internally on success, so no
+    // extra cleanup call here.
     const result = await createBackup();
 
     if (!result.success) {
       console.error("[BackgroundBackup] Backup failed:", result.error);
       return BackgroundTask.BackgroundTaskResult.Failed;
-    }
-
-    // Clean up old backups
-    const deletedCount = await cleanupOldBackups();
-    if (deletedCount > 0) {
-      console.log(`[BackgroundBackup] Cleaned up ${deletedCount} old backup(s)`);
     }
 
     console.log("[BackgroundBackup] Backup completed successfully");
@@ -40,10 +35,14 @@ TaskManager.defineTask(BACKGROUND_BACKUP_TASK, async () => {
     console.error("[BackgroundBackup] Task error:", error);
     return BackgroundTask.BackgroundTaskResult.Failed;
   }
-});
+}
+
+TaskManager.defineTask(BACKGROUND_BACKUP_TASK, runBackgroundBackupTask);
 
 /**
- * Registers the background task for weekly backups.
+ * Registers the periodic background backup task. The OS decides when it
+ * actually fires — minimumInterval is a hint, not a guarantee. The task itself
+ * throttles via isBackupNeeded so backups happen at most weekly.
  * Call this once when the app initializes.
  */
 export async function registerBackgroundBackupTask(): Promise<void> {

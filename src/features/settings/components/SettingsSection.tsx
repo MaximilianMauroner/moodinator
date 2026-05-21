@@ -4,10 +4,11 @@ import { useColorScheme } from "nativewind";
 
 interface SettingsSectionProps {
   title?: string;
+  footer?: string;
   children: React.ReactNode;
 }
 
-export function SettingsSection({ title, children }: SettingsSectionProps) {
+export function SettingsSection({ title, footer, children }: SettingsSectionProps) {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === "dark";
 
@@ -24,6 +25,11 @@ export function SettingsSection({ title, children }: SettingsSectionProps) {
       >
         {children}
       </View>
+      {footer && (
+        <Text className="text-xs text-sand-500 dark:text-paper-500 mt-2 ml-1 leading-5">
+          {footer}
+        </Text>
+      )}
     </View>
   );
 }

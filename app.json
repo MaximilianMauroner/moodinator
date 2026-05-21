@@ -18,9 +18,6 @@
         ]
       }
     },
-    "androidStatusBar": {
-      "translucent": true
-    },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/app-icons/adaptive-foreground.png",

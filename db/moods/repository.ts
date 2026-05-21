@@ -11,7 +11,6 @@ import {
   toMoodEntry,
 } from "./serialization";
 import {
-  deleteEmotion,
   linkEmotionsToMood,
   upsertEmotionCategory,
 } from "./emotions";
@@ -280,13 +279,6 @@ export async function updateEmotionCategoryInMoods(
   category: Emotion["category"]
 ): Promise<{ updated: number }> {
   await upsertEmotionCategory(emotionName, category);
-  return { updated: 0 };
-}
-
-export async function removeEmotionFromMoods(
-  emotionName: string
-): Promise<{ updated: number }> {
-  await deleteEmotion(emotionName);
   return { updated: 0 };
 }
 

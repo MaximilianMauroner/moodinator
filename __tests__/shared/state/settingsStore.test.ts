@@ -172,4 +172,40 @@ describe("useSettingsStore", () => {
       JSON.stringify(nextQuickEntryPrefs)
     );
   });
+
+  test("removing an emotion from the list does not touch the moods table", async () => {
+    const getDbSpy = vi.fn(() => {
+      throw new Error(
+        "settings list deletion must not call the moods database — would rewrite history snapshots"
+      );
+    });
+    vi.doMock("@db/client", () => ({ getDb: getDbSpy }));
+
+    await useSettingsStore.getState().setEmotions([
+      { name: "Calm", category: "positive" as const },
+    ]);
+
+    expect(getDbSpy).not.toHaveBeenCalled();
+    expect(useSettingsStore.getState().emotions).toEqual([
+      { name: "Calm", category: "positive" },
+    ]);
+
+    vi.doUnmock("@db/client");
+  });
+
+  test("removing a context tag from the list does not touch the moods table", async () => {
+    const getDbSpy = vi.fn(() => {
+      throw new Error(
+        "settings list deletion must not call the moods database — would rewrite history snapshots"
+      );
+    });
+    vi.doMock("@db/client", () => ({ getDb: getDbSpy }));
+
+    await useSettingsStore.getState().setContexts(["Home"]);
+
+    expect(getDbSpy).not.toHaveBeenCalled();
+    expect(useSettingsStore.getState().contexts).toEqual(["Home"]);
+
+    vi.doUnmock("@db/client");
+  });
 });
