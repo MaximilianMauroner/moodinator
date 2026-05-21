@@ -13,7 +13,6 @@ export {
   insertMoodEntry,
   updateMoodEntry,
   updateEmotionCategoryInMoods,
-  removeEmotionFromMoods,
   getEmotionNamesFromMoods,
   updateMoodNote,
   updateMoodTimestamp,

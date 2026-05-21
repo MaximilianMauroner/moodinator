@@ -32,10 +32,10 @@ import {
   updateMoodEntry,
   getMoodCount,
   hasMoodBeenLoggedToday,
-  removeEmotionFromMoods,
   updateEmotionCategoryInMoods,
 } from "../../db/moods/repository";
 import { linkEmotionsToMood } from "../../db/moods/emotions";
+import { toMoodEntry } from "../../db/moods/serialization";
 
 describe("Repository", () => {
   beforeEach(() => {
@@ -304,19 +304,46 @@ describe("Repository", () => {
       );
     });
 
-    it("does not remove historical mood emotions when deleting an emotion option", async () => {
-      mockDb.__addEmotion({ name: "Calm", category: "positive" });
-      mockDb.__addMood({
+    it("preserves historical emotions on a mood snapshot even when the emotions table has no matching row", () => {
+      const row = {
+        id: 1,
         mood: 5,
+        note: null,
+        timestamp: 1_700_000_000_000,
         emotions: '[{"name":"Calm","category":"positive"}]',
-      });
+        context_tags: "[]",
+        energy: null,
+        mood_scale_json: null,
+        photos_json: "[]",
+        location_json: null,
+        voice_memos_json: "[]",
+        based_on_entry_id: null,
+      };
 
-      const result = await removeEmotionFromMoods("Calm");
+      const entry = toMoodEntry(row);
 
-      expect(result.updated).toBe(0);
-      expect(mockDb.__getMoods()[0].emotions).toBe(
-        '[{"name":"Calm","category":"positive"}]'
-      );
+      expect(entry.emotions).toEqual([{ name: "Calm", category: "positive" }]);
+    });
+
+    it("preserves historical context tags on a mood snapshot regardless of current context tag list", () => {
+      const row = {
+        id: 2,
+        mood: 4,
+        note: null,
+        timestamp: 1_700_000_000_000,
+        emotions: "[]",
+        context_tags: '["Home","Work"]',
+        energy: null,
+        mood_scale_json: null,
+        photos_json: "[]",
+        location_json: null,
+        voice_memos_json: "[]",
+        based_on_entry_id: null,
+      };
+
+      const entry = toMoodEntry(row);
+
+      expect(entry.contextTags).toEqual(["Home", "Work"]);
     });
   });
 

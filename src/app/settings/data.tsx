@@ -41,7 +41,7 @@ export default function DataSettingsScreen() {
       const backupResult = await dataPortabilityService.createBackup();
       if (backupResult.success) {
         await loadBackupInfo();
-        Alert.alert("Backup Created", "Weekly backup created successfully.");
+        Alert.alert("Backup Created", "Backup created successfully.");
       } else {
         Alert.alert("Backup Failed", backupResult.error);
       }
@@ -191,14 +191,17 @@ export default function DataSettingsScreen() {
           />
         </SettingsSection>
 
-        <SettingsSection title="Automatic Backups">
+        <SettingsSection
+          title="Periodic Backups"
+          footer="Backups run automatically when the system allows background work, usually with network available. The system decides when, so timing may vary."
+        >
           {Platform.OS === "android" && (
             <SettingRow
               label="Backup Folder"
               subLabel={
                 backupFolderUri
                   ? `Location: ${formatBackupFolderPath(backupFolderUri)}`
-                  : "Select a folder for automatic backups"
+                  : "Select a folder for periodic backups"
               }
               icon="folder-outline"
               onPress={handleSelectBackupFolder}
