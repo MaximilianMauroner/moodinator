@@ -26,12 +26,14 @@ import { InsightCard, CompactInsightCard } from "../components/InsightCard";
 import { PatternCard } from "../components/PatternCard";
 import { StreakBadge } from "../components/StreakBadge";
 import { EntryDetailModal } from "../components/EntryDetailModal";
+import { InsightsHeader } from "../components/InsightsHeader";
 import { MoodCalendar } from "@/components/calendar";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
-import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { IconBadge } from "@/components/ui/IconBadge";
+import { ScreenBackgroundAccent } from "@/components/layout/ScreenBackgroundAccent";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { typography } from "@/constants/typography";
 import { motion } from "@/constants/motion";
 import { haptics } from "@/lib/haptics";
@@ -39,6 +41,11 @@ import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import type { MoodEntry } from "@db/types";
 
 type ViewMode = "calendar" | "charts";
+
+const viewModes: { id: ViewMode; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { id: "calendar", label: "Calendar", icon: "calendar" },
+  { id: "charts", label: "Charts", icon: "bar-chart" },
+];
 
 export function InsightsScreen() {
   const { colorScheme } = useColorScheme();
@@ -99,7 +106,7 @@ export function InsightsScreen() {
     return (
       <View
         className="flex-1 justify-center items-center"
-        style={{ backgroundColor: isDark ? "#1E2D26" : "#FAF8F4" }}
+        style={{ backgroundColor: isDark ? "#08150F" : "#FAF8F4" }}
       >
         <LoadingSpinner message="Loading insights..." />
       </View>
@@ -115,139 +122,26 @@ export function InsightsScreen() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaView
         className="flex-1"
-        style={{ backgroundColor: isDark ? "#1E2D26" : "#FAF8F4" }}
+        style={{ backgroundColor: isDark ? "#08150F" : "#FAF8F4" }}
         edges={["top"]}
       >
-        <View
-          pointerEvents="none"
-          style={{
-            position: "absolute",
-            top: -56,
-            right: -40,
-            width: 220,
-            height: 220,
-            borderRadius: 110,
-            backgroundColor: isDark ? "rgba(123, 168, 123, 0.11)" : "rgba(123, 168, 123, 0.10)",
-          }}
-        />
-        <View
-          pointerEvents="none"
-          style={{
-            position: "absolute",
-            top: 24,
-            left: -60,
-            width: 180,
-            height: 180,
-            borderRadius: 90,
-            backgroundColor: isDark ? "rgba(196, 187, 207, 0.05)" : "rgba(132, 117, 150, 0.08)",
-          }}
-        />
-        {/* Header */}
-        <ScreenHeader
-          title="Insights"
-          eyebrow="Your wellness journey"
-          subtitle={`${allMoods.length} entries tracked`}
-          icon="analytics-outline"
-          tone="sage"
-          trailing={(
-            <Pressable
-              onPress={onRefresh}
-              className="rounded-2xl"
-              style={({ pressed }) => [
-                {
-                  backgroundColor: isDark ? "#2C4038" : "#FDFCFA",
-                  borderWidth: 1,
-                  borderColor: isDark ? "rgba(168, 197, 168, 0.20)" : "#E5D9BF",
-                  padding: 10,
-                  minWidth: 44,
-                  minHeight: 44,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  shadowColor: isDark ? "#000" : "#9D8660",
-                  shadowOffset: { width: 0, height: 4 },
-                  shadowOpacity: isDark ? 0.25 : 0.1,
-                  shadowRadius: 8,
-                  elevation: 2,
-                },
-                pressed ? { opacity: 0.8, transform: [{ scale: 0.98 }] } : null,
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel="Refresh insights"
-            >
-              <Ionicons
-                name="refresh"
-                size={18}
-                color={isDark ? "#A8C5A8" : "#5B8A5B"}
-              />
-            </Pressable>
-          )}
+        <ScreenBackgroundAccent />
+        <InsightsHeader
+          moods={allMoods}
+          totalEntries={allMoods.length}
+          onRefresh={onRefresh}
         />
 
         {/* View Mode Toggle */}
         {hasData && (
-          <Animated.View
-            entering={FadeIn.duration(motion.duration.normal)}
-            className="flex-row mx-4 mb-4 p-1 rounded-2xl"
-            style={{
-              backgroundColor: isDark ? "#2C4038" : "#F5F1E8",
-            }}
-          >
-            <Pressable
-              onPress={() => handleViewModeChange("calendar")}
-              className="flex-1 flex-row items-center justify-center py-2.5 rounded-xl"
-              style={{
-                backgroundColor: viewMode === "calendar"
-                  ? isDark ? "#5B8A5B" : "#5B8A5B"
-                  : "transparent",
-              }}
-              accessibilityRole="button"
-              accessibilityState={{ selected: viewMode === "calendar" }}
-              accessibilityLabel="Calendar view"
-            >
-              <Ionicons
-                name="calendar"
-                size={16}
-                color={viewMode === "calendar" ? "#FFFFFF" : isDark ? "#9FB39A" : "#6B5C4A"}
-              />
-              <Text
-                className="ml-2"
-                style={{
-                  ...typography.bodyMd,
-                  fontWeight: "700",
-                  color: viewMode === "calendar" ? "#FFFFFF" : isDark ? "#9FB39A" : "#6B5C4A",
-                }}
-              >
-                Calendar
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={() => handleViewModeChange("charts")}
-              className="flex-1 flex-row items-center justify-center py-2.5 rounded-xl"
-              style={{
-                backgroundColor: viewMode === "charts"
-                  ? isDark ? "#5B8A5B" : "#5B8A5B"
-                  : "transparent",
-              }}
-              accessibilityRole="button"
-              accessibilityState={{ selected: viewMode === "charts" }}
-              accessibilityLabel="Charts view"
-            >
-              <Ionicons
-                name="bar-chart"
-                size={16}
-                color={viewMode === "charts" ? "#FFFFFF" : isDark ? "#9FB39A" : "#6B5C4A"}
-              />
-              <Text
-                className="ml-2"
-                style={{
-                  ...typography.bodyMd,
-                  fontWeight: "700",
-                  color: viewMode === "charts" ? "#FFFFFF" : isDark ? "#9FB39A" : "#6B5C4A",
-                }}
-              >
-                Charts
-              </Text>
-            </Pressable>
+          <Animated.View entering={FadeIn.duration(motion.duration.normal)}>
+            <SegmentedControl
+              value={viewMode}
+              items={viewModes}
+              onChange={handleViewModeChange}
+              variant="primary"
+              padding={4}
+            />
           </Animated.View>
         )}
 
@@ -274,7 +168,7 @@ export function InsightsScreen() {
                 <RefreshControl
                   refreshing={refreshing}
                   onRefresh={onRefresh}
-                  tintColor={isDark ? "#A8C5A8" : "#5B8A5B"}
+                  tintColor={isDark ? "#A6E39B" : "#5B8A5B"}
                 />
               }
             >
@@ -317,7 +211,7 @@ export function InsightsScreen() {
                 <RefreshControl
                   refreshing={refreshing}
                   onRefresh={onRefresh}
-                  tintColor={isDark ? "#A8C5A8" : "#5B8A5B"}
+                  tintColor={isDark ? "#A6E39B" : "#5B8A5B"}
                 />
               }
             >

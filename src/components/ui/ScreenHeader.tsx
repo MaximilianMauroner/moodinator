@@ -42,7 +42,7 @@ export function ScreenHeader({
   }[tone];
 
   return (
-    <View className={compact ? "px-4 pt-2 pb-4" : "px-6 py-5"}>
+    <View className={compact ? "px-4 pt-2 pb-3" : "px-6 pt-4 pb-4"}>
       {onBack ? (
         <Pressable
           onPress={onBack}
@@ -61,14 +61,14 @@ export function ScreenHeader({
         </Pressable>
       ) : null}
 
-      <View className="flex-row items-end justify-between">
+      <View className="flex-row items-center justify-between">
         <View className="flex-row items-center flex-1 pr-3">
           {icon ? (
             <IconBadge
               icon={icon}
               tone={tone}
-              size={compact ? "md" : "lg"}
-              style={{ marginRight: compact ? 12 : 14 }}
+              size={compact ? "sm" : "md"}
+              style={{ marginRight: compact ? 10 : 12 }}
             />
           ) : null}
           <View className="flex-1">
@@ -79,7 +79,7 @@ export function ScreenHeader({
             ) : null}
             <Text
               className="text-paper-800 dark:text-paper-200"
-              style={compact ? typography.titleMd : typography.titleLg}
+              style={typography.titleMd}
             >
               {title}
             </Text>
@@ -93,7 +93,7 @@ export function ScreenHeader({
             ) : null}
           </View>
         </View>
-        {trailing ? <View>{trailing}</View> : null}
+        {trailing ? <View className="items-end justify-center">{trailing}</View> : null}
       </View>
     </View>
   );

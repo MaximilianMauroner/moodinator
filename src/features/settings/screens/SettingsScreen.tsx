@@ -8,6 +8,8 @@ import { useMoodsStore } from "@/shared/state/moodsStore";
 
 import { ProfileCard } from "../components/ProfileCard";
 import { SettingsCategoryCard } from "../components/SettingsCategoryCard";
+import { SettingsHeader } from "../components/SettingsHeader";
+import { ScreenBackgroundAccent } from "@/components/layout/ScreenBackgroundAccent";
 
 export function SettingsScreen() {
   const [backupCount, setBackupCount] = useState(0);
@@ -59,15 +61,8 @@ export function SettingsScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-paper-100 dark:bg-paper-900" edges={["top"]}>
-      {/* Header */}
-      <View className="px-6 pt-4 pb-5 bg-paper-100 dark:bg-paper-900">
-        <Text className="text-xs font-medium mb-1 text-sage-500 dark:text-sage-300">
-          Customize your experience
-        </Text>
-        <Text className="text-2xl font-bold text-paper-800 dark:text-paper-200 tracking-tight">
-          Settings
-        </Text>
-      </View>
+      <ScreenBackgroundAccent />
+      <SettingsHeader />
 
       <ScrollView
         className="flex-1 px-4"

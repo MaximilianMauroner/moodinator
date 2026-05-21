@@ -2,9 +2,9 @@ import type { MoodScale } from "@/types/mood";
 
 // Soft Organic aesthetic - warm, natural tones
 // Light mode: warm creams and earth tones - watercolor washes on paper
-// Dark mode: lifted sage canvas with hue-identity cards - watercolor on moonlit forest
-//   Each family preserves its character (sage / dusk / sand / coral) at low luminance
-//   with enough chroma to read as distinct washes, not muddy variations.
+// Dark mode: warm botanical ink with hue-identity washes.
+//   Each family preserves its character (sage / dusk / sand / coral) without
+//   collapsing into blackened chips or over-saturated emergency blocks.
 export const moodScale: MoodScale[] = [
     {
         value: 0,
@@ -15,9 +15,8 @@ export const moodScale: MoodScale[] = [
         borderColor: "#A8C5A8",
         bgHex: "#E8EFE8",
         textHex: "#476D47",
-        // Dark: very dark sage bg → pale sage text (contrast ~9:1)
-        bgHexDark: "#132316",
-        textHexDark: "#C8EEC8",
+        bgHexDark: "#1F3326",
+        textHexDark: "#CBE4C4",
     },
     {
         value: 1,
@@ -28,8 +27,8 @@ export const moodScale: MoodScale[] = [
         borderColor: "#D1DFD1",
         bgHex: "#F4F7F4",
         textHex: "#476D47",
-        bgHexDark: "#162518",
-        textHexDark: "#C0E8C0",
+        bgHexDark: "#22372A",
+        textHexDark: "#C5E0BE",
     },
     {
         value: 2,
@@ -40,8 +39,8 @@ export const moodScale: MoodScale[] = [
         borderColor: "#D1DFD1",
         bgHex: "#F4F7F4",
         textHex: "#5B8A5B",
-        bgHexDark: "#18271A",
-        textHexDark: "#BAE4BA",
+        bgHexDark: "#263B2D",
+        textHexDark: "#BED9B8",
     },
     {
         value: 3,
@@ -52,9 +51,8 @@ export const moodScale: MoodScale[] = [
         borderColor: "#DDD8E5",
         bgHex: "#EFECF2",
         textHex: "#695C78",
-        // Dark: very dark dusk/purple → pale lavender (contrast ~8:1)
-        bgHexDark: "#1C1835",
-        textHexDark: "#D4CCF4",
+        bgHexDark: "#2D2940",
+        textHexDark: "#D8D0E4",
     },
     {
         value: 4,
@@ -65,8 +63,8 @@ export const moodScale: MoodScale[] = [
         borderColor: "#EFECF2",
         bgHex: "#F8F7F9",
         textHex: "#6B5C7A",
-        bgHexDark: "#1A162F",
-        textHexDark: "#CABEEC",
+        bgHexDark: "#302B3E",
+        textHexDark: "#CEC4DC",
     },
     {
         value: 5,
@@ -77,9 +75,8 @@ export const moodScale: MoodScale[] = [
         borderColor: "#E5D9BF",
         bgHex: "#F9F5ED",
         textHex: "#7A6545",
-        // Dark: very dark sand/amber → pale gold (contrast ~8:1)
-        bgHexDark: "#2C1C0C",
-        textHexDark: "#F2D898",
+        bgHexDark: "#3A2D1D",
+        textHexDark: "#E8D19C",
     },
     {
         value: 6,
@@ -90,8 +87,8 @@ export const moodScale: MoodScale[] = [
         borderColor: "#F2EBD9",
         bgHex: "#FDFBF7",
         textHex: "#8B7352",
-        bgHexDark: "#32180A",
-        textHexDark: "#EDCF8E",
+        bgHexDark: "#422C18",
+        textHexDark: "#E5C583",
     },
     {
         value: 7,
@@ -102,9 +99,8 @@ export const moodScale: MoodScale[] = [
         borderColor: "#FACFC7",
         bgHex: "#FDE8E4",
         textHex: "#E06B55",
-        // Dark: very dark coral/crimson → pale blush (contrast ~8:1)
-        bgHexDark: "#3C1008",
-        textHexDark: "#FFBCB0",
+        bgHexDark: "#4A2119",
+        textHexDark: "#F3BAAD",
     },
     {
         value: 8,
@@ -115,8 +111,8 @@ export const moodScale: MoodScale[] = [
         borderColor: "#FDE8E4",
         bgHex: "#FEF6F4",
         textHex: "#E06B55",
-        bgHexDark: "#3E0E08",
-        textHexDark: "#FFB8AA",
+        bgHexDark: "#4D1E18",
+        textHexDark: "#F0B1A4",
     },
     {
         value: 9,
@@ -127,8 +123,8 @@ export const moodScale: MoodScale[] = [
         borderColor: "#FACFC7",
         bgHex: "#FDE8E4",
         textHex: "#C75441",
-        bgHexDark: "#400C06",
-        textHexDark: "#FFA898",
+        bgHexDark: "#511B15",
+        textHexDark: "#EFA99B",
     },
     {
         value: 10,
@@ -139,7 +135,7 @@ export const moodScale: MoodScale[] = [
         borderColor: "#F5A899",
         bgHex: "#FACFC7",
         textHex: "#C75441",
-        bgHexDark: "#440A06",
-        textHexDark: "#FFA898",
+        bgHexDark: "#561913",
+        textHexDark: "#EFA99B",
     },
 ];

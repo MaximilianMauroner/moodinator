@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useRef } from "react";
-import { View, Text, Pressable } from "react-native";
+import { StyleSheet, View, Text, Pressable } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   FadeInUp,
@@ -61,11 +61,9 @@ function CommentBlock({
 
   return (
     <View
-      className={variant === "compact" ? "mt-3 rounded-xl px-3 py-2.5" : "mb-3 rounded-xl p-3"}
+      className={variant === "compact" ? "mt-3 rounded-xl px-3 py-2.5" : "mb-3 rounded-xl px-3 py-2.5"}
       style={{
         backgroundColor: get("surfaceAlt"),
-        borderWidth: variant === "minimal" ? 1 : 0,
-        borderColor: get("borderSubtle"),
       }}
     >
       <Text
@@ -259,22 +257,22 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
               accessibilityHint={getMoodItemHint()}
             >
               <View
-                className="rounded-2xl overflow-hidden"
                 style={{
+                  borderRadius: 16,
                   backgroundColor:
-                    historyCardStyle === "compact" ? get("surfaceAlt") : get("background"),
-                  borderWidth: historyCardStyle === "compact" ? (isDark ? 1 : 0) : 1,
+                    historyCardStyle === "compact" ? get("surfaceAlt") : get("surface"),
+                  borderWidth: StyleSheet.hairlineWidth,
                   borderColor:
                     historyCardStyle === "compact"
-                      ? isDark ? "rgba(168, 197, 168, 0.14)" : "transparent"
-                      : isDark ? `${moodData.textHex}40` : `${moodData.textHex}35`,
-                  shadowColor: historyCardStyle === "compact"
-                    ? (isDark ? "#000" : colors.sand.text.light)
-                    : "transparent",
-                  shadowOffset: { width: 0, height: isDark ? 3 : 4 },
-                  shadowOpacity: historyCardStyle === "compact" ? (isDark ? 0.28 : 0.06) : 0,
-                  shadowRadius: historyCardStyle === "compact" ? (isDark ? 8 : 10) : 0,
-                  elevation: historyCardStyle === "compact" ? (isDark ? 4 : 3) : 0,
+                      ? isDark ? "rgba(78, 101, 86, 0.55)" : "rgba(229, 217, 191, 0.55)"
+                      : isDark ? "rgba(224, 201, 147, 0.18)" : "rgba(157, 134, 96, 0.22)",
+                  shadowColor: isDark ? colors.background.dark : colors.sand.text.light,
+                  shadowOffset: { width: 0, height: historyCardStyle === "compact" ? 3 : 2 },
+                  shadowOpacity: historyCardStyle === "compact"
+                    ? (isDark ? 0.28 : 0.06)
+                    : (isDark ? 0.2 : 0.045),
+                  shadowRadius: historyCardStyle === "compact" ? (isDark ? 8 : 10) : 9,
+                  elevation: historyCardStyle === "compact" ? (isDark ? 4 : 3) : 2,
                 }}
               >
                 {historyCardStyle === "compact" ? (
@@ -348,14 +346,6 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
                         {formattedTime}
                       </Text>
                     </View>
-
-                    <View
-                      className="mb-3 h-px"
-                      style={{
-                        backgroundColor:
-                          isDark ? "rgba(168,197,168,0.12)" : "rgba(61,53,42,0.08)",
-                      }}
-                    />
 
                     <Text className="mb-3 text-xs" style={{ color: get("textMuted") }}>
                       {formattedDate}

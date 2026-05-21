@@ -33,7 +33,7 @@ const COLLAPSED_HEIGHT = 60;
 const PILL_W = 52;
 const PILL_H = 38;
 const PILL_GAP = 5;
-const TRACK_PAD_X = 8;
+const TRACK_PAD_X = 16;
 const COLLAPSED_TRACK_CONTENT_WIDTH =
   TRACK_PAD_X * 2 + moodScale.length * PILL_W + (moodScale.length - 1) * PILL_GAP;
 
@@ -214,9 +214,9 @@ export function UnifiedMoodSelector({
   const scrollViewRef = useRef<ScrollView>(null);
   const { get } = useThemeColors();
 
-  const trackBgColor = isDark ? "#2C4038" : "#FDFCFA";
-  const trackBorderColor = isDark ? "#3A5448" : "#E5D9BF";
-  const textMutedColor = isDark ? colors.sand.textMuted.dark : "#6B5C4A";
+  const trackBgColor = isDark ? colors.surface.dark : colors.surface.light;
+  const trackBorderColor = isDark ? colors.border.dark : colors.border.light;
+  const textMutedColor = isDark ? colors.sand.textMuted.dark : colors.textMuted.light;
   const accentColor = isDark ? colors.primaryMuted.dark : colors.primary.light;
   const negativeColor = isDark
     ? colors.negative.text.dark
@@ -328,29 +328,36 @@ export function UnifiedMoodSelector({
         />
       </Animated.View>
 
+      {/* Fixed collapsed track frame. The scroll viewport is inset inside this frame. */}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          StyleSheet.absoluteFill,
+          {
+            backgroundColor: trackBgColor,
+            borderWidth: 1,
+            borderColor: trackBorderColor,
+          },
+          trackBgStyle,
+        ]}
+      />
+
       <ScrollView
         ref={scrollViewRef}
         horizontal
         bounces={false}
         scrollEnabled={isCollapsed}
         showsHorizontalScrollIndicator={false}
-        style={StyleSheet.absoluteFill}
+        style={[
+          StyleSheet.absoluteFill,
+          {
+            left: TRACK_PAD_X,
+            right: TRACK_PAD_X,
+          },
+        ]}
         contentContainerStyle={{ width: contentWidth }}
       >
         <View style={{ width: contentWidth, flex: 1 }}>
-          {/* Collapsed pill-track background */}
-          <Animated.View
-            style={[
-              StyleSheet.absoluteFill,
-              {
-                backgroundColor: trackBgColor,
-                borderWidth: 1,
-                borderColor: trackBorderColor,
-              },
-              trackBgStyle,
-            ]}
-          />
-
           {/* Mood buttons — each one is an independent entity that travels between states */}
           {containerWidth > 0 &&
             moodScale.map((mood, index) => (

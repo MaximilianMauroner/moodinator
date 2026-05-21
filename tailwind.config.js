@@ -18,11 +18,11 @@ module.exports = {
           200: "#F5F1E8",
           300: "#EDE7DA",
           400: "#DDD4C4",
-          // Dark mode variants — deeper botanical night for stronger card elevation contrast
-          800: "#3E5649",
-          850: "#304840",
-          900: "#1E2D26",
-          950: "#141E1A",
+          // Dark mode variants: clean eucalyptus ink with lifted green paper layers.
+          800: "#182C20",
+          850: "#14251C",
+          900: "#08150F",
+          950: "#09130E",
         },
         sage: {
           50: "#F4F7F4",
@@ -51,8 +51,8 @@ module.exports = {
           500: "#BDA77D",
           600: "#9D8660",
           // Dark variants
-          800: "#3D352A",
-          900: "#2E281F",
+          800: "#342B1D",
+          900: "#241E15",
         },
         dusk: {
           50: "#F8F7F9",
@@ -63,9 +63,9 @@ module.exports = {
           500: "#847596",
           600: "#695C78",
           // Dark mode
-          700: "#4A4255",
-          800: "#342E3C",
-          900: "#252129",
+          700: "#51485F",
+          800: "#332D3D",
+          900: "#24212D",
         },
         // Mood spectrum - more organic, less saturated
         mood: {

@@ -1,16 +1,9 @@
 import React from "react";
 import { View, StyleSheet, type StyleProp, type ViewStyle } from "react-native";
 import { useColorScheme } from "nativewind";
+import { effectColors, semanticToneColors, type SemanticTone } from "@/constants/colors";
 
-type Tone = "neutral" | "sage" | "sand" | "dusk" | "coral";
-
-const toneBorder = {
-  neutral: { light: "#E5D9BF", dark: "#3D352A" },
-  sage: { light: "#D1DFD1", dark: "#3D4D3D" },
-  sand: { light: "#E9DCC1", dark: "#4A4032" },
-  dusk: { light: "#DDD8E5", dark: "#3D3A43" },
-  coral: { light: "#FACFC7", dark: "#4D3832" },
-} as const;
+type Tone = SemanticTone;
 
 interface SurfaceCardProps {
   children: React.ReactNode;
@@ -41,7 +34,9 @@ export function SurfaceCard({
         isDark ? styles.shadowDark : styles.shadowLight,
         {
           borderWidth: 1,
-          borderColor: isDark ? toneBorder[tone].dark : toneBorder[tone].light,
+          borderColor: isDark
+            ? semanticToneColors[tone].dark.border
+            : semanticToneColors[tone].light.border,
         },
         style,
       ]}
@@ -63,15 +58,15 @@ export function SurfaceCard({
 const styles = StyleSheet.create({
   shadowLight: {
     elevation: 3,
-    shadowColor: "#9D8660",
+    shadowColor: effectColors.shadow.light,
     shadowOpacity: 0.08,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 5 },
   },
   shadowDark: {
     elevation: 3,
-    shadowColor: "#000",
-    shadowOpacity: 0.24,
+    shadowColor: effectColors.shadow.dark,
+    shadowOpacity: 0.28,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 5 },
   },

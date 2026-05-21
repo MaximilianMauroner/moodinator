@@ -14,14 +14,13 @@ export default function TabLayout() {
   const isDark = colorScheme === "dark";
   const insets = useSafeAreaInsets();
 
-  // Soft Organic palette — canvas matches `paper-100` (light) / `paper-900` (dark)
-  // so every tab screen shares one background. Border uses `paper-850` for a
-  // gentle separation against the canvas.
+  // Soft Organic palette: tab chrome follows the same botanical night tokens
+  // as the screens so dark mode keeps the warm field-journal feel.
   const colors = {
-    active: isDark ? "#A8C5A8" : "#5B8A5B",
-    inactive: isDark ? "#8AAE98" : "#7A6B55",
-    background: isDark ? "#1E2D26" : "#FAF8F4",
-    border: isDark ? "#2E4438" : "#E5D9BF",
+    active: isDark ? "#A6E39B" : "#5B8A5B",
+    inactive: isDark ? "#9EB894" : "#7A6B55",
+    background: isDark ? "#08150F" : "#FAF8F4",
+    border: isDark ? "#233D2D" : "#E5D9BF",
   };
   const compactTabBarHeight = 50;
   const compactBottomPadding = Math.max(insets.bottom - 4, 6);
