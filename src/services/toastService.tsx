@@ -1,6 +1,6 @@
 import type { MoodEntry } from "@db/types";
 
-import { DeletedMoodToast } from "@/components/ui/DeletedMoodToast";
+import { DeletedMoodToast, RestoredMoodToast } from "@/components/ui/DeletedMoodToast";
 import { toast } from "@/lib/toast";
 
 type ToastId = string | number;
@@ -29,8 +29,7 @@ async function restoreDeletedMood(
     await onUndo(deletedEntry);
     cleanupDeletedMoodEntry(toastId);
     toast.dismiss(toastId);
-    toast.success("Entry restored", {
-      description: "The deleted mood entry is back in your history.",
+    toast.custom(() => <RestoredMoodToast entry={deletedEntry} />, {
       duration: 2600,
     });
   } catch (error) {
