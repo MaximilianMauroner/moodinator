@@ -21,7 +21,7 @@ export {
 } from "./moods/repository";
 export { exportMoods, importMoods, importOldBackup, type ImportResult } from "./moods/importExport";
 export { clearMoods, seedMoods, seedMoodsFromFile } from "./moods/seed";
-export { migrateEmotionsToCategories } from "./moods/migrations";
+export { backfillMoodScaleJson, migrateEmotionsToCategories } from "./moods/migrations";
 export {
   createEmotionsTable,
   createMoodEmotionsTable,

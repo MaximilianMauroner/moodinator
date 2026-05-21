@@ -1,8 +1,9 @@
+import type * as SQLite from "expo-sqlite";
 import { getDb } from "../client";
 import type { Emotion } from "../types";
 import type { MoodRow, RawEmotionItem } from "../types/rows";
 import { DEFAULT_EMOTIONS } from "../../src/lib/entrySettings";
-import { serializeEmotions } from "./serialization";
+import { CURRENT_MOOD_SCALE_SNAPSHOT, serializeEmotions, serializeMoodScale } from "./serialization";
 
 export async function migrateEmotionsToCategories(): Promise<{
   migrated: number;
@@ -85,4 +86,16 @@ export async function migrateEmotionsToCategories(): Promise<{
     console.error("Error during emotion migration:", error);
     throw error;
   }
+}
+
+export async function backfillMoodScaleJson(
+  database?: SQLite.SQLiteDatabase
+): Promise<{ backfilled: number }> {
+  const db = database ?? (await getDb());
+  const currentScaleJson = serializeMoodScale(CURRENT_MOOD_SCALE_SNAPSHOT);
+  const result = await db.runAsync(
+    "UPDATE moods SET mood_scale_json = ? WHERE mood_scale_json IS NULL OR mood_scale_json = '';",
+    currentScaleJson
+  );
+  return { backfilled: result.changes ?? 0 };
 }

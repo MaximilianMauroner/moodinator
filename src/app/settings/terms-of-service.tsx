@@ -19,7 +19,7 @@ export default function TermsOfServiceScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Text className="text-xs text-sand-500 dark:text-sand-400 mb-4">
-          Last Updated: February 2, 2026
+          Last Updated: May 21, 2026
         </Text>
 
         <Section title="Agreement to Terms">
@@ -66,7 +66,7 @@ export default function TermsOfServiceScreen() {
 
           <Subtitle>No Recovery</Subtitle>
           <Paragraph>
-            {"Since we do not store your data on any servers, we cannot recover lost data. We strongly recommend using the app's export and backup features regularly."}
+            {"Since we do not store your data on any servers, we cannot recover lost data. We strongly recommend using the app's Data Export and Backup features regularly."}
           </Paragraph>
         </Section>
 
@@ -108,7 +108,7 @@ export default function TermsOfServiceScreen() {
 
         <Section title="Termination">
           <Paragraph>
-            You may stop using the app at any time by uninstalling it from your device. Upon uninstallation, all locally stored data will be deleted unless you have created external backups.
+            You may stop using the app at any time by uninstalling it from your device. Upon uninstallation, all locally stored data will be deleted unless you have saved a Data Export or external backup.
           </Paragraph>
         </Section>
 

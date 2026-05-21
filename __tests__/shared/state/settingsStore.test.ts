@@ -208,4 +208,40 @@ describe("useSettingsStore", () => {
 
     vi.doUnmock("@db/client");
   });
+
+  test("renaming a context tag in the preset list does not touch the moods table (future-only default)", async () => {
+    const getDbSpy = vi.fn(() => {
+      throw new Error(
+        "context tag rename must not call the moods database — would rewrite history snapshots"
+      );
+    });
+    vi.doMock("@db/client", () => ({ getDb: getDbSpy }));
+
+    await useSettingsStore.getState().setContexts(["Workplace", "Home"]);
+
+    expect(getDbSpy).not.toHaveBeenCalled();
+    expect(useSettingsStore.getState().contexts).toEqual(["Workplace", "Home"]);
+
+    vi.doUnmock("@db/client");
+  });
+
+  test("renaming an emotion in the preset list does not touch the moods table (future-only default)", async () => {
+    const getDbSpy = vi.fn(() => {
+      throw new Error(
+        "emotion rename must not call the moods database — would rewrite history snapshots"
+      );
+    });
+    vi.doMock("@db/client", () => ({ getDb: getDbSpy }));
+
+    await useSettingsStore.getState().setEmotions([
+      { name: "Joyful", category: "positive" as const },
+    ]);
+
+    expect(getDbSpy).not.toHaveBeenCalled();
+    expect(useSettingsStore.getState().emotions).toEqual([
+      { name: "Joyful", category: "positive" },
+    ]);
+
+    vi.doUnmock("@db/client");
+  });
 });
