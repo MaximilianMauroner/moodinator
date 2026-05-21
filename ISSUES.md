@@ -1,487 +1,563 @@
-# Architecture Deepening Opportunities
+# Moodinator Issues
 
-Generated from an architecture pass on 2026-04-29.
+Vertical-slice issues generated from the 2026-04-29 architecture pass, the 2026-04-29 Google Play readiness pass, and the 2026-05-02 local build report. Each slice is sized to be independently grabbable.
 
-These are candidate refactors, not implementation specs. Each item uses the architecture vocabulary from the `improve-codebase-architecture` skill: module, interface, implementation, depth, seam, adapter, leverage, and locality.
+Legend: **AFK** = can ship without a human-in-the-loop decision. **HITL** = needs a design or product call first.
 
-## 1. Deepen Mood Insights
+Ordering: priority — P0 (release-blocking or active data-loss) first, then data-integrity follow-throughs, then foundational architecture, then HITL design follow-ups, then build/config cleanup, then monitoring.
 
-**Files**
+---
 
-- `src/services/analyticsService.ts`
-- `src/components/charts/ChartComponents.tsx`
-- `src/features/insights/hooks/useInsightsData.ts`
-- `src/features/insights/utils/patternDetection.ts`
+# P0 — Release-blocking & data integrity
 
-**Problem**
+## 1. Decide automatic-backup direction
 
-Mood analytics are split across chart UI, a service module, and an insights hook. The deletion test is revealing: deleting `analyticsService` would not remove much complexity because key behavior remains in `ChartComponents` and `useInsightsData`. The module is shallow, while the actual mood-pattern rules are scattered.
+**Type:** HITL (release-blocking)
 
-**Solution**
+### What to build
 
-Move mood aggregation, period filtering, streaks, trend math, pattern detection, and mood-scale interpretation into one deeper mood insights module. UI modules should render results, not own calculations.
+The Settings UI presents **Automatic Backups**, but background backup registration is currently disabled due to an `expo-task-manager` / New Architecture compatibility issue. Decide: re-enable and verify on Android release builds, or remove the promise from UI and legal copy.
 
-**Benefits**
+### Acceptance criteria
 
-Locality improves for the inverted mood scale rule, period semantics, and chart aggregation. Leverage improves because Home, Insights, Charts, Therapy Export, and Settings can reuse the same tested behavior. Tests can target one interface with fixture mood histories instead of testing UI-adjacent helpers.
+- [ ] Decision documented (re-enable vs remove)
+- [ ] Decision recorded in `ISSUES.md` and any relevant ADR
+- [ ] #2 unblocked with chosen path
 
-## 2. Deepen Mood Entry Workflows
+### Blocked by
 
-**Files**
+None — can start immediately. Release-blocking for Play Store submission.
 
-- `src/services/moodService.ts`
-- `src/shared/state/moodsStore.ts`
-- `src/app/(tabs)/index.tsx`
-- `src/hooks/useMoodItemActions.ts`
+---
 
-**Problem**
+## 2. Implement chosen automatic-backup path
 
-`moodService` mostly mirrors repository functions, so callers still need to know workflow details: refresh after timestamp update, local restore behavior, undo behavior, migration side effects, and when to reload. Some UI code still imports `@db/db` directly, which conflicts with the project constraint to go through service-layer modules.
+**Type:** AFK
 
-**Solution**
+### What to build
 
-Deepen the mood entry workflow module so create, edit, reschedule, delete, restore, and load-history are coherent operations with cache/store updates and persistence rules behind the seam.
+Execute the decision from #1. If re-enable: verify task registration, folder selection, permission persistence, backup creation, and cleanup on an Android release build. If remove: scrub UI copy, `PRIVACY_POLICY.md`, `TERMS_OF_SERVICE.md`, and in-app legal screens of automatic-backup wording.
 
-**Benefits**
+### Acceptance criteria
 
-Locality improves because mood entry mutation rules stop spreading across Home, hooks, stores, and repositories. Leverage improves because UI callers get user-level operations instead of composing low-level steps. Tests can verify full workflows against a fake adapter, including undo and timestamp edits.
+- [ ] If re-enabled: end-to-end Android release test of registration → backup → cleanup
+- [ ] If removed: no remaining mention of "Automatic Backups" in UI or legal
+- [ ] Legal "Last Updated" dates bumped if copy changed
 
-## 3. Consolidate Settings Storage
+### Blocked by
 
-**Files**
+- #1
 
-- `src/services/settingsService.ts`
-- `src/lib/entrySettings.ts`
-- `src/shared/state/settingsStore.ts`
+---
 
-**Problem**
+## 3. Emotion deletes preserve historical mood entries
 
-Settings parsing and defaults exist in both `settingsService` and `entrySettings`. The settings store bypasses `settingsService` and mixes storage keys, global haptics side effects, and presets. This creates a shallow service and weak locality for preference migration behavior.
+**Type:** AFK
 
-**Solution**
+### What to build
 
-Make the settings module own persistence, defaults, parsing, and migration. The store should hydrate from that module and update through it.
+Stop bulk-removing deleted emotions from historical mood entries. Introduce an archived/inactive state so the emotion disappears from future selection while remaining attached to past **Mood Entry Snapshots**. Currently a data-loss bug — deleting an emotion silently rewrites history.
 
-**Benefits**
+### Acceptance criteria
 
-Locality improves for corrupted storage handling, default preference changes, and future privacy-sensitive settings. Leverage improves because settings screens, entry modals, and export preferences share one behavior source. Tests can cover storage parsing once instead of through multiple near-duplicates.
+- [ ] Deleting an emotion in the Emotion List Editor moves it to archived, not removed-from-history
+- [ ] Existing mood entries that referenced the deleted emotion still show that label in lists, insights, and exports
+- [ ] `removeEmotionFromMoods` is gone or only runs through an explicit Historical Update
+- [ ] Repository tests cover the archived flow
 
-## 4. Deepen Data Portability
+### Blocked by
 
-**Files**
+None — can start immediately.
 
-- `src/app/settings/data.tsx`
-- `db/moods/importExport.ts`
-- `db/backup.ts`
-- `src/features/settings/components/ExportModal.tsx`
+---
 
-**Problem**
+## 4. Context tag deletes preserve historical mood entries
 
-Data portability is a user-facing privacy promise, but the workflow crosses UI, database import/export, backup folder logic, filesystem access, and summary text. The seam is unclear: UI code knows too much about document picking, backup state, import result shaping, and alert summaries.
+**Type:** AFK
 
-**Solution**
+### What to build
 
-Deepen a data portability module that owns export ranges, import validation summaries, backup metadata, and manual backup operations. Platform file picking can remain an adapter at the edge.
+Mirror #3 for context tags. Deleting a context tag from the Context Tag List removes it from future selection but leaves it attached to past mood entries.
 
-**Benefits**
+### Acceptance criteria
 
-Locality improves around local-only data handling and backup semantics. Leverage improves because settings, developer tools, background backups, and therapy export can share the same tested workflow. Tests can validate import/export/backup outcomes without rendering settings screens.
+- [ ] Deleting a context tag preserves historical references
+- [ ] Existing mood entries still show the deleted context tag in lists, insights, and exports
+- [ ] Tests cover historical-preservation behavior
 
-## 5. Deepen Mood Scale Interpretation
+### Blocked by
 
-**Files**
+None — can start immediately (independent of #3, different storage path).
 
-- `src/constants/moodScale.ts`
-- `src/components/charts/ChartComponents.tsx`
-- `src/features/insights/hooks/useInsightsData.ts`
-- `src/components/DisplayMoodItem.tsx`
+---
 
-**Problem**
+## 5. Remove deprecated `androidStatusBar.translucent`
 
-Callers repeatedly know how to round mood values, map Tailwind classes to hex colors, pick labels, and account for "lower is better." This is a shallow constant table with too much interface knowledge leaking into callers.
+**Type:** AFK
 
-**Solution**
+### What to build
 
-Deepen the mood scale module so callers ask for display and semantic interpretation of a mood value instead of manually combining constants.
+Drop `androidStatusBar.translucent` from `app.json`. The setting is deprecated due to Android edge-to-edge enforcement and has no effect. Rely on current edge-to-edge patterns. Cheap release-prep cleanup.
 
-**Benefits**
+### Acceptance criteria
 
-Locality improves for the inverted mood scale and color semantics. Leverage improves across lists, calendar, charts, accessibility labels, and insights. Tests become small and stable: mood value in, interpretation out.
+- [ ] `androidStatusBar.translucent` removed from `app.json`
+- [ ] `expo prebuild` no longer warns about it
+- [ ] Status bar still renders correctly on a release Android build
 
-## 7. Preserve Historical Emotions Unless the User Updates History
+### Blocked by
 
-**Files**
+None — can start immediately.
 
-- `src/services/moodService.ts`
-- `src/services/emotionService.ts`
-- `db/moods/emotions.ts`
-- `db/moods/emotionUtils.ts`
-- `src/features/settings/components/EmotionListEditor.tsx`
-- Emotion repository tests
+---
 
-**Problem**
+# P1 — Data integrity follow-throughs
 
-The domain rule is that renaming or deleting an **Emotion** from the **Emotion List** affects future selection by default. Existing **Mood Entries** are snapshots; renames should change history only through a user-approved **Historical Update**, and deletes should not remove historical values. The current service/repository path appears to remove deleted emotions from historical entries through `removeEmotionFromMoods`, which erases past labels and changes historical interpretation.
+## 6. Emotion renames default to future-only
 
-**Solution**
+**Type:** AFK
 
-Change emotion list edits so the **Emotion** is renamed or removed from future selection while existing entries keep their historical label by default. If the person explicitly chooses a **Historical Update** during rename, apply the rename to existing **Mood Entries** as a deliberate workflow. Deletes should not bulk-remove historical values. If the storage model needs it, introduce an archived/inactive state for selectable emotions instead of deleting or detaching historical references.
+### What to build
 
-**Benefits**
+Renaming an emotion in the Emotion List Editor changes future selection only. Existing mood entries keep their original label as a snapshot. This is the default behavior with no historical update applied.
 
-Mood history remains stable and trustworthy. Users can clean up their selectable **Emotion List** without accidentally changing previous **Mood Entries**, while still having an explicit path for intentional historical corrections.
+### Acceptance criteria
 
-## 8. Preserve Historical Context Tags Unless the User Updates History
+- [ ] Renaming an emotion does not mutate any existing mood entry
+- [ ] New mood entries use the new name; old entries keep the old name
+- [ ] Insights and exports show the historical label on historical entries
+- [ ] Tests cover rename-without-historical-update
 
-**Files**
+### Blocked by
 
-- `src/services/settingsService.ts`
-- `src/lib/entrySettings.ts`
-- `src/features/settings/components/ListEditor.tsx`
-- `src/features/settings/sections/EntryCustomizationSection.tsx`
-- Context tag persistence and mood entry tests
+- #3 (archived state must exist first to model "in-list vs in-history")
 
-**Problem**
+---
 
-The domain rule is that renaming or deleting a **Context Tag** from the **Context Tag List** affects future selection by default. Existing **Mood Entries** are snapshots; renames should change history only through a user-approved **Historical Update**, and deletes should not remove historical values. The current code needs a clear workflow for distinguishing future-only list edits from intentional historical corrections.
+## 7. Context tag renames default to future-only
 
-**Solution**
+**Type:** AFK
 
-Make **Context Tag List** editing explicit about future-only renames versus a user-approved **Historical Update**. Implement or verify that default renames and removals leave existing **Mood Entries** untouched, that rename can intentionally update history, and that deletes never bulk-remove historical values.
+### What to build
 
-**Benefits**
+Renaming a context tag changes future selection only. Existing mood entries keep their original label as a snapshot.
 
-The person's mood history keeps its original context even as the selectable **Context Tag List** changes. Insights and exports remain stable because historical observations are not accidentally changed by list maintenance.
+### Acceptance criteria
 
-## 9. Prepare Mood Ratings for Future Mood Scale Versioning
+- [ ] Renaming a context tag does not mutate any existing mood entry
+- [ ] New entries use the new name; old entries keep the old name
+- [ ] Insights and exports show the historical label on historical entries
+- [ ] Tests cover rename-without-historical-update
 
-**Files**
+### Blocked by
 
-- `db/types.ts`
-- `db/moods/schema.ts`
-- `db/moods/repository.ts`
-- `src/constants/moodScale.ts`
-- `src/services/analyticsService.ts`
-- `src/features/insights/utils/patternDetection.ts`
-- import/export and backup serialization tests
+- #4
 
-**Problem**
+---
 
-The current version uses a fixed **Mood Scale** of 0-10 where lower values are better, but the domain model allows the **Mood Scale** range and direction to become modifiable later. A historical **Mood Rating** must be interpreted against the **Mood Scale** that existed when its **Mood Entry** was created, not against whatever scale is current later. The current storage model only persists the numeric `mood` value, which will not be enough once scales can change.
+## 8. Persist mood scale reference on each mood entry
 
-**Solution**
+**Type:** AFK
 
-Before configurable **Mood Scales** ship, introduce a way for each **Mood Entry** to retain or reference the **Mood Scale** used when the **Mood Rating** was created. Update analytics, insights, charts, import/export, backups, and therapy exports to interpret historical ratings using their original scale metadata. Ensure **Data Export** and **Backup** preserve the full database state needed for exact restoration, and ensure **Therapy Export** includes enough **Mood Scale** context for exported **Mood Ratings** to be interpreted outside the app.
+### What to build
 
-**Benefits**
+Add a mood-scale reference column to the mood entries schema so a historical **Mood Rating** can be interpreted against the **Mood Scale** that existed when its entry was created. Backfill existing rows with the current scale identifier. This is the foundation for future configurable scales — the read path comes in #15.
 
-Historical mood data remains interpretable after scale changes. Future scale customization can be introduced without corrupting old **Statistics**, **Patterns**, **Insights**, or exported data.
+### Acceptance criteria
 
-## 10. Align Backup and Data Export Terminology
+- [ ] Schema migration adds a non-nullable mood-scale reference per entry
+- [ ] Repository writes the current scale id on every new entry
+- [ ] Backfill migration sets the current scale id on all existing rows
+- [ ] Migration tested against a fixture database
 
-**Files**
+### Blocked by
 
-- `src/app/settings/data.tsx`
-- `db/backup.ts`
-- `src/features/settings/components/ExportModal.tsx`
-- `src/lib/entrySettings.ts`
-- `PRIVACY_POLICY.md`
-- `TERMS_OF_SERVICE.md`
-- In-app settings legal/about screens
+None — can start immediately.
 
-**Problem**
+---
 
-The domain boundary is that **Data Export** is a manually initiated full database export, while **Backup** is an automatic full database export for recovery. Any "manual backup" wording blurs that distinction and makes it harder to reason about user intent, privacy language, and recovery behavior.
+## 9. Align backup vs data export terminology
 
-**Solution**
+**Type:** AFK
 
-Audit user-facing copy, function names, settings labels, and legal text for "backup" and "manual backup" wording. Rename manual full-database export flows to **Data Export** and reserve **Backup** for automatic recovery exports. Keep legal documents and in-app settings screens synchronized if copy changes affect data storage or sharing promises.
+### What to build
 
-**Benefits**
+Audit user-facing copy, function names, settings labels, and legal text. Rename manual full-database export flows to **Data Export** and reserve **Backup** for automatic recovery exports. Keep `PRIVACY_POLICY.md`, `TERMS_OF_SERVICE.md`, and in-app legal screens synchronized.
 
-Users get clearer language about what is automatic versus user-initiated. Developers get cleaner boundaries for export, backup scheduling, recovery, and privacy-sensitive copy.
+### Acceptance criteria
 
-# Google Play Store Readiness Issues
+- [ ] No "manual backup" wording in UI, code, or legal docs
+- [ ] Function and component names reflect the **Data Export** vs **Backup** boundary
+- [ ] Legal docs and in-app legal screens reflect the new terminology
+- [ ] "Last Updated" dates bumped on any legal doc that changed
 
-Generated from a publish-readiness pass on 2026-04-29.
+### Blocked by
 
-These are release-blocking or release-sensitive issues to resolve before submitting the Android app to Google Play.
+- #2 (avoids copy churn if #1 removes the Backup feature entirely)
 
-## 13. Align Expo SDK Package Versions
+---
 
-**Status: Resolved on 2026-05-03.**
+# P2 — Foundational architecture
 
-Updated the Expo SDK 55 package set in `package.json` and `bun.lock`, then rebuilt `node_modules` from the refreshed lockfile. Verification now passes:
+## 10. Deepen mood scale interpretation module
 
-- `bunx expo install --check`
-- `bunx expo-doctor`
-- `bun run lint`
-- `bunx tsc --noEmit`
+**Type:** AFK
 
-**Files**
+### What to build
 
-- `package.json`
-- `bun.lock`
-- `app.json`
-- `eas.json`
+A single mood scale module that callers ask for the display and semantic interpretation of a mood value, instead of combining constants themselves. Callers should be able to pass a numeric mood value and get back the rounded value, label, color (hex, not Tailwind class), and accessibility text — without knowing that lower is better.
 
-**Problem**
+### Acceptance criteria
 
-# Local Build Report
+- [ ] One module owns mood value → label, color (hex), rounded value, accessibility text
+- [ ] `DisplayMoodItem`, `ChartComponents`, `useInsightsData`, and any other caller use the module instead of manually combining constants
+- [ ] Unit tests cover edge values (0, 10) and a representative mid value
+- [ ] No remaining Tailwind-class-to-hex mapping outside the module
 
-Generated from a successful local Android preview build on 2026-05-02.
+### Blocked by
 
-Artifact:
+None — can start immediately.
 
-- `build-1777724151485.apk`
+---
 
-## Build Outcome
+## 11. Deepen mood entry workflow module
 
-- Build succeeded.
-- No terminal errors were reported at the end of the build.
+**Type:** AFK
 
-## Build Warnings
+### What to build
 
-### 1. Expo Doctor dependency mismatch check failed
+Make `moodService` a workflow seam that owns create, edit, reschedule, delete, restore, and load-history as coherent operations — including cache/store updates, refresh-after-edit behavior, and migration side effects. Callers (`Home`, `useMoodItemActions`, the store) should call workflow methods, not compose low-level repository steps.
 
-**Problem**
+### Acceptance criteria
 
-`expo doctor` reported `17/18` checks passed and failed `Check that packages match versions required by installed Expo SDK`. It listed 29 outdated packages, including `expo`, many `expo-*` modules, `react-native`, and `react-native-worklets`.
+- [ ] `moodService` exposes user-level workflow methods that handle store updates internally
+- [ ] `useMoodItemActions` and `(tabs)/index.tsx` call workflow methods, not repository functions
+- [ ] No UI module imports `@db/db` directly (services-only seam, per AGENTS.md)
+- [ ] Workflow tests cover create, edit, reschedule, delete, restore, and undo against a fake adapter
 
-**Impact**
+### Blocked by
 
-The APK still built successfully, but the project is drifting from the SDK 55 expected patch set. That increases risk of runtime bugs, build instability, and future upgrade friction.
+None — can start immediately.
 
-**Suggested fix**
+---
 
-Run `npx expo install --check`, then align the reported packages to the versions expected by the installed Expo SDK.
+## 12. Consolidate settings storage module
 
-### 2. Deprecated Android status bar config
+**Type:** AFK
 
-**Problem**
+### What to build
 
-Expo prebuild warned that `androidStatusBar.translucent` is deprecated due to Android edge-to-edge enforcement and has no effect.
+A single settings module owns persistence, defaults, parsing, and migration. `settingsStore` hydrates from the module and updates through it; `entrySettings` is folded in or reduced to a thin re-export. Storage-key knowledge and corrupted-storage handling live in one place.
 
-**Files**
+### Acceptance criteria
 
-- `app.json`
+- [ ] One settings module owns storage keys, defaults, parsing, and migration
+- [ ] `settingsStore` only orchestrates state — no direct AsyncStorage/SecureStore calls
+- [ ] No duplicate default values between `settingsService` and `entrySettings`
+- [ ] Tests cover corrupted-storage parsing and default-preference migration once
 
-**Impact**
+### Blocked by
 
-No current build failure, but the config is dead and will be removed in a future Expo release.
+None — can start immediately.
 
-**Suggested fix**
+---
 
-Remove `androidStatusBar.translucent` from app config and rely on current edge-to-edge patterns.
+## 13. Deepen data portability module
 
-### 3. Missing environment configuration during build
+**Type:** AFK
 
-**Problem**
+### What to build
 
-The build reported:
+A data portability module owns export ranges, import validation summaries, backup metadata, and manual backup operations. Platform file picking stays as an adapter at the edge. `src/app/settings/data.tsx` and `ExportModal` consume the module rather than orchestrating document picking, backup state, and summary text themselves.
 
-- no preview EAS environment variables configured
-- `ANDROID_NDK_HOME` not set
-- `NODE_ENV` not set, so Expo continued without mode-specific `.env`
+### Acceptance criteria
 
-**Impact**
+- [ ] One portability module owns export ranges, import validation, backup metadata
+- [ ] Document picker and filesystem access remain as edge adapters
+- [ ] Settings UI and `ExportModal` call into the module, not directly into `db/backup` or `db/moods/importExport`
+- [ ] Tests validate export/import/backup outcomes without rendering settings screens
 
-These did not block the build, but they make the build environment less explicit and can hide configuration drift between local, CI, and release builds.
+### Blocked by
 
-**Suggested fix**
+None — can start immediately.
 
-- Define preview env vars in EAS if they are expected.
-- Set `NODE_ENV` explicitly for local build scripts if env-dependent config matters.
-- Only set `ANDROID_NDK_HOME` if the project needs a fixed local NDK path outside the SDK-managed flow.
+---
 
-### 4. Gradle deprecation warning
+## 14. Deepen mood insights module
 
-**Problem**
+**Type:** AFK
 
-Gradle reported:
+### What to build
 
-- `Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.`
+Move mood aggregation, period filtering, streaks, trend math, pattern detection, and mood-scale interpretation into one mood insights module. UI modules in `src/features/insights` and `src/components/charts` should render results rather than compute them.
 
-It also emitted a problems report during the temporary EAS build at:
+### Acceptance criteria
 
-- `android/build/reports/problems/problems-report.html` inside the temporary build directory
+- [ ] One insights module owns aggregation, period filtering, streaks, trend math, pattern detection
+- [ ] `useInsightsData`, `ChartComponents`, and Home reuse the module
+- [ ] Tests target the module interface with fixture mood histories, not UI-adjacent helpers
+- [ ] Deleting the module would remove the actual complexity (depth test passes)
 
-**Impact**
+### Blocked by
 
-The current build works, but future Gradle upgrades may break the project or its plugins.
+- #10 (uses the mood scale interpretation seam)
 
-**Suggested fix**
+---
 
-Run a build with `--warning-mode all` in the Android project and triage whether the deprecations come from app code, Expo tooling, or third-party dependencies.
+## 15. Read path interprets ratings via stored scale
 
-### 5. Android manifest merge warnings in app module
+**Type:** AFK
 
-**Problem**
+### What to build
 
-At the end of the Gradle run, the app manifest emitted:
+Update `analyticsService`, `useInsightsData`, `ChartComponents`, and `patternDetection` to read the stored scale reference and interpret historical ratings using it. The interpretation should go through the module from #10.
 
-- `provider#expo.modules.filesystem.FileSystemFileProvider@android:authorities was tagged ... to replace other declarations but no other declaration present`
-- `activity#expo.modules.imagepicker.ExpoCropImageActivity@android:exported was tagged ... to replace other declarations but no other declaration present`
+### Acceptance criteria
 
-**Impact**
+- [ ] Insights, charts, and pattern detection use the stored scale reference, not the current scale
+- [ ] Comparisons across entries with different scales either normalize or flag the mismatch (decide which in code review)
+- [ ] Tests use fixtures with mixed scales
 
-These did not fail the build, but they indicate manifest override directives that are not currently replacing anything. That can signal stale or unnecessary manifest merge config.
+### Blocked by
 
-**Suggested fix**
+- #10 (scale interpretation module)
+- #8 (stored reference must exist)
 
-Inspect the generated Android manifest merge inputs and remove or simplify redundant `tools:replace` usage if it is not needed.
+---
 
-### 6. Third-party Android manifest namespace warnings
+## 16. Import/export/backup preserves scale metadata
 
-**Problem**
+**Type:** AFK
 
-Several dependencies emitted warnings that `package="..."` in source `AndroidManifest.xml` is no longer used to define namespace, including:
+### What to build
 
-- `@react-native-async-storage/async-storage`
-- `react-native-haptic-feedback`
-- `react-native-safe-area-context`
-- `react-native-vector-icons`
-- `@shopify/react-native-skia`
+Update `importExport`, `backup`, and the data portability module from #13 to serialize the mood-scale reference per entry. Importing data without a scale reference (older exports) must fall back to the current scale with a documented assumption.
 
-**Impact**
+### Acceptance criteria
 
-These are dependency-level warnings, not app-code failures. They indicate ecosystem lag against newer Android Gradle Plugin expectations.
+- [ ] Data export includes per-entry scale reference
+- [ ] Backup format includes per-entry scale reference
+- [ ] Import of legacy exports without scale data succeeds and applies a documented fallback
+- [ ] Round-trip tests verify a full export + import preserves scale on every entry
 
-**Suggested fix**
+### Blocked by
 
-Track upstream package releases and upgrade when patched versions remove these manifest warnings.
+- #8
 
-### 7. Third-party Kotlin/Java deprecation noise
+---
 
-**Problem**
+# P3 — HITL design follow-ups
 
-The build emitted many deprecation and unchecked-operation warnings from dependencies, especially:
+## 17. Historical Update opt-in flow for emotion renames
 
-- `react-native-pager-view`
-- `react-native-safe-area-context`
-- `react-native-webview`
-- `react-native-screens`
-- `react-native-gesture-handler`
-- `react-native-worklets`
-- `react-native-reanimated`
-- `expo-modules-core`
-- `expo`
-- `expo-constants`
-- `@shopify/react-native-skia`
+**Type:** HITL (UX design)
 
-Common warning themes:
+### What to build
 
-- deprecated React Native Android APIs
-- deprecated Android platform APIs
-- deprecated Kotlin interop patterns
-- unchecked casts / unsafe operations
+Design and implement an explicit opt-in flow during emotion rename that, if confirmed, applies the new name to existing mood entries as a deliberate **Historical Update**. Needs a UX decision on confirmation copy, scope (all-time vs date range), and undo behavior.
 
-**Impact**
+### Acceptance criteria
 
-No immediate build breakage, but these warnings make future RN/AGP/Gradle upgrades riskier and make real regressions harder to spot in build logs.
+- [ ] Rename UI offers an explicit "also update past entries" choice with clear copy
+- [ ] Choosing it applies the rename to existing mood entries in a single transaction
+- [ ] Default remains future-only (#6)
+- [ ] Tests cover both branches
 
-**Suggested fix**
+### Blocked by
 
-Prefer package upgrades first. Only patch locally if a dependency warning becomes release-blocking.
+- #6 (future-only default is the no-op baseline this opts out of)
 
-### 8. Repeated NO_COLOR / FORCE_COLOR warning
+---
 
-**Problem**
+## 18. Historical Update opt-in flow for context tag renames
 
-Node repeatedly logged:
+**Type:** HITL (UX design)
 
-- `The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.`
+### What to build
 
-**Impact**
+Mirror #17 for context tags. Opt-in flow that applies a rename to existing mood entries as an explicit Historical Update.
 
-Harmless, but noisy.
+### Acceptance criteria
 
-**Suggested fix**
+- [ ] Rename UI offers an explicit "also update past entries" choice
+- [ ] Choosing it applies the rename to existing mood entries
+- [ ] Default remains future-only (#7)
+- [ ] Tests cover both branches
 
-Normalize local build environment variables so only one of `NO_COLOR` or `FORCE_COLOR` is set.
+### Blocked by
 
-### 9. Bundler cache cold-start warning
+- #7
 
-**Problem**
+---
 
-During Gradle asset bundling, Metro reported:
+## 19. Therapy export includes scale context
 
-- `warning: Bundler cache is empty, rebuilding (this may take a minute)`
+**Type:** HITL (decide fields)
 
-**Impact**
+### What to build
 
-Not a correctness issue. It only affects build time.
+Therapy export needs enough mood-scale context for exported ratings to be interpreted outside the app. Needs a product call on which scale metadata to include (range, direction, label per value) and how to present it in the export format.
 
-**Suggested fix**
+### Acceptance criteria
 
-None required unless local build performance becomes a problem.
+- [ ] Decision documented on what scale context the therapy export includes
+- [ ] Therapy export includes the agreed metadata
+- [ ] Sample export reviewable by a non-developer reader and self-explanatory
+- [ ] Tests cover the export format
 
-## Side Effects Observed
+### Blocked by
 
-- Running `bun run build` also ran the `prebuild` script and bumped the app version from `1.2.0` to `1.3.0`.
+- #16
 
-`npx expo-doctor` fails because many Expo SDK 55 packages are behind the versions expected by the installed SDK. This includes core runtime/build packages such as `expo`, `react-native`, `expo-router`, `expo-notifications`, `expo-sqlite`, `expo-file-system`, and `jest-expo`.
+---
 
-**Solution**
+# P4 — Build & config cleanup
 
-Run `npx expo install --check`, upgrade the mismatched packages to SDK-compatible versions, refresh the lockfile, and rerun `npx expo-doctor`. Re-test SQLite, notifications, file import/export, backups, app lock, and navigation after the version alignment.
+## 20. Explicit build environment
 
-**Benefits**
+**Type:** AFK
 
-The production build uses a dependency set Expo expects, reducing risk of native build failures, Play Store crashes, and subtle Expo module incompatibilities.
+### What to build
 
-## 15. Make Automatic Backup Behavior Match the UI
+Make the local Android build environment explicit. Set `NODE_ENV` in build scripts, define preview EAS env vars (or document that none are expected), and decide whether `ANDROID_NDK_HOME` should be pinned outside the SDK-managed flow.
 
-**Files**
+### Acceptance criteria
 
-- `src/app/_layout.tsx`
-- `src/app/settings/data.tsx`
-- `db/backgroundBackup.ts`
-- `db/backup.ts`
-- `PRIVACY_POLICY.md`
-- `TERMS_OF_SERVICE.md`
-- In-app privacy and terms screens
+- [ ] `NODE_ENV` is set explicitly for `bun run build` and `bun run build:preview`
+- [ ] Preview EAS env vars are defined in EAS or documented as "none required"
+- [ ] `ANDROID_NDK_HOME` decision is documented (set or rely on SDK-managed)
 
-**Problem**
+### Blocked by
 
-The Settings UI presents **Automatic Backups**, but background backup registration is disabled in the app layout due to an `expo-task-manager` / New Architecture compatibility issue. This creates a product mismatch: users may believe automatic recovery exports are running when only manual backup/export behavior may be available.
+None — can start immediately.
 
-**Solution**
+---
 
-Either re-enable and verify background backup registration on Android release builds, or change the UI/legal copy to avoid promising automatic backups. If automatic backups remain, add release testing for folder selection, permission persistence, task registration, backup creation, and backup cleanup.
+## 21. Clean redundant `tools:replace` manifest directives
 
-**Benefits**
+**Type:** AFK
 
-The app does not overpromise data recovery behavior, and the backup feature can be trusted in a privacy-sensitive product.
+### What to build
 
-## 19. Clean Release Verification Warnings
+Inspect the generated Android manifest merge inputs and remove or simplify `tools:replace` directives that are not replacing anything. The build currently emits stale-override warnings for `FileSystemFileProvider` and `ExpoCropImageActivity`.
 
-**Status: Resolved on 2026-05-03.**
+### Acceptance criteria
 
-`bun run lint` now completes without warnings after the current release-cleanup changes. TypeScript also passes with `bunx tsc --noEmit`.
+- [ ] No "tagged ... to replace other declarations but no other declaration present" warnings at build time
+- [ ] No regression in manifest merge output
 
-**Files**
+### Blocked by
 
-- `src/app/notifications/[id].tsx`
-- `src/components/HapticTab.tsx`
-- `src/components/NoteModal.tsx`
-- `src/components/charts/ChartComponents.tsx`
-- `src/components/charts/DailyTab.tsx`
-- `src/components/charts/OverviewTab.tsx`
-- `src/components/entry/LocationPicker.tsx`
-- `src/components/entry/SameAsYesterdayButton.tsx`
-- `src/components/entry/VoiceMemoRecorder.tsx`
-- `src/lib/haptics.ts`
-- `src/shared/state/moodsStore.ts`
+None — can start immediately.
 
-**Problem**
+---
 
-`bun run lint` passes but reports warnings for unused variables, hook dependency arrays, missing component display names, and require-style imports. Warnings are not all release blockers, but hook dependency warnings in notification and modal code can hide stale-state bugs.
+## 22. Triage Gradle 10 deprecations
 
-**Solution**
+**Type:** AFK (investigation)
 
-Fix the warnings that affect runtime correctness first, especially hook dependency warnings. Then clean unused variables and import style warnings or intentionally document why they are safe.
+### What to build
 
-**Benefits**
+Run an Android build with `--warning-mode all` and classify each Gradle deprecation as app-code, Expo tooling, or third-party. File follow-up issues only for app-code findings.
 
-The release branch has a cleaner signal-to-noise ratio, and future lint warnings are more likely to represent real regressions.
+### Acceptance criteria
+
+- [ ] `--warning-mode all` output captured
+- [ ] Each deprecation classified (app / Expo / third-party)
+- [ ] App-code deprecations get follow-up issues; the rest are documented as upstream
+
+### Blocked by
+
+None — can start immediately.
+
+---
+
+## 23. Normalize `NO_COLOR` / `FORCE_COLOR` in build environment
+
+**Type:** AFK
+
+### What to build
+
+Pick one of `NO_COLOR` or `FORCE_COLOR` for the local build environment. The current setup sets both, and Node warns repeatedly that `NO_COLOR` is ignored.
+
+### Acceptance criteria
+
+- [ ] Only one of `NO_COLOR` / `FORCE_COLOR` is set during builds
+- [ ] No repeated "ignored due to FORCE_COLOR" warning in build logs
+
+### Blocked by
+
+None — can start immediately.
+
+---
+
+# P5 — Monitoring (no action required)
+
+## 24. Watch upstream Android manifest namespace warnings
+
+**Type:** AFK (monitoring)
+
+### What to build
+
+Track upstream releases for `@react-native-async-storage/async-storage`, `react-native-haptic-feedback`, `react-native-safe-area-context`, `react-native-vector-icons`, and `@shopify/react-native-skia`. Upgrade when patched versions remove the `package="..."` manifest warnings.
+
+### Acceptance criteria
+
+- [ ] Each listed package is upgraded to a version that no longer emits the namespace warning, or the issue is closed when the warning becomes irrelevant
+
+### Blocked by
+
+None — pure monitoring.
+
+---
+
+## 25. Watch upstream Kotlin/Java deprecation noise
+
+**Type:** AFK (monitoring)
+
+### What to build
+
+Track upstream releases for `react-native-pager-view`, `react-native-safe-area-context`, `react-native-webview`, `react-native-screens`, `react-native-gesture-handler`, `react-native-worklets`, `react-native-reanimated`, `expo-modules-core`, `expo`, `expo-constants`, and `@shopify/react-native-skia`. Upgrade when patched versions remove the deprecation warnings. Only patch locally if a warning becomes release-blocking.
+
+### Acceptance criteria
+
+- [ ] Listed packages tracked; upgrades land when available
+- [ ] No local patches without a release-blocking trigger
+
+### Blocked by
+
+None — pure monitoring.
+
+---
+
+## 26. Track bundler cache cold-start cost
+
+**Type:** AFK (monitoring)
+
+### What to build
+
+No action required today — Metro's "Bundler cache is empty" warning only affects build time. Track this only if local build performance becomes a problem.
+
+### Acceptance criteria
+
+- [ ] Issue stays open as a placeholder; close if cold-start time becomes a measurable pain point
+
+### Blocked by
+
+None — pure monitoring.
+
+---
+
+# Completed
+
+## Align Expo SDK Package Versions
+
+**Status:** Resolved on 2026-05-03.
+
+Updated the Expo SDK 55 package set in `package.json` and `bun.lock`, then rebuilt `node_modules` from the refreshed lockfile. Verification passes: `bunx expo install --check`, `bunx expo-doctor`, `bun run lint`, `bunx tsc --noEmit`.
+
+## Clean Release Verification Warnings
+
+**Status:** Resolved on 2026-05-03.
+
+`bun run lint` completes without warnings after release-cleanup changes. TypeScript also passes with `bunx tsc --noEmit`. Files touched: `src/app/notifications/[id].tsx`, `src/components/HapticTab.tsx`, `src/components/NoteModal.tsx`, `src/components/charts/ChartComponents.tsx`, `src/components/charts/DailyTab.tsx`, `src/components/charts/OverviewTab.tsx`, `src/components/entry/LocationPicker.tsx`, `src/components/entry/SameAsYesterdayButton.tsx`, `src/components/entry/VoiceMemoRecorder.tsx`, `src/lib/haptics.ts`, `src/shared/state/moodsStore.ts`.

@@ -202,13 +202,13 @@ export default function ContextsSettingsScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <Animated.View
-          entering={FadeInDown.delay(100).springify()}
+          entering={FadeInDown.delay(100).duration(260)}
           style={styles.heroSection}
         >
           <ContextHeroStats counts={counts} isDark={isDark} />
         </Animated.View>
 
-        <Animated.View entering={FadeInDown.delay(180).springify()}>
+        <Animated.View entering={FadeInDown.delay(180).duration(260)}>
           <DefaultContextsSection
             chips={defaultChips}
             isDark={isDark}
@@ -218,7 +218,7 @@ export default function ContextsSettingsScreen() {
           />
         </Animated.View>
 
-        <Animated.View entering={FadeInDown.delay(260).springify()}>
+        <Animated.View entering={FadeInDown.delay(260).duration(260)}>
           <CustomContextsSection
             contexts={customContexts}
             isDark={isDark}
@@ -228,7 +228,7 @@ export default function ContextsSettingsScreen() {
         </Animated.View>
 
         <Animated.View
-          entering={FadeInDown.delay(340).springify()}
+          entering={FadeInDown.delay(340).duration(260)}
           style={styles.tipsSection}
         >
           <View
@@ -275,7 +275,7 @@ export default function ContextsSettingsScreen() {
       </ScrollView>
 
       <Animated.View
-        entering={FadeInUp.delay(420).springify()}
+        entering={FadeInUp.delay(420).duration(260)}
         style={styles.fabContainer}
       >
         <Pressable

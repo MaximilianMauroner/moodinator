@@ -59,202 +59,209 @@ function applyCollectionState(moods: MoodEntry[]) {
   };
 }
 
-export const useMoodsStore = create<MoodsStore>((set, get) => ({
-  moods: [],
-  status: "idle",
-  error: null,
-  lastLoadedAt: null,
-  isStale: true,
-  lastTracked: null,
-  totalCount: 0,
-  hasMore: false,
-  currentOffset: 0,
+let activeHydrationPromise: Promise<void> | null = null;
 
-  setLocal: (moods) =>
+export const useMoodsStore = create<MoodsStore>((set, get) => {
+  const hydrateAll = (
+    nextStatus: Extract<LoadStatus, "loading" | "refreshing">,
+    options?: { clearError?: boolean }
+  ) => {
+    if (activeHydrationPromise) {
+      return activeHydrationPromise;
+    }
+
     set({
-      isStale: false,
-      ...applyCollectionState(moods),
-    }),
+      status: nextStatus,
+      ...(options?.clearError ? { error: null } : {}),
+    });
 
-  loadAll: async () => {
-    set({ status: "loading", error: null });
-    try {
-      const moods = await moodService.getAll();
+    activeHydrationPromise = (async () => {
+      try {
+        const moods = await moodService.getAll();
+        set({
+          status: "idle",
+          lastLoadedAt: Date.now(),
+          isStale: false,
+          ...applyCollectionState(moods),
+        });
+      } catch (error) {
+        if (nextStatus === "loading") {
+          console.error("[moodsStore] Failed to load moods:", error);
+          set({
+            status: "error",
+            error: error instanceof Error ? error.message : "Failed to load moods",
+          });
+          return;
+        }
+
+        console.error("[moodsStore] Failed to refresh moods:", error);
+        set({ status: "idle" });
+      } finally {
+        activeHydrationPromise = null;
+      }
+    })();
+
+    return activeHydrationPromise;
+  };
+
+  return {
+    moods: [],
+    status: "idle",
+    error: null,
+    lastLoadedAt: null,
+    isStale: true,
+    lastTracked: null,
+    totalCount: 0,
+    hasMore: false,
+    currentOffset: 0,
+
+    setLocal: (moods) =>
       set({
-        moods,
-        status: "idle",
-        lastLoadedAt: Date.now(),
         isStale: false,
-        lastTracked: computeLastTracked(moods),
-        totalCount: moods.length,
-        hasMore: false,
-        currentOffset: moods.length,
+        ...applyCollectionState(moods),
+      }),
+
+    loadAll: () => hydrateAll("loading", { clearError: true }),
+
+    loadMore: async (pageSize = DEFAULT_PAGE_SIZE) => {
+      const { status, currentOffset, hasMore } = get();
+      if (status === "loading" || !hasMore) return;
+
+      set({ status: "loading" });
+      try {
+        const result = await moodService.getPaginated({
+          limit: pageSize,
+          offset: currentOffset,
+        });
+        set((state) => ({
+          moods: [...state.moods, ...result.data],
+          status: "idle",
+          totalCount: result.total,
+          hasMore: result.hasMore,
+          currentOffset: state.currentOffset + result.data.length,
+        }));
+      } catch (error) {
+        console.error("[moodsStore] Failed to load more moods:", error);
+        set({ status: "idle" });
+      }
+    },
+
+    refreshMoods: () => hydrateAll("refreshing"),
+
+    invalidate: () => set({ isStale: true }),
+
+    ensureFresh: async () => {
+      const { isStale, status, lastLoadedAt, moods, loadAll, refreshMoods } = get();
+      if (!isStale || status === "loading" || status === "refreshing") {
+        return;
+      }
+
+      if (lastLoadedAt !== null || moods.length > 0) {
+        await refreshMoods();
+        return;
+      }
+
+      await loadAll();
+    },
+
+    updateTimestamp: async (id, timestamp) => {
+      const updated = await moodService.updateTimestamp(id, timestamp);
+      if (!updated) {
+        return null;
+      }
+
+      set((state) => {
+        const newMoods = [...state.moods]
+          .map((mood) => (mood.id === id ? updated : mood))
+          .sort((a, b) => b.timestamp - a.timestamp);
+
+        return {
+          ...applyCollectionState(newMoods),
+          isStale: true,
+        };
       });
-    } catch (error) {
-      console.error("[moodsStore] Failed to load moods:", error);
-      set({
-        status: "error",
-        error: error instanceof Error ? error.message : "Failed to load moods",
+
+      queueMicrotask(() => {
+        void get().ensureFresh();
       });
-    }
-  },
 
-  loadMore: async (pageSize = DEFAULT_PAGE_SIZE) => {
-    const { status, currentOffset, hasMore } = get();
-    if (status === "loading" || !hasMore) return;
+      return updated;
+    },
 
-    set({ status: "loading" });
-    try {
-      const result = await moodService.getPaginated({
-        limit: pageSize,
-        offset: currentOffset,
+    create: async (entry) => {
+      const created = await moodService.create(entry);
+      set((state) => {
+        const newMoods = [created, ...state.moods.filter((m) => m.id !== created.id)];
+        return {
+          ...applyCollectionState(newMoods),
+          isStale: true,
+        };
       });
-      set((state) => ({
-        moods: [...state.moods, ...result.data],
-        status: "idle",
-        totalCount: result.total,
-        hasMore: result.hasMore,
-        currentOffset: state.currentOffset + result.data.length,
-      }));
-    } catch (error) {
-      console.error("[moodsStore] Failed to load more moods:", error);
-      set({ status: "idle" });
-    }
-  },
 
-  refreshMoods: async () => {
-    set({ status: "refreshing" });
-    try {
-      const moods = await moodService.getAll();
-      set({
-        moods,
-        status: "idle",
-        lastLoadedAt: Date.now(),
-        isStale: false,
-        lastTracked: computeLastTracked(moods),
-        totalCount: moods.length,
-        hasMore: false,
-        currentOffset: moods.length,
+      queueMicrotask(() => {
+        void get().ensureFresh();
       });
-    } catch (error) {
-      console.error("[moodsStore] Failed to refresh moods:", error);
-      set({ status: "idle" }); // Don't overwrite error for refresh failures
-    }
-  },
 
-  invalidate: () => set({ isStale: true }),
+      return created;
+    },
 
-  ensureFresh: async () => {
-    const { isStale, status, lastLoadedAt, moods, loadAll, refreshMoods } = get();
-    if (!isStale || status === "loading" || status === "refreshing") {
-      return;
-    }
+    update: async (id, updates) => {
+      const updated = await moodService.update(id, updates);
+      if (!updated) {
+        return null;
+      }
+      set((state) => {
+        const newMoods = state.moods.map((m) => (m.id === id ? updated : m));
+        return {
+          ...applyCollectionState(newMoods),
+          isStale: true,
+        };
+      });
 
-    if (lastLoadedAt !== null || moods.length > 0) {
-      await refreshMoods();
-      return;
-    }
+      queueMicrotask(() => {
+        void get().ensureFresh();
+      });
 
-    await loadAll();
-  },
+      return updated;
+    },
 
-  updateTimestamp: async (id, timestamp) => {
-    const updated = await moodService.updateTimestamp(id, timestamp);
-    if (!updated) {
-      return null;
-    }
+    remove: async (id) => {
+      const existing = get().moods.find((m) => m.id === id) ?? null;
+      await moodService.delete(id);
+      set((state) => {
+        const newMoods = state.moods.filter((m) => m.id !== id);
+        return {
+          ...applyCollectionState(newMoods),
+          isStale: true,
+        };
+      });
 
-    set((state) => {
-      const newMoods = [...state.moods]
-        .map((mood) => (mood.id === id ? updated : mood))
-        .sort((a, b) => b.timestamp - a.timestamp);
+      queueMicrotask(() => {
+        void get().ensureFresh();
+      });
 
-      return {
-        ...applyCollectionState(newMoods),
-        isStale: true,
-      };
-    });
+      return existing;
+    },
 
-    queueMicrotask(() => {
-      void get().ensureFresh();
-    });
+    restore: async (entry) => {
+      const restored = await moodService.create(entry);
+      set((state) => {
+        const newMoods = [restored, ...state.moods.filter((m) => m.id !== restored.id)];
+        return {
+          ...applyCollectionState(newMoods),
+          isStale: true,
+        };
+      });
 
-    return updated;
-  },
+      queueMicrotask(() => {
+        void get().ensureFresh();
+      });
 
-  create: async (entry) => {
-    const created = await moodService.create(entry);
-    set((state) => {
-      const newMoods = [created, ...state.moods.filter((m) => m.id !== created.id)];
-      return {
-        ...applyCollectionState(newMoods),
-        isStale: true,
-      };
-    });
+      return restored;
+    },
 
-    queueMicrotask(() => {
-      void get().ensureFresh();
-    });
-
-    return created;
-  },
-
-  update: async (id, updates) => {
-    const updated = await moodService.update(id, updates);
-    if (!updated) {
-      return null;
-    }
-    set((state) => {
-      const newMoods = state.moods.map((m) => (m.id === id ? updated : m));
-      return {
-        ...applyCollectionState(newMoods),
-        isStale: true,
-      };
-    });
-
-    queueMicrotask(() => {
-      void get().ensureFresh();
-    });
-
-    return updated;
-  },
-
-  remove: async (id) => {
-    const existing = get().moods.find((m) => m.id === id) ?? null;
-    await moodService.delete(id);
-    set((state) => {
-      const newMoods = state.moods.filter((m) => m.id !== id);
-      return {
-        ...applyCollectionState(newMoods),
-        isStale: true,
-      };
-    });
-
-    queueMicrotask(() => {
-      void get().ensureFresh();
-    });
-
-    return existing;
-  },
-
-  restore: async (entry) => {
-    const restored = await moodService.create(entry);
-    set((state) => {
-      const newMoods = [restored, ...state.moods.filter((m) => m.id !== restored.id)];
-      return {
-        ...applyCollectionState(newMoods),
-        isStale: true,
-      };
-    });
-
-    queueMicrotask(() => {
-      void get().ensureFresh();
-    });
-
-    return restored;
-  },
-
-  // Selectors
-  getMoodById: (id) => get().moods.find((m) => m.id === id),
-  getMoodCount: () => get().moods.length,
-}));
+    // Selectors
+    getMoodById: (id) => get().moods.find((m) => m.id === id),
+    getMoodCount: () => get().moods.length,
+  };
+});

@@ -12,7 +12,12 @@ import { Ionicons } from "@expo/vector-icons";
 import { useColorScheme } from "nativewind";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { format } from "date-fns";
-import Animated, { FadeInUp } from "react-native-reanimated";
+import Animated, {
+  FadeIn,
+  FadeInUp,
+  FadeOut,
+  LinearTransition,
+} from "react-native-reanimated";
 
 import { useInsightsData } from "../hooks/useInsightsData";
 import { TimePeriodSelector } from "../components/TimePeriodSelector";
@@ -30,6 +35,7 @@ import { IconBadge } from "@/components/ui/IconBadge";
 import { typography } from "@/constants/typography";
 import { motion } from "@/constants/motion";
 import { haptics } from "@/lib/haptics";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import type { MoodEntry } from "@db/types";
 
 type ViewMode = "calendar" | "charts";
@@ -62,8 +68,6 @@ export function InsightsScreen() {
     refresh,
   } = useInsightsData();
 
-  const [refreshing, setRefreshing] = React.useState(false);
-
   // Reset expanded state when period or date changes
   useEffect(() => {
     setShowAllEntries(false);
@@ -82,17 +86,14 @@ export function InsightsScreen() {
     setSelectedEntry(entry);
   }, []);
 
-  const onRefresh = React.useCallback(async () => {
-    setRefreshing(true);
-    try {
-      await Promise.all([
-        refresh(),
-        calendarRefreshRef.current?.() ?? Promise.resolve(),
-      ]);
-    } finally {
-      setRefreshing(false);
-    }
+  const handleRefreshAction = React.useCallback(async () => {
+    await Promise.all([
+      refresh(),
+      calendarRefreshRef.current?.() ?? Promise.resolve(),
+    ]);
   }, [refresh]);
+
+  const { refreshing, onRefresh } = usePullToRefresh(handleRefreshAction);
 
   if (loading && allMoods.length === 0) {
     return (
@@ -108,7 +109,7 @@ export function InsightsScreen() {
   const hasData = allMoods.length > 0;
   const hasPeriodData = periodMoods.length > 0;
   const reveal = (index: number) =>
-    FadeInUp.duration(motion.duration.slow).delay(index * motion.stagger.normal);
+    FadeInUp.duration(motion.duration.normal).delay(index * motion.stagger.tight);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -184,9 +185,13 @@ export function InsightsScreen() {
 
         {/* View Mode Toggle */}
         {hasData && (
-          <View className="flex-row mx-4 mb-4 p-1 rounded-2xl" style={{
-            backgroundColor: isDark ? "#2C4038" : "#F5F1E8",
-          }}>
+          <Animated.View
+            entering={FadeIn.duration(motion.duration.normal)}
+            className="flex-row mx-4 mb-4 p-1 rounded-2xl"
+            style={{
+              backgroundColor: isDark ? "#2C4038" : "#F5F1E8",
+            }}
+          >
             <Pressable
               onPress={() => handleViewModeChange("calendar")}
               className="flex-1 flex-row items-center justify-center py-2.5 rounded-xl"
@@ -243,7 +248,7 @@ export function InsightsScreen() {
                 Charts
               </Text>
             </Pressable>
-          </View>
+          </Animated.View>
         )}
 
         {!hasData ? (
@@ -254,26 +259,38 @@ export function InsightsScreen() {
             description="Start tracking your moods to discover patterns and understand your emotional well-being better."
           />
         ) : viewMode === "calendar" ? (
-          <ScrollView
-            className="flex-1 px-4"
-            contentContainerStyle={{ paddingBottom: Platform.OS === "ios" ? 100 : 24 }}
-            contentInsetAdjustmentBehavior="automatic"
-            showsVerticalScrollIndicator={false}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={onRefresh}
-                tintColor={isDark ? "#A8C5A8" : "#5B8A5B"}
-              />
-            }
+          <Animated.View
+            key="calendar-view"
+            entering={FadeIn.duration(motion.duration.normal)}
+            exiting={FadeOut.duration(motion.duration.fast)}
+            style={{ flex: 1 }}
           >
-            <MoodCalendar
-              onRefreshReady={handleCalendarRefreshReady}
-              onEditEntry={handleCalendarEntryPress}
-            />
-          </ScrollView>
+            <ScrollView
+              className="flex-1 px-4"
+              contentContainerStyle={{ paddingBottom: Platform.OS === "ios" ? 100 : 24 }}
+              contentInsetAdjustmentBehavior="automatic"
+              showsVerticalScrollIndicator={false}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={onRefresh}
+                  tintColor={isDark ? "#A8C5A8" : "#5B8A5B"}
+                />
+              }
+            >
+              <MoodCalendar
+                onRefreshReady={handleCalendarRefreshReady}
+                onEditEntry={handleCalendarEntryPress}
+              />
+            </ScrollView>
+          </Animated.View>
         ) : (
-          <>
+          <Animated.View
+            key="charts-view"
+            entering={FadeIn.duration(motion.duration.normal)}
+            exiting={FadeOut.duration(motion.duration.fast)}
+            style={{ flex: 1 }}
+          >
             {/* Time Period Selector */}
             <TimePeriodSelector value={period} onChange={setPeriod} />
 
@@ -426,43 +443,50 @@ export function InsightsScreen() {
                       </View>
 
                       {(showAllEntries ? periodMoods : periodMoods.slice(0, 5)).map((mood, index, arr) => (
-                        <Pressable
+                        <Animated.View
                           key={mood.id}
-                          onPress={() => setSelectedEntry(mood)}
-                          style={({ pressed }) => (pressed ? { opacity: 0.7 } : null)}
-                          className={`flex-row items-center py-3 ${
-                            index < arr.length - 1
-                              ? "border-b border-paper-200 dark:border-paper-800"
-                              : ""
-                          }`}
+                          entering={FadeInUp.duration(motion.duration.normal).delay(
+                            Math.min(index, 6) * motion.stagger.tight
+                          )}
+                          layout={LinearTransition.duration(motion.duration.normal)}
                         >
-                          <View
-                            className="w-10 h-10 rounded-2xl items-center justify-center mr-3"
-                            style={{ backgroundColor: getMoodColor(mood.mood) + "20" }}
+                          <Pressable
+                            onPress={() => setSelectedEntry(mood)}
+                            style={({ pressed }) => (pressed ? { opacity: 0.7 } : null)}
+                            className={`flex-row items-center py-3 ${
+                              index < arr.length - 1
+                                ? "border-b border-paper-200 dark:border-paper-800"
+                                : ""
+                            }`}
                           >
-                            <Text
-                              className="text-lg font-bold"
-                              style={{ color: getMoodColor(mood.mood) }}
+                            <View
+                              className="w-10 h-10 rounded-2xl items-center justify-center mr-3"
+                              style={{ backgroundColor: getMoodColor(mood.mood) + "20" }}
                             >
-                              {mood.mood}
-                            </Text>
-                          </View>
-                          <View className="flex-1">
-                            <Text className="text-paper-800 dark:text-paper-200" style={typography.bodyMd}>
-                              {getMoodLabel(mood.mood)}
-                            </Text>
-                            <Text className="text-sand-500 dark:text-sand-400" style={typography.bodySm}>
-                              {period === "week"
-                                ? format(new Date(mood.timestamp), "EEE 'at' h:mm a")
-                                : format(new Date(mood.timestamp), "EEE, MMM d 'at' h:mm a")}
-                            </Text>
-                          </View>
-                          <Ionicons
-                            name="chevron-forward"
-                            size={16}
-                            color={isDark ? "#9FB39A" : "#BDA77D"}
-                          />
-                        </Pressable>
+                              <Text
+                                className="text-lg font-bold"
+                                style={{ color: getMoodColor(mood.mood) }}
+                              >
+                                {mood.mood}
+                              </Text>
+                            </View>
+                            <View className="flex-1">
+                              <Text className="text-paper-800 dark:text-paper-200" style={typography.bodyMd}>
+                                {getMoodLabel(mood.mood)}
+                              </Text>
+                              <Text className="text-sand-500 dark:text-sand-400" style={typography.bodySm}>
+                                {period === "week"
+                                  ? format(new Date(mood.timestamp), "EEE 'at' h:mm a")
+                                  : format(new Date(mood.timestamp), "EEE, MMM d 'at' h:mm a")}
+                              </Text>
+                            </View>
+                            <Ionicons
+                              name="chevron-forward"
+                              size={16}
+                              color={isDark ? "#9FB39A" : "#BDA77D"}
+                            />
+                          </Pressable>
+                        </Animated.View>
                       ))}
 
                       {periodMoods.length > 5 && (
@@ -504,7 +528,7 @@ export function InsightsScreen() {
                 />
               )}
             </ScrollView>
-          </>
+          </Animated.View>
         )}
       </SafeAreaView>
 

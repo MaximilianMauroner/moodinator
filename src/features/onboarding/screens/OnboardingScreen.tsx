@@ -1,10 +1,7 @@
 import React, { useState, useCallback } from "react";
 import { View, Text, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Animated, {
-  useAnimatedStyle,
-  withSpring,
-} from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
 import { useThemeColors } from "@/constants/colors";
 import { haptics } from "@/lib/haptics";
@@ -47,10 +44,6 @@ export function OnboardingScreen() {
     haptics.light();
     void complete();
   }, [complete]);
-
-  const buttonAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: withSpring(1, { damping: 15 }) }],
-  }));
 
   return (
     <SafeAreaView
@@ -124,7 +117,7 @@ export function OnboardingScreen() {
         />
 
         {/* Action button */}
-        <Animated.View style={buttonAnimatedStyle}>
+        <Animated.View>
           <Pressable
             onPress={handleNext}
             className="flex-row items-center justify-center py-4 rounded-2xl"

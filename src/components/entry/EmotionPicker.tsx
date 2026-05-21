@@ -112,7 +112,7 @@ const SelectedChip: React.FC<{
     const scale = useSharedValue(0.8);
 
     useEffect(() => {
-        scale.value = withSpring(1, { damping: 16, stiffness: 300 });
+        scale.value = withSpring(1, { damping: 22, stiffness: 320, overshootClamping: true });
     }, [scale]);
 
     const selectedChipAnimatedStyle = useAnimatedStyle(() => ({

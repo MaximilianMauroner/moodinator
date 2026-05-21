@@ -1,5 +1,7 @@
 import * as BackgroundTask from "expo-background-task";
+import Constants from "expo-constants";
 import * as TaskManager from "expo-task-manager";
+import { Platform } from "react-native";
 import { createBackup, isBackupNeeded, cleanupOldBackups } from "./backup";
 
 export const BACKGROUND_BACKUP_TASK = "MOODINATOR_WEEKLY_BACKUP";
@@ -46,6 +48,11 @@ TaskManager.defineTask(BACKGROUND_BACKUP_TASK, async () => {
  */
 export async function registerBackgroundBackupTask(): Promise<void> {
   try {
+    if (Platform.OS === "ios" && !Constants.isDevice) {
+      console.log("[BackgroundBackup] Skipping background task registration on iOS simulator");
+      return;
+    }
+
     // Check if the task is already registered
     const isRegistered = await TaskManager.isTaskRegisteredAsync(BACKGROUND_BACKUP_TASK);
 

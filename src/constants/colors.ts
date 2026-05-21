@@ -87,6 +87,39 @@ export const colors = {
     "#C75441", // 9 - Crisis (coral-600)
   ],
 
+  /**
+   * Energy card (0 drained → 10 wired): higher is better.
+   * Ramp reads depleted → neutral → vitality (coral/rose → sand → sage), not cool→hot.
+   */
+  energySegmentColors: {
+    light: [
+      "#C49A92", // 0 — depleted (muted coral)
+      "#C6A08E",
+      "#C8A68C",
+      "#C8AC84",
+      "#C6AE7C",
+      "#BDA77D", // 5 — sand / moderate
+      "#B0B892",
+      "#9BB88A",
+      "#85B082",
+      "#6FA46E",
+      "#5B8A5B", // 10 — wired (sage-500)
+    ],
+    dark: [
+      "#5C3E3A", // 0 — depleted
+      "#5F443C",
+      "#624A3E",
+      "#624E40",
+      "#5E5242",
+      "#6A5C48", // 5 — sand-brown mid
+      "#5A6448",
+      "#4F6E46",
+      "#4A7848",
+      "#45824C",
+      "#7BA87B", // 10 — bright sage
+    ],
+  },
+
   // Swipe action colors
   swipeDelete: {
     bg: { light: "#FDE8E4", dark: "#472E2A" },
@@ -126,6 +159,15 @@ export const chartColors = {
   tooltipBg: { light: "#3D352A", dark: "#F5F1E8" },
   tooltipText: { light: "#F5F1E8", dark: "#3D352A" },
 } as const;
+
+/** Fill color for energy UI (slider segment, detail bar) for index 0–10 */
+export function getEnergySegmentColor(level: number, isDark: boolean): string {
+  const i = Math.max(0, Math.min(10, Math.round(level)));
+  const stops = isDark
+    ? colors.energySegmentColors.dark
+    : colors.energySegmentColors.light;
+  return stops[i] ?? stops[stops.length - 1];
+}
 
 /**
  * Get chart color based on theme.
@@ -282,7 +324,9 @@ export function getThemedColor(
     typeof color === "object" &&
     color !== null &&
     "light" in color &&
-    "dark" in color
+    "dark" in color &&
+    typeof color.light === "string" &&
+    typeof color.dark === "string"
   ) {
     return isDark ? color.dark : color.light;
   }

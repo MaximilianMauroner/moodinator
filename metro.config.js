@@ -4,6 +4,10 @@ const path = require("path");
 
 const config = getDefaultConfig(__dirname);
 
+config.resolver.assetExts = Array.from(
+  new Set([...(config.resolver.assetExts ?? []), "wasm"])
+);
+
 // Enable inline requires for better performance
 config.transformer = {
   ...config.transformer,

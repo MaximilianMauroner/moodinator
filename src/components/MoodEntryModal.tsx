@@ -144,8 +144,8 @@ const MoodAdjustRow: React.FC<{
         if (prevMood.current !== mood) {
             prevMood.current = mood;
             pillScale.value = withSequence(
-                withSpring(1.1, { damping: 10, stiffness: 500, mass: 0.6 }),
-                withSpring(1, { damping: 18, stiffness: 350 })
+                withSpring(1.08, { damping: 20, stiffness: 480, overshootClamping: true }),
+                withSpring(1, { damping: 22, stiffness: 320, overshootClamping: true })
             );
         }
     }, [mood, pillScale]);

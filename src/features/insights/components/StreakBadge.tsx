@@ -1,7 +1,13 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { View, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useColorScheme } from "nativewind";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+  Easing,
+} from "react-native-reanimated";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { IconBadge } from "@/components/ui/IconBadge";
 import { typography } from "@/constants/typography";
@@ -22,6 +28,19 @@ function StreakBadgeBase({ current, longest, compact }: StreakBadgeBaseProps) {
   const isOnStreak = current > 0;
   const isNewRecord = current > 0 && current === longest;
   const progressPercent = longest > 0 ? Math.min((current / longest) * 100, 100) : 0;
+
+  const progressWidth = useSharedValue(progressPercent);
+
+  useEffect(() => {
+    progressWidth.value = withTiming(progressPercent, {
+      duration: 520,
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [progressPercent, progressWidth]);
+
+  const progressAnimatedStyle = useAnimatedStyle(() => ({
+    width: `${progressWidth.value}%`,
+  }));
 
   // Flame colors for active streak
   const flameColors = {
@@ -169,12 +188,14 @@ function StreakBadgeBase({ current, longest, compact }: StreakBadgeBaseProps) {
               className="h-3 rounded-full overflow-hidden"
               style={{ backgroundColor: isDark ? "#3D352A" : "#E5D9BF" }}
             >
-              <View
+              <Animated.View
                 className="h-full rounded-full"
-                style={{
-                  width: `${progressPercent}%`,
-                  backgroundColor: isOnStreak ? flameColors.primary : inactiveColors.primary,
-                }}
+                style={[
+                  {
+                    backgroundColor: isOnStreak ? flameColors.primary : inactiveColors.primary,
+                  },
+                  progressAnimatedStyle,
+                ]}
               />
             </View>
           </View>

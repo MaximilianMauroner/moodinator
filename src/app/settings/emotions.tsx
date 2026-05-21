@@ -383,7 +383,7 @@ export default function EmotionsSettingsScreen() {
       >
         {/* Hero Stats Section */}
         <Animated.View
-          entering={FadeInDown.delay(100).springify()}
+          entering={FadeInDown.delay(100).duration(260)}
           style={styles.heroSection}
         >
           <HeroStats counts={counts} isDark={isDark} />
@@ -393,7 +393,7 @@ export default function EmotionsSettingsScreen() {
         {CATEGORIES.map((cat, index) => (
           <Animated.View
             key={cat}
-            entering={FadeInDown.delay(200 + index * 80).springify()}
+            entering={FadeInDown.delay(200 + index * 80).duration(260)}
           >
             <CategorySection
               category={cat}
@@ -413,7 +413,7 @@ export default function EmotionsSettingsScreen() {
 
         {/* Tips Section */}
         <Animated.View
-          entering={FadeInDown.delay(500).springify()}
+          entering={FadeInDown.delay(500).duration(260)}
           style={styles.tipsSection}
         >
           <View
@@ -461,7 +461,7 @@ export default function EmotionsSettingsScreen() {
 
       {/* Floating Add Button */}
       <Animated.View
-        entering={FadeInUp.delay(600).springify()}
+        entering={FadeInUp.delay(600).duration(260)}
         style={styles.fabContainer}
       >
         <Pressable
