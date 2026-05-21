@@ -2,32 +2,10 @@ import React from "react";
 import { View, StyleSheet, type StyleProp, type ViewStyle } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useColorScheme } from "nativewind";
+import { semanticToneColors, type SemanticTone } from "@/constants/colors";
 
-type Tone = "sage" | "sand" | "coral" | "dusk" | "neutral";
+type Tone = SemanticTone;
 type Size = "sm" | "md" | "lg";
-
-const tonePalette = {
-  sage: {
-    light: { bg: "#E8EFE8", fg: "#5B8A5B", ring: "rgba(91, 138, 91, 0.16)" },
-    dark: { bg: "#2D3D2D", fg: "#A8C5A8", ring: "rgba(168, 197, 168, 0.18)" },
-  },
-  sand: {
-    light: { bg: "#F9F5ED", fg: "#7A6545", ring: "rgba(157, 134, 96, 0.14)" },
-    dark: { bg: "#302A22", fg: "#D4C4A0", ring: "rgba(212, 196, 160, 0.14)" },
-  },
-  coral: {
-    light: { bg: "#FDE8E4", fg: "#E06B55", ring: "rgba(224, 107, 85, 0.16)" },
-    dark: { bg: "#3C1A14", fg: "#F5A899", ring: "rgba(245, 168, 153, 0.16)" },
-  },
-  dusk: {
-    light: { bg: "#EFECF2", fg: "#847596", ring: "rgba(132, 117, 150, 0.16)" },
-    dark: { bg: "#2D2A33", fg: "#C4BBCF", ring: "rgba(196, 187, 207, 0.16)" },
-  },
-  neutral: {
-    light: { bg: "#F5F1E8", fg: "#6B5C4A", ring: "rgba(157, 134, 96, 0.14)" },
-    dark: { bg: "#364C44", fg: "#BDA77D", ring: "rgba(189, 167, 125, 0.14)" },
-  },
-} as const;
 
 const sizeMap = {
   sm: { box: 34, radius: 12, icon: 16, inner: 8 },
@@ -50,7 +28,7 @@ export function IconBadge({
 }: IconBadgeProps) {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === "dark";
-  const palette = isDark ? tonePalette[tone].dark : tonePalette[tone].light;
+  const palette = isDark ? semanticToneColors[tone].dark : semanticToneColors[tone].light;
   const dims = sizeMap[size];
 
   return (

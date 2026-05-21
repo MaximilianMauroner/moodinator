@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text } from "react-native";
 import { useColorScheme } from "@/hooks/useColorScheme";
+import { colors } from "@/constants/colors";
 
 interface HistoryListHeaderProps {
   moodCount: number;
@@ -18,18 +19,18 @@ export function HistoryListHeader({ moodCount }: HistoryListHeaderProps) {
     <View className="flex-row justify-between items-center mb-3 px-1">
       <Text
         className="font-semibold text-base"
-        style={{ color: isDark ? "#F5F1E8" : "#3D352A" }}
+        style={{ color: isDark ? colors.text.dark : colors.text.light }}
       >
         Recent entries
       </Text>
       {moodCount > 0 && (
         <View
           className="px-2.5 py-1 rounded-full"
-          style={{ backgroundColor: isDark ? "#2D3D2D" : "#E8EFE8" }}
+          style={{ backgroundColor: isDark ? colors.primaryBg.dark : colors.primaryBg.light }}
         >
           <Text
             className="text-xs font-medium"
-            style={{ color: isDark ? "#A8C5A8" : "#5B8A5B" }}
+            style={{ color: isDark ? colors.positive.text.dark : colors.positive.text.light }}
           >
             {moodCount} total
           </Text>

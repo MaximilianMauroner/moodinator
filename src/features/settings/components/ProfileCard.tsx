@@ -1,7 +1,8 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useColorScheme } from "nativewind";
+import { colors, effectColors } from "@/constants/colors";
 
 
 interface ProfileCardProps {
@@ -26,10 +27,14 @@ export function ProfileCard({ entryCount, daysTracking }: ProfileCardProps) {
         <View className="flex-row items-center mb-5">
           {/* App Icon with layered background */}
           <View className="relative mr-4">
-            <View className="w-16 h-16 rounded-2xl items-center justify-center bg-sage-100 dark:bg-sage-600/20">
-              {/* Subtle inner glow effect */}
-              <View className="absolute w-12 h-12 rounded-xl bg-sage-500/10 dark:bg-sage-300/15" />
-              <Ionicons name="leaf-outline" size={30} color={isDark ? "#A8C5A8" : "#5B8A5B"} />
+            <View className="w-16 h-16 rounded-2xl items-center justify-center bg-sage-100 dark:bg-sage-600/20 overflow-hidden">
+              <Image
+                source={require("../../../../assets/images/app-icons/app-icon.png")}
+                className="w-14 h-14 rounded-xl"
+                resizeMode="cover"
+                accessible
+                accessibilityLabel="Moodinator app icon"
+              />
             </View>
           </View>
 
@@ -53,7 +58,7 @@ export function ProfileCard({ entryCount, daysTracking }: ProfileCardProps) {
                 <Ionicons
                   name="document-text"
                   size={16}
-                  color={isDark ? "#A8C5A8" : "#5B8A5B"}
+                  color={isDark ? colors.positive.text.dark : colors.positive.text.light}
                 />
               </View>
               <Text className="text-xs font-medium uppercase tracking-wider text-sage-500 dark:text-sage-300">
@@ -72,7 +77,7 @@ export function ProfileCard({ entryCount, daysTracking }: ProfileCardProps) {
                 <Ionicons
                   name="calendar"
                   size={16}
-                  color={isDark ? "#D4C4A0" : "#9D8660"}
+                  color={isDark ? colors.sand.text.dark : colors.sand.bgSelected.light}
                 />
               </View>
               <Text className="text-xs font-medium uppercase tracking-wider text-sand-600 dark:text-paper-400">
@@ -92,14 +97,14 @@ export function ProfileCard({ entryCount, daysTracking }: ProfileCardProps) {
 const styles = StyleSheet.create({
   cardShadowLight: {
     elevation: 4,
-    shadowColor: "#9D8660",
+    shadowColor: effectColors.shadow.light,
     shadowOpacity: 0.1,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 6 },
   },
   cardShadowDark: {
     elevation: 4,
-    shadowColor: "#000",
+    shadowColor: effectColors.shadow.dark,
     shadowOpacity: 0.3,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 6 },

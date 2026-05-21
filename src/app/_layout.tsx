@@ -13,14 +13,14 @@ import "./global.css";
 
 function AppBootSplash() {
   return (
-    <View className="flex-1 bg-white dark:bg-slate-950 justify-center items-center px-8">
-      <View className="w-20 h-20 rounded-3xl items-center justify-center mb-5 bg-emerald-50 dark:bg-emerald-900/20">
+    <View className="flex-1 bg-paper-100 dark:bg-paper-900 justify-center items-center px-8">
+      <View className="w-20 h-20 rounded-3xl items-center justify-center mb-5 bg-sage-100 dark:bg-sage-600/20">
         <Ionicons name="leaf-outline" size={36} color="#5B8A5B" />
       </View>
-      <Text className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+      <Text className="text-2xl font-bold text-paper-800 dark:text-paper-100 mb-2">
         Moodinator
       </Text>
-      <Text className="text-sm text-slate-600 dark:text-slate-400 mb-5 text-center">
+      <Text className="text-sm text-sand-600 dark:text-sand-400 mb-5 text-center">
         Preparing your private space...
       </Text>
       <ActivityIndicator size="small" color="#5B8A5B" />
@@ -61,7 +61,7 @@ export default function Layout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <View className="flex-1 bg-white dark:bg-slate-950">
+      <View className="flex-1 bg-paper-100 dark:bg-paper-900">
         <Stack
           screenOptions={{
             headerShown: false,

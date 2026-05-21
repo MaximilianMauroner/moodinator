@@ -3,8 +3,44 @@ import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useColorScheme } from "nativewind";
 import { useRouter } from "expo-router";
+import {
+  colors as themeColors,
+  effectColors,
+  semanticToneColors,
+} from "@/constants/colors";
 
-type AccentColor = "sage" | "sand" | "coral" | "dusk";
+const settingsCategoryColors = {
+  sage: {
+    iconBg: themeColors.primaryBg,
+    iconColor: themeColors.positive.text,
+    accentLine: { light: themeColors.primaryMuted.light, dark: themeColors.primary.dark },
+    badgeBg: { light: themeColors.primaryBg.light, dark: "rgba(166, 227, 155, 0.13)" },
+    badgeText: themeColors.positive.text,
+  },
+  sand: {
+    iconBg: { light: themeColors.sand.bg.light, dark: "#342B1D" },
+    iconColor: themeColors.sand.text,
+    accentLine: { light: "#D4C4A0", dark: themeColors.sand.bgSelected.dark },
+    badgeBg: { light: themeColors.sand.bg.light, dark: "rgba(195, 166, 111, 0.13)" },
+    badgeText: themeColors.sand.text,
+  },
+  coral: {
+    iconBg: { light: themeColors.negative.bg.light, dark: semanticToneColors.coral.dark.bg },
+    iconColor: themeColors.negative.text,
+    accentLine: { light: "#F5A899", dark: themeColors.negative.bgSelected.dark },
+    badgeBg: { light: themeColors.negative.bg.light, dark: "rgba(216, 117, 97, 0.18)" },
+    badgeText: themeColors.negative.text,
+  },
+  dusk: {
+    iconBg: themeColors.dusk.bg,
+    iconColor: { light: themeColors.dusk.bgSelected.light, dark: themeColors.dusk.text.dark },
+    accentLine: themeColors.dusk.bgSelected,
+    badgeBg: { light: themeColors.dusk.bg.light, dark: "rgba(138, 122, 160, 0.18)" },
+    badgeText: { light: themeColors.dusk.bgSelected.light, dark: themeColors.dusk.text.dark },
+  },
+} as const;
+
+type AccentColor = keyof typeof settingsCategoryColors;
 
 interface SettingsCategoryCardProps {
   title: string;
@@ -29,38 +65,14 @@ export function SettingsCategoryCard({
   const isDark = colorScheme === "dark";
   const router = useRouter();
 
-  const accentColors = {
-    sage: {
-      iconBg: isDark ? "#2D3D2D" : "#E8EFE8",
-      iconColor: isDark ? "#A8C5A8" : "#5B8A5B",
-      accentLine: isDark ? "#5B8A5B" : "#7BA87B",
-      badgeBg: isDark ? "rgba(91, 138, 91, 0.2)" : "#E8EFE8",
-      badgeText: isDark ? "#A8C5A8" : "#5B8A5B",
-    },
-    sand: {
-      iconBg: isDark ? "#302A22" : "#F9F5ED",
-      iconColor: isDark ? "#D4C4A0" : "#7A6545",
-      accentLine: isDark ? "#BDA77D" : "#D4C4A0",
-      badgeBg: isDark ? "rgba(189, 167, 125, 0.2)" : "#F9F5ED",
-      badgeText: isDark ? "#D4C4A0" : "#7A6545",
-    },
-    coral: {
-      iconBg: isDark ? "#3C1A14" : "#FDE8E4",
-      iconColor: isDark ? "#F5A899" : "#E06B55",
-      accentLine: isDark ? "#E06B55" : "#F5A899",
-      badgeBg: isDark ? "rgba(224, 107, 85, 0.2)" : "#FDE8E4",
-      badgeText: isDark ? "#F5A899" : "#E06B55",
-    },
-    dusk: {
-      iconBg: isDark ? "#2D2A33" : "#EFECF2",
-      iconColor: isDark ? "#C4BBCF" : "#847596",
-      accentLine: isDark ? "#847596" : "#A396B3",
-      badgeBg: isDark ? "rgba(132, 117, 150, 0.2)" : "#EFECF2",
-      badgeText: isDark ? "#C4BBCF" : "#847596",
-    },
+  const palette = settingsCategoryColors[accentColor];
+  const colors = {
+    iconBg: isDark ? palette.iconBg.dark : palette.iconBg.light,
+    iconColor: isDark ? palette.iconColor.dark : palette.iconColor.light,
+    accentLine: isDark ? palette.accentLine.dark : palette.accentLine.light,
+    badgeBg: isDark ? palette.badgeBg.dark : palette.badgeBg.light,
+    badgeText: isDark ? palette.badgeText.dark : palette.badgeText.light,
   };
-
-  const colors = accentColors[accentColor];
 
   return (
     <TouchableOpacity
@@ -132,13 +144,15 @@ export function SettingsCategoryCard({
               <View
                 className="w-8 h-8 rounded-xl items-center justify-center"
                 style={{
-                  backgroundColor: isDark ? "#364C44" : "#F5F1E8",
+                  backgroundColor: isDark
+                    ? themeColors.surfaceAlt.dark
+                    : themeColors.surfaceAlt.light,
                 }}
               >
                 <Ionicons
                   name="chevron-forward"
                   size={18}
-                  color={isDark ? "#8AAE98" : "#7A6B55"}
+                  color={isDark ? themeColors.textSubtle.dark : themeColors.textSubtle.light}
                 />
               </View>
             </View>
@@ -152,14 +166,14 @@ export function SettingsCategoryCard({
 const styles = StyleSheet.create({
   cardShadowLight: {
     elevation: 2,
-    shadowColor: "#9D8660",
+    shadowColor: effectColors.shadow.light,
     shadowOpacity: 0.06,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 },
   },
   cardShadowDark: {
     elevation: 2,
-    shadowColor: "#000",
+    shadowColor: effectColors.shadow.black,
     shadowOpacity: 0.2,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 },

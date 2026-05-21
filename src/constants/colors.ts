@@ -7,70 +7,70 @@ import { useColorScheme } from "@/hooks/useColorScheme";
 
 export const colors = {
   // Background colors
-  background: { light: "#FAF8F4", dark: "#1E2D26" },
-  surface: { light: "#FDFCFA", dark: "#2C4038" },
-  surfaceAlt: { light: "#F5F1E8", dark: "#364C44" },
-  surfaceElevated: { light: "#F9F5ED", dark: "#3E564E" },
+  background: { light: "#FAF8F4", dark: "#08150F" },
+  surface: { light: "#FDFCFA", dark: "#14251C" },
+  surfaceAlt: { light: "#F5F1E8", dark: "#111F17" },
+  surfaceElevated: { light: "#F9F5ED", dark: "#182C20" },
 
   // Text colors
-  text: { light: "#3D352A", dark: "#F0EDE6" },
-  textMuted: { light: "#5C4E3D", dark: "#C4AA80" },
-  textSubtle: { light: "#7A6B55", dark: "#D4C49C" },
-  textInverse: { light: "#FFFFFF", dark: "#FFFFFF" },
+  text: { light: "#3D352A", dark: "#F0F7EA" },
+  textMuted: { light: "#5C4E3D", dark: "#C7D8BC" },
+  textSubtle: { light: "#7A6B55", dark: "#9EB894" },
+  textInverse: { light: "#FDFCFA", dark: "#FDFCFA" },
 
   // Primary accent (sage green)
-  primary: { light: "#5B8A5B", dark: "#7BA87B" },
-  primaryMuted: { light: "#7BA87B", dark: "#A8C5A8" },
-  primaryBg: { light: "#E8EFE8", dark: "#2C4A34" },
-  primaryBgHover: { light: "#D1DFD1", dark: "#385440" },
+  primary: { light: "#5B8A5B", dark: "#A6E39B" },
+  primaryMuted: { light: "#7BA87B", dark: "#C8F5BE" },
+  primaryBg: { light: "#E8EFE8", dark: "#122A1A" },
+  primaryBgHover: { light: "#D1DFD1", dark: "#193622" },
 
   // Border colors
-  border: { light: "#E5D9BF", dark: "#3A5448" },
-  borderSubtle: { light: "#F2EBD9", dark: "#2E4438" },
+  border: { light: "#E5D9BF", dark: "#2F513B" },
+  borderSubtle: { light: "#F2EBD9", dark: "#233D2D" },
 
   // Overlay
   overlay: "rgba(0,0,0,0.4)",
 
   // Category colors - for emotions and tags
   positive: {
-    bg: { light: "#E8EFE8", dark: "#2C4A34" },
-    bgSelected: { light: "#5B8A5B", dark: "#5B8A5B" },
-    border: { light: "#D1DFD1", dark: "#3A5A42" },
-    text: { light: "#5B8A5B", dark: "#A8C5A8" },
-    textSelected: { light: "#FFFFFF", dark: "#FFFFFF" },
-    textDark: { light: "#476D47", dark: "#A8C5A8" },
+    bg: { light: "#E8EFE8", dark: "#122A1A" },
+    bgSelected: { light: "#5B8A5B", dark: "#34703D" },
+    border: { light: "#D1DFD1", dark: "#2F5A39" },
+    text: { light: "#5B8A5B", dark: "#C8F5BE" },
+    textSelected: { light: "#FDFCFA", dark: "#FDFCFA" },
+    textDark: { light: "#476D47", dark: "#C8F5BE" },
   },
   negative: {
-    bg: { light: "#FDE8E4", dark: "#472E2A" },
-    bgSelected: { light: "#E06B55", dark: "#C75441" },
-    border: { light: "#FACFC7", dark: "#573A36" },
-    text: { light: "#C75441", dark: "#F5A899" },
-    textSelected: { light: "#FFFFFF", dark: "#FFFFFF" },
+    bg: { light: "#FDE8E4", dark: "#482721" },
+    bgSelected: { light: "#E06B55", dark: "#D87561" },
+    border: { light: "#FACFC7", dark: "#693930" },
+    text: { light: "#C75441", dark: "#F2B4A6" },
+    textSelected: { light: "#FDFCFA", dark: "#FDFCFA" },
   },
   neutral: {
-    bg: { light: "#EFECF2", dark: "#36344A" },
-    bgSelected: { light: "#847596", dark: "#695C78" },
-    border: { light: "#DDD8E5", dark: "#44425A" },
-    text: { light: "#695C78", dark: "#C4BBCF" },
-    textSelected: { light: "#FFFFFF", dark: "#FFFFFF" },
+    bg: { light: "#EFECF2", dark: "#332D3D" },
+    bgSelected: { light: "#847596", dark: "#8A7AA0" },
+    border: { light: "#DDD8E5", dark: "#51485F" },
+    text: { light: "#695C78", dark: "#D5CCDD" },
+    textSelected: { light: "#FDFCFA", dark: "#FDFCFA" },
   },
 
   // Sand/warm tones (for energy, timestamps, etc.)
   sand: {
-    bg: { light: "#F9F5ED", dark: "#3E3E30" },
-    bgSelected: { light: "#9D8660", dark: "#BDA77D" },
-    bgHover: { light: "#FDF8EF", dark: "#3E5448" },
-    border: { light: "#E5D9BF", dark: "#425C50" },
-    text: { light: "#7A6B55", dark: "#D4C4A0" },
-    textMuted: { light: "#8C7A60", dark: "#AAA080" },
+    bg: { light: "#F9F5ED", dark: "#3D321F" },
+    bgSelected: { light: "#9D8660", dark: "#C3A66F" },
+    bgHover: { light: "#FDF8EF", dark: "#252D22" },
+    border: { light: "#E5D9BF", dark: "#5B5036" },
+    text: { light: "#7A6B55", dark: "#E0C993" },
+    textMuted: { light: "#8C7A60", dark: "#BDAE8A" },
   },
 
   // Dusk/purple tones (for context tags)
   dusk: {
-    bg: { light: "#EFECF2", dark: "#36344A" },
-    bgSelected: { light: "#847596", dark: "#695C78" },
-    border: { light: "#DDD8E5", dark: "#44425A" },
-    text: { light: "#695C78", dark: "#C4BBCF" },
+    bg: { light: "#EFECF2", dark: "#332D3D" },
+    bgSelected: { light: "#847596", dark: "#8A7AA0" },
+    border: { light: "#DDD8E5", dark: "#51485F" },
+    text: { light: "#695C78", dark: "#D5CCDD" },
   },
 
   // Mood scale gradient colors (raw hex values for gradient bars)
@@ -106,28 +106,28 @@ export const colors = {
       "#5B8A5B", // 10 — wired (sage-500)
     ],
     dark: [
-      "#5C3E3A", // 0 — depleted
-      "#5F443C",
-      "#624A3E",
-      "#624E40",
-      "#5E5242",
-      "#6A5C48", // 5 — sand-brown mid
-      "#5A6448",
-      "#4F6E46",
-      "#4A7848",
-      "#45824C",
-      "#7BA87B", // 10 — bright sage
+      "#5B3932", // 0 — depleted
+      "#604036",
+      "#65483A",
+      "#65503E",
+      "#65583F",
+      "#756242", // 5 — sand-brown mid
+      "#69734E",
+      "#5D7D4F",
+      "#558754",
+      "#55935D",
+      "#A6E39B", // 10 — bright sage
     ],
   },
 
   // Swipe action colors
   swipeDelete: {
-    bg: { light: "#FDE8E4", dark: "#472E2A" },
-    text: { light: "#C75441", dark: "#F5A899" },
+    bg: { light: "#FDE8E4", dark: "#482721" },
+    text: { light: "#C75441", dark: "#F2B4A6" },
   },
   swipeEdit: {
-    bg: { light: "#E8EFE8", dark: "#2C4A34" },
-    text: { light: "#5B8A5B", dark: "#A8C5A8" },
+    bg: { light: "#E8EFE8", dark: "#122A1A" },
+    text: { light: "#5B8A5B", dark: "#C8F5BE" },
   },
 } as const;
 
@@ -139,17 +139,17 @@ export type ThemeMode = "light" | "dark";
  */
 export const chartColors = {
   // Line/area chart colors
-  line: { light: "#5B8A5B", dark: "#A8C5A8" },
-  lineSecondary: { light: "#847596", dark: "#C4BBCF" },
-  fill: { light: "#7BA87B", dark: "#7BA87B" },
+  line: { light: "#5B8A5B", dark: "#A6E39B" },
+  lineSecondary: { light: "#847596", dark: "#D5CCDD" },
+  fill: { light: "#7BA87B", dark: "#A6E39B" },
   fillOpacity: 0.14,
 
   // Grid and axis
-  gridLine: { light: "#EDE7DA", dark: "#425C50" },
-  axisLabel: { light: "#7A6B55", dark: "#C4AA80" },
+  gridLine: { light: "#EDE7DA", dark: "#47414C" },
+  axisLabel: { light: "#7A6B55", dark: "#C7B895" },
 
   // Background
-  chartBg: { light: "#FDFCFA", dark: "#2C3C34" },
+  chartBg: { light: "#FDFCFA", dark: "#14251C" },
 
   // Dot styling
   dotStroke: "#ffffff",
@@ -159,6 +159,44 @@ export const chartColors = {
   tooltipBg: { light: "#3D352A", dark: "#F5F1E8" },
   tooltipText: { light: "#F5F1E8", dark: "#3D352A" },
 } as const;
+
+export const semanticToneColors = {
+  sage: {
+    light: { bg: "#E8EFE8", fg: "#5B8A5B", ring: "rgba(91, 138, 91, 0.16)", border: "#D1DFD1" },
+    dark: { bg: "#122A1A", fg: "#C8F5BE", ring: "rgba(200, 245, 190, 0.12)", border: "#2F5A39" },
+  },
+  sand: {
+    light: { bg: "#F9F5ED", fg: "#7A6545", ring: "rgba(157, 134, 96, 0.14)", border: "#E9DCC1" },
+    dark: { bg: "#3D321F", fg: "#E0C993", ring: "rgba(224, 201, 147, 0.14)", border: "#5B5036" },
+  },
+  coral: {
+    light: { bg: "#FDE8E4", fg: "#E06B55", ring: "rgba(224, 107, 85, 0.16)", border: "#FACFC7" },
+    dark: { bg: "#4B2A22", fg: "#F2B4A6", ring: "rgba(242, 180, 166, 0.16)", border: "#6B3B31" },
+  },
+  dusk: {
+    light: { bg: "#EFECF2", fg: "#847596", ring: "rgba(132, 117, 150, 0.16)", border: "#DDD8E5" },
+    dark: { bg: "#332D3D", fg: "#D5CCDD", ring: "rgba(213, 204, 221, 0.16)", border: "#51485F" },
+  },
+  neutral: {
+    light: { bg: "#F5F1E8", fg: "#6B5C4A", ring: "rgba(157, 134, 96, 0.14)", border: "#E5D9BF" },
+    dark: { bg: "#111F17", fg: "#C7D8BC", ring: "rgba(199, 216, 188, 0.10)", border: "#2F513B" },
+  },
+} as const;
+
+export const effectColors = {
+  shadow: {
+    light: "#9D8660",
+    dark: "#09130E",
+    black: "#000",
+  },
+  overlay: {
+    scrim: "rgba(0,0,0,0.4)",
+    lightGlass: "rgba(255,255,255,0.7)",
+    darkGlass: "rgba(0,0,0,0.2)",
+  },
+} as const;
+
+export type SemanticTone = keyof typeof semanticToneColors;
 
 /** Fill color for energy UI (slider segment, detail bar) for index 0–10 */
 export function getEnergySegmentColor(level: number, isDark: boolean): string {

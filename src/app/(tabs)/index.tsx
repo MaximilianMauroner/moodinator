@@ -35,6 +35,8 @@ import { HapticTab } from "@/components/HapticTab";
 import { DisplayMoodItem } from "@/components/DisplayMoodItem";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { ScreenBackgroundAccent } from "@/components/layout/ScreenBackgroundAccent";
+import { TabSceneTransition } from "@/components/ui/TabSceneTransition";
 import {
   DetailedMoodButtonSelector,
   HomeHeader,
@@ -421,9 +423,9 @@ function HomeScreenContent() {
                   refreshing={refreshing}
                   onRefresh={handlePullToRefresh}
                   progressViewOffset={refreshIndicatorOffset}
-                  tintColor={isDark ? "#A8C5A8" : "#5B8A5B"}
-                  colors={[isDark ? "#A8C5A8" : "#5B8A5B"]}
-                  progressBackgroundColor={isDark ? "#2C4038" : "#FDFCFA"}
+                  tintColor={isDark ? "#A6E39B" : "#5B8A5B"}
+                  colors={[isDark ? "#A6E39B" : "#5B8A5B"]}
+                  progressBackgroundColor={isDark ? "#14251C" : "#FDFCFA"}
                 />
               }
               style={{ flex: 1 }}
@@ -439,7 +441,7 @@ function HomeScreenContent() {
               style={[
                 overlayAnimatedStyle,
                 {
-                  backgroundColor: isDark ? "#1D2A24" : "#FDFCFA",
+                  backgroundColor: isDark ? "#08150F" : "#FAF8F4",
                   left: 0,
                   paddingHorizontal: CONTENT_HORIZONTAL_PADDING,
                   position: "absolute",
@@ -449,6 +451,7 @@ function HomeScreenContent() {
                 },
               ]}
             >
+              <ScreenBackgroundAccent density="compact" />
               <View
                 pointerEvents="none"
                 onLayout={handleHomeChromeLayout}
@@ -562,8 +565,11 @@ interface CollapsedMoodSelectorProps {
 const PILL_WIDTH = 52;
 const PILL_HEIGHT = 38;
 const PILL_GAP = 5;
-const TRACK_PADDING_X = 8;
+const PILL_STEP = PILL_WIDTH + PILL_GAP;
+const TRACK_EDGE_INSET = 16;
 const CENTER_INDEX = 5;
+const MIN_VISIBLE_PILLS = 4;
+const MAX_VISIBLE_PILLS = 7;
 
 function CollapsedMoodSelector({
   isDark,
@@ -573,43 +579,59 @@ function CollapsedMoodSelector({
   const scrollRef = useRef<RNScrollView>(null);
   const [trackWidth, setTrackWidth] = useState(0);
 
-  const contentWidth =
-    TRACK_PADDING_X * 2 +
-    moodScale.length * PILL_WIDTH +
-    (moodScale.length - 1) * PILL_GAP;
+  // Size the scroll viewport to fit a whole number of pills with NO horizontal
+  // padding inside. Combined with snap-to-start, this guarantees every resting
+  // position shows full pills only — no partial-pill slivers at the edges to
+  // mask. Anything outside this exact width becomes solid container background,
+  // which is visually quiet.
+  const availableScrollWidth = Math.max(0, trackWidth - TRACK_EDGE_INSET * 2);
+  const visiblePills =
+    availableScrollWidth > 0
+      ? Math.max(
+          MIN_VISIBLE_PILLS,
+          Math.min(
+            MAX_VISIBLE_PILLS,
+            Math.floor((availableScrollWidth + PILL_GAP) / PILL_STEP)
+          )
+        )
+      : MIN_VISIBLE_PILLS;
+  const scrollAreaWidth = visiblePills * PILL_STEP - PILL_GAP;
+  const fits = scrollAreaWidth >= moodScale.length * PILL_STEP - PILL_GAP;
 
   useEffect(() => {
-    if (trackWidth <= 0) return;
-    if (contentWidth <= trackWidth) return;
+    if (trackWidth <= 0 || fits) return;
 
-    const targetCenter =
-      TRACK_PADDING_X +
-      CENTER_INDEX * (PILL_WIDTH + PILL_GAP) +
-      PILL_WIDTH / 2;
-    const maxScroll = contentWidth - trackWidth;
-    const x = Math.max(0, Math.min(maxScroll, targetCenter - trackWidth / 2));
+    // Position CENTER_INDEX as centered as possible inside the visible slot.
+    const leftmostIndex = Math.max(
+      0,
+      Math.min(
+        moodScale.length - visiblePills,
+        CENTER_INDEX - Math.floor(visiblePills / 2)
+      )
+    );
+    const x = leftmostIndex * PILL_STEP;
 
     requestAnimationFrame(() => {
       scrollRef.current?.scrollTo({ x, y: 0, animated: false });
     });
-  }, [trackWidth, contentWidth]);
-
-  const fitsWithoutScroll = contentWidth <= trackWidth;
+  }, [trackWidth, fits, visiblePills]);
 
   return (
     <View
       onLayout={(event: LayoutChangeEvent) => setTrackWidth(event.nativeEvent.layout.width)}
       style={{
-        backgroundColor: isDark ? "#2C4038" : "#FDFCFA",
+        backgroundColor: isDark ? "#14251C" : "#FDFCFA",
         borderWidth: 1,
-        borderColor: isDark ? "#3A5448" : "#E5D9BF",
+        borderColor: isDark ? "#2F513B" : "#E5D9BF",
         borderRadius: 18,
-        shadowColor: isDark ? "#000" : "#9D8660",
+        shadowColor: isDark ? "#09130E" : "#9D8660",
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: isDark ? 0.22 : 0.08,
         shadowRadius: 8,
         elevation: 3,
         overflow: "hidden",
+        paddingHorizontal: TRACK_EDGE_INSET,
+        paddingVertical: 6,
       }}
     >
       <RNScrollView
@@ -617,12 +639,20 @@ function CollapsedMoodSelector({
         horizontal
         showsHorizontalScrollIndicator={false}
         decelerationRate="fast"
+        snapToInterval={fits ? undefined : PILL_STEP}
+        snapToAlignment="start"
+        disableIntervalMomentum
+        removeClippedSubviews
+        style={{
+          width: "100%",
+          flexGrow: 0,
+          flexShrink: 0,
+          overflow: "hidden",
+        }}
         contentContainerStyle={{
-          flexGrow: fitsWithoutScroll ? 1 : undefined,
-          justifyContent: fitsWithoutScroll ? "center" : "flex-start",
+          flexGrow: fits ? 1 : undefined,
+          justifyContent: fits ? "center" : "flex-start",
           alignItems: "center",
-          paddingHorizontal: TRACK_PADDING_X,
-          paddingVertical: 6,
           gap: PILL_GAP,
         }}
       >
@@ -668,7 +698,9 @@ function CollapsedMoodSelector({
 export default function HomeScreen() {
   return (
     <ErrorBoundary FallbackComponent={HomeErrorFallback}>
-      <HomeScreenContent />
+      <TabSceneTransition>
+        <HomeScreenContent />
+      </TabSceneTransition>
     </ErrorBoundary>
   );
 }

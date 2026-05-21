@@ -1,6 +1,13 @@
 import React, { useState, useCallback, useEffect, useMemo } from "react";
 import { View, Text, ActivityIndicator } from "react-native";
 import { GestureDetector, Gesture } from "react-native-gesture-handler";
+import Animated, {
+  Easing,
+  SlideInLeft,
+  SlideInRight,
+  SlideOutLeft,
+  SlideOutRight,
+} from "react-native-reanimated";
 import { useThemeColors } from "@/constants/colors";
 import { haptics } from "@/lib/haptics";
 import { useCalendarData, type CalendarDayData } from "./useCalendarData";
@@ -9,6 +16,7 @@ import { CalendarWeekHeader } from "./CalendarWeekHeader";
 import { CalendarDay } from "./CalendarDay";
 import { DayDetailModal } from "./DayDetailModal";
 import { moodScale } from "@/constants/moodScale";
+import { motion } from "@/constants/motion";
 import { typography } from "@/constants/typography";
 import type { MoodEntry } from "@db/types";
 
@@ -17,6 +25,8 @@ type MoodCalendarProps = {
   onEditEntry?: (entry: MoodEntry) => void;
   onRefreshReady?: (refreshFn: (() => Promise<void>) | null) => void;
 };
+
+type MonthTransitionDirection = "previous" | "next";
 
 export function MoodCalendar({
   onAddEntry,
@@ -41,6 +51,8 @@ export function MoodCalendar({
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedEntries, setSelectedEntries] = useState<MoodEntry[]>([]);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [transitionDirection, setTransitionDirection] =
+    useState<MonthTransitionDirection>("next");
 
   const today = new Date();
   const isThisMonth = year === today.getFullYear() && month === today.getMonth();
@@ -111,12 +123,32 @@ export function MoodCalendar({
 
       if (event.translationX > 0) {
         haptics.monthChange();
+        setTransitionDirection("previous");
         goToPreviousMonth();
       } else if (event.translationX < -80 && canGoNext) {
         haptics.monthChange();
+        setTransitionDirection("next");
         goToNextMonth();
       }
     });
+
+  const handlePreviousMonth = useCallback(() => {
+    setTransitionDirection("previous");
+    goToPreviousMonth();
+  }, [goToPreviousMonth]);
+
+  const handleNextMonth = useCallback(() => {
+    setTransitionDirection("next");
+    goToNextMonth();
+  }, [goToNextMonth]);
+
+  const handleToday = useCallback(() => {
+    const current = new Date();
+    const currentMonthIndex = year * 12 + month;
+    const todayMonthIndex = current.getFullYear() * 12 + current.getMonth();
+    setTransitionDirection(todayMonthIndex >= currentMonthIndex ? "next" : "previous");
+    goToToday();
+  }, [goToToday, month, year]);
 
   const handleDayPress = useCallback(
     (day: number, data?: CalendarDayData) => {
@@ -227,15 +259,15 @@ export function MoodCalendar({
       <CalendarHeader
         monthName={monthName}
         year={year}
-        onPrevious={goToPreviousMonth}
-        onNext={goToNextMonth}
-        onToday={goToToday}
+        onPrevious={handlePreviousMonth}
+        onNext={handleNextMonth}
+        onToday={handleToday}
         canGoNext={canGoNext}
         isCurrentMonth={isCurrentMonth}
       />
 
       <GestureDetector gesture={swipeGesture}>
-        <View>
+        <View style={{ overflow: "hidden" }}>
           <CalendarWeekHeader />
 
           {loading ? (
@@ -243,7 +275,22 @@ export function MoodCalendar({
               <ActivityIndicator size="small" color={get("primary")} />
             </View>
           ) : (
-            <View className="gap-1">{renderCalendarGrid()}</View>
+            <Animated.View
+              key={`${year}-${month}`}
+              entering={
+                transitionDirection === "previous"
+                  ? SlideInLeft.duration(motion.duration.slow).easing(Easing.out(Easing.cubic))
+                  : SlideInRight.duration(motion.duration.slow).easing(Easing.out(Easing.cubic))
+              }
+              exiting={
+                transitionDirection === "previous"
+                  ? SlideOutRight.duration(motion.duration.normal).easing(Easing.out(Easing.cubic))
+                  : SlideOutLeft.duration(motion.duration.normal).easing(Easing.out(Easing.cubic))
+              }
+              className="gap-1"
+            >
+              {renderCalendarGrid()}
+            </Animated.View>
           )}
         </View>
       </GestureDetector>
