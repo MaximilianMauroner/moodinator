@@ -10,13 +10,10 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { FlashList, type FlashListRef } from "@shopify/flash-list";
-import {
-  Gesture,
-  GestureDetector,
-  GestureHandlerRootView,
-} from "react-native-gesture-handler";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
+  Easing,
   Extrapolation,
   interpolate,
   runOnJS,
@@ -24,6 +21,7 @@ import Animated, {
   useAnimatedStyle,
   useDerivedValue,
   useSharedValue,
+  withTiming,
 } from "react-native-reanimated";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -76,6 +74,12 @@ const ESTIMATED_HOME_CHROME_HEIGHT = 72;
 const ESTIMATED_HISTORY_CHROME_HEIGHT = 56;
 const HOME_LIST_DRAW_DISTANCE = 900;
 const JUMP_TO_TOP_THRESHOLD = 760;
+// Light low-pass smoothing applied to the (JS-thread ingested) scroll position
+// before it drives the collapse animation. Long enough to absorb dropped frames
+// and jitter, short enough to still feel tied to the finger.
+const COLLAPSE_SMOOTHING_MS = 90;
+// Duration of the programmatic "return to start" header expansion.
+const SCROLL_TO_TOP_MS = 360;
 
 function clamp(value: number, min: number, max: number) {
   "worklet";
@@ -183,9 +187,22 @@ function HomeScreenContent() {
     currentHomeChromeHeight + COLLAPSED_SELECTOR_HEIGHT + currentHistoryChromeHeight;
 
   const scrollY = useSharedValue(0);
-  const collapseProgress = useDerivedValue(
+  const rawCollapseProgress = useDerivedValue(
     () => clamp(scrollY.value / collapseDistance, 0, 1),
     [collapseDistance, scrollY]
+  );
+  // Easing the raw scroll-driven progress on the UI thread smooths out the
+  // jitter introduced by ingesting scroll offsets on the JS thread (see the
+  // handleScroll comment). withTiming re-targets every frame, acting as a
+  // low-pass filter rather than a discrete animation. Every visual style and
+  // reaction reads this value so the whole collapse moves as one.
+  const collapseProgress = useDerivedValue(
+    () =>
+      withTiming(rawCollapseProgress.value, {
+        duration: COLLAPSE_SMOOTHING_MS,
+        easing: Easing.out(Easing.quad),
+      }),
+    [rawCollapseProgress]
   );
   // useAnimatedScrollHandler (createAnimatedComponent) triggers flash-list's
   // getScrollableNode() which has an un-guarded null ref on RN New Architecture.
@@ -206,14 +223,17 @@ function HomeScreenContent() {
       }
 
       setJumpToTopVisible(false);
-      const list = listRef.current;
+      listRef.current?.scrollToOffset({ offset: 0, animated: true });
 
-      if (list) {
-        list.scrollToOffset({ offset: 0, animated: true });
-      } else {
-        scrollY.value = 0;
-        setSelectorCollapsed(false);
-      }
+      // Animate the header back open ourselves so the expansion stays smooth and
+      // in sync with the list returning to the start, independent of how the
+      // list's onScroll events happen to land. (onScroll still drives scrollY
+      // frame-to-frame during the scroll and simply wins where it does.)
+      scrollY.value = withTiming(0, {
+        duration: SCROLL_TO_TOP_MS,
+        easing: Easing.out(Easing.cubic),
+      });
+      setSelectorCollapsed(false);
 
       if (options?.refresh) {
         void handlePullToRefresh();
@@ -223,18 +243,9 @@ function HomeScreenContent() {
   );
 
   const handleJumpToTopPress = useCallback(() => {
-    scrollHomeListToTop({ haptic: true });
+    // HapticTab fires its own press feedback, so skip the duplicate buzz here.
+    scrollHomeListToTop({ haptic: false });
   }, [scrollHomeListToTop]);
-
-  const jumpToTopTapGesture = useMemo(
-    () =>
-      Gesture.Tap()
-        .runOnJS(true)
-        .onEnd(() => {
-          handleJumpToTopPress();
-        }),
-    [handleJumpToTopPress]
-  );
 
   const handleHomeTabDoublePress = useCallback(() => {
     scrollHomeListToTop({ haptic: false, refresh: true });
@@ -444,6 +455,14 @@ function HomeScreenContent() {
           <View className="flex-1">
             <FlashList
               ref={listRef}
+              // FlashList v2 defaults to Animated.ScrollView and then wraps it
+              // again in Animated.createAnimatedComponent. On the New
+              // Architecture that double-wrap leaves the internal scroll ref
+              // null, so every programmatic scroll (scrollToOffset/scrollToTop —
+              // the jump-to-top button and double-tap-home) silently no-ops.
+              // Supplying a plain ScrollView keeps it a single wrap and restores
+              // a working native scroll ref.
+              renderScrollComponent={RNScrollView}
               data={moods}
               keyExtractor={keyExtractor}
               renderItem={renderMoodItem}
@@ -558,21 +577,19 @@ function HomeScreenContent() {
                   zIndex: 20,
                 }}
               >
-                <GestureDetector gesture={jumpToTopTapGesture}>
-                  <Animated.View
-                    accessible
-                    accessibilityHint="Scrolls the recent entries list back to the top"
-                    accessibilityLabel="Jump to top"
-                    accessibilityRole="button"
-                    style={jumpButtonStyle}
-                  >
-                    <Ionicons
-                      name="arrow-up"
-                      size={23}
-                      color={isDark ? "#08150F" : "#FDFCFA"}
-                    />
-                  </Animated.View>
-                </GestureDetector>
+                <HapticTab
+                  accessibilityHint="Scrolls the recent entries list back to the top"
+                  accessibilityLabel="Jump to top"
+                  accessibilityRole="button"
+                  onPress={handleJumpToTopPress}
+                  style={jumpButtonStyle}
+                >
+                  <Ionicons
+                    name="arrow-up"
+                    size={23}
+                    color={isDark ? "#08150F" : "#FDFCFA"}
+                  />
+                </HapticTab>
               </View>
             ) : null}
           </View>
