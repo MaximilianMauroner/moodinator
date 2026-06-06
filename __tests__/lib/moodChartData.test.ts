@@ -18,9 +18,21 @@ const defaultScale = {
   lowerIsBetter: true as const,
 };
 
+const higherIsBetterScale = {
+  version: 2,
+  min: 0,
+  max: 10,
+  lowerIsBetter: false,
+};
+
 let nextId = 1;
 
-function mood(value: number, isoDate: string, hour = 12): MoodEntry {
+function mood(
+  value: number,
+  isoDate: string,
+  hour = 12,
+  moodScale: MoodEntry["moodScale"] = defaultScale
+): MoodEntry {
   return {
     id: nextId++,
     mood: value,
@@ -29,10 +41,7 @@ function mood(value: number, isoDate: string, hour = 12): MoodEntry {
     emotions: [],
     contextTags: [],
     energy: null,
-    moodScale: defaultScale,
-    photos: [],
-    location: null,
-    voiceMemos: [],
+    moodScale,
     basedOnEntryId: null,
   };
 }
@@ -113,6 +122,17 @@ describe("processMoodDataForDailyChart", () => {
     expect(dailyAggregates[0].moods).toEqual([2, 6]);
   });
 
+  test("normalizes stored scale references before daily aggregation", () => {
+    const moods = [
+      mood(9, "2024-01-15", 12, higherIsBetterScale),
+      mood(3, "2024-01-15"),
+    ];
+    const { dailyAggregates } = processMoodDataForDailyChart(moods);
+
+    expect(dailyAggregates[0].finalAvg).toBe(2);
+    expect(dailyAggregates[0].moods).toEqual([1, 3]);
+  });
+
   test("linearly interpolates a gap day between two real days", () => {
     // Jan 1: mood 2, Jan 3: mood 6 → Jan 2 should interpolate to 4
     const moods = [mood(2, "2024-01-01"), mood(6, "2024-01-03")];
@@ -180,6 +200,18 @@ describe("processWeeklyMoodData", () => {
     const { weeklyAggregates } = processWeeklyMoodData(moods, 52, REF);
     expect(weeklyAggregates[0].avg).toBeCloseTo(5, 5);    // mean
     expect(weeklyAggregates[0].finalAvg).toBe(4);          // q2 median, not mean
+  });
+
+  test("normalizes stored scale references before weekly quartiles", () => {
+    const moods = [
+      mood(9, "2024-01-01", 12, higherIsBetterScale),
+      mood(3, "2024-01-02"),
+      mood(8, "2024-01-03"),
+    ];
+    const { weeklyAggregates } = processWeeklyMoodData(moods, 52, REF);
+
+    expect(weeklyAggregates[0].moods).toEqual([1, 3, 8]);
+    expect(weeklyAggregates[0].finalAvg).toBe(3);
   });
 
   test("groups Mood Entries from different weeks into separate aggregates", () => {

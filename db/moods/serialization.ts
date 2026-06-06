@@ -1,4 +1,4 @@
-import type { Emotion, MoodEntry, MoodEntryInput, Location, MoodScaleSnapshot } from "../types";
+import type { Emotion, MoodEntry, MoodEntryInput, MoodScaleSnapshot } from "../types";
 import type { MoodRow, RawEmotionItem } from "../types/rows";
 
 export const CURRENT_MOOD_SCALE_SNAPSHOT: MoodScaleSnapshot = {
@@ -7,6 +7,18 @@ export const CURRENT_MOOD_SCALE_SNAPSHOT: MoodScaleSnapshot = {
   max: 10,
   lowerIsBetter: true,
 };
+
+export const LEGACY_HIGHER_IS_BETTER_MOOD_SCALE_SNAPSHOT: MoodScaleSnapshot = {
+  version: 2,
+  min: 0,
+  max: 10,
+  lowerIsBetter: false,
+};
+
+const SUPPORTED_MOOD_SCALE_SNAPSHOTS = [
+  CURRENT_MOOD_SCALE_SNAPSHOT,
+  LEGACY_HIGHER_IS_BETTER_MOOD_SCALE_SNAPSHOT,
+];
 
 export function serializeArray(value?: string[]): string {
   if (!value || value.length === 0) {
@@ -22,15 +34,27 @@ export function serializeEmotions(value?: Emotion[]): string {
   return JSON.stringify(value.slice(0, 50));
 }
 
-export function serializeLocation(value?: Location | null): string | null {
-  if (!value) {
-    return null;
-  }
-  return JSON.stringify(value);
-}
-
 export function serializeMoodScale(value?: MoodScaleSnapshot): string {
   return JSON.stringify(value ?? CURRENT_MOOD_SCALE_SNAPSHOT);
+}
+
+function getSupportedMoodScaleSnapshot(value: unknown): MoodScaleSnapshot | null {
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
+  const candidate = value as Record<string, unknown>;
+  const scale = SUPPORTED_MOOD_SCALE_SNAPSHOTS.find(
+    (scale) =>
+      candidate.version === scale.version &&
+      candidate.min === scale.min &&
+      candidate.max === scale.max &&
+      candidate.lowerIsBetter === scale.lowerIsBetter
+  );
+  return scale ? { ...scale } : null;
+}
+
+export function isValidMoodScaleSnapshot(value: unknown): value is MoodScaleSnapshot {
+  return getSupportedMoodScaleSnapshot(value) !== null;
 }
 
 function deserializeArray(value: unknown): string[] {
@@ -89,47 +113,15 @@ function deserializeEmotions(value: unknown): Emotion[] {
   }
 }
 
-function isValidLocation(value: unknown): value is Location {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    typeof (value as Record<string, unknown>).latitude === "number" &&
-    typeof (value as Record<string, unknown>).longitude === "number"
-  );
-}
-
-function deserializeLocation(value: unknown): Location | null {
-  if (typeof value !== "string" || value.length === 0) {
-    return null;
-  }
-  try {
-    const parsed = JSON.parse(value);
-    if (isValidLocation(parsed)) {
-      return {
-        latitude: parsed.latitude,
-        longitude: parsed.longitude,
-        name: typeof parsed.name === "string" ? parsed.name : undefined,
-      };
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
 function deserializeMoodScale(value: unknown): MoodScaleSnapshot {
   if (typeof value !== "string" || value.length === 0) {
     return CURRENT_MOOD_SCALE_SNAPSHOT;
   }
   try {
-    const parsed = JSON.parse(value) as Partial<MoodScaleSnapshot>;
-    if (
-      parsed.version === 1 &&
-      parsed.min === 0 &&
-      parsed.max === 10 &&
-      parsed.lowerIsBetter === true
-    ) {
-      return CURRENT_MOOD_SCALE_SNAPSHOT;
+    const parsed = JSON.parse(value);
+    const snapshot = getSupportedMoodScaleSnapshot(parsed);
+    if (snapshot) {
+      return snapshot;
     }
   } catch {
     // Fall back below.
@@ -170,9 +162,6 @@ export function toMoodEntry(row: MoodRow): MoodEntry {
         ? null
         : Number(row.energy),
     moodScale: deserializeMoodScale(row.mood_scale_json),
-    photos: deserializeArray(row.photos_json),
-    location: deserializeLocation(row.location_json),
-    voiceMemos: deserializeArray(row.voice_memos_json),
     basedOnEntryId: row.based_on_entry_id ?? null,
   };
 }
@@ -188,9 +177,6 @@ export function normalizeInput(entry: MoodEntryInput) {
         : Math.min(10, Math.max(0, Math.round(entry.energy))),
     moodScale: entry.moodScale ?? CURRENT_MOOD_SCALE_SNAPSHOT,
     timestamp: entry.timestamp ?? Date.now(),
-    photos: [],
-    location: null,
-    voiceMemos: [],
     basedOnEntryId: entry.basedOnEntryId ?? null,
   };
 }
@@ -230,4 +216,8 @@ export function sanitizeEnergy(value: unknown): number | null {
     return null;
   }
   return Math.min(10, Math.max(0, Math.round(value)));
+}
+
+export function sanitizeImportedMoodScale(value: unknown): MoodScaleSnapshot {
+  return getSupportedMoodScaleSnapshot(value) ?? CURRENT_MOOD_SCALE_SNAPSHOT;
 }

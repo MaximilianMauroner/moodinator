@@ -15,7 +15,11 @@ import { CalendarHeader } from "./CalendarHeader";
 import { CalendarWeekHeader } from "./CalendarWeekHeader";
 import { CalendarDay } from "./CalendarDay";
 import { DayDetailModal } from "./DayDetailModal";
-import { moodScale } from "@/constants/moodScale";
+import {
+  getInterpretedMoodRating,
+  getMoodRatingDisplay,
+  isBetterMoodRating,
+} from "@/constants/moodScaleInterpretation";
 import { motion } from "@/constants/motion";
 import { typography } from "@/constants/typography";
 import type { MoodEntry } from "@db/types";
@@ -64,7 +68,7 @@ export function MoodCalendar({
     let totalMood = 0;
     let loggedDays = 0;
     let bestDay: number | null = null;
-    let bestMood = Number.POSITIVE_INFINITY;
+    let bestMood: number | null = null;
     let busiestDay: number | null = null;
     let busiestCount = 0;
 
@@ -74,9 +78,15 @@ export function MoodCalendar({
 
       loggedDays += 1;
       totalEntries += entryCount;
-      totalMood += dayData.entries.reduce((sum, entry) => sum + entry.mood, 0);
+      totalMood += dayData.entries.reduce(
+        (sum, entry) => sum + getInterpretedMoodRating(entry),
+        0
+      );
 
-      if (dayData.averageMood !== null && dayData.averageMood < bestMood) {
+      if (
+        dayData.averageMood !== null &&
+        (bestMood === null || isBetterMoodRating(dayData.averageMood, bestMood))
+      ) {
         bestMood = dayData.averageMood;
         bestDay = day;
       }
@@ -88,11 +98,7 @@ export function MoodCalendar({
     });
 
     const averageMood = totalEntries > 0 ? Math.round((totalMood / totalEntries) * 10) / 10 : null;
-    const averageMoodIndex =
-      averageMood !== null
-        ? Math.max(0, Math.min(10, Math.round(averageMood)))
-        : null;
-    const averageMoodInfo = averageMoodIndex !== null ? moodScale[averageMoodIndex] : null;
+    const averageMoodInfo = averageMood !== null ? getMoodRatingDisplay(averageMood, isDark) : null;
 
     return {
       totalEntries,
@@ -104,7 +110,7 @@ export function MoodCalendar({
       busiestCount,
       coverage: Math.round((loggedDays / monthData.daysInMonth) * 100),
     };
-  }, [monthData]);
+  }, [isDark, monthData]);
 
   // Swipe gesture for month navigation
   const swipeGesture = Gesture.Pan()
@@ -325,18 +331,14 @@ export function MoodCalendar({
               <View
                 className="px-3 py-2 rounded-2xl"
                 style={{
-                  backgroundColor: isDark
-                    ? monthSummary.averageMoodInfo.bgHexDark
-                    : monthSummary.averageMoodInfo.bgHex,
+                  backgroundColor: monthSummary.averageMoodInfo.backgroundHex,
                 }}
               >
                 <Text
                   style={[
                     typography.bodySm,
                     {
-                      color: isDark
-                        ? monthSummary.averageMoodInfo.textHexDark
-                        : monthSummary.averageMoodInfo.textHex,
+                      color: monthSummary.averageMoodInfo.colorHex,
                     },
                   ]}
                 >
@@ -346,9 +348,7 @@ export function MoodCalendar({
                   style={[
                     typography.bodyMd,
                     {
-                      color: isDark
-                        ? monthSummary.averageMoodInfo.textHexDark
-                        : monthSummary.averageMoodInfo.textHex,
+                      color: monthSummary.averageMoodInfo.colorHex,
                       fontWeight: "700",
                     },
                   ]}

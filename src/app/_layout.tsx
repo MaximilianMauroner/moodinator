@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { View, Text, AppState, AppStateStatus, ActivityIndicator } from "react-native";
 import { Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -8,6 +8,7 @@ import { LockScreen, useAppLockStore } from "@/features/appLock";
 import { OnboardingScreen, useOnboardingStore } from "@/features/onboarding";
 import { AppToaster } from "@/components/ui/AppToaster";
 import { useSettingsStore } from "@/shared/state/settingsStore";
+import { runAppBootstrap, type AppBootstrapStatus } from "@/services/bootstrapService";
 
 import "./global.css";
 
@@ -29,6 +30,8 @@ function AppBootSplash() {
 }
 
 export default function Layout() {
+  const [bootstrapStatus, setBootstrapStatus] =
+    useState<AppBootstrapStatus>("running");
   const { hydrated: lockHydrated, hydrate: hydrateLock, isEnabled, isLocked, lock } = useAppLockStore();
   const { hydrated: onboardingHydrated, hydrate: hydrateOnboarding, hasCompletedOnboarding } = useOnboardingStore();
   const { hydrated: settingsHydrated, hydrate: hydrateSettings } = useSettingsStore();
@@ -41,7 +44,8 @@ export default function Layout() {
     hydrateSettings();
   }, [hydrateLock, hydrateOnboarding, hydrateSettings]);
 
-  const hydrated = lockHydrated && onboardingHydrated && settingsHydrated;
+  const hydrated =
+    lockHydrated && onboardingHydrated && settingsHydrated && bootstrapStatus !== "running";
 
   // Lock app when it goes to background
   useEffect(() => {
@@ -57,6 +61,27 @@ export default function Layout() {
 
   useEffect(() => {
     registerBackgroundBackupTask();
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    runAppBootstrap()
+      .then((result) => {
+        if (isMounted) {
+          setBootstrapStatus(result.status);
+        }
+      })
+      .catch((error) => {
+        console.error("[layout] Failed to run app bootstrap:", error);
+        if (isMounted) {
+          setBootstrapStatus("ready-with-warning");
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   return (

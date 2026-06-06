@@ -26,6 +26,11 @@ import {
   type PaginatedResult,
 } from "@db/db";
 import type { MoodDateRange, MoodRangePreset } from "@db/moods/range";
+export {
+  createMoodEntryWorkflow,
+  type MoodEntryWorkflowRepository,
+  type MoodEntryWorkflowStoreAdapter,
+} from "./moodEntryWorkflow";
 
 export type { PaginationOptions, PaginatedResult };
 export type { MoodDateRange, MoodRangePreset };

@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import type { MoodEntry } from "@db/types";
 
 import { useThemeColors } from "@/constants/colors";
-import { moodScale } from "@/constants/moodScale";
+import { getMoodRatingDisplay } from "@/constants/moodScaleInterpretation";
 import { fontFamilies, typography } from "@/constants/typography";
 
 interface DeletedMoodToastProps {
@@ -34,8 +34,8 @@ function MoodChangeToast({
   const { get, isDark } = useThemeColors();
 
   const mood = useMemo(
-    () => moodScale.find((item) => item.value === entry.mood),
-    [entry.mood]
+    () => getMoodRatingDisplay(entry.mood, isDark, entry.moodScale),
+    [entry.mood, entry.moodScale, isDark]
   );
 
   const timestampLabel = useMemo(
@@ -49,14 +49,10 @@ function MoodChangeToast({
     [entry.timestamp]
   );
 
-  const moodLabel = mood?.label ?? "Mood";
-  const moodChipBg = isDark
-    ? mood?.bgHexDark ?? get("surfaceElevated")
-    : mood?.bgHex ?? get("surfaceElevated");
-  const moodChipText = isDark
-    ? mood?.textHexDark ?? get("textMuted")
-    : mood?.textHex ?? get("textMuted");
-  const moodChipBorder = isDark ? get("borderSubtle") : mood?.borderColor ?? get("border");
+  const moodLabel = mood.label;
+  const moodChipBg = mood.backgroundHex;
+  const moodChipText = mood.colorHex;
+  const moodChipBorder = isDark ? get("borderSubtle") : mood.borderColor;
 
   return (
     <View style={styles.frame}>

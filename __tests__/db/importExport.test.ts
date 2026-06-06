@@ -8,6 +8,12 @@ import { createMockDb } from "./mockClient";
 
 // Mock the database client module
 const mockDb = createMockDb();
+const higherIsBetterScale = {
+  version: 2,
+  min: 0,
+  max: 10,
+  lowerIsBetter: false,
+};
 
 vi.mock("../../db/client", () => ({
   getDb: vi.fn(() => Promise.resolve(mockDb)),
@@ -71,6 +77,19 @@ describe("Import/Export", () => {
       });
     });
 
+    it("exports the stored mood scale reference per entry", async () => {
+      mockDb.__addMood({
+        mood: 9,
+        timestamp: 1705320000000,
+        mood_scale_json: JSON.stringify(higherIsBetterScale),
+      });
+
+      const result = await exportMoods();
+      const parsed = JSON.parse(result);
+
+      expect(parsed[0].moodScale).toEqual(higherIsBetterScale);
+    });
+
     it("exports multiple moods", async () => {
       mockDb.__addMood({ mood: 5, timestamp: 1000 });
       mockDb.__addMood({ mood: 7, timestamp: 2000 });
@@ -129,6 +148,61 @@ describe("Import/Export", () => {
         lowerIsBetter: true,
       });
       expect(moods[0].based_on_entry_id).toBe(3);
+    });
+
+    it("imports and persists per-entry mood scale references", async () => {
+      const data = JSON.stringify([
+        {
+          mood: 9,
+          timestamp: 1705320000000,
+          moodScale: higherIsBetterScale,
+        },
+      ]);
+
+      const result = await importMoods(data);
+
+      expect(result.imported).toBe(1);
+      const moods = mockDb.__getMoods();
+      expect(JSON.parse(moods[0].mood_scale_json!)).toEqual(higherIsBetterScale);
+    });
+
+    it("falls back when imported mood scale metadata is unsupported", async () => {
+      const data = JSON.stringify([
+        {
+          mood: 4,
+          timestamp: 1705320000000,
+          moodScale: {
+            version: 3,
+            min: 0,
+            max: 5,
+            lowerIsBetter: false,
+          },
+        },
+      ]);
+
+      await importMoods(data);
+
+      const moods = mockDb.__getMoods();
+      expect(JSON.parse(moods[0].mood_scale_json!)).toEqual({
+        version: 1,
+        min: 0,
+        max: 10,
+        lowerIsBetter: true,
+      });
+    });
+
+    it("imports legacy exports without scale data using the current scale fallback", async () => {
+      const data = JSON.stringify([{ mood: 5, timestamp: 1705320000000 }]);
+
+      await importMoods(data);
+
+      const moods = mockDb.__getMoods();
+      expect(JSON.parse(moods[0].mood_scale_json!)).toEqual({
+        version: 1,
+        min: 0,
+        max: 10,
+        lowerIsBetter: true,
+      });
     });
 
     it("links emotions during import", async () => {
@@ -245,6 +319,21 @@ describe("Import/Export", () => {
       expect(moods[0].mood).toBe(7);
     });
 
+    it("preserves scale metadata in backup imports when present", async () => {
+      const data = JSON.stringify([
+        {
+          mood: 9,
+          timestamp: "2024-01-15T12:00:00Z",
+          moodScale: higherIsBetterScale,
+        },
+      ]);
+
+      await importOldBackup(data);
+
+      const moods = mockDb.__getMoods();
+      expect(JSON.parse(moods[0].mood_scale_json!)).toEqual(higherIsBetterScale);
+    });
+
     it("uses transactions", async () => {
       const data = JSON.stringify([{ mood: 5 }]);
 
@@ -298,6 +387,7 @@ describe("Import/Export", () => {
         location_json: '{"latitude":48.2,"longitude":16.37,"name":"Vienna"}',
         voice_memos_json: '["file:///memo.m4a"]',
         based_on_entry_id: 5,
+        mood_scale_json: JSON.stringify(higherIsBetterScale),
       });
 
       // Export
@@ -317,6 +407,7 @@ describe("Import/Export", () => {
       expect(moods[0].location_json).toBeNull();
       expect(moods[0].voice_memos_json).toBe("[]");
       expect(moods[0].based_on_entry_id).toBe(5);
+      expect(JSON.parse(moods[0].mood_scale_json!)).toEqual(higherIsBetterScale);
     });
 
     it("handles empty data gracefully", async () => {

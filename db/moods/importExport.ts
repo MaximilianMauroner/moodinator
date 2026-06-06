@@ -6,6 +6,7 @@ import {
   sanitizeEnergy,
   sanitizeImportedArray,
   sanitizeImportedEmotions,
+  sanitizeImportedMoodScale,
   serializeArray,
   serializeEmotions,
   serializeMoodScale,
@@ -89,6 +90,8 @@ export async function importMoods(jsonData: string): Promise<ImportResult> {
       const contextTags = sanitizeImportedArray(contextSource);
       const energy = sanitizeEnergy(rawMood?.energy);
       const basedOnEntryId = sanitizeBasedOnEntryId(rawMood?.basedOnEntryId);
+      // Legacy exports did not carry moodScale; assume the current local scale.
+      const moodScale = sanitizeImportedMoodScale(rawMood?.moodScale);
 
       const dbResult = await db.runAsync(
         "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy, mood_scale_json, photos_json, location_json, voice_memos_json, based_on_entry_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
@@ -98,7 +101,7 @@ export async function importMoods(jsonData: string): Promise<ImportResult> {
         serializeEmotions(emotions),
         serializeArray(contextTags),
         energy,
-        serializeMoodScale(),
+        serializeMoodScale(moodScale),
         "[]",
         null,
         "[]",
@@ -163,6 +166,8 @@ export async function importOldBackup(jsonData: string): Promise<ImportResult> {
       const contextTags = sanitizeImportedArray(contextSource);
       const energy = sanitizeEnergy(mood?.energy);
       const basedOnEntryId = sanitizeBasedOnEntryId(mood?.basedOnEntryId);
+      // Legacy backups did not carry moodScale; assume the current local scale.
+      const moodScale = sanitizeImportedMoodScale(mood?.moodScale);
 
       const dbResult = await db.runAsync(
         "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy, mood_scale_json, photos_json, location_json, voice_memos_json, based_on_entry_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
@@ -172,7 +177,7 @@ export async function importOldBackup(jsonData: string): Promise<ImportResult> {
         serializeEmotions(emotions),
         serializeArray(contextTags),
         energy,
-        serializeMoodScale(),
+        serializeMoodScale(moodScale),
         "[]",
         null,
         "[]",

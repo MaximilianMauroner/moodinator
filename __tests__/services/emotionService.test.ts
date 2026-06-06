@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createMockDb } from "../db/mockClient";
+import { createMockDb, createMockMoodEntry } from "../db/mockClient";
 
 const mockDb = createMockDb();
 
@@ -9,10 +9,22 @@ vi.mock("../../db/client", () => ({
 }));
 
 import { emotionService } from "../../src/services/emotionService";
+import { useMoodsStore } from "../../src/shared/state/moodsStore";
 
 describe("emotionService", () => {
   beforeEach(() => {
     mockDb.__reset();
+    useMoodsStore.setState({
+      moods: [],
+      status: "idle",
+      error: null,
+      lastLoadedAt: null,
+      isStale: true,
+      lastTracked: null,
+      totalCount: 0,
+      hasMore: false,
+      currentOffset: 0,
+    });
     vi.clearAllMocks();
   });
 
@@ -44,9 +56,11 @@ describe("emotionService", () => {
 
     await emotionService.update("Happy", { name: "Joyful", category: "positive" });
 
-    expect(mockDb.__getEmotions()).toEqual([
-      { id: 1, name: "Joyful", category: "positive" },
-    ]);
+    expect(mockDb.__getEmotions()).toEqual(
+      expect.arrayContaining([
+        { id: 1, name: "Joyful", category: "positive" },
+      ])
+    );
     expect(mockDb.__getMoods().map((mood) => mood.emotions)).toEqual([
       JSON.stringify([{ name: "Happy", category: "positive" }]),
       JSON.stringify([
@@ -115,9 +129,11 @@ describe("emotionService", () => {
 
     await emotionService.applyRenameHistoricalUpdate("Happy", "Joyful");
 
-    expect(mockDb.__getEmotions()).toEqual([
-      { id: 1, name: "Joyful", category: "positive" },
-    ]);
+    expect(mockDb.__getEmotions()).toEqual(
+      expect.arrayContaining([
+        { id: 1, name: "Joyful", category: "positive" },
+      ])
+    );
     expect(mockDb.__getMoods().map((mood) => mood.emotions)).toEqual([
       JSON.stringify([{ name: "Joyful", category: "positive" }]),
       JSON.stringify([
@@ -125,6 +141,40 @@ describe("emotionService", () => {
         { name: "Calm", category: "neutral" },
       ]),
     ]);
+  });
+
+  it("keeps JSON snapshots, normalized emotions, and join rows aligned after a rename historical update", async () => {
+    const happy = mockDb.__addEmotion({ name: "Happy", category: "positive" });
+    const calm = mockDb.__addEmotion({ name: "Calm", category: "neutral" });
+    const mood = mockDb.__addMood({
+      emotions: JSON.stringify([
+        { name: "Happy", category: "positive" },
+        { name: "Calm", category: "neutral" },
+      ]),
+    });
+    mockDb.__addMoodEmotion(mood.id, happy.id);
+    mockDb.__addMoodEmotion(mood.id, calm.id);
+
+    await emotionService.applyRenameHistoricalUpdate("Happy", "Joyful");
+
+    expect(mockDb.__getMoods()[0]?.emotions).toBe(
+      JSON.stringify([
+        { name: "Joyful", category: "positive" },
+        { name: "Calm", category: "neutral" },
+      ])
+    );
+    expect(mockDb.__getEmotions()).toEqual(
+      expect.arrayContaining([
+        { id: calm.id, name: "Calm", category: "neutral" },
+        { id: happy.id, name: "Joyful", category: "positive" },
+      ])
+    );
+    expect(mockDb.__getMoodEmotions()).toEqual(
+      expect.arrayContaining([
+        { mood_id: mood.id, emotion_id: happy.id },
+        { mood_id: mood.id, emotion_id: calm.id },
+      ])
+    );
   });
 
   it("previews a category historical update with an exact count across all matching snapshots", async () => {
@@ -168,6 +218,42 @@ describe("emotionService", () => {
         { name: "Happy", category: "positive" },
       ]),
     ]);
+  });
+
+  it("keeps JSON snapshots, normalized emotions, and join rows aligned after a category historical update", async () => {
+    const calm = mockDb.__addEmotion({ name: "Calm", category: "neutral" });
+    const mood = mockDb.__addMood({
+      emotions: JSON.stringify([{ name: "Calm", category: "neutral" }]),
+    });
+    mockDb.__addMoodEmotion(mood.id, calm.id);
+
+    await emotionService.applyCategoryHistoricalUpdate("Calm", "positive");
+
+    expect(mockDb.__getMoods()[0]?.emotions).toBe(
+      JSON.stringify([{ name: "Calm", category: "positive" }])
+    );
+    expect(mockDb.__getEmotions()).toEqual([
+      { id: calm.id, name: "Calm", category: "positive" },
+    ]);
+    expect(mockDb.__getMoodEmotions()).toEqual([
+      { mood_id: mood.id, emotion_id: calm.id },
+    ]);
+  });
+
+  it("invalidates loaded mood entries after a successful historical update", async () => {
+    mockDb.__addEmotion({ name: "Calm", category: "neutral" });
+    mockDb.__addMood({
+      emotions: JSON.stringify([{ name: "Calm", category: "neutral" }]),
+    });
+    useMoodsStore
+      .getState()
+      .setLocal([createMockMoodEntry({ emotions: [{ name: "Calm", category: "neutral" }] })]);
+
+    expect(useMoodsStore.getState().isStale).toBe(false);
+
+    await emotionService.applyCategoryHistoricalUpdate("Calm", "positive");
+
+    expect(useMoodsStore.getState().isStale).toBe(true);
   });
 
   it("returns importable emotion names from past mood entries", async () => {

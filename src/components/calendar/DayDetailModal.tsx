@@ -3,9 +3,9 @@ import { View, Text, Modal, Pressable, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { format } from "date-fns";
 import { useThemeColors, colors } from "@/constants/colors";
-import { moodScale } from "@/constants/moodScale";
+import { getMoodRatingDisplay } from "@/constants/moodScaleInterpretation";
 import { haptics } from "@/lib/haptics";
-import type { MoodEntry } from "@db/types";
+import type { MoodEntry, MoodScaleSnapshot } from "@db/types";
 
 type DayDetailModalProps = {
   visible: boolean;
@@ -36,12 +36,12 @@ export function DayDetailModal({
     onEditEntry?.(entry);
   };
 
-  const getMoodData = (mood: number) => {
-    const info = moodScale[Math.min(mood, moodScale.length - 1)];
+  const getMoodData = (mood: number, sourceScale?: MoodScaleSnapshot) => {
+    const info = getMoodRatingDisplay(mood, isDark, sourceScale);
     return {
-      label: info?.label ?? `Mood ${mood}`,
-      textHex: isDark ? info?.textHexDark : info?.textHex,
-      bgHex: isDark ? info?.bgHexDark : info?.bgHex,
+      label: info.label,
+      textHex: info.colorHex,
+      bgHex: info.backgroundHex,
     };
   };
 
@@ -133,7 +133,7 @@ export function DayDetailModal({
             ) : (
               <View className="gap-3">
                 {entries.map((entry) => {
-                  const moodData = getMoodData(entry.mood);
+                  const moodData = getMoodData(entry.mood, entry.moodScale);
                   return (
                     <Pressable
                       key={entry.id}

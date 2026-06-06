@@ -115,17 +115,16 @@ describe("Repository", () => {
       });
     });
 
-    it("does not persist media or location for new mood entries", async () => {
-      const result = await insertMoodEntry({
-        mood: 6,
-        photos: ["file:///photo.jpg"],
-        location: { latitude: 48.2, longitude: 16.37, name: "Vienna" },
-        voiceMemos: ["file:///memo.m4a"],
-      });
+    it("sets legacy media and location columns to empty defaults", async () => {
+      const result = await insertMoodEntry({ mood: 6 });
+      const [row] = mockDb.__getMoods();
 
-      expect(result.photos).toEqual([]);
-      expect(result.location).toBeNull();
-      expect(result.voiceMemos).toEqual([]);
+      expect(result).not.toHaveProperty("photos");
+      expect(result).not.toHaveProperty("location");
+      expect(result).not.toHaveProperty("voiceMemos");
+      expect(row.photos_json).toBe("[]");
+      expect(row.location_json).toBeNull();
+      expect(row.voice_memos_json).toBe("[]");
     });
 
     it("links emotions when provided", async () => {

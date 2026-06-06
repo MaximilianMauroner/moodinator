@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
   },
   cardShadowDark: {
-    elevation: 2,
+    elevation: 0,
     shadowColor: effectColors.shadow.black,
     shadowOpacity: 0.2,
     shadowRadius: 8,

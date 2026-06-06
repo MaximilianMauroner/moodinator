@@ -19,8 +19,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useThemeColors, colors } from "@/constants/colors";
 import { haptics } from "@/lib/haptics";
 import { moodService } from "@/services/moodService";
-import { moodScale } from "@/constants/moodScale";
-import type { MoodEntry } from "@db/types";
+import { getMoodRatingDisplay } from "@/constants/moodScaleInterpretation";
+import type { MoodEntry, MoodScaleSnapshot } from "@db/types";
 
 interface SameAsYesterdayButtonProps {
   onCopy: (entry: MoodEntry) => void;
@@ -155,9 +155,11 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
     }
   };
 
-  const getMoodData = (moodValue: number) => {
-    const moodItem = moodScale.find((m) => m.value === moodValue);
-    return moodItem || moodScale[5];
+  const getMoodData = (
+    moodValue: number,
+    sourceScale?: MoodScaleSnapshot
+  ) => {
+    return getMoodRatingDisplay(moodValue, isDark, sourceScale);
   };
 
   if (noEntry) {
@@ -257,9 +259,7 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
                   <View
                     className="p-4"
                     style={{
-                      backgroundColor: isDark
-                        ? getMoodData(previewEntry.mood).bgHexDark
-                        : getMoodData(previewEntry.mood).bgHex,
+                      backgroundColor: getMoodData(previewEntry.mood, previewEntry.moodScale).backgroundHex,
                       borderBottomWidth: 1,
                       borderBottomColor: isDark ? "rgba(61, 53, 42, 0.3)" : "rgba(229, 217, 191, 0.5)",
                     }}
@@ -275,9 +275,7 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
                           <Text
                             className="text-2xl font-bold"
                             style={{
-                              color: isDark
-                                ? getMoodData(previewEntry.mood).textHexDark
-                                : getMoodData(previewEntry.mood).textHex,
+                              color: getMoodData(previewEntry.mood, previewEntry.moodScale).colorHex,
                             }}
                           >
                             {previewEntry.mood}
@@ -287,19 +285,15 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
                           <Text
                             className="text-lg font-bold"
                             style={{
-                              color: isDark
-                                ? getMoodData(previewEntry.mood).textHexDark
-                                : getMoodData(previewEntry.mood).textHex,
+                              color: getMoodData(previewEntry.mood, previewEntry.moodScale).colorHex,
                             }}
                           >
-                            {getMoodData(previewEntry.mood).label}
+                            {getMoodData(previewEntry.mood, previewEntry.moodScale).label}
                           </Text>
                           <Text
                             className="text-xs"
                             style={{
-                              color: isDark
-                                ? getMoodData(previewEntry.mood).textHexDark
-                                : getMoodData(previewEntry.mood).textHex,
+                              color: getMoodData(previewEntry.mood, previewEntry.moodScale).colorHex,
                               opacity: 0.7,
                             }}
                           >
@@ -315,10 +309,7 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
                         <Ionicons
                           name="close"
                           size={18}
-                          color={isDark
-                            ? getMoodData(previewEntry.mood).textHexDark
-                            : getMoodData(previewEntry.mood).textHex
-                          }
+                          color={getMoodData(previewEntry.mood, previewEntry.moodScale).colorHex}
                         />
                       </Pressable>
                     </View>

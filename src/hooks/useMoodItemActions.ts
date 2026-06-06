@@ -5,13 +5,7 @@ import { haptics } from "@/lib/haptics";
 import { toastService } from "@/services/toastService";
 import { useMoodsStore } from "@/shared/state/moodsStore";
 
-type MoodsSetter =
-  | React.Dispatch<React.SetStateAction<MoodEntry[]>>
-  | ((updater: MoodEntry[] | ((prev: MoodEntry[]) => MoodEntry[])) => void);
-
 interface UseMoodItemActionsParams {
-  setMoods: MoodsSetter;
-  setLastTracked: React.Dispatch<React.SetStateAction<Date | null>> | (() => void);
   setEditingEntry: (entry: MoodEntry) => void;
 }
 
@@ -19,8 +13,6 @@ interface UseMoodItemActionsParams {
  * Hook for handling mood item actions (delete, swipe, long press).
  */
 export function useMoodItemActions({
-  setMoods,
-  setLastTracked,
   setEditingEntry,
 }: UseMoodItemActionsParams) {
   const SWIPE_THRESHOLD = 100;
@@ -31,10 +23,9 @@ export function useMoodItemActions({
     async (mood: MoodEntry) => {
       haptics.warning(); // Haptic feedback for delete action
       await removeMood(mood.id);
-      setMoods((prev) => prev.filter((m) => m.id !== mood.id));
       toastService.showDeletedMood(mood, async (deletedMood) => {
         haptics.success(); // Haptic feedback for undo/restore
-        const restoredMood = await restoreMood({
+        await restoreMood({
           mood: deletedMood.mood,
           note: deletedMood.note,
           timestamp: deletedMood.timestamp,
@@ -42,33 +33,11 @@ export function useMoodItemActions({
           contextTags: deletedMood.contextTags,
           energy: deletedMood.energy,
           moodScale: deletedMood.moodScale,
-          photos: deletedMood.photos,
-          location: deletedMood.location,
-          voiceMemos: deletedMood.voiceMemos,
           basedOnEntryId: deletedMood.basedOnEntryId,
-        });
-
-        setMoods((prev) => {
-          const updated = [...prev, restoredMood].sort(
-            (a, b) =>
-              new Date(b.timestamp).getTime() -
-              new Date(a.timestamp).getTime()
-          );
-          return updated;
-        });
-
-        setLastTracked((prevLastTracked) => {
-          if (
-            !prevLastTracked ||
-            new Date(restoredMood.timestamp) > prevLastTracked
-          ) {
-            return new Date(restoredMood.timestamp);
-          }
-          return prevLastTracked;
         });
       });
     },
-    [removeMood, restoreMood, setMoods, setLastTracked]
+    [removeMood, restoreMood]
   );
 
   const onSwipeableWillOpen = useCallback(

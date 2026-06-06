@@ -3,8 +3,8 @@ import { View, Text, ScrollView, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
-import * as Notifications from "expo-notifications";
 import { moodService } from "@/services/moodService";
+import { notificationService } from "@/services/notificationService";
 import { useSettingsStore } from "@/shared/state/settingsStore";
 import { useMoodsStore } from "@/shared/state/moodsStore";
 import { useOnboardingStore } from "@/features/onboarding";
@@ -55,11 +55,10 @@ export default function DeveloperSettingsScreen() {
   }, [ensureFreshMoods, invalidateMoods]);
 
   const handleTestNotification = useCallback(async () => {
-    await Notifications.scheduleNotificationAsync({
-      content: { title: "Test Notification", body: "This is a test notification!" },
-      trigger: { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: 2 },
-    });
-    Alert.alert("Scheduled", "Notification will appear in 2 seconds.");
+    const scheduled = await notificationService.scheduleTestNotification();
+    if (scheduled) {
+      Alert.alert("Scheduled", "Notification will appear in 2 seconds.");
+    }
   }, []);
 
   const handleClearMoods = useCallback(() => {
@@ -98,7 +97,7 @@ export default function DeveloperSettingsScreen() {
           style: "destructive",
           onPress: async () => {
             try {
-              await Notifications.cancelAllScheduledNotificationsAsync();
+              await notificationService.cancelAllScheduledNotifications();
               await clearPin();
               await moodService.clearAll();
               await AsyncStorage.clear();

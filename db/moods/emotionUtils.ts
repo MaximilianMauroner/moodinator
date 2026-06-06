@@ -1,5 +1,5 @@
 import type { Emotion } from "../types";
-import { DEFAULT_EMOTIONS } from "../../src/lib/entrySettings";
+import { DEFAULT_EMOTIONS } from "../../domain/entrySettings";
 
 export function parseEmotionItem(item: unknown): Emotion | null {
   if (typeof item === "string" && item.trim().length > 0) {

@@ -11,7 +11,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useColorScheme } from "nativewind";
 import { format } from "date-fns";
 import Animated, { FadeInUp } from "react-native-reanimated";
-import type { MoodEntry } from "@db/types";
+import type { MoodEntry, MoodScaleSnapshot } from "@db/types";
 import { getEnergySegmentColor } from "@/constants/colors";
 import { motion } from "@/constants/motion";
 
@@ -21,8 +21,8 @@ const sectionReveal = (index: number) =>
 interface EntryDetailModalProps {
   entry: MoodEntry | null;
   onClose: () => void;
-  getMoodLabel: (mood: number) => string;
-  getMoodColor: (mood: number) => string;
+  getMoodLabel: (mood: number, sourceScale?: MoodScaleSnapshot) => string;
+  getMoodColor: (mood: number, sourceScale?: MoodScaleSnapshot) => string;
 }
 
 export function EntryDetailModal({
@@ -100,11 +100,11 @@ export function EntryDetailModal({
             <View className="flex-row items-center">
               <View
                 className="w-16 h-16 rounded-2xl items-center justify-center mr-4"
-                style={{ backgroundColor: getMoodColor(entry.mood) + "20" }}
+                style={{ backgroundColor: getMoodColor(entry.mood, entry.moodScale) + "20" }}
               >
                 <Text
                   className="text-3xl font-bold"
-                  style={{ color: getMoodColor(entry.mood) }}
+                  style={{ color: getMoodColor(entry.mood, entry.moodScale) }}
                 >
                   {entry.mood}
                 </Text>
@@ -114,7 +114,7 @@ export function EntryDetailModal({
                   className="text-xl font-semibold"
                   style={{ color: isDark ? "#F5F1E8" : "#3D352A" }}
                 >
-                  {getMoodLabel(entry.mood)}
+                  {getMoodLabel(entry.mood, entry.moodScale)}
                 </Text>
                 <Text
                   className="text-sm mt-1"

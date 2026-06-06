@@ -39,6 +39,7 @@ import { motion } from "@/constants/motion";
 import { haptics } from "@/lib/haptics";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import type { MoodEntry } from "@db/types";
+import { getInterpretedMoodRating } from "@/constants/moodScaleInterpretation";
 
 type ViewMode = "calendar" | "charts";
 
@@ -261,7 +262,7 @@ export function InsightsScreen() {
                         title="Mood Range"
                         metric={
                           periodMoods.length > 0
-                            ? `${Math.min(...periodMoods.map((m) => m.mood))}-${Math.max(...periodMoods.map((m) => m.mood))}`
+                            ? `${Math.min(...periodMoods.map(getInterpretedMoodRating))}-${Math.max(...periodMoods.map(getInterpretedMoodRating))}`
                             : "-"
                         }
                         interpretation="spread"
@@ -355,18 +356,18 @@ export function InsightsScreen() {
                           >
                             <View
                               className="w-10 h-10 rounded-2xl items-center justify-center mr-3"
-                              style={{ backgroundColor: getMoodColor(mood.mood) + "20" }}
+                              style={{ backgroundColor: getMoodColor(mood.mood, mood.moodScale) + "20" }}
                             >
                               <Text
                                 className="text-lg font-bold"
-                                style={{ color: getMoodColor(mood.mood) }}
+                                style={{ color: getMoodColor(mood.mood, mood.moodScale) }}
                               >
                                 {mood.mood}
                               </Text>
                             </View>
                             <View className="flex-1">
                               <Text className="text-paper-800 dark:text-paper-200" style={typography.bodyMd}>
-                                {getMoodLabel(mood.mood)}
+                                {getMoodLabel(mood.mood, mood.moodScale)}
                               </Text>
                               <Text className="text-sand-500 dark:text-sand-400" style={typography.bodySm}>
                                 {period === "week"

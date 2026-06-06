@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last Updated: May 21, 2026**
+**Last Updated: May 22, 2026**
 
 ## Introduction
 
@@ -15,8 +15,6 @@ Moodinator collects and stores the following information that you voluntarily pr
 - **Mood Entries**: Your mood ratings (0-10 scale), timestamps, and any notes you add
 - **Emotions**: Emotion tags you select for each entry
 - **Contexts**: Context tags describing your situation (e.g., work, home, social)
-- **Photos**: Images you choose to attach to mood entries
-- **Voice Notes**: Audio recordings you attach to entries
 
 ### Local-Only Storage
 

@@ -15,11 +15,11 @@ import {
   migrateEmotionsToTable,
   hasEmotionTableMigrated,
   countMoodEntriesWithEmotionName,
-  renameEmotionInMoodEntries,
-  recategorizeEmotionInMoodEntries,
+  applyEmotionHistoricalUpdate,
 } from "@db/moods/emotions";
 import { migrateEmotionsToCategories } from "@db/moods/migrations";
 import { getEmotionNamesFromMoods } from "@db/moods/repository";
+import { useMoodsStore } from "@/shared/state/moodsStore";
 
 export interface HistoricalUpdatePreview {
   affectedMoodEntryCount: number;
@@ -57,6 +57,10 @@ export interface EmotionServiceInterface {
   migrateToTable: () => Promise<{ migrated: number }>;
   migrateToCategories: () => Promise<{ migrated: number; skipped: number }>;
   hasMigrated: () => Promise<boolean>;
+}
+
+function invalidateMoodEntryHistory() {
+  useMoodsStore.getState().invalidate();
 }
 
 export const emotionService: EmotionServiceInterface = {
@@ -105,20 +109,8 @@ export const emotionService: EmotionServiceInterface = {
   },
 
   async applyRenameHistoricalUpdate(oldName: string, newName: string): Promise<void> {
-    const emotions = await getAllEmotions();
-    const existing = emotions.find(
-      (emotion) => emotion.name.trim().toLowerCase() === oldName.trim().toLowerCase()
-    );
-
-    if (!existing) {
-      return;
-    }
-
-    await updateEmotion(oldName, {
-      name: newName,
-      category: existing.category,
-    });
-    await renameEmotionInMoodEntries(oldName, newName);
+    await applyEmotionHistoricalUpdate({ type: "rename", oldName, newName });
+    invalidateMoodEntryHistory();
   },
 
   async previewCategoryHistoricalUpdate(
@@ -134,7 +126,8 @@ export const emotionService: EmotionServiceInterface = {
     name: string,
     category: Emotion["category"]
   ): Promise<void> {
-    await recategorizeEmotionInMoodEntries(name, category);
+    await applyEmotionHistoricalUpdate({ type: "category", name, category });
+    invalidateMoodEntryHistory();
   },
 
   async getImportableEmotionNames(): Promise<string[]> {

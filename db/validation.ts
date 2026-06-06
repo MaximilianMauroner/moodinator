@@ -1,4 +1,4 @@
-import { MOOD_MIN, MOOD_MAX, type Emotion, type Location, type MoodEntryInput } from "./types";
+import { MOOD_MIN, MOOD_MAX, type Emotion, type MoodEntryInput } from "./types";
 
 export type ValidationError = {
   field: string;
@@ -55,24 +55,6 @@ function isValidEmotion(emotion: unknown): emotion is Emotion {
     e.name.trim().length > 0 &&
     typeof e.category === "string" &&
     VALID_CATEGORIES.includes(e.category as Emotion["category"])
-  );
-}
-
-function isValidLocation(location: unknown): location is Location | null {
-  if (location === null || location === undefined) {
-    return true;
-  }
-  if (typeof location !== "object") {
-    return false;
-  }
-  const loc = location as Record<string, unknown>;
-  return (
-    typeof loc.latitude === "number" &&
-    typeof loc.longitude === "number" &&
-    loc.latitude >= -90 &&
-    loc.latitude <= 90 &&
-    loc.longitude >= -180 &&
-    loc.longitude <= 180
   );
 }
 
@@ -139,24 +121,6 @@ export function validateMoodEntry(input: unknown): ValidationResult<MoodEntryInp
     errors.push({ field: "contextTags", message: "Context tags must be an array of strings" });
   }
 
-  // Optional: photos
-  if (entry.photos !== undefined && !isStringArray(entry.photos)) {
-    errors.push({ field: "photos", message: "Photos must be an array of strings" });
-  }
-
-  // Optional: voiceMemos
-  if (entry.voiceMemos !== undefined && !isStringArray(entry.voiceMemos)) {
-    errors.push({ field: "voiceMemos", message: "Voice memos must be an array of strings" });
-  }
-
-  // Optional: location
-  if (!isValidLocation(entry.location)) {
-    errors.push({
-      field: "location",
-      message: "Location must have valid latitude (-90 to 90) and longitude (-180 to 180)",
-    });
-  }
-
   // Optional: basedOnEntryId
   if (
     entry.basedOnEntryId !== undefined &&
@@ -178,9 +142,6 @@ export function validateMoodEntry(input: unknown): ValidationResult<MoodEntryInp
     emotions: entry.emotions as Emotion[] | undefined,
     contextTags: entry.contextTags as string[] | undefined,
     energy: entry.energy as number | null | undefined,
-    photos: entry.photos as string[] | undefined,
-    location: entry.location as Location | null | undefined,
-    voiceMemos: entry.voiceMemos as string[] | undefined,
     basedOnEntryId: entry.basedOnEntryId as number | null | undefined,
   };
 

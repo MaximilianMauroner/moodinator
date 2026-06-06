@@ -16,7 +16,10 @@ import {
   subDays,
 } from "date-fns";
 import type { MoodEntry } from "@db/types";
-import { moodScale } from "@/constants/moodScale";
+import {
+  getInterpretedMoodRating,
+  getNeutralMoodRating,
+} from "@/constants/moodScaleInterpretation";
 
 /** Daily aggregate data point for charts */
 export interface DailyDataPoint {
@@ -151,7 +154,7 @@ export const processMoodDataForDailyChart = (
     if (!moodsByDay[dayKey]) {
       moodsByDay[dayKey] = [];
     }
-    moodsByDay[dayKey].push(mood.mood);
+    moodsByDay[dayKey].push(getInterpretedMoodRating(mood));
   });
 
   type WorkingAggregate = {
@@ -228,8 +231,7 @@ export const processMoodDataForDailyChart = (
       } else if (nextAgg?.avg !== undefined) {
         interpolatedAvg = nextAgg.avg;
       } else {
-        const neutralMood = moodScale.find((s) => s.label === "Neutral");
-        interpolatedAvg = neutralMood ? neutralMood.value : 5;
+        interpolatedAvg = getNeutralMoodRating();
       }
 
       return {
@@ -276,7 +278,7 @@ export const processWeeklyMoodData = (
     if (!moodsByWeek[weekKey]) {
       moodsByWeek[weekKey] = [];
     }
-    moodsByWeek[weekKey].push(mood.mood);
+    moodsByWeek[weekKey].push(getInterpretedMoodRating(mood));
   });
 
   const weekKeys = Object.keys(moodsByWeek).sort().reverse();

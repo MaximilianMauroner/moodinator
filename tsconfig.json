@@ -17,6 +17,7 @@
   "include": [
     "src/**/*.ts",
     "src/**/*.tsx",
+    "domain/**/*.ts",
     "db/**/*.ts",
     "db/**/*.tsx",
     "expo-env.d.ts",

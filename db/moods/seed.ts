@@ -1,7 +1,7 @@
 import type { Emotion } from "../types";
 import type * as SQLite from "expo-sqlite";
 import { getDb } from "../client";
-import { DEFAULT_CONTEXTS, DEFAULT_EMOTIONS } from "../../src/lib/entrySettings";
+import { DEFAULT_CONTEXTS, DEFAULT_EMOTIONS } from "../../domain/entrySettings";
 import {
   serializeArray,
   serializeEmotions,

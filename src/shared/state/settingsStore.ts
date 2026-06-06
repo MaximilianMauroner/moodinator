@@ -1,33 +1,10 @@
 import { create } from "zustand";
-import {
-    DEFAULT_CONTEXTS,
-    DEFAULT_EMOTIONS,
-    DEFAULT_HISTORY_CARD_STYLE,
-    DEFAULT_QUICK_ENTRY_PREFS,
-    parseEmotionList,
-    parseStringList,
-    sanitizeHistoryCardStyle,
-    type HistoryCardStyle,
-    type QuickEntryPrefs,
-} from "@/lib/entrySettings";
+import type { HistoryCardStyle, QuickEntryPrefs } from "@/lib/entrySettings";
 import type { Emotion } from "@db/types";
 import {
-    DEV_OPTIONS_KEY,
-    EMOTION_PRESETS_KEY,
-    CONTEXT_TAGS_KEY,
-    QUICK_ENTRY_PREFS_KEY,
-    HAPTICS_ENABLED_KEY,
-    HISTORY_CARD_STYLE_KEY,
-    SHOW_LABELS_KEY,
-} from "@/shared/storage/keys";
-import {
-    getBoolean,
-    setBoolean,
-    getJson,
-    getString,
-    setJson,
-    setString,
-} from "@/shared/storage/asyncStorage";
+    DEFAULT_SETTINGS_SNAPSHOT,
+    settingsService,
+} from "@/services/settingsService";
 import { setHapticsEnabled as setHapticsEnabledGlobal } from "@/lib/haptics";
 
 // Note: therapyExportPrefs are intentionally absent. They have only one
@@ -59,89 +36,58 @@ export type SettingsStore = {
 export const useSettingsStore = create<SettingsStore>((set) => ({
     hydrated: false,
 
-    showDetailedLabels: false,
-    devOptionsEnabled: false,
-    hapticsEnabled: true,
-    historyCardStyle: DEFAULT_HISTORY_CARD_STYLE,
+    showDetailedLabels: DEFAULT_SETTINGS_SNAPSHOT.showDetailedLabels,
+    devOptionsEnabled: DEFAULT_SETTINGS_SNAPSHOT.devOptionsEnabled,
+    hapticsEnabled: DEFAULT_SETTINGS_SNAPSHOT.hapticsEnabled,
+    historyCardStyle: DEFAULT_SETTINGS_SNAPSHOT.historyCardStyle,
 
-    emotions: DEFAULT_EMOTIONS,
-    contexts: DEFAULT_CONTEXTS,
-    quickEntryPrefs: DEFAULT_QUICK_ENTRY_PREFS,
+    emotions: DEFAULT_SETTINGS_SNAPSHOT.emotions,
+    contexts: DEFAULT_SETTINGS_SNAPSHOT.contexts,
+    quickEntryPrefs: DEFAULT_SETTINGS_SNAPSHOT.quickEntryPrefs,
 
     hydrate: async () => {
-        const [
-            showDetailedLabels,
-            devOptionsEnabled,
-            hapticsEnabled,
-            historyCardStyle,
-            emotionsRaw,
-            contextsRaw,
-            quickEntryPrefsRaw,
-        ] = await Promise.all([
-            getBoolean(SHOW_LABELS_KEY),
-            getBoolean(DEV_OPTIONS_KEY),
-            getBoolean(HAPTICS_ENABLED_KEY),
-            getString(HISTORY_CARD_STYLE_KEY),
-            getJson<unknown>(EMOTION_PRESETS_KEY),
-            getJson<unknown>(CONTEXT_TAGS_KEY),
-            getJson<Partial<QuickEntryPrefs>>(QUICK_ENTRY_PREFS_KEY),
-        ]);
-
-        const hapticsValue = hapticsEnabled ?? true;
-        setHapticsEnabledGlobal(hapticsValue);
+        const snapshot = await settingsService.load();
+        setHapticsEnabledGlobal(snapshot.hapticsEnabled);
 
         set({
             hydrated: true,
-            showDetailedLabels: showDetailedLabels ?? false,
-            devOptionsEnabled: devOptionsEnabled ?? false,
-            hapticsEnabled: hapticsValue,
-            historyCardStyle: sanitizeHistoryCardStyle(historyCardStyle),
-            emotions: parseEmotionList(emotionsRaw),
-            contexts: parseStringList(contextsRaw, DEFAULT_CONTEXTS),
-            quickEntryPrefs: quickEntryPrefsRaw
-                ? { ...DEFAULT_QUICK_ENTRY_PREFS, ...quickEntryPrefsRaw }
-                : DEFAULT_QUICK_ENTRY_PREFS,
+            ...snapshot,
         });
     },
 
-    // Optimistic writes: state updates immediately; storage write fires async.
-    // AsyncStorage failures on device are effectively impossible, so no rollback
-    // is implemented. A failed write would cause a silent divergence on the
-    // next cold launch — an accepted risk.
-
     setShowDetailedLabels: async (value) => {
         set({ showDetailedLabels: value });
-        void setBoolean(SHOW_LABELS_KEY, value);
+        await settingsService.setShowDetailedLabels(value);
     },
 
     setDevOptionsEnabled: async (value) => {
         set({ devOptionsEnabled: value });
-        void setBoolean(DEV_OPTIONS_KEY, value);
+        await settingsService.setDevOptionsEnabled(value);
     },
 
     setHapticsEnabled: async (value) => {
         setHapticsEnabledGlobal(value);
         set({ hapticsEnabled: value });
-        void setBoolean(HAPTICS_ENABLED_KEY, value);
+        await settingsService.setHapticsEnabled(value);
     },
 
     setHistoryCardStyle: async (value) => {
         set({ historyCardStyle: value });
-        void setString(HISTORY_CARD_STYLE_KEY, value);
+        await settingsService.setHistoryCardStyle(value);
     },
 
     setEmotions: async (values) => {
         set({ emotions: values });
-        void setJson(EMOTION_PRESETS_KEY, values);
+        await settingsService.setEmotions(values);
     },
 
     setContexts: async (values) => {
         set({ contexts: values });
-        void setJson(CONTEXT_TAGS_KEY, values);
+        await settingsService.setContexts(values);
     },
 
     setQuickEntryPrefs: async (prefs) => {
         set({ quickEntryPrefs: prefs });
-        void setJson(QUICK_ENTRY_PREFS_KEY, prefs);
+        await settingsService.setQuickEntryPrefs(prefs);
     },
 }));

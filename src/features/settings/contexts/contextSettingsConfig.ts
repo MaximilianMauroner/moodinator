@@ -1,0 +1,18 @@
+export const CONTEXT_THEME = {
+  lightPrimary: "#695C78",
+  darkPrimary: "#C4BBCF",
+  lightBgSolid: "#F5F3F8",
+  darkBgSolid: "rgba(48,42,65,0.65)",
+  lightBorder: "rgba(105,92,120,0.20)",
+  darkBorder: "rgba(105,92,120,0.30)",
+  lightAccentBg: "#E0D8EC",
+  darkAccentBg: "rgba(105,92,120,0.25)",
+  lightChipActive: "#E8E2F0",
+  darkChipActive: "rgba(105,92,120,0.40)",
+  lightChipBorder: "#695C78",
+  darkChipBorder: "#9888B0",
+  lightCustomBg: "#FDFCFA",
+  darkCustomBg: "rgba(255,255,255,0.05)",
+  lightCustomBorder: "rgba(0,0,0,0.08)",
+  darkCustomBorder: "rgba(255,255,255,0.10)",
+} as const;
