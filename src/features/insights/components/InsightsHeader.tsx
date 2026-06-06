@@ -143,7 +143,7 @@ export function InsightsHeader({ moods, totalEntries, onRefresh }: InsightsHeade
       const isLatest = i === recent.length - 1;
       items.push({
         key: `m${entry.id ?? i}`,
-        color: getMoodHex(entry.mood, isDark),
+        color: getMoodHex(entry.mood, isDark, entry.moodScale),
         isData: true,
         isLatest,
       });

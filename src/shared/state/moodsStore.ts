@@ -1,6 +1,9 @@
 import { create } from "zustand";
 import type { MoodEntry, MoodEntryInput } from "@db/types";
-import { moodService } from "@/services/moodService";
+import {
+  createMoodEntryWorkflow,
+  moodService,
+} from "@/services/moodService";
 
 type LoadStatus = "idle" | "loading" | "error" | "refreshing";
 
@@ -104,6 +107,20 @@ export const useMoodsStore = create<MoodsStore>((set, get) => {
     return activeHydrationPromise;
   };
 
+  const workflow = createMoodEntryWorkflow(moodService, {
+    getMoods: () => get().moods,
+    applyMutation: (moods) =>
+      set({
+        ...applyCollectionState(moods),
+        isStale: true,
+      }),
+    refreshAfterMutation: () => {
+      queueMicrotask(() => {
+        void get().ensureFresh();
+      });
+    },
+  });
+
   return {
     moods: [],
     status: "idle",
@@ -165,99 +182,23 @@ export const useMoodsStore = create<MoodsStore>((set, get) => {
     },
 
     updateTimestamp: async (id, timestamp) => {
-      const updated = await moodService.updateTimestamp(id, timestamp);
-      if (!updated) {
-        return null;
-      }
-
-      set((state) => {
-        const newMoods = [...state.moods]
-          .map((mood) => (mood.id === id ? updated : mood))
-          .sort((a, b) => b.timestamp - a.timestamp);
-
-        return {
-          ...applyCollectionState(newMoods),
-          isStale: true,
-        };
-      });
-
-      queueMicrotask(() => {
-        void get().ensureFresh();
-      });
-
-      return updated;
+      return workflow.reschedule(id, timestamp);
     },
 
     create: async (entry) => {
-      const created = await moodService.create(entry);
-      set((state) => {
-        const newMoods = [created, ...state.moods.filter((m) => m.id !== created.id)];
-        return {
-          ...applyCollectionState(newMoods),
-          isStale: true,
-        };
-      });
-
-      queueMicrotask(() => {
-        void get().ensureFresh();
-      });
-
-      return created;
+      return workflow.create(entry);
     },
 
     update: async (id, updates) => {
-      const updated = await moodService.update(id, updates);
-      if (!updated) {
-        return null;
-      }
-      set((state) => {
-        const newMoods = state.moods.map((m) => (m.id === id ? updated : m));
-        return {
-          ...applyCollectionState(newMoods),
-          isStale: true,
-        };
-      });
-
-      queueMicrotask(() => {
-        void get().ensureFresh();
-      });
-
-      return updated;
+      return workflow.update(id, updates);
     },
 
     remove: async (id) => {
-      const existing = get().moods.find((m) => m.id === id) ?? null;
-      await moodService.delete(id);
-      set((state) => {
-        const newMoods = state.moods.filter((m) => m.id !== id);
-        return {
-          ...applyCollectionState(newMoods),
-          isStale: true,
-        };
-      });
-
-      queueMicrotask(() => {
-        void get().ensureFresh();
-      });
-
-      return existing;
+      return workflow.delete(id);
     },
 
     restore: async (entry) => {
-      const restored = await moodService.create(entry);
-      set((state) => {
-        const newMoods = [restored, ...state.moods.filter((m) => m.id !== restored.id)];
-        return {
-          ...applyCollectionState(newMoods),
-          isStale: true,
-        };
-      });
-
-      queueMicrotask(() => {
-        void get().ensureFresh();
-      });
-
-      return restored;
+      return workflow.restore(entry);
     },
 
     // Selectors

@@ -2,7 +2,7 @@ import type * as SQLite from "expo-sqlite";
 import { getDb } from "../client";
 import type { Emotion } from "../types";
 import type { MoodRow, RawEmotionItem } from "../types/rows";
-import { DEFAULT_EMOTIONS } from "../../src/lib/entrySettings";
+import { DEFAULT_EMOTIONS } from "../../domain/entrySettings";
 import { CURRENT_MOOD_SCALE_SNAPSHOT, serializeEmotions, serializeMoodScale } from "./serialization";
 
 export async function migrateEmotionsToCategories(): Promise<{

@@ -15,53 +15,15 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import * as Clipboard from "expo-clipboard";
 import { Ionicons } from "@expo/vector-icons";
-import { dataPortabilityService } from "@/services/dataPortabilityService";
-
-type ExportRange = "week" | "month" | "custom" | "full";
-type ExportRangePayload =
-  | { preset: "week" | "month" }
-  | { startDate: number; endDate: number }
-  | undefined;
-
-function formatDateSlug(date: Date) {
-  return date.toISOString().split("T")[0];
-}
-
-function resolveRangePayload(
-  exportRange: ExportRange,
-  customStartDate: Date,
-  customEndDate: Date
-): ExportRangePayload | null {
-  if (exportRange === "full") {
-    return undefined;
-  }
-  if (exportRange === "week" || exportRange === "month") {
-    return { preset: exportRange };
-  }
-  const start = new Date(customStartDate);
-  const end = new Date(customEndDate);
-  start.setHours(0, 0, 0, 0);
-  end.setHours(23, 59, 59, 999);
-  if (end.getTime() < start.getTime()) {
-    Alert.alert("Invalid Range", "End date must be after the start date.");
-    return null;
-  }
-  return { startDate: start.getTime(), endDate: end.getTime() };
-}
+import {
+  dataPortabilityService,
+  type ExportRange,
+} from "@/services/dataPortabilityService";
 
 async function shareJsonData(
   jsonData: string,
-  exportRange: ExportRange,
-  customStartDate: Date,
-  customEndDate: Date
+  fileName: string
 ) {
-  const fileName =
-    exportRange === "custom"
-      ? `moodinator-export-${formatDateSlug(customStartDate)}-to-${formatDateSlug(customEndDate)}.json`
-      : exportRange === "full"
-        ? `moodinator-export-full-${formatDateSlug(new Date())}.json`
-        : `moodinator-export-${exportRange}-${formatDateSlug(new Date())}.json`;
-
   if (Platform.OS === "android") {
     const permissions =
       await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
@@ -147,18 +109,20 @@ export function ExportModal({
   }, [visible]);
 
   const handleExportShare = async () => {
-    const rangePayload = resolveRangePayload(
-      exportRange,
-      customStartDate,
-      customEndDate
-    );
-    if (rangePayload === null) {
-      return;
-    }
     try {
       setLoading(true);
-      const jsonData = await dataPortabilityService.exportData(rangePayload);
-      await shareJsonData(jsonData, exportRange, customStartDate, customEndDate);
+      const exportResult = await dataPortabilityService.createExport({
+        range: exportRange,
+        customStartDate,
+        customEndDate,
+      });
+
+      if (!exportResult.ok) {
+        Alert.alert(exportResult.title, exportResult.message);
+        return;
+      }
+
+      await shareJsonData(exportResult.jsonData, exportResult.fileName);
       onClose();
     } catch (error) {
       Alert.alert("Export Error", "Failed to export mood data");

@@ -12,6 +12,8 @@ import {
   sanitizeImportedArray,
   sanitizeImportedEmotions,
   sanitizeEnergy,
+  sanitizeImportedMoodScale,
+  isValidMoodScaleSnapshot,
 } from "../../db/moods/serialization";
 import type { Emotion, MoodEntryInput } from "../../db/types";
 
@@ -151,9 +153,6 @@ describe("toMoodEntry", () => {
         max: 10,
         lowerIsBetter: true,
       },
-      photos: [],
-      location: null,
-      voiceMemos: [],
       basedOnEntryId: null,
     });
   });
@@ -261,6 +260,68 @@ describe("toMoodEntry", () => {
     ]);
   });
 
+  it("preserves a stored non-current Mood Scale reference", () => {
+    const row = {
+      id: 1,
+      mood: 9,
+      note: null,
+      timestamp: 1705320000000,
+      emotions: "[]",
+      context_tags: "[]",
+      energy: null,
+      mood_scale_json: JSON.stringify({
+        version: 2,
+        min: 0,
+        max: 10,
+        lowerIsBetter: false,
+      }),
+      photos_json: null,
+      location_json: null,
+      voice_memos_json: null,
+      based_on_entry_id: null,
+    };
+
+    const result = toMoodEntry(row);
+
+    expect(result.moodScale).toEqual({
+      version: 2,
+      min: 0,
+      max: 10,
+      lowerIsBetter: false,
+    });
+  });
+
+  it("falls back when stored Mood Scale metadata uses an unsupported range", () => {
+    const row = {
+      id: 1,
+      mood: 4,
+      note: null,
+      timestamp: 1705320000000,
+      emotions: "[]",
+      context_tags: "[]",
+      energy: null,
+      mood_scale_json: JSON.stringify({
+        version: 3,
+        min: 0,
+        max: 5,
+        lowerIsBetter: false,
+      }),
+      photos_json: null,
+      location_json: null,
+      voice_memos_json: null,
+      based_on_entry_id: null,
+    };
+
+    const result = toMoodEntry(row);
+
+    expect(result.moodScale).toEqual({
+      version: 1,
+      min: 0,
+      max: 10,
+      lowerIsBetter: true,
+    });
+  });
+
   it("handles empty emotions string", () => {
     const row = {
       id: 1,
@@ -301,7 +362,7 @@ describe("toMoodEntry", () => {
     expect(result.emotions).toEqual([]);
   });
 
-  it("parses photos, location, and voice memos", () => {
+  it("does not expose legacy media or location columns on MoodEntry", () => {
     const row = {
       id: 1,
       mood: 7,
@@ -318,9 +379,9 @@ describe("toMoodEntry", () => {
     };
 
     const result = toMoodEntry(row);
-    expect(result.photos).toEqual(["file://photo1.jpg", "file://photo2.jpg"]);
-    expect(result.location).toEqual({ latitude: 40.7128, longitude: -74.006, name: "New York" });
-    expect(result.voiceMemos).toEqual(["file://memo1.m4a"]);
+    expect(result).not.toHaveProperty("photos");
+    expect(result).not.toHaveProperty("location");
+    expect(result).not.toHaveProperty("voiceMemos");
     expect(result.basedOnEntryId).toBe(5);
   });
 });
@@ -508,5 +569,37 @@ describe("sanitizeEnergy", () => {
     expect(sanitizeEnergy(5)).toBe(5);
     expect(sanitizeEnergy(0)).toBe(0);
     expect(sanitizeEnergy(10)).toBe(10);
+  });
+});
+
+describe("sanitizeImportedMoodScale", () => {
+  it("accepts supported current and legacy 0-10 scale snapshots", () => {
+    const legacyHigherIsBetter = {
+      version: 2,
+      min: 0,
+      max: 10,
+      lowerIsBetter: false,
+    };
+
+    expect(isValidMoodScaleSnapshot(legacyHigherIsBetter)).toBe(true);
+    expect(sanitizeImportedMoodScale(legacyHigherIsBetter)).toEqual(
+      legacyHigherIsBetter
+    );
+  });
+
+  it("falls back for arbitrary ranges the app does not support", () => {
+    expect(
+      sanitizeImportedMoodScale({
+        version: 3,
+        min: 0,
+        max: 5,
+        lowerIsBetter: false,
+      })
+    ).toEqual({
+      version: 1,
+      min: 0,
+      max: 10,
+      lowerIsBetter: true,
+    });
   });
 });

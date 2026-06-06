@@ -1,6 +1,7 @@
 import { Tabs } from "expo-router";
 import React from "react";
 import { Platform } from "react-native";
+import type { BottomTabBarButtonProps } from "@react-navigation/bottom-tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { HapticTab } from "@/components/HapticTab";
@@ -8,6 +9,31 @@ import { IconSymbol } from "@/components/ui/IconSymbol";
 import TabBarBackground from "@/components/ui/TabBarBackground";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { TAB_ACCESSIBILITY_LABELS } from "@/constants/accessibility";
+import { emitHomeTabDoublePress } from "@/lib/homeTabEvents";
+
+const HOME_TAB_DOUBLE_PRESS_MS = 450;
+
+function HomeTabButton(props: BottomTabBarButtonProps) {
+  const lastSelectedPressAtRef = React.useRef(0);
+
+  return (
+    <HapticTab
+      {...props}
+      onPress={(event) => {
+        const now = Date.now();
+
+        if (now - lastSelectedPressAtRef.current <= HOME_TAB_DOUBLE_PRESS_MS) {
+          lastSelectedPressAtRef.current = 0;
+          emitHomeTabDoublePress();
+        } else {
+          lastSelectedPressAtRef.current = now;
+        }
+
+        props.onPress?.(event);
+      }}
+    />
+  );
+}
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -69,6 +95,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title: "Home",
+          tabBarButton: HomeTabButton,
           tabBarIcon: ({ color }) => (
             <IconSymbol size={24} name="house.fill" color={color} />
           ),

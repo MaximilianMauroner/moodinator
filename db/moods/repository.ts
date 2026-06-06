@@ -6,7 +6,6 @@ import {
   normalizeInput,
   serializeArray,
   serializeEmotions,
-  serializeLocation,
   serializeMoodScale,
   toMoodEntry,
 } from "./serialization";
@@ -39,9 +38,9 @@ export async function insertMood(
       serializeArray(normalized.contextTags),
       normalized.energy,
       serializeMoodScale(normalized.moodScale),
-      serializeArray(normalized.photos),
-      serializeLocation(normalized.location),
-      serializeArray(normalized.voiceMemos),
+      "[]",
+      null,
+      "[]",
       normalized.basedOnEntryId
     );
 
@@ -77,9 +76,9 @@ export async function insertMoodEntry(entry: MoodEntryInput): Promise<MoodEntry>
       serializeArray(normalized.contextTags),
       normalized.energy,
       serializeMoodScale(normalized.moodScale),
-      serializeArray(normalized.photos),
-      serializeLocation(normalized.location),
-      serializeArray(normalized.voiceMemos),
+      "[]",
+      null,
+      "[]",
       normalized.basedOnEntryId
     );
 

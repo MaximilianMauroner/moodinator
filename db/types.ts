@@ -1,26 +1,24 @@
-/**
- * Represents an emotion with its category.
- */
-export type Emotion = {
-    name: string;
-    category: 'positive' | 'negative' | 'neutral';
-};
+import type { Emotion } from "../domain/entrySettings";
 
-/**
- * Represents a location with coordinates and optional name.
- */
-export type Location = {
-    latitude: number;
-    longitude: number;
-    name?: string;
-};
+export type { Emotion } from "../domain/entrySettings";
 
-export type MoodScaleSnapshot = {
+export type CurrentMoodScaleSnapshot = {
     version: 1;
     min: 0;
     max: 10;
     lowerIsBetter: true;
 };
+
+export type LegacyHigherIsBetterMoodScaleSnapshot = {
+    version: 2;
+    min: 0;
+    max: 10;
+    lowerIsBetter: false;
+};
+
+export type MoodScaleSnapshot =
+    | CurrentMoodScaleSnapshot
+    | LegacyHigherIsBetterMoodScaleSnapshot;
 
 /**
  * Represents a single mood entry in the database.
@@ -34,9 +32,6 @@ export type MoodEntry = {
     contextTags: string[];
     energy: number | null;
     moodScale: MoodScaleSnapshot;
-    photos: string[];              // Array of file URIs
-    location: Location | null;     // Location coordinates
-    voiceMemos: string[];          // Array of audio file URIs
     basedOnEntryId: number | null; // Reference to copied entry
 };
 
@@ -58,8 +53,5 @@ export type MoodEntryInput = {
     contextTags?: string[];
     energy?: number | null;
     moodScale?: MoodScaleSnapshot;
-    photos?: string[];
-    location?: Location | null;
-    voiceMemos?: string[];
     basedOnEntryId?: number | null;
 };

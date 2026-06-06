@@ -4,7 +4,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
 import { MoodEntry } from "@db/types";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { moodScale } from "@/constants/moodScale";
+import { getMoodRatingDisplay } from "@/constants/moodScaleInterpretation";
 import { useThemeColors, colors } from "@/constants/colors";
 import { haptics } from "@/lib/haptics";
 
@@ -34,16 +34,12 @@ export const DateTimePickerModal: React.FC<Props> = ({
 
   const moodData = useMemo(() => {
     if (!mood) return null;
-    const moodInfo = moodScale.find((m) => m.value === mood.mood);
+    const moodInfo = getMoodRatingDisplay(mood.mood, isDark, mood.moodScale);
     return {
-      color: moodInfo?.color ?? "text-sand-600",
-      textHex: isDark
-        ? (moodInfo?.textHexDark ?? "#D4C4A0")
-        : (moodInfo?.textHex ?? "#9D8660"),
-      label: moodInfo?.label ?? `Mood ${mood.mood}`,
-      bgHex: isDark
-        ? (moodInfo?.bgHexDark ?? "#302A22")
-        : (moodInfo?.bgHex ?? "#F9F5ED"),
+      color: moodInfo.color,
+      textHex: moodInfo.colorHex,
+      label: moodInfo.label,
+      bgHex: moodInfo.backgroundHex,
     };
   }, [mood, isDark]);
 

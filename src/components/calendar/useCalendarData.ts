@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import type { MoodEntry } from "@db/types";
-import { moodScale } from "@/constants/moodScale";
+import {
+  getInterpretedMoodRating,
+  getMoodRatingBackgroundHex,
+} from "@/constants/moodScaleInterpretation";
 import { moodService } from "@/services/moodService";
 
 export type CalendarDayData = {
@@ -51,19 +54,19 @@ export function useCalendarData(initialYear?: number, initialMonth?: number) {
         if (entries.length === 0) continue;
 
         // Calculate average mood
-        const totalMood = entries.reduce((sum, e) => sum + e.mood, 0);
+        const totalMood = entries.reduce(
+          (sum, entry) => sum + getInterpretedMoodRating(entry),
+          0
+        );
         const averageMood = totalMood / entries.length;
 
         // Get mood color from the scale
-        const moodIndex = Math.round(averageMood);
-        const moodInfo = moodScale[Math.min(moodIndex, moodScale.length - 1)];
-
         days.set(day, {
           day,
           entries,
           averageMood,
-          moodColor: moodInfo?.bgHex ?? "#F9F5ED",
-          moodColorDark: moodInfo?.bgHexDark ?? "#302A22",
+          moodColor: getMoodRatingBackgroundHex(averageMood),
+          moodColorDark: getMoodRatingBackgroundHex(averageMood, true),
           hasMultiple: entries.length > 1,
         });
       }

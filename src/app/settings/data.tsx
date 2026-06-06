@@ -25,10 +25,9 @@ export default function DataSettingsScreen() {
   const [backupFolderUri, setBackupFolderUri] = useState<string | null>(null);
 
   const loadBackupInfo = useCallback(async () => {
-    const info = await dataPortabilityService.getBackupInfo();
-    setBackupInfo({ count: info.count, latestBackup: info.latestBackup });
-    const folderUri = await dataPortabilityService.getBackupFolder();
-    setBackupFolderUri(folderUri);
+    const status = await dataPortabilityService.getBackupStatus();
+    setBackupInfo(status.info);
+    setBackupFolderUri(status.folderUri);
   }, []);
 
   useEffect(() => {
@@ -38,13 +37,11 @@ export default function DataSettingsScreen() {
   const handleRunBackupNow = useCallback(async () => {
     try {
       setLoading("backup");
-      const backupResult = await dataPortabilityService.createBackup();
+      const backupResult = await dataPortabilityService.runBackupNow();
       if (backupResult.success) {
         await loadBackupInfo();
-        Alert.alert("Backup Created", "Backup created successfully.");
-      } else {
-        Alert.alert("Backup Failed", backupResult.error);
       }
+      Alert.alert(backupResult.title, backupResult.message);
     } catch (error) {
       Alert.alert("Backup Error", "Failed to create backup.");
       console.error(error);
@@ -99,18 +96,10 @@ export default function DataSettingsScreen() {
             onPress: async () => {
               try {
                 const importResult = await dataPortabilityService.importData(fileContent);
-                const summary = [
-                  `Imported ${importResult.imported} entr${importResult.imported === 1 ? "y" : "ies"}.`,
-                  importResult.skipped > 0
-                    ? `Skipped ${importResult.skipped} invalid entr${importResult.skipped === 1 ? "y" : "ies"}.`
-                    : null,
-                  importResult.errors.length > 0
-                    ? importResult.errors.slice(0, 2).join("\n")
-                    : null,
-                ]
-                  .filter(Boolean)
-                  .join("\n\n");
-                Alert.alert("Import Successful", summary);
+                Alert.alert(
+                  "Import Successful",
+                  dataPortabilityService.summarizeImportResult(importResult)
+                );
               } catch (error) {
                 Alert.alert("Import Error", "Failed to import mood data.");
                 console.error(error);

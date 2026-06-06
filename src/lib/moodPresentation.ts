@@ -6,27 +6,41 @@
  * imports — every function is testable with plain Vitest.
  */
 
-import { moodScale } from "@/constants/moodScale";
+import {
+  getMoodRatingBgClass,
+  getMoodRatingDisplay,
+  getMoodRatingLabel,
+  getMoodRatingTextClass,
+  isKnownMoodRating,
+} from "@/constants/moodScaleInterpretation";
+import type { MoodScaleSnapshot } from "@db/types";
 
-/** Returns the hex colour for a Mood Rating value.
- *  Uses textHexDark when isDark is true. Falls back to a neutral slate if the
- *  value is not found on the Mood Scale (should not happen for 0–10). */
-export const getMoodHex = (value: number, isDark?: boolean): string => {
-  const mood = moodScale.find((m) => m.value === Math.round(value));
-  if (!mood) return "#64748b";
-  return (isDark ? mood.textHexDark : mood.textHex) ?? "#64748b";
+/** Returns the resolved hex colour for a Mood Rating value. */
+export const getMoodHex = (
+  value: number,
+  isDark?: boolean,
+  sourceScale?: MoodScaleSnapshot
+): string => {
+  if (!isKnownMoodRating(value, sourceScale)) return "#64748b";
+  return getMoodRatingDisplay(value, isDark, sourceScale).colorHex;
 };
 
 /** Returns the Tailwind text-colour class for a Mood Rating value. */
-export const getMoodScaleColor = (moodValue: number): string => {
-  const mood = moodScale.find((m) => m.value === Math.round(moodValue));
-  return mood ? mood.color : "text-slate-500";
+export const getMoodScaleColor = (
+  moodValue: number,
+  sourceScale?: MoodScaleSnapshot
+): string => {
+  if (!isKnownMoodRating(moodValue, sourceScale)) return "text-slate-500";
+  return getMoodRatingTextClass(moodValue, sourceScale);
 };
 
 /** Returns the Tailwind background-colour class for a Mood Rating value. */
-export const getMoodScaleBg = (moodValue: number): string => {
-  const mood = moodScale.find((m) => m.value === Math.round(moodValue));
-  return mood ? mood.bg : "bg-slate-100";
+export const getMoodScaleBg = (
+  moodValue: number,
+  sourceScale?: MoodScaleSnapshot
+): string => {
+  if (!isKnownMoodRating(moodValue, sourceScale)) return "bg-slate-100";
+  return getMoodRatingBgClass(moodValue, sourceScale);
 };
 
 export interface MoodInterpretation {
@@ -40,59 +54,17 @@ export interface MoodInterpretation {
 }
 
 /** Maps an average Mood Rating to a labelled colour interpretation. */
-export const getMoodInterpretation = (average: number): MoodInterpretation => {
-  const roundedAverage = Math.round(average);
-  const moodInfo = moodScale.find((m) => m.value === roundedAverage);
-
-  if (moodInfo) {
-    return {
-      color: moodInfo.color.replace("text-", ""),
-      text: moodInfo.label,
-      bg: moodInfo.bg,
-      textClass: moodInfo.color,
-      bgClass: moodInfo.bg,
-    };
-  }
-
-  // Fallback — should only be reached for values outside 0–10
-  if (average <= 2)
-    return {
-      color: "sky-500",
-      text: "Excellent",
-      bg: "bg-sky-100",
-      textClass: "text-sky-500",
-      bgClass: "bg-sky-100",
-    };
-  if (average <= 4)
-    return {
-      color: "green-500",
-      text: "Good",
-      bg: "bg-green-100",
-      textClass: "text-green-500",
-      bgClass: "bg-green-100",
-    };
-  if (average <= 6)
-    return {
-      color: "yellow-500",
-      text: "Fair",
-      bg: "bg-yellow-100",
-      textClass: "text-yellow-500",
-      bgClass: "bg-yellow-100",
-    };
-  if (average <= 8)
-    return {
-      color: "orange-600",
-      text: "Challenging",
-      bg: "bg-orange-100",
-      textClass: "text-orange-600",
-      bgClass: "bg-orange-100",
-    };
+export const getMoodInterpretation = (
+  average: number,
+  sourceScale?: MoodScaleSnapshot
+): MoodInterpretation => {
+  const moodInfo = getMoodRatingDisplay(average, false, sourceScale);
   return {
-    color: "red-500",
-    text: "Difficult",
-    bg: "bg-red-100",
-    textClass: "text-red-500",
-    bgClass: "bg-red-100",
+    color: moodInfo.color.replace("text-", ""),
+    text: getMoodRatingLabel(average, sourceScale),
+    bg: moodInfo.bg,
+    textClass: moodInfo.color,
+    bgClass: moodInfo.bg,
   };
 };
 

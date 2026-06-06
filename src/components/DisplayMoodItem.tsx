@@ -2,8 +2,6 @@ import React, { useCallback, useMemo, useRef } from "react";
 import { StyleSheet, View, Text, Pressable } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
-  FadeInUp,
-  LinearTransition,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
@@ -11,7 +9,7 @@ import Animated, {
 } from "react-native-reanimated";
 import type { SwipeDirection } from "../types/mood";
 import { MoodEntry } from "@db/types";
-import { moodScale } from "@/constants/moodScale";
+import { getMoodRatingDisplay } from "@/constants/moodScaleInterpretation";
 import { useThemeColors, colors } from "@/constants/colors";
 import { getMoodItemLabel, getMoodItemHint } from "@/constants/accessibility";
 import { motion, springs } from "@/constants/motion";
@@ -93,20 +91,16 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
     const pressScale = useSharedValue(1);
 
     const moodData = useMemo(() => {
-      const moodInfo = moodScale.find((m) => m.value === mood.mood);
+      const moodInfo = getMoodRatingDisplay(mood.mood, isDark, mood.moodScale);
       return {
-        color: moodInfo?.color ?? "text-sand-600",
-        textHex: isDark
-          ? (moodInfo?.textHexDark ?? "#D4C4A0")
-          : (moodInfo?.textHex ?? "#9D8660"),
-        label: moodInfo?.label ?? `Mood ${mood.mood}`,
-        bg: moodInfo?.bg ?? "bg-sand-100",
-        bgHex: isDark
-          ? (moodInfo?.bgHexDark ?? "#302A22")
-          : (moodInfo?.bgHex ?? "#F9F5ED"),
-        borderColor: moodInfo?.borderColor ?? "#E5D9BF",
+        color: moodInfo.color,
+        textHex: moodInfo.colorHex,
+        label: moodInfo.label,
+        bg: moodInfo.bg,
+        bgHex: moodInfo.backgroundHex,
+        borderColor: moodInfo.borderColor,
       };
-    }, [mood.mood, isDark]);
+    }, [mood.mood, mood.moodScale, isDark]);
 
     const sortedEmotions = useMemo(() => {
       return mood.emotions
@@ -206,11 +200,7 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
     }));
 
     return (
-      <Animated.View
-        entering={FadeInUp.duration(motion.duration.normal)}
-        layout={LinearTransition.duration(motion.duration.normal)}
-        style={{ marginBottom: 12, borderRadius: 16, overflow: "hidden" }}
-      >
+      <View style={{ marginBottom: 12, borderRadius: 16, overflow: "hidden" }}>
         <View
           pointerEvents="none"
           className="absolute inset-0 flex-row justify-between"
@@ -388,7 +378,7 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
             </Pressable>
           </Animated.View>
         </GestureDetector>
-      </Animated.View>
+      </View>
     );
   }
 );

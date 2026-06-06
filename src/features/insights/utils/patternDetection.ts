@@ -1,5 +1,10 @@
 import type { MoodEntry } from "@db/types";
 import { format, getHours, getDay, isWeekend } from "date-fns";
+import {
+  getInterpretedMoodRating,
+  isBetterMoodRating,
+  sortMoodRatingsBestFirst,
+} from "@/constants/moodScaleInterpretation";
 
 export interface Pattern {
   id: string;
@@ -60,7 +65,7 @@ function detectTimeOfDayPattern(moods: MoodEntry[]): Pattern | null {
   moods.forEach((mood) => {
     const hour = getHours(new Date(mood.timestamp));
     const period = getTimeOfDay(hour);
-    stats[period].total += mood.mood;
+    stats[period].total += getInterpretedMoodRating(mood);
     stats[period].count++;
   });
 
@@ -72,13 +77,13 @@ function detectTimeOfDayPattern(moods: MoodEntry[]): Pattern | null {
       avg: data.total / data.count,
       count: data.count,
     }))
-    .sort((a, b) => a.avg - b.avg); // Lower is better
+    .sort((a, b) => sortMoodRatingsBestFirst(a.avg, b.avg));
 
   if (averages.length < 2) return null;
 
   const best = averages[0];
   const worst = averages[averages.length - 1];
-  const difference = worst.avg - best.avg;
+  const difference = Math.abs(worst.avg - best.avg);
 
   // Need at least 0.8 difference to be significant
   if (difference < 0.8) return null;
@@ -108,7 +113,7 @@ function detectDayOfWeekPattern(moods: MoodEntry[]): Pattern | null {
 
   moods.forEach((mood) => {
     const dayIndex = getDay(new Date(mood.timestamp));
-    stats[dayIndex].total += mood.mood;
+    stats[dayIndex].total += getInterpretedMoodRating(mood);
     stats[dayIndex].count++;
   });
 
@@ -119,13 +124,13 @@ function detectDayOfWeekPattern(moods: MoodEntry[]): Pattern | null {
       avg: data.total / data.count,
       count: data.count,
     }))
-    .sort((a, b) => a.avg - b.avg);
+    .sort((a, b) => sortMoodRatingsBestFirst(a.avg, b.avg));
 
   if (averages.length < 3) return null;
 
   const best = averages[0];
   const worst = averages[averages.length - 1];
-  const difference = worst.avg - best.avg;
+  const difference = Math.abs(worst.avg - best.avg);
 
   if (difference < 0.8) return null;
 
@@ -152,11 +157,12 @@ function detectWeekendPattern(moods: MoodEntry[]): Pattern | null {
 
   moods.forEach((mood) => {
     const date = new Date(mood.timestamp);
+    const interpretedMood = getInterpretedMoodRating(mood);
     if (isWeekend(date)) {
-      weekendTotal += mood.mood;
+      weekendTotal += interpretedMood;
       weekendCount++;
     } else {
-      weekdayTotal += mood.mood;
+      weekdayTotal += interpretedMood;
       weekdayCount++;
     }
   });
@@ -169,7 +175,7 @@ function detectWeekendPattern(moods: MoodEntry[]): Pattern | null {
 
   if (difference < 0.5) return null;
 
-  const isBetterOnWeekends = weekendAvg < weekdayAvg; // Lower is better
+  const isBetterOnWeekends = isBetterMoodRating(weekendAvg, weekdayAvg);
 
   return {
     id: "weekend",
@@ -196,7 +202,7 @@ function detectEmotionPatterns(moods: MoodEntry[]): Pattern | null {
         if (!emotionStats[name]) {
           emotionStats[name] = { total: 0, count: 0 };
         }
-        emotionStats[name].total += mood.mood;
+        emotionStats[name].total += getInterpretedMoodRating(mood);
         emotionStats[name].count++;
       });
     }
@@ -209,7 +215,7 @@ function detectEmotionPatterns(moods: MoodEntry[]): Pattern | null {
       avg: data.total / data.count,
       count: data.count,
     }))
-    .sort((a, b) => a.avg - b.avg);
+    .sort((a, b) => sortMoodRatingsBestFirst(a.avg, b.avg));
 
   if (sortedEmotions.length < 2) return null;
 
@@ -224,7 +230,7 @@ function detectEmotionPatterns(moods: MoodEntry[]): Pattern | null {
     type: "emotion",
     title: "Emotion Insight",
     description: `When feeling "${capitalize(best.name)}", your mood tends to be better`,
-    confidence: Math.min((worst.avg - best.avg) / 2, 1),
+    confidence: Math.min(Math.abs(worst.avg - best.avg) / 2, 1),
     icon: "heart-outline",
   };
 }
@@ -242,7 +248,7 @@ function detectContextPatterns(moods: MoodEntry[]): Pattern | null {
         if (!contextStats[name]) {
           contextStats[name] = { total: 0, count: 0 };
         }
-        contextStats[name].total += mood.mood;
+        contextStats[name].total += getInterpretedMoodRating(mood);
         contextStats[name].count++;
       });
     }
@@ -255,7 +261,7 @@ function detectContextPatterns(moods: MoodEntry[]): Pattern | null {
       avg: data.total / data.count,
       count: data.count,
     }))
-    .sort((a, b) => a.avg - b.avg);
+    .sort((a, b) => sortMoodRatingsBestFirst(a.avg, b.avg));
 
   if (sortedContexts.length < 2) return null;
 
@@ -269,7 +275,7 @@ function detectContextPatterns(moods: MoodEntry[]): Pattern | null {
     type: "context",
     title: "Context Insight",
     description: `"${capitalize(best.name)}" activities are associated with better moods`,
-    confidence: Math.min((worst.avg - best.avg) / 2, 1),
+    confidence: Math.min(Math.abs(worst.avg - best.avg) / 2, 1),
     icon: "location-outline",
   };
 }

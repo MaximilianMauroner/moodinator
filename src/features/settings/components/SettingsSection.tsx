@@ -43,7 +43,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
   },
   sectionShadowDark: {
-    elevation: 2,
+    elevation: 0,
     shadowColor: "#000",
     shadowOpacity: 0.2,
     shadowRadius: 8,

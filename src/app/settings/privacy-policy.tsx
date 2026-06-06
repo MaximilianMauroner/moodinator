@@ -19,7 +19,7 @@ export default function PrivacyPolicyScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Text className="text-xs text-sand-500 dark:text-sand-400 mb-4">
-          Last Updated: May 21, 2026
+          Last Updated: May 22, 2026
         </Text>
 
         <Section title="Introduction">
@@ -37,14 +37,11 @@ export default function PrivacyPolicyScreen() {
             "Mood Entries: Your mood ratings, timestamps, and notes",
             "Emotions: Emotion tags you select for each entry",
             "Contexts: Context tags describing your situation",
-            "Photos: Images you attach to mood entries",
-            "Voice Notes: Audio recordings you attach to entries",
-            "Location Data: Optional location information if enabled",
           ]} />
 
           <Subtitle>Local-Only Storage</Subtitle>
           <Paragraph>
-            All your data is stored locally on your device. We do not upload, transmit, or store your personal data on any external servers. Your mood entries, photos, voice notes, and all other information remain exclusively on your device.
+            All your data is stored locally on your device. We do not upload, transmit, or store your personal data on any external servers. Your mood entries, notes, emotions, contexts, and settings remain exclusively on your device.
           </Paragraph>
 
           <Subtitle>No Account Required</Subtitle>

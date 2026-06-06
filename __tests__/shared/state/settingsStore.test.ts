@@ -173,6 +173,32 @@ describe("useSettingsStore", () => {
     );
   });
 
+  test("setter promises resolve only after persistence completes", async () => {
+    let finishWrite!: () => void;
+    const pendingWrite = new Promise<void>((resolve) => {
+      finishWrite = resolve;
+    });
+    vi.mocked(AsyncStorage.setItem).mockImplementationOnce(() => pendingWrite);
+
+    const promise = useSettingsStore.getState().setShowDetailedLabels(true);
+    let resolved = false;
+    void promise.then(() => {
+      resolved = true;
+    });
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(useSettingsStore.getState().showDetailedLabels).toBe(true);
+    expect(resolved).toBe(false);
+
+    finishWrite();
+    await promise;
+    await Promise.resolve();
+
+    expect(resolved).toBe(true);
+  });
+
   test("removing an emotion from the list does not touch the moods table", async () => {
     const getDbSpy = vi.fn(() => {
       throw new Error(

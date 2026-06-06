@@ -8,10 +8,14 @@ import {
   type NativeSyntheticEvent,
   type NativeScrollEvent,
 } from "react-native";
-import { FlashList } from "@shopify/flash-list";
-import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { SafeAreaView } from "react-native-safe-area-context";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Ionicons } from "@expo/vector-icons";
+import { FlashList, type FlashListRef } from "@shopify/flash-list";
+import {
+  Gesture,
+  GestureDetector,
+  GestureHandlerRootView,
+} from "react-native-gesture-handler";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
   Extrapolation,
   interpolate,
@@ -51,11 +55,14 @@ import { useMoodModals } from "@/hooks/useMoodModals";
 import { useMoodItemActions } from "@/hooks/useMoodItemActions";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { haptics } from "@/lib/haptics";
+import { addHomeTabDoublePressListener } from "@/lib/homeTabEvents";
 
 import type { MoodEntry } from "@db/types";
-import { emotionService } from "@/services/emotionService";
-import { toastService } from "@/services/toastService";
-import { moodScale } from "@/constants/moodScale";
+import {
+  getAllMoodRatingDisplays,
+  getNeutralMoodRating,
+} from "@/constants/moodScaleInterpretation";
 
 const HomeErrorFallback = createScreenErrorFallback("Home");
 const COLLAPSED_SELECTOR_HEIGHT = 60;
@@ -67,6 +74,8 @@ const HEADER_SECTION_GAP = 16;
 const CONTENT_HORIZONTAL_PADDING = 16;
 const ESTIMATED_HOME_CHROME_HEIGHT = 72;
 const ESTIMATED_HISTORY_CHROME_HEIGHT = 56;
+const HOME_LIST_DRAW_DISTANCE = 900;
+const JUMP_TO_TOP_THRESHOLD = 760;
 
 function clamp(value: number, min: number, max: number) {
   "worklet";
@@ -76,6 +85,7 @@ function clamp(value: number, min: number, max: number) {
 function HomeScreenContent() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
+  const insets = useSafeAreaInsets();
 
   const moods = useMoodsStore((state) => state.moods);
   const status = useMoodsStore((state) => state.status);
@@ -84,83 +94,25 @@ function HomeScreenContent() {
   const createMood = useMoodsStore((state) => state.create);
   const updateMood = useMoodsStore((state) => state.update);
   const updateMoodTimestamp = useMoodsStore((state) => state.updateTimestamp);
-  const setLocal = useMoodsStore((state) => state.setLocal);
 
   const loading = status === "loading";
   const [homeChromeHeight, setHomeChromeHeight] = useState(0);
   const [expandedPanelHeight, setExpandedPanelHeight] = useState(0);
   const [historyChromeHeight, setHistoryChromeHeight] = useState(0);
   const [selectorCollapsed, setSelectorCollapsed] = useState(false);
+  const [jumpToTopVisible, setJumpToTopVisible] = useState(false);
+  const listRef = useRef<FlashListRef<MoodEntry>>(null);
   const { refreshing, onRefresh: handlePullToRefresh } = usePullToRefresh(refreshMoods);
-
-  const setMoods = useCallback(
-    (updater: MoodEntry[] | ((prev: MoodEntry[]) => MoodEntry[])) => {
-      if (typeof updater === "function") {
-        const currentMoods = useMoodsStore.getState().moods;
-        setLocal(updater(currentMoods));
-      } else {
-        setLocal(updater);
-      }
-    },
-    [setLocal]
-  );
 
   const entrySettings = useEntrySettings();
   const modals = useMoodModals();
   const itemActions = useMoodItemActions({
-    setMoods,
-    setLastTracked: () => {},
     setEditingEntry: modals.setEditingEntry,
   });
 
   useEffect(() => {
     loadAll();
   }, [loadAll]);
-
-  const runEmotionMigration = useCallback(async () => {
-    const MIGRATION_KEY = "emotionCategoryMigrationCompleted";
-    const MIGRATION_RETRY_KEY = "emotionCategoryMigrationRetries";
-    const MAX_MIGRATION_RETRIES = 3;
-
-    try {
-      const migrationStatus = await AsyncStorage.getItem(MIGRATION_KEY);
-
-      if (migrationStatus === "true" || migrationStatus === "failed") {
-        return;
-      }
-
-      console.log("Running emotion category migration...");
-      const result = await emotionService.migrateToCategories();
-      console.log(`Migration complete: ${result.migrated} entries migrated, ${result.skipped} skipped`);
-      await AsyncStorage.setItem(MIGRATION_KEY, "true");
-      await loadAll();
-    } catch (error) {
-      console.error("Failed to run emotion migration:", error);
-
-      try {
-        const currentRetriesRaw = await AsyncStorage.getItem(MIGRATION_RETRY_KEY);
-        const currentRetries = currentRetriesRaw ? parseInt(currentRetriesRaw, 10) || 0 : 0;
-        const nextRetries = currentRetries + 1;
-
-        await AsyncStorage.setItem(MIGRATION_RETRY_KEY, String(nextRetries));
-
-        if (nextRetries >= MAX_MIGRATION_RETRIES) {
-          await AsyncStorage.setItem(MIGRATION_KEY, "failed");
-
-          toastService.error(
-            "Migration issue",
-            "We couldn't finish updating some past mood entries. New entries will still work."
-          );
-        }
-      } catch (storageError) {
-        console.error("Failed to update migration retry state:", storageError);
-      }
-    }
-  }, [loadAll]);
-
-  useEffect(() => {
-    runEmotionMigration();
-  }, [runEmotionMigration]);
 
   const handleEntrySave = useCallback(async (values: MoodEntryFormValues) => {
     await createMood({
@@ -241,10 +193,56 @@ function HomeScreenContent() {
   // useAnimatedStyle still run on the UI thread, only the ingestion is on JS.
   const handleScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      scrollY.value = Math.max(event.nativeEvent.contentOffset.y, 0);
+      const offsetY = Math.max(event.nativeEvent.contentOffset.y, 0);
+      scrollY.value = offsetY;
     },
     [scrollY]
   );
+
+  const scrollHomeListToTop = useCallback(
+    (options?: { refresh?: boolean; haptic?: boolean }) => {
+      if (options?.haptic !== false) {
+        haptics.selection();
+      }
+
+      setJumpToTopVisible(false);
+      const list = listRef.current;
+
+      if (list) {
+        list.scrollToOffset({ offset: 0, animated: true });
+      } else {
+        scrollY.value = 0;
+        setSelectorCollapsed(false);
+      }
+
+      if (options?.refresh) {
+        void handlePullToRefresh();
+      }
+    },
+    [handlePullToRefresh, scrollY]
+  );
+
+  const handleJumpToTopPress = useCallback(() => {
+    scrollHomeListToTop({ haptic: true });
+  }, [scrollHomeListToTop]);
+
+  const jumpToTopTapGesture = useMemo(
+    () =>
+      Gesture.Tap()
+        .runOnJS(true)
+        .onEnd(() => {
+          handleJumpToTopPress();
+        }),
+    [handleJumpToTopPress]
+  );
+
+  const handleHomeTabDoublePress = useCallback(() => {
+    scrollHomeListToTop({ haptic: false, refresh: true });
+  }, [scrollHomeListToTop]);
+
+  useEffect(() => {
+    return addHomeTabDoublePressListener(handleHomeTabDoublePress);
+  }, [handleHomeTabDoublePress]);
 
   const handleHomeChromeLayout = useCallback(
     ({ nativeEvent }: LayoutChangeEvent) => {
@@ -284,6 +282,16 @@ function HomeScreenContent() {
     (isCollapsed, wasCollapsed) => {
       if (isCollapsed !== wasCollapsed) {
         runOnJS(setSelectorCollapsed)(isCollapsed);
+      }
+    },
+    []
+  );
+
+  useAnimatedReaction(
+    () => scrollY.value > JUMP_TO_TOP_THRESHOLD,
+    (isVisible, wasVisible) => {
+      if (isVisible !== wasVisible) {
+        runOnJS(setJumpToTopVisible)(isVisible);
       }
     },
     []
@@ -407,6 +415,27 @@ function HomeScreenContent() {
   const refreshIndicatorOffset = selectorCollapsed
     ? totalCollapsedHeaderHeight
     : totalExpandedHeaderHeight;
+  const jumpButtonBottomOffset = Math.max(insets.bottom, 8) + 76;
+  const jumpButtonStyle = useMemo(
+    () => ({
+      alignItems: "center" as const,
+      backgroundColor: isDark ? "#A6E39B" : "#5B8A5B",
+      borderColor: isDark
+        ? "rgba(8, 21, 15, 0.24)"
+        : "rgba(253, 252, 250, 0.72)",
+      borderRadius: 24,
+      borderWidth: 1,
+      elevation: 4,
+      height: 48,
+      justifyContent: "center" as const,
+      shadowColor: isDark ? "#000000" : "#9D8660",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: isDark ? 0.28 : 0.16,
+      shadowRadius: 10,
+      width: 48,
+    }),
+    [isDark]
+  );
 
   return (
     <>
@@ -414,6 +443,7 @@ function HomeScreenContent() {
         <SafeAreaView className="flex-1 bg-paper-100 dark:bg-paper-900">
           <View className="flex-1">
             <FlashList
+              ref={listRef}
               data={moods}
               keyExtractor={keyExtractor}
               renderItem={renderMoodItem}
@@ -432,6 +462,7 @@ function HomeScreenContent() {
               contentInsetAdjustmentBehavior="automatic"
               showsVerticalScrollIndicator
               contentContainerStyle={listContentContainerStyle}
+              drawDistance={HOME_LIST_DRAW_DISTANCE}
               scrollEventThrottle={16}
               onScroll={handleScroll}
             />
@@ -512,6 +543,38 @@ function HomeScreenContent() {
                 <HistoryListHeader moodCount={moods.length} />
               </View>
             </Animated.View>
+
+            {jumpToTopVisible ? (
+              <View
+                style={{
+                  alignItems: "center",
+                  bottom: jumpButtonBottomOffset,
+                  elevation: 8,
+                  height: 56,
+                  justifyContent: "center",
+                  position: "absolute",
+                  right: 18,
+                  width: 56,
+                  zIndex: 20,
+                }}
+              >
+                <GestureDetector gesture={jumpToTopTapGesture}>
+                  <Animated.View
+                    accessible
+                    accessibilityHint="Scrolls the recent entries list back to the top"
+                    accessibilityLabel="Jump to top"
+                    accessibilityRole="button"
+                    style={jumpButtonStyle}
+                  >
+                    <Ionicons
+                      name="arrow-up"
+                      size={23}
+                      color={isDark ? "#08150F" : "#FDFCFA"}
+                    />
+                  </Animated.View>
+                </GestureDetector>
+              </View>
+            ) : null}
           </View>
         </SafeAreaView>
       </GestureHandlerRootView>
@@ -567,9 +630,10 @@ const PILL_HEIGHT = 38;
 const PILL_GAP = 5;
 const PILL_STEP = PILL_WIDTH + PILL_GAP;
 const TRACK_EDGE_INSET = 16;
-const CENTER_INDEX = 5;
+const CENTER_INDEX = getNeutralMoodRating();
 const MIN_VISIBLE_PILLS = 4;
 const MAX_VISIBLE_PILLS = 7;
+const MOOD_RATING_COUNT = getAllMoodRatingDisplays(false).length;
 
 function CollapsedMoodSelector({
   isDark,
@@ -578,6 +642,7 @@ function CollapsedMoodSelector({
 }: CollapsedMoodSelectorProps) {
   const scrollRef = useRef<RNScrollView>(null);
   const [trackWidth, setTrackWidth] = useState(0);
+  const moodData = useMemo(() => getAllMoodRatingDisplays(isDark), [isDark]);
 
   // Size the scroll viewport to fit a whole number of pills with NO horizontal
   // padding inside. Combined with snap-to-start, this guarantees every resting
@@ -596,7 +661,7 @@ function CollapsedMoodSelector({
         )
       : MIN_VISIBLE_PILLS;
   const scrollAreaWidth = visiblePills * PILL_STEP - PILL_GAP;
-  const fits = scrollAreaWidth >= moodScale.length * PILL_STEP - PILL_GAP;
+  const fits = scrollAreaWidth >= MOOD_RATING_COUNT * PILL_STEP - PILL_GAP;
 
   useEffect(() => {
     if (trackWidth <= 0 || fits) return;
@@ -605,7 +670,7 @@ function CollapsedMoodSelector({
     const leftmostIndex = Math.max(
       0,
       Math.min(
-        moodScale.length - visiblePills,
+        MOOD_RATING_COUNT - visiblePills,
         CENTER_INDEX - Math.floor(visiblePills / 2)
       )
     );
@@ -656,10 +721,7 @@ function CollapsedMoodSelector({
           gap: PILL_GAP,
         }}
       >
-        {moodScale.map((mood) => {
-          const backgroundColor = isDark ? mood.bgHexDark : mood.bgHex;
-          const color = isDark ? mood.textHexDark : mood.textHex;
-
+        {moodData.map((mood) => {
           return (
             <HapticTab
               key={mood.value}
@@ -667,18 +729,18 @@ function CollapsedMoodSelector({
               style={{
                 width: PILL_WIDTH,
                 height: PILL_HEIGHT,
-                backgroundColor,
+                backgroundColor: mood.backgroundHex,
                 borderRadius: 12,
               }}
               onPress={() => onMoodPress(mood.value)}
               onLongPress={() => onLongPress(mood.value)}
               delayLongPress={500}
               accessibilityRole="button"
-              accessibilityLabel={`Log ${mood.label}, mood ${mood.value}`}
+              accessibilityLabel={mood.accessibilityText}
             >
               <Text
                 style={{
-                  color,
+                  color: mood.colorHex,
                   fontSize: 14,
                   fontWeight: "700",
                   fontVariant: ["tabular-nums"],

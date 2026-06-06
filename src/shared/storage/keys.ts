@@ -9,6 +9,9 @@ export const EMOTION_PRESETS_KEY = "emotionPresets";
 export const CONTEXT_TAGS_KEY = "contextTags";
 export const QUICK_ENTRY_PREFS_KEY = "quickEntryPrefs";
 export const THERAPY_EXPORT_PREFS_KEY = "therapyExportPrefs";
+export const BOOTSTRAP_MIGRATIONS_STATE_KEY = "bootstrapMigrationsState";
+export const EMOTION_CATEGORY_MIGRATION_COMPLETED_KEY = "emotionCategoryMigrationCompleted";
+export const EMOTION_CATEGORY_MIGRATION_RETRIES_KEY = "emotionCategoryMigrationRetries";
 
 // App Lock
 export const APP_LOCK_ENABLED_KEY = "appLockEnabled";

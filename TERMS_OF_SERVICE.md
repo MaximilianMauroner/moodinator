@@ -1,6 +1,6 @@
 # Terms of Service
 
-**Last Updated: May 21, 2026**
+**Last Updated: May 22, 2026**
 
 ## Agreement to Terms
 
@@ -35,7 +35,7 @@ You agree not to:
 
 ### Ownership
 
-You retain full ownership of all data you create within the app, including mood entries and notes.
+You retain full ownership of all data you create within the app, including mood entries, notes, emotion tags, context tags, settings, exports, and backups.
 
 ### Local Storage
 

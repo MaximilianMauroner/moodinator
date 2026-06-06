@@ -2,7 +2,7 @@ import type * as SQLite from "expo-sqlite";
 import { getDb } from "../client";
 import type { Emotion } from "../types";
 import type { EmotionRow, MoodRow, CountResult } from "../types/rows";
-import { DEFAULT_EMOTIONS } from "../../src/lib/entrySettings";
+import { DEFAULT_EMOTIONS } from "../../domain/entrySettings";
 import { parseEmotionItem } from "./emotionUtils";
 import { serializeEmotions } from "./serialization";
 
@@ -113,18 +113,32 @@ async function getOrCreateEmotionId(
   db: SQLite.SQLiteDatabase,
   emotion: Emotion
 ): Promise<number> {
-  await db.runAsync(
-    "INSERT OR REPLACE INTO emotions (name, category) VALUES (?, ?);",
-    emotion.name,
-    emotion.category
-  );
-
-  const row = await db.getFirstAsync<Pick<EmotionRow, "id">>(
+  const existing = await db.getFirstAsync<Pick<EmotionRow, "id">>(
     "SELECT id FROM emotions WHERE name = ?;",
     emotion.name
   );
 
-  return row!.id;
+  if (existing) {
+    await db.runAsync(
+      "UPDATE emotions SET category = ? WHERE name = ?;",
+      emotion.category,
+      emotion.name
+    );
+    return existing.id;
+  }
+
+  await db.runAsync(
+    "INSERT INTO emotions (name, category) VALUES (?, ?);",
+    emotion.name,
+    emotion.category
+  );
+
+  const inserted = await db.getFirstAsync<Pick<EmotionRow, "id">>(
+    "SELECT id FROM emotions WHERE name = ?;",
+    emotion.name
+  );
+
+  return inserted!.id;
 }
 
 export async function linkEmotionsToMood(
@@ -310,15 +324,66 @@ export async function countMoodEntriesWithEmotionName(name: string): Promise<num
   return affectedMoodEntryCount;
 }
 
-export async function renameEmotionInMoodEntries(
-  oldName: string,
-  newName: string
+export type EmotionHistoricalUpdate =
+  | { type: "rename"; oldName: string; newName: string }
+  | { type: "category"; name: string; category: Emotion["category"] };
+
+function normalizeEmotionName(name: string): string {
+  return name.trim().toLowerCase();
+}
+
+function parseMoodRowEmotions(row: Pick<MoodRow, "emotions">): Emotion[] {
+  if (!row.emotions || row.emotions === "[]") {
+    return [];
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(row.emotions);
+  } catch {
+    return [];
+  }
+
+  if (!Array.isArray(parsed)) {
+    return [];
+  }
+
+  return parsed
+    .map(parseEmotionItem)
+    .filter((emotion): emotion is Emotion => emotion !== null);
+}
+
+export async function applyEmotionHistoricalUpdate(
+  update: EmotionHistoricalUpdate
 ): Promise<{ updated: number }> {
   const db = await getDb();
-  const normalizedTarget = oldName.trim().toLowerCase();
 
-  if (!normalizedTarget) {
-    return { updated: 0 };
+  if (update.type === "rename") {
+    const oldName = update.oldName.trim();
+    const newName = update.newName.trim();
+    const normalizedOldName = normalizeEmotionName(oldName);
+    const normalizedNewName = normalizeEmotionName(newName);
+
+    if (!normalizedOldName || !normalizedNewName) {
+      return { updated: 0 };
+    }
+
+    if (normalizedOldName !== normalizedNewName) {
+      const [existingOld, existingNew] = await Promise.all([
+        db.getFirstAsync<Pick<EmotionRow, "id">>(
+          "SELECT id FROM emotions WHERE name = ?;",
+          oldName
+        ),
+        db.getFirstAsync<Pick<EmotionRow, "id">>(
+          "SELECT id FROM emotions WHERE name = ?;",
+          newName
+        ),
+      ]);
+
+      if (existingNew && existingNew.id !== existingOld?.id) {
+        throw new Error("An emotion with this name already exists");
+      }
+    }
   }
 
   const rows = await db.getAllAsync<Pick<MoodRow, "id" | "emotions">>(
@@ -327,27 +392,65 @@ export async function renameEmotionInMoodEntries(
 
   let updated = 0;
 
-  for (const row of rows) {
-    if (!row.emotions || row.emotions === "[]") {
-      continue;
+  await db.execAsync("BEGIN TRANSACTION;");
+  try {
+    if (update.type === "rename") {
+      const oldName = update.oldName.trim();
+      const newName = update.newName.trim();
+
+      if (normalizeEmotionName(oldName) !== normalizeEmotionName(newName)) {
+        await db.runAsync(
+          "UPDATE emotions SET name = ? WHERE name = ?;",
+          newName,
+          oldName
+        );
+      }
+    } else {
+      const name = update.name.trim();
+      if (name) {
+        const existing = await db.getFirstAsync<Pick<EmotionRow, "id">>(
+          "SELECT id FROM emotions WHERE name = ?;",
+          name
+        );
+
+        if (existing) {
+          await db.runAsync(
+            "UPDATE emotions SET category = ? WHERE name = ?;",
+            update.category,
+            name
+          );
+        } else {
+          await db.runAsync(
+            "INSERT INTO emotions (name, category) VALUES (?, ?);",
+            name,
+            update.category
+          );
+        }
+      }
     }
 
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(row.emotions);
-    } catch {
-      continue;
-    }
+    for (const row of rows) {
+      const emotions = parseMoodRowEmotions(row);
+      if (!emotions.length) {
+        continue;
+      }
 
-    if (!Array.isArray(parsed)) {
-      continue;
-    }
+      let changed = false;
+      const rewritten = emotions.map((emotion) => {
+        if (update.type === "rename") {
+          const normalizedTarget = normalizeEmotionName(update.oldName);
+          if (emotion.name.trim().toLowerCase() !== normalizedTarget) {
+            return emotion;
+          }
 
-    let changed = false;
-    const rewritten = parsed
-      .map(parseEmotionItem)
-      .filter((emotion): emotion is Emotion => emotion !== null)
-      .map((emotion) => {
+          changed = true;
+          return {
+            ...emotion,
+            name: update.newName.trim(),
+          };
+        }
+
+        const normalizedTarget = normalizeEmotionName(update.name);
         if (emotion.name.trim().toLowerCase() !== normalizedTarget) {
           return emotion;
         }
@@ -355,88 +458,42 @@ export async function renameEmotionInMoodEntries(
         changed = true;
         return {
           ...emotion,
-          name: newName,
+          category: update.category,
         };
       });
 
-    if (!changed) {
-      continue;
+      if (!changed) {
+        continue;
+      }
+
+      await db.runAsync(
+        "UPDATE moods SET emotions = ? WHERE id = ?;",
+        serializeEmotions(rewritten),
+        row.id
+      );
+      await linkEmotionsToMood(db, row.id, rewritten);
+      updated++;
     }
 
-    await db.runAsync(
-      "UPDATE moods SET emotions = ? WHERE id = ?;",
-      serializeEmotions(rewritten),
-      row.id
-    );
-    updated++;
+    await db.execAsync("COMMIT;");
+  } catch (error) {
+    await db.execAsync("ROLLBACK;");
+    throw error;
   }
 
   return { updated };
+}
+
+export async function renameEmotionInMoodEntries(
+  oldName: string,
+  newName: string
+): Promise<{ updated: number }> {
+  return applyEmotionHistoricalUpdate({ type: "rename", oldName, newName });
 }
 
 export async function recategorizeEmotionInMoodEntries(
   name: string,
   category: Emotion["category"]
 ): Promise<{ updated: number }> {
-  const db = await getDb();
-  const normalizedTarget = name.trim().toLowerCase();
-
-  if (!normalizedTarget) {
-    return { updated: 0 };
-  }
-
-  const rows = await db.getAllAsync<Pick<MoodRow, "id" | "emotions">>(
-    "SELECT id, emotions FROM moods;"
-  );
-
-  let updated = 0;
-
-  for (const row of rows) {
-    if (!row.emotions || row.emotions === "[]") {
-      continue;
-    }
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(row.emotions);
-    } catch {
-      continue;
-    }
-
-    if (!Array.isArray(parsed)) {
-      continue;
-    }
-
-    let changed = false;
-    const rewritten = parsed
-      .map(parseEmotionItem)
-      .filter((emotion): emotion is Emotion => emotion !== null)
-      .map((emotion) => {
-        if (emotion.name.trim().toLowerCase() !== normalizedTarget) {
-          return emotion;
-        }
-        if (emotion.category === category) {
-          return emotion;
-        }
-
-        changed = true;
-        return {
-          ...emotion,
-          category,
-        };
-      });
-
-    if (!changed) {
-      continue;
-    }
-
-    await db.runAsync(
-      "UPDATE moods SET emotions = ? WHERE id = ?;",
-      serializeEmotions(rewritten),
-      row.id
-    );
-    updated++;
-  }
-
-  return { updated };
+  return applyEmotionHistoricalUpdate({ type: "category", name, category });
 }

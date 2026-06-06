@@ -10,9 +10,16 @@ const moodServiceMock = vi.hoisted(() => ({
   getPaginated: vi.fn(),
 }));
 
-vi.mock("@/services/moodService", () => ({
-  moodService: moodServiceMock,
-}));
+vi.mock("@/services/moodService", async () => {
+  const actual = await vi.importActual<typeof import("../../../src/services/moodEntryWorkflow")>(
+    "../../../src/services/moodEntryWorkflow"
+  );
+
+  return {
+    createMoodEntryWorkflow: actual.createMoodEntryWorkflow,
+    moodService: moodServiceMock,
+  };
+});
 
 import { useMoodsStore } from "../../../src/shared/state/moodsStore";
 
@@ -31,9 +38,6 @@ function makeMood(id: number, timestamp: number, overrides: Partial<MoodEntry> =
       max: 10,
       lowerIsBetter: true,
     },
-    photos: [],
-    location: null,
-    voiceMemos: [],
     basedOnEntryId: null,
     ...overrides,
   };

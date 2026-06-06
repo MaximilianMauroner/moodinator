@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, type ViewStyle } from "react-native";
 import { HapticTab } from "./HapticTab";
-import { moodScale } from "@/constants/moodScale";
+import { getAllMoodRatingDisplays } from "@/constants/moodScaleInterpretation";
 import {
 	getMoodButtonLabel,
 	getMoodButtonHint,
@@ -25,15 +25,15 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
 	const { isDark, get } = useThemeColors();
 
 	const moodData = React.useMemo(() => {
-		return moodScale.map((mood) => ({
+		return getAllMoodRatingDisplays(isDark).map((mood) => ({
 			value: mood.value,
 			label: mood.label,
 			description: mood.description,
 			color: mood.color,
 			bg: mood.bg,
 			borderColor: mood.borderColor,
-			textHex: isDark ? mood.textHexDark : mood.textHex,
-			bgHex: isDark ? mood.bgHexDark : mood.bgHex,
+			textHex: mood.colorHex,
+			bgHex: mood.backgroundHex,
 		}));
 	}, [isDark]);
 

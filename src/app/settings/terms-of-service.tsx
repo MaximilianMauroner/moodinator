@@ -19,7 +19,7 @@ export default function TermsOfServiceScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Text className="text-xs text-sand-500 dark:text-sand-400 mb-4">
-          Last Updated: May 21, 2026
+          Last Updated: May 22, 2026
         </Text>
 
         <Section title="Agreement to Terms">
@@ -35,7 +35,6 @@ export default function TermsOfServiceScreen() {
           <BulletList items={[
             "Record daily mood entries on a 0-10 scale",
             "Tag entries with emotions and contexts",
-            "Attach photos, voice notes, and location data",
             "View analytics and insights about your mood patterns",
             "Export your data for personal use",
           ]} />
@@ -56,7 +55,7 @@ export default function TermsOfServiceScreen() {
         <Section title="Your Data">
           <Subtitle>Ownership</Subtitle>
           <Paragraph>
-            You retain full ownership of all data you create within the app, including mood entries, notes, photos, and voice recordings.
+            You retain full ownership of all data you create within the app, including mood entries, notes, emotion tags, context tags, settings, exports, and backups.
           </Paragraph>
 
           <Subtitle>Local Storage</Subtitle>

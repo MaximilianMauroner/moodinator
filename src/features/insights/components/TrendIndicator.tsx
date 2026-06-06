@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useColorScheme } from "nativewind";
+import { getMoodTrendDirection } from "@/constants/moodScaleInterpretation";
 
 export type TrendDirection = "up" | "down" | "stable";
 
@@ -29,12 +30,9 @@ export function TrendIndicator({
 
   const config = sizeConfig[size];
 
-  // For mood tracking: lower is better, so "up" in trend means mood worsened
-  // We show green when improving (direction down = mood number decreasing)
   const getColors = () => {
     switch (direction) {
       case "up":
-        // Mood worsening (higher number = worse)
         return {
           bg: isDark ? "rgba(239, 68, 68, 0.15)" : "#FEE2E2",
           text: isDark ? "#FCA5A5" : "#DC2626",
@@ -42,7 +40,6 @@ export function TrendIndicator({
           label: "Worsening",
         };
       case "down":
-        // Mood improving (lower number = better)
         return {
           bg: isDark ? "rgba(34, 197, 94, 0.15)" : "#DCFCE7",
           text: isDark ? "#86EFAC" : "#16A34A",
@@ -82,12 +79,6 @@ export function TrendIndicator({
   );
 }
 
-/**
- * Helper to determine trend direction from a numeric change
- * For mood tracking: negative change = improvement (direction "down")
- */
 export function getTrendDirection(change: number, threshold = 0.1): TrendDirection {
-  if (change < -threshold) return "down"; // Improving
-  if (change > threshold) return "up"; // Worsening
-  return "stable";
+  return getMoodTrendDirection(change, threshold);
 }

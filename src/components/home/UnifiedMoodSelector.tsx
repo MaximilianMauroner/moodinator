@@ -9,7 +9,10 @@ import Animated, {
   type SharedValue,
 } from "react-native-reanimated";
 import { HapticTab } from "@/components/HapticTab";
-import { moodScale } from "@/constants/moodScale";
+import {
+  getAllMoodRatingDisplays,
+  type MoodRatingDisplay,
+} from "@/constants/moodScaleInterpretation";
 import { useThemeColors, colors } from "@/constants/colors";
 import { getMoodButtonLabel, getMoodButtonHint } from "@/constants/accessibility";
 
@@ -34,8 +37,9 @@ const PILL_W = 52;
 const PILL_H = 38;
 const PILL_GAP = 5;
 const TRACK_PAD_X = 16;
+const MOOD_RATING_COUNT = getAllMoodRatingDisplays(false).length;
 const COLLAPSED_TRACK_CONTENT_WIDTH =
-  TRACK_PAD_X * 2 + moodScale.length * PILL_W + (moodScale.length - 1) * PILL_GAP;
+  TRACK_PAD_X * 2 + MOOD_RATING_COUNT * PILL_W + (MOOD_RATING_COUNT - 1) * PILL_GAP;
 
 // ─── Position helpers (worklet-safe) ──────────────────────────────────────────
 
@@ -70,11 +74,10 @@ function expandedPos(index: number, containerWidth: number) {
 // ─── Individual button ─────────────────────────────────────────────────────────
 
 interface MoodButtonProps {
-  mood: (typeof moodScale)[0];
+  mood: MoodRatingDisplay;
   index: number;
   collapseProgress: SharedValue<number>;
-  containerWidth: number;
-  isDark: boolean;
+  expandedWidth: number;
   onMoodPress: (mood: number) => void;
   onLongPress: (mood: number) => void;
 }
@@ -83,18 +86,14 @@ function MoodButton({
   mood,
   index,
   collapseProgress,
-  containerWidth,
-  isDark,
+  expandedWidth,
   onMoodPress,
   onLongPress,
 }: MoodButtonProps) {
-  const bgHex = isDark ? mood.bgHexDark : mood.bgHex;
-  const textHex = isDark ? mood.textHexDark : mood.textHex;
-
   const containerStyle = useAnimatedStyle(() => {
     const p = collapseProgress.value;
     const c = collapsedPos(index);
-    const e = expandedPos(index, containerWidth);
+    const e = expandedPos(index, expandedWidth);
     return {
       position: "absolute" as const,
       left: interpolate(p, [0, 1], [e.left, c.left], Extrapolation.CLAMP),
@@ -153,7 +152,7 @@ function MoodButton({
           flex: 1,
           alignItems: "center",
           justifyContent: "center",
-          backgroundColor: bgHex,
+          backgroundColor: mood.backgroundHex,
         }}
         onPress={() => onMoodPress(mood.value)}
         onLongPress={() => onLongPress(mood.value)}
@@ -165,7 +164,7 @@ function MoodButton({
         <Animated.Text
           style={[
             {
-              color: textHex,
+              color: mood.colorHex,
               fontWeight: "700",
               fontVariant: ["tabular-nums"],
             },
@@ -177,7 +176,7 @@ function MoodButton({
         <Animated.Text
           style={[
             {
-              color: textHex,
+              color: mood.colorHex,
               fontSize: 8,
               fontWeight: "600",
               opacity: 0.85,
@@ -210,7 +209,7 @@ export function UnifiedMoodSelector({
   onLongPress,
 }: UnifiedMoodSelectorProps) {
   const [containerWidth, setContainerWidth] = useState(0);
-  const [isCollapsed, setIsCollapsed] = useState(true);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
   const { get } = useThemeColors();
 
@@ -221,6 +220,10 @@ export function UnifiedMoodSelector({
   const negativeColor = isDark
     ? colors.negative.text.dark
     : colors.negative.text.light;
+  const moodData = React.useMemo(
+    () => getAllMoodRatingDisplays(isDark),
+    [isDark]
+  );
 
   // Track background fades in as the panel collapses
   const trackBgStyle = useAnimatedStyle(() => ({
@@ -285,6 +288,10 @@ export function UnifiedMoodSelector({
   }, [isCollapsed]);
 
   const borderColor = get("border");
+  const expandedContentWidth = Math.max(
+    0,
+    containerWidth - TRACK_PAD_X * 2
+  );
   const contentWidth = Math.max(containerWidth, COLLAPSED_TRACK_CONTENT_WIDTH);
 
   return (
@@ -360,14 +367,13 @@ export function UnifiedMoodSelector({
         <View style={{ width: contentWidth, flex: 1 }}>
           {/* Mood buttons — each one is an independent entity that travels between states */}
           {containerWidth > 0 &&
-            moodScale.map((mood, index) => (
+            moodData.map((mood, index) => (
               <MoodButton
                 key={mood.value}
                 mood={mood}
                 index={index}
                 collapseProgress={collapseProgress}
-                containerWidth={containerWidth}
-                isDark={isDark}
+                expandedWidth={expandedContentWidth}
                 onMoodPress={onMoodPress}
                 onLongPress={onLongPress}
               />

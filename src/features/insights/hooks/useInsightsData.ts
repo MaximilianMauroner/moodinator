@@ -1,37 +1,20 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import {
-  startOfWeek,
-  endOfWeek,
-  startOfMonth,
-  endOfMonth,
-  subWeeks,
-  addWeeks,
-  subMonths,
-  addMonths,
-  isAfter,
-  isBefore,
-  format,
-  startOfDay,
-} from "date-fns";
+import { isAfter, isBefore, startOfDay } from "date-fns";
 import { useFocusEffect } from "expo-router";
-import type { MoodEntry } from "@db/types";
-import { TimePeriod } from "../components/TimePeriodSelector";
-import { detectPatterns, calculateStreak, Pattern } from "../utils/patternDetection";
-import { getTrendDirection, TrendDirection } from "../components/TrendIndicator";
-import { moodScale } from "@/constants/moodScale";
+import type { MoodEntry, MoodScaleSnapshot } from "@db/types";
+import type { TimePeriod } from "../components/TimePeriodSelector";
+import type { Pattern } from "../utils/patternDetection";
+import {
+  buildMoodInsights,
+  getNextPeriodDate,
+  getPreviousPeriodDate,
+} from "../utils/moodInsights";
+import type { PeriodStats } from "../utils/periodStats";
+import { getMoodRatingLabel } from "@/constants/moodScaleInterpretation";
 import { getMoodHex } from "@/lib/moodPresentation";
 import { useMoodsStore } from "@/shared/state/moodsStore";
 
-export interface PeriodStats {
-  entryCount: number;
-  averageMood: number;
-  moodChange: number; // Change from previous period
-  trendDirection: TrendDirection;
-  bestDay: string | null;
-  worstDay: string | null;
-  mostCommonMood: number;
-  energyAvg: number | null;
-}
+export type { PeriodStats };
 
 export interface InsightsData {
   // Data state
@@ -55,116 +38,11 @@ export interface InsightsData {
   streak: { current: number; longest: number };
 
   // Helpers
-  getMoodLabel: (value: number) => string;
-  getMoodColor: (value: number) => string;
+  getMoodLabel: (value: number, sourceScale?: MoodScaleSnapshot) => string;
+  getMoodColor: (value: number, sourceScale?: MoodScaleSnapshot) => string;
 
   // Refresh
   refresh: () => Promise<void>;
-}
-
-function getMoodsInPeriod(
-  moods: MoodEntry[],
-  period: TimePeriod,
-  date: Date
-): MoodEntry[] {
-  if (period === "all") return moods;
-
-  let start: Date;
-  let end: Date;
-
-  if (period === "week") {
-    start = startOfWeek(date, { weekStartsOn: 1 });
-    end = endOfWeek(date, { weekStartsOn: 1 });
-  } else if (period === "month") {
-    start = startOfMonth(date);
-    end = endOfMonth(date);
-  } else {
-    return moods;
-  }
-
-  return moods.filter((mood) => {
-    const moodDate = new Date(mood.timestamp);
-    return moodDate >= start && moodDate <= end;
-  });
-}
-
-function calculatePeriodStats(
-  currentMoods: MoodEntry[],
-  previousMoods: MoodEntry[]
-): PeriodStats {
-  const entryCount = currentMoods.length;
-
-  if (entryCount === 0) {
-    return {
-      entryCount: 0,
-      averageMood: 0,
-      moodChange: 0,
-      trendDirection: "stable",
-      bestDay: null,
-      worstDay: null,
-      mostCommonMood: 5,
-      energyAvg: null,
-    };
-  }
-
-  // Calculate average mood
-  const totalMood = currentMoods.reduce((sum, m) => sum + m.mood, 0);
-  const averageMood = totalMood / entryCount;
-
-  // Calculate mood change from previous period
-  let moodChange = 0;
-  if (previousMoods.length > 0) {
-    const prevAvg = previousMoods.reduce((sum, m) => sum + m.mood, 0) / previousMoods.length;
-    moodChange = averageMood - prevAvg;
-  }
-
-  // Determine trend direction
-  const trendDirection = getTrendDirection(moodChange);
-
-  // Find best and worst days
-  const moodsByDay: Record<string, { total: number; count: number }> = {};
-  currentMoods.forEach((mood) => {
-    const dayKey = format(new Date(mood.timestamp), "EEEE");
-    if (!moodsByDay[dayKey]) {
-      moodsByDay[dayKey] = { total: 0, count: 0 };
-    }
-    moodsByDay[dayKey].total += mood.mood;
-    moodsByDay[dayKey].count++;
-  });
-
-  const dayAverages = Object.entries(moodsByDay)
-    .map(([day, data]) => ({ day, avg: data.total / data.count }))
-    .sort((a, b) => a.avg - b.avg);
-
-  const bestDay = dayAverages.length > 0 ? dayAverages[0].day : null;
-  const worstDay = dayAverages.length > 0 ? dayAverages[dayAverages.length - 1].day : null;
-
-  // Calculate most common mood
-  const moodCounts: Record<number, number> = {};
-  currentMoods.forEach((mood) => {
-    moodCounts[mood.mood] = (moodCounts[mood.mood] || 0) + 1;
-  });
-  const mostCommonMood = Object.entries(moodCounts).sort(
-    (a, b) => b[1] - a[1]
-  )[0]?.[0];
-
-  // Calculate energy average
-  const moodsWithEnergy = currentMoods.filter((m) => m.energy !== undefined && m.energy !== null);
-  const energyAvg =
-    moodsWithEnergy.length > 0
-      ? moodsWithEnergy.reduce((sum, m) => sum + (m.energy || 0), 0) / moodsWithEnergy.length
-      : null;
-
-  return {
-    entryCount,
-    averageMood: Math.round(averageMood * 10) / 10,
-    moodChange: Math.round(moodChange * 10) / 10,
-    trendDirection,
-    bestDay,
-    worstDay,
-    mostCommonMood: parseInt(mostCommonMood || "5", 10),
-    energyAvg: energyAvg !== null ? Math.round(energyAvg * 10) / 10 : null,
-  };
 }
 
 export function useInsightsData(): InsightsData {
@@ -198,54 +76,22 @@ export function useInsightsData(): InsightsData {
     }, [ensureFresh])
   );
 
-  // Get moods for current period
-  const periodMoods = useMemo(
-    () => getMoodsInPeriod(allMoods, period, currentDate),
+  const insights = useMemo(
+    () => buildMoodInsights(allMoods, period, currentDate),
     [allMoods, period, currentDate]
   );
-
-  // Get moods for previous period (for comparison)
-  const previousPeriodMoods = useMemo(() => {
-    if (period === "all") return [];
-
-    const prevDate =
-      period === "week"
-        ? subWeeks(currentDate, 1)
-        : subMonths(currentDate, 1);
-
-    return getMoodsInPeriod(allMoods, period, prevDate);
-  }, [allMoods, period, currentDate]);
-
-  // Calculate stats
-  const stats = useMemo(
-    () => calculatePeriodStats(periodMoods, previousPeriodMoods),
-    [periodMoods, previousPeriodMoods]
-  );
-
-  // Detect patterns (only for all data or larger periods)
-  const patterns = useMemo(() => {
-    if (period === "week") return [];
-    const moodsForPatterns = period === "all" ? allMoods : periodMoods;
-    return detectPatterns(moodsForPatterns);
-  }, [allMoods, periodMoods, period]);
-
-  // Calculate streak
-  const streak = useMemo(() => calculateStreak(allMoods), [allMoods]);
+  const { periodMoods, stats, patterns, streak } = insights;
 
   // Navigation
   const goToPrevious = useCallback(() => {
-    if (period === "week") {
-      setCurrentDate((d) => subWeeks(d, 1));
-    } else if (period === "month") {
-      setCurrentDate((d) => subMonths(d, 1));
+    if (period !== "all") {
+      setCurrentDate((d) => getPreviousPeriodDate(period, d));
     }
   }, [period]);
 
   const goToNext = useCallback(() => {
-    if (period === "week") {
-      setCurrentDate((d) => addWeeks(d, 1));
-    } else if (period === "month") {
-      setCurrentDate((d) => addMonths(d, 1));
+    if (period !== "all") {
+      setCurrentDate((d) => getNextPeriodDate(period, d));
     }
   }, [period]);
 
@@ -256,10 +102,7 @@ export function useInsightsData(): InsightsData {
   // Can navigate?
   const canGoNext = useMemo(() => {
     if (period === "all") return false;
-    const nextDate =
-      period === "week"
-        ? addWeeks(currentDate, 1)
-        : addMonths(currentDate, 1);
+    const nextDate = getNextPeriodDate(period, currentDate);
     return !isAfter(startOfDay(nextDate), startOfDay(new Date()));
   }, [period, currentDate]);
 
@@ -270,21 +113,21 @@ export function useInsightsData(): InsightsData {
     // Can go back as long as there's data
     const oldestMood = allMoods[allMoods.length - 1];
     const oldestDate = new Date(oldestMood.timestamp);
-    const prevDate =
-      period === "week"
-        ? subWeeks(currentDate, 1)
-        : subMonths(currentDate, 1);
+    const prevDate = getPreviousPeriodDate(period, currentDate);
 
     return !isBefore(prevDate, startOfDay(oldestDate));
   }, [period, currentDate, allMoods]);
 
   // Helpers
-  const getMoodLabel = useCallback((value: number) => {
-    const mood = moodScale.find((m) => m.value === Math.round(value));
-    return mood?.label || "Unknown";
+  const getMoodLabel = useCallback((value: number, sourceScale?: MoodScaleSnapshot) => {
+    return getMoodRatingLabel(value, sourceScale);
   }, []);
 
-  const getMoodColor = useCallback((value: number) => getMoodHex(value), []);
+  const getMoodColor = useCallback(
+    (value: number, sourceScale?: MoodScaleSnapshot) =>
+      getMoodHex(value, false, sourceScale),
+    []
+  );
 
   return {
     allMoods,

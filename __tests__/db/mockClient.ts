@@ -169,6 +169,18 @@ export function createMockDb() {
           return { changes: 1 };
         }
 
+        if (sql.includes("SET name = ? WHERE name = ?")) {
+          const [name, oldName] = params;
+          const existing = emotionRows.find(
+            (e) => e.name.toLowerCase() === String(oldName).toLowerCase()
+          );
+          if (!existing) {
+            return { changes: 0 };
+          }
+          existing.name = name;
+          return { changes: 1 };
+        }
+
         const [name, category, oldName] = params;
         const existing = emotionRows.find(
           (e) => e.name.toLowerCase() === String(oldName).toLowerCase()
@@ -195,6 +207,12 @@ export function createMockDb() {
       if (sql.includes("INSERT") && sql.includes("mood_emotions")) {
         const moodId = params[0];
         const emotionId = params[1];
+        const existing = moodEmotionRows.some(
+          (me) => me.mood_id === moodId && me.emotion_id === emotionId
+        );
+        if (existing) {
+          return { changes: 0 };
+        }
         moodEmotionRows.push({ mood_id: moodId, emotion_id: emotionId });
         return { changes: 1 };
       }
@@ -335,6 +353,9 @@ export function createMockDb() {
       emotionRows.push(newRow);
       return newRow;
     },
+    __addMoodEmotion: (moodId: number, emotionId: number) => {
+      moodEmotionRows.push({ mood_id: moodId, emotion_id: emotionId });
+    },
   };
 
   return mockDb;
@@ -353,9 +374,6 @@ export function createMockMoodEntry(overrides?: Partial<MoodEntry>): MoodEntry {
     contextTags: [],
     energy: null,
     moodScale: { version: 1, min: 0, max: 10, lowerIsBetter: true },
-    photos: [],
-    location: null,
-    voiceMemos: [],
     basedOnEntryId: null,
     ...overrides,
   };
