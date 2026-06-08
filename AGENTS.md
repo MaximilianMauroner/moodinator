@@ -1,5 +1,7 @@
 # Agent Notes
 
+This is a Mobile only app - don't attempt to open the browser or web version
+
 Keep this file limited to project-specific constraints that are not obvious from a quick code search.
 
 - Mood scale is inverted: `0` means best (`Elated`), `10` means worst (`Emergency`). Lower is better everywhere.

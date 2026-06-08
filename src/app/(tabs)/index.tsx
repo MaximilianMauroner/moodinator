@@ -54,6 +54,7 @@ import { useMoodItemActions } from "@/hooks/useMoodItemActions";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { haptics } from "@/lib/haptics";
+import { getHomeHeaderSnapTarget } from "@/lib/homeHeaderSnap";
 import { addHomeTabDoublePressListener } from "@/lib/homeTabEvents";
 
 import type { MoodEntry } from "@db/types";
@@ -80,6 +81,11 @@ const JUMP_TO_TOP_THRESHOLD = 760;
 const COLLAPSE_SMOOTHING_MS = 90;
 // Duration of the programmatic "return to start" header expansion.
 const SCROLL_TO_TOP_MS = 360;
+const HEADER_SNAP_MS = 220;
+const HEADER_SNAP_DELAY_MS = 80;
+// FlashList briefly preserves the old anchor after prepending a new entry.
+// These retries make the explicit post-save jump-to-top win after that settles.
+const POST_SAVE_SCROLL_RESET_DELAYS_MS = [140, 320];
 
 function clamp(value: number, min: number, max: number) {
   "worklet";
@@ -106,6 +112,16 @@ function HomeScreenContent() {
   const [selectorCollapsed, setSelectorCollapsed] = useState(false);
   const [jumpToTopVisible, setJumpToTopVisible] = useState(false);
   const listRef = useRef<FlashListRef<MoodEntry>>(null);
+  const latestScrollMetricsRef = useRef({
+    offsetY: 0,
+    contentHeight: 0,
+    viewportHeight: 0,
+  });
+  const pendingHeaderSnapRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
+  const pendingTopResetTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const momentumScrollActiveRef = useRef(false);
   const { refreshing, onRefresh: handlePullToRefresh } = usePullToRefresh(refreshMoods);
 
   const entrySettings = useEntrySettings();
@@ -117,16 +133,6 @@ function HomeScreenContent() {
   useEffect(() => {
     loadAll();
   }, [loadAll]);
-
-  const handleEntrySave = useCallback(async (values: MoodEntryFormValues) => {
-    await createMood({
-      mood: values.mood,
-      note: values.note || null,
-      emotions: values.emotions,
-      contextTags: values.contextTags,
-      energy: values.energy,
-    });
-  }, [createMood]);
 
   const handleEditEntrySave = useCallback(
     async (values: MoodEntryFormValues) => {
@@ -204,6 +210,103 @@ function HomeScreenContent() {
       }),
     [rawCollapseProgress]
   );
+
+  const clearPendingHeaderSnap = useCallback(() => {
+    if (pendingHeaderSnapRef.current === null) return;
+
+    clearTimeout(pendingHeaderSnapRef.current);
+    pendingHeaderSnapRef.current = null;
+  }, []);
+
+  const clearPendingTopResets = useCallback(() => {
+    pendingTopResetTimersRef.current.forEach(clearTimeout);
+    pendingTopResetTimersRef.current = [];
+  }, []);
+
+  useEffect(
+    () => () => {
+      clearPendingHeaderSnap();
+      clearPendingTopResets();
+    },
+    [clearPendingHeaderSnap, clearPendingTopResets]
+  );
+
+  const forceHomeListToTop = useCallback(
+    (animated: boolean) => {
+      clearPendingHeaderSnap();
+      momentumScrollActiveRef.current = false;
+      latestScrollMetricsRef.current = {
+        ...latestScrollMetricsRef.current,
+        offsetY: 0,
+      };
+      setJumpToTopVisible(false);
+      listRef.current?.scrollToOffset({ offset: 0, animated });
+
+      if (animated) {
+        scrollY.value = withTiming(0, {
+          duration: SCROLL_TO_TOP_MS,
+          easing: Easing.out(Easing.cubic),
+        });
+      } else {
+        scrollY.value = 0;
+      }
+
+      setSelectorCollapsed(false);
+    },
+    [clearPendingHeaderSnap, scrollY]
+  );
+
+  const schedulePostSaveTopResets = useCallback(() => {
+    clearPendingTopResets();
+
+    pendingTopResetTimersRef.current = POST_SAVE_SCROLL_RESET_DELAYS_MS.map((delayMs) => {
+      const timerId = setTimeout(() => {
+        pendingTopResetTimersRef.current =
+          pendingTopResetTimersRef.current.filter((currentId) => currentId !== timerId);
+        forceHomeListToTop(false);
+      }, delayMs);
+
+      return timerId;
+    });
+  }, [clearPendingTopResets, forceHomeListToTop]);
+
+  const snapHomeHeaderIfNeeded = useCallback(() => {
+    clearPendingHeaderSnap();
+
+    const targetOffset = getHomeHeaderSnapTarget({
+      ...latestScrollMetricsRef.current,
+      collapseDistance,
+    });
+
+    if (targetOffset === null) return;
+
+    latestScrollMetricsRef.current = {
+      ...latestScrollMetricsRef.current,
+      offsetY: targetOffset,
+    };
+    listRef.current?.scrollToOffset({ offset: targetOffset, animated: true });
+    scrollY.value = withTiming(targetOffset, {
+      duration: HEADER_SNAP_MS,
+      easing: Easing.out(Easing.cubic),
+    });
+
+    if (targetOffset === 0) {
+      setSelectorCollapsed(false);
+    }
+  }, [clearPendingHeaderSnap, collapseDistance, scrollY]);
+
+  const scheduleHomeHeaderSnap = useCallback(() => {
+    clearPendingHeaderSnap();
+
+    pendingHeaderSnapRef.current = setTimeout(() => {
+      pendingHeaderSnapRef.current = null;
+
+      if (!momentumScrollActiveRef.current) {
+        snapHomeHeaderIfNeeded();
+      }
+    }, HEADER_SNAP_DELAY_MS);
+  }, [clearPendingHeaderSnap, snapHomeHeaderIfNeeded]);
+
   // useAnimatedScrollHandler (createAnimatedComponent) triggers flash-list's
   // getScrollableNode() which has an un-guarded null ref on RN New Architecture.
   // A plain JS callback writing to the shared value is safe: useDerivedValue /
@@ -211,9 +314,40 @@ function HomeScreenContent() {
   const handleScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       const offsetY = Math.max(event.nativeEvent.contentOffset.y, 0);
+      latestScrollMetricsRef.current = {
+        offsetY,
+        contentHeight: event.nativeEvent.contentSize.height,
+        viewportHeight: event.nativeEvent.layoutMeasurement.height,
+      };
       scrollY.value = offsetY;
     },
     [scrollY]
+  );
+
+  const handleScrollEndDrag = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      handleScroll(event);
+      scheduleHomeHeaderSnap();
+    },
+    [handleScroll, scheduleHomeHeaderSnap]
+  );
+
+  const handleScrollBeginDrag = useCallback(() => {
+    clearPendingTopResets();
+  }, [clearPendingTopResets]);
+
+  const handleMomentumScrollBegin = useCallback(() => {
+    momentumScrollActiveRef.current = true;
+    clearPendingHeaderSnap();
+  }, [clearPendingHeaderSnap]);
+
+  const handleMomentumScrollEnd = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      handleScroll(event);
+      momentumScrollActiveRef.current = false;
+      snapHomeHeaderIfNeeded();
+    },
+    [handleScroll, snapHomeHeaderIfNeeded]
   );
 
   const scrollHomeListToTop = useCallback(
@@ -222,25 +356,28 @@ function HomeScreenContent() {
         haptics.selection();
       }
 
-      setJumpToTopVisible(false);
-      listRef.current?.scrollToOffset({ offset: 0, animated: true });
-
-      // Animate the header back open ourselves so the expansion stays smooth and
-      // in sync with the list returning to the start, independent of how the
-      // list's onScroll events happen to land. (onScroll still drives scrollY
-      // frame-to-frame during the scroll and simply wins where it does.)
-      scrollY.value = withTiming(0, {
-        duration: SCROLL_TO_TOP_MS,
-        easing: Easing.out(Easing.cubic),
-      });
-      setSelectorCollapsed(false);
+      clearPendingTopResets();
+      forceHomeListToTop(true);
 
       if (options?.refresh) {
         void handlePullToRefresh();
       }
     },
-    [handlePullToRefresh, scrollY]
+    [clearPendingTopResets, forceHomeListToTop, handlePullToRefresh]
   );
+
+  const handleEntrySave = useCallback(async (values: MoodEntryFormValues) => {
+    await createMood({
+      mood: values.mood,
+      note: values.note || null,
+      emotions: values.emotions,
+      contextTags: values.contextTags,
+      energy: values.energy,
+    });
+
+    scrollHomeListToTop({ haptic: false });
+    schedulePostSaveTopResets();
+  }, [createMood, schedulePostSaveTopResets, scrollHomeListToTop]);
 
   const handleJumpToTopPress = useCallback(() => {
     // HapticTab fires its own press feedback, so skip the duplicate buzz here.
@@ -484,6 +621,10 @@ function HomeScreenContent() {
               drawDistance={HOME_LIST_DRAW_DISTANCE}
               scrollEventThrottle={16}
               onScroll={handleScroll}
+              onScrollBeginDrag={handleScrollBeginDrag}
+              onScrollEndDrag={handleScrollEndDrag}
+              onMomentumScrollBegin={handleMomentumScrollBegin}
+              onMomentumScrollEnd={handleMomentumScrollEnd}
             />
 
             <Animated.View
