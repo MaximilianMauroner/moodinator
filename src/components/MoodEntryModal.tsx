@@ -8,7 +8,6 @@ import {
     TextInput,
     Alert,
     useWindowDimensions,
-    KeyboardAvoidingView,
     Keyboard,
     Platform,
 } from "react-native";
@@ -106,9 +105,10 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
 }) => {
     const { isDark, get, getCategoryColors } = useThemeColors();
     const { height: windowHeight } = useWindowDimensions();
-    const sheetHeight = Math.round(windowHeight * 0.92);
     const scrollViewRef = useRef<ScrollView>(null);
     const notesFocusedRef = useRef(false);
+    const notesContainerYRef = useRef(0);
+    const notesScrollTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
     // ── Form state
     const [mood, setMood] = useState(initialMood);
@@ -119,6 +119,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     const [basedOnEntryId, setBasedOnEntryId] = useState<number | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [keyboardHeight, setKeyboardHeight] = useState(0);
+    const [isNotesFocused, setIsNotesFocused] = useState(false);
 
     // ── Step state
     const [currentStep, setCurrentStep] = useState(0);
@@ -148,16 +149,34 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
         transform: [{ scale: nextBtnScale.value }],
     }));
 
+    const clearScheduledNotesScrolls = useCallback(() => {
+        notesScrollTimeoutsRef.current.forEach(clearTimeout);
+        notesScrollTimeoutsRef.current = [];
+    }, []);
+
     const scrollNotesIntoView = useCallback(() => {
         requestAnimationFrame(() => {
-            scrollViewRef.current?.scrollToEnd({ animated: true });
+            scrollViewRef.current?.scrollTo({
+                y: Math.max(notesContainerYRef.current - 8, 0),
+                animated: true,
+            });
         });
     }, []);
+
+    const scheduleScrollNotesIntoView = useCallback(() => {
+        clearScheduledNotesScrolls();
+        scrollNotesIntoView();
+        notesScrollTimeoutsRef.current = [80, 180, 320].map((delayMs) =>
+            setTimeout(scrollNotesIntoView, delayMs)
+        );
+    }, [clearScheduledNotesScrolls, scrollNotesIntoView]);
 
     useEffect(() => {
         if (!visible) {
             setKeyboardHeight(0);
+            setIsNotesFocused(false);
             notesFocusedRef.current = false;
+            clearScheduledNotesScrolls();
             return;
         }
 
@@ -169,18 +188,26 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
         const showSubscription = Keyboard.addListener(keyboardShowEvent, (event) => {
             setKeyboardHeight(event.endCoordinates.height);
             if (notesFocusedRef.current) {
-                setTimeout(scrollNotesIntoView, 50);
+                scheduleScrollNotesIntoView();
             }
         });
         const hideSubscription = Keyboard.addListener(keyboardHideEvent, () => {
             setKeyboardHeight(0);
+            setIsNotesFocused(false);
+            notesFocusedRef.current = false;
+            clearScheduledNotesScrolls();
         });
 
         return () => {
             showSubscription.remove();
             hideSubscription.remove();
+            clearScheduledNotesScrolls();
         };
-    }, [scrollNotesIntoView, visible]);
+    }, [
+        clearScheduledNotesScrolls,
+        scheduleScrollNotesIntoView,
+        visible,
+    ]);
 
     // ── Compute steps
     const steps = useMemo<StepId[]>(() => {
@@ -199,6 +226,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     const isLastStep = currentStep === steps.length - 1;
     const isMultiStep = steps.length > 1;
     const currentStepId = steps[currentStep];
+    const isNotesKeyboardActive = isNotesFocused && keyboardHeight > 0;
 
     // ── Adaptive placeholder
     const notesPlaceholder = useMemo(() => getNotesPlaceholder(mood), [mood]);
@@ -218,6 +246,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
             setBasedOnEntryId(initialValues?.basedOnEntryId ?? null);
             setIsSaving(false);
             setCurrentStep(0);
+            setIsNotesFocused(false);
             notesFocusedRef.current = false;
             // Reset transition state when modal opens
             stepOpacity.value = 1;
@@ -305,6 +334,16 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
         setNote(entry.note ?? "");
         setBasedOnEntryId(entry.id);
     };
+
+    const handleNoteChange = useCallback(
+        (value: string) => {
+            setNote(value);
+            if (notesFocusedRef.current) {
+                scrollNotesIntoView();
+            }
+        },
+        [scrollNotesIntoView]
+    );
 
     const toggleContext = useCallback((value: string) => {
         setContextTags((prev) =>
@@ -453,24 +492,33 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                         {(fieldConfig.context || fieldConfig.energy) && (
                             <Separator isDark={isDark} />
                         )}
-                        <View>
-                            <SectionLabel
-                                label="Notes"
-                                isDark={isDark}
-                                badge={note.trim() ? "Added" : undefined}
-                            />
+                        <View
+                            onLayout={(event) => {
+                                notesContainerYRef.current = event.nativeEvent.layout.y;
+                            }}
+                        >
+                            {!isNotesKeyboardActive && (
+                                <SectionLabel
+                                    label="Notes"
+                                    isDark={isDark}
+                                    badge={note.trim() ? "Added" : undefined}
+                                />
+                            )}
                             <TextInput
                                 multiline
                                 value={note}
-                                onChangeText={setNote}
+                                onChangeText={handleNoteChange}
                                 placeholder={notesPlaceholder}
                                 placeholderTextColor={get("textMuted")}
                                 onFocus={() => {
                                     notesFocusedRef.current = true;
-                                    scrollNotesIntoView();
+                                    setIsNotesFocused(true);
+                                    scheduleScrollNotesIntoView();
                                 }}
                                 onBlur={() => {
                                     notesFocusedRef.current = false;
+                                    setIsNotesFocused(false);
+                                    clearScheduledNotesScrolls();
                                 }}
                                 style={{
                                     minHeight: 100,
@@ -489,6 +537,8 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                     lineHeight: 21,
                                     fontFamily: undefined,
                                 }}
+                                cursorColor={get("primary")}
+                                selectionColor={isDark ? "rgba(166, 227, 155, 0.32)" : "rgba(91, 138, 91, 0.24)"}
                                 accessibilityLabel="Notes input"
                                 accessibilityHint={notesPlaceholder}
                             />
@@ -518,10 +568,22 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
             ? "#3D5A3D"
             : colors.primaryMuted.light
         : get("primary");
-    const scrollBottomPadding =
-        Platform.OS === "android" && keyboardHeight > 0
-            ? keyboardHeight + 120
-            : 28;
+    // Keyboard-aware sheet sizing. Transparent modals do not reliably receive
+    // Android's usual adjustResize behavior, so lift and shrink the sheet
+    // ourselves on both platforms when the keyboard is visible.
+    const keyboardOffset = Math.min(
+        keyboardHeight,
+        Math.max(windowHeight - 1, 0)
+    );
+    const availableHeight = Math.max(0, windowHeight - keyboardOffset);
+    const scrollBottomPadding = isNotesKeyboardActive ? 12 : 28;
+    const sheetHeight = Math.min(
+        Math.round(windowHeight * 0.92),
+        Math.max(
+            1,
+            Math.round(availableHeight - (isNotesKeyboardActive ? 0 : 24))
+        )
+    );
 
     return (
         <Modal
@@ -532,8 +594,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
             accessibilityViewIsModal
             accessibilityLabel={`${title} form`}
         >
-            <KeyboardAvoidingView
-                behavior={Platform.OS === "ios" ? "padding" : "height"}
+            <View
                 className="flex-1 justify-end"
                 style={{ backgroundColor: colors.overlay }}
             >
@@ -542,69 +603,73 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                     style={{
                         backgroundColor: get("background"),
                         height: sheetHeight,
-                        maxHeight: "92%",
+                        marginBottom: keyboardOffset,
                     }}
                 >
-                    {/* ── Header ─────────────────────────────────────────── */}
-                    <View
-                        style={{
-                            borderBottomWidth: 1,
-                            borderBottomColor: isDark
-                                ? "rgba(61, 53, 42, 0.25)"
-                                : "rgba(229, 217, 191, 0.5)",
-                        }}
-                    >
-                        {/* Drag handle */}
-                        <View className="items-center pt-3 pb-1">
+                    {!isNotesKeyboardActive && (
+                        <>
+                            {/* ── Header ─────────────────────────────────── */}
                             <View
                                 style={{
-                                    width: 36,
-                                    height: 4,
-                                    borderRadius: 2,
-                                    backgroundColor: isDark
-                                        ? "rgba(61, 53, 42, 0.5)"
-                                        : "rgba(180, 160, 130, 0.4)",
+                                    borderBottomWidth: 1,
+                                    borderBottomColor: isDark
+                                        ? "rgba(61, 53, 42, 0.25)"
+                                        : "rgba(229, 217, 191, 0.5)",
                                 }}
-                            />
-                        </View>
-
-                        {/* Mood adjust row + Last Entry */}
-                        <View className="flex-row items-center px-4 pb-1">
-                            <View className="flex-1">
-                                <MoodAdjustRow
-                                    mood={mood}
-                                    onAdjust={setMood}
-                                    isDark={isDark}
-                                />
-                            </View>
-                            <View className="ml-2">
-                                <SameAsYesterdayButton onCopy={handleCopyYesterday} />
-                            </View>
-                        </View>
-
-                        {/* Step dots */}
-                        <View className="pb-3">
-                            <StepDots
-                                total={steps.length}
-                                current={currentStep}
-                                isDark={isDark}
-                            />
-                            {/* Step title — matches step body direction */}
-                            <Animated.Text
-                                style={[
-                                    titleOpacityStyle,
-                                    {
-                                        ...typography.eyebrow,
-                                        textAlign: "center",
-                                        color: isDark ? "#5C4E3D" : "#B0A090",
-                                        marginTop: 6,
-                                    },
-                                ]}
                             >
-                                {STEP_TITLES[currentStepId]}
-                            </Animated.Text>
-                        </View>
-                    </View>
+                                {/* Drag handle */}
+                                <View className="items-center pt-3 pb-1">
+                                    <View
+                                        style={{
+                                            width: 36,
+                                            height: 4,
+                                            borderRadius: 2,
+                                            backgroundColor: isDark
+                                                ? "rgba(61, 53, 42, 0.5)"
+                                                : "rgba(180, 160, 130, 0.4)",
+                                        }}
+                                    />
+                                </View>
+
+                                {/* Mood adjust row + Last Entry */}
+                                <View className="flex-row items-center px-4 pb-1">
+                                    <View className="flex-1">
+                                        <MoodAdjustRow
+                                            mood={mood}
+                                            onAdjust={setMood}
+                                            isDark={isDark}
+                                        />
+                                    </View>
+                                    <View className="ml-2">
+                                        <SameAsYesterdayButton onCopy={handleCopyYesterday} />
+                                    </View>
+                                </View>
+
+                                {/* Step dots */}
+                                <View className="pb-3">
+                                    <StepDots
+                                        total={steps.length}
+                                        current={currentStep}
+                                        isDark={isDark}
+                                    />
+                                    {/* Step title — matches step body direction */}
+                                    <Animated.Text
+                                        style={[
+                                            titleOpacityStyle,
+                                            {
+                                                ...typography.eyebrow,
+                                                textAlign: "center",
+                                                color: isDark ? "#5C4E3D" : "#B0A090",
+                                                marginTop: 6,
+                                            },
+                                        ]}
+                                    >
+                                        {STEP_TITLES[currentStepId]}
+                                    </Animated.Text>
+                                </View>
+                            </View>
+                        </>
+                    )}
 
                     {/* ── Step content ────────────────────────────────────── */}
                     <Animated.View style={[{ flex: 1 }, stepOpacityStyle]}>
@@ -615,27 +680,27 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                             showsVerticalScrollIndicator={false}
                             keyboardShouldPersistTaps="handled"
                             keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
-                            automaticallyAdjustKeyboardInsets
                         >
                             {renderCurrentStep()}
                         </ScrollView>
                     </Animated.View>
 
-                    {/* ── Footer ──────────────────────────────────────────── */}
-                    <View
-                        style={{
-                            borderTopWidth: 1,
-                            borderTopColor: isDark
-                                ? "rgba(61, 53, 42, 0.25)"
-                                : "rgba(229, 217, 191, 0.5)",
-                            backgroundColor: isDark
-                                ? "rgba(28, 25, 22, 0.97)"
-                                : "rgba(250, 248, 244, 0.97)",
-                            paddingHorizontal: 20,
-                            paddingTop: 12,
-                            paddingBottom: 20,
-                        }}
-                    >
+                    {!isNotesKeyboardActive && (
+                        <View
+                            style={{
+                                borderTopWidth: 1,
+                                borderTopColor: isDark
+                                    ? "rgba(61, 53, 42, 0.25)"
+                                    : "rgba(229, 217, 191, 0.5)",
+                                backgroundColor: isDark
+                                    ? "rgba(28, 25, 22, 0.97)"
+                                    : "rgba(250, 248, 244, 0.97)",
+                                paddingHorizontal: 20,
+                                paddingTop: 12,
+                                paddingBottom: 20,
+                            }}
+                        >
+                            {/* ── Footer ─────────────────────────────────── */}
                         {/* Primary row */}
                         <View className="flex-row gap-3">
                             {/* Back / Cancel */}
@@ -779,9 +844,10 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                 </Pressable>
                             </Animated.View>
                         )}
-                    </View>
+                        </View>
+                    )}
                 </View>
-            </KeyboardAvoidingView>
+            </View>
         </Modal>
     );
 };

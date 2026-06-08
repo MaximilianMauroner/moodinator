@@ -1,7 +1,16 @@
 import React, { useCallback, useMemo, useRef } from "react";
-import { StyleSheet, View, Text, Pressable } from "react-native";
+import {
+  StyleSheet,
+  View,
+  Text,
+  Pressable,
+  useWindowDimensions,
+  type LayoutChangeEvent,
+} from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
+  Easing,
+  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
@@ -86,9 +95,29 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
 ) {
     const swipeActionPendingRef = useRef(false);
     const { isDark, get, getCategoryColors } = useThemeColors();
+    const { width: windowWidth } = useWindowDimensions();
     const historyCardStyle = useSettingsStore((state) => state.historyCardStyle);
     const translateX = useSharedValue(0);
     const pressScale = useSharedValue(1);
+    // Delete-exit animation: slide the card off-screen, fade it, then collapse
+    // the row height so the gap closes smoothly before the data is removed.
+    const deleteFade = useSharedValue(1);
+    const deleteCollapse = useSharedValue(1);
+    const isDeleting = useSharedValue(false);
+    const measuredHeight = useSharedValue(0);
+
+    // FlashList recycles this component across different entries. Reset the
+    // exit-animation state synchronously when the underlying entry changes so a
+    // recycled row never inherits a previous row's mid-delete (collapsed/faded)
+    // values.
+    const lastIdRef = useRef(mood.id);
+    if (lastIdRef.current !== mood.id) {
+      lastIdRef.current = mood.id;
+      isDeleting.value = false;
+      deleteFade.value = 1;
+      deleteCollapse.value = 1;
+      translateX.value = 0;
+    }
 
     const moodData = useMemo(() => {
       const moodInfo = getMoodRatingDisplay(mood.mood, isDark, mood.moodScale);
@@ -158,6 +187,39 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
       [mood, onSwipeableWillOpen]
     );
 
+    const triggerDelete = useCallback(() => {
+      if (swipeActionPendingRef.current) return;
+      swipeActionPendingRef.current = true;
+
+      haptics.destructive();
+      isDeleting.value = true;
+
+      // Slide the card the rest of the way off-screen and fade it out, then
+      // collapse the row before handing off to the store removal + undo toast.
+      translateX.set(
+        withTiming(-windowWidth, {
+          duration: 220,
+          easing: Easing.in(Easing.cubic),
+        })
+      );
+      deleteFade.set(withTiming(0, { duration: 200 }));
+      deleteCollapse.set(
+        withTiming(0, { duration: 260, easing: Easing.in(Easing.cubic) }, (finished) => {
+          if (finished) {
+            runOnJS(onSwipeableWillOpen)("right", mood);
+          }
+        })
+      );
+    }, [
+      deleteCollapse,
+      deleteFade,
+      isDeleting,
+      mood,
+      onSwipeableWillOpen,
+      translateX,
+      windowWidth,
+    ]);
+
     const panGesture = useMemo(
       () =>
         Gesture.Pan()
@@ -182,25 +244,46 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
             }
 
             if (shouldDelete) {
-              translateX.set(withTiming(0, { duration: motion.duration.fast }));
-              triggerSwipeAction("right");
+              triggerDelete();
               return;
             }
 
             translateX.set(withSpring(0, springs.gentle));
           })
           .onFinalize(() => {
+            // Don't fight the delete-exit animation when it's running.
+            if (isDeleting.value) return;
             translateX.set(withSpring(0, springs.gentle));
           }),
-      [swipeThreshold, translateX, triggerSwipeAction]
+      [isDeleting, swipeThreshold, translateX, triggerDelete, triggerSwipeAction]
     );
 
     const cardAnimatedStyle = useAnimatedStyle(() => ({
       transform: [{ translateX: translateX.value }, { scale: pressScale.value }],
     }));
 
+    const containerAnimatedStyle = useAnimatedStyle(() => ({
+      height: isDeleting.value
+        ? measuredHeight.value * deleteCollapse.value
+        : undefined,
+      marginBottom: isDeleting.value ? 12 * deleteCollapse.value : 12,
+      opacity: isDeleting.value ? deleteFade.value : 1,
+    }));
+
+    const handleContainerLayout = useCallback(
+      (event: LayoutChangeEvent) => {
+        if (!isDeleting.value) {
+          measuredHeight.value = event.nativeEvent.layout.height;
+        }
+      },
+      [isDeleting, measuredHeight]
+    );
+
     return (
-      <View style={{ marginBottom: 12, borderRadius: 16, overflow: "hidden" }}>
+      <Animated.View
+        onLayout={handleContainerLayout}
+        style={[{ borderRadius: 16, overflow: "hidden" }, containerAnimatedStyle]}
+      >
         <View
           pointerEvents="none"
           className="absolute inset-0 flex-row justify-between"
@@ -378,7 +461,7 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
             </Pressable>
           </Animated.View>
         </GestureDetector>
-      </View>
+      </Animated.View>
     );
   }
 );
