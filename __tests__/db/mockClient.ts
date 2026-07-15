@@ -128,9 +128,16 @@ export function createMockDb() {
 
       // Handle DELETE FROM moods
       if (sql.includes("DELETE FROM moods")) {
+        if (params.length === 0) {
+          const changes = moodRows.length;
+          moodRows = [];
+          moodEmotionRows = [];
+          return { changes };
+        }
         const id = params[0];
         const initialLength = moodRows.length;
         moodRows = moodRows.filter((r) => r.id !== id);
+        moodEmotionRows = moodEmotionRows.filter((row) => row.mood_id !== id);
         return { changes: initialLength - moodRows.length };
       }
 
@@ -219,6 +226,11 @@ export function createMockDb() {
 
       // Handle DELETE FROM mood_emotions
       if (sql.includes("DELETE FROM mood_emotions")) {
+        if (params.length === 0) {
+          const changes = moodEmotionRows.length;
+          moodEmotionRows = [];
+          return { changes };
+        }
         const moodId = params[0];
         moodEmotionRows = moodEmotionRows.filter((me) => me.mood_id !== moodId);
         return { changes: 1 };
@@ -300,7 +312,28 @@ export function createMockDb() {
 
       // Handle SELECT emotions FROM moods
       if (sql.includes("SELECT emotions FROM moods")) {
-        return moodRows.map((r) => ({ emotions: r.emotions }));
+        const rows = sql.includes("ORDER BY timestamp DESC")
+          ? [...moodRows].sort((a, b) => {
+              if (b.timestamp !== a.timestamp) {
+                return b.timestamp - a.timestamp;
+              }
+              return b.id - a.id;
+            })
+          : moodRows;
+        return rows.map((r) => ({ emotions: r.emotions }));
+      }
+
+      // Handle SELECT context_tags FROM moods
+      if (sql.includes("SELECT context_tags FROM moods")) {
+        const rows = sql.includes("ORDER BY timestamp DESC")
+          ? [...moodRows].sort((a, b) => {
+              if (b.timestamp !== a.timestamp) {
+                return b.timestamp - a.timestamp;
+              }
+              return b.id - a.id;
+            })
+          : moodRows;
+        return rows.map((r) => ({ context_tags: r.context_tags }));
       }
 
       // Handle SELECT name, category FROM emotions

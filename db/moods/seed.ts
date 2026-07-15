@@ -14,7 +14,7 @@ import {
 import { clearMoods } from "./seedUtils";
 import { linkEmotionsToMood } from "./emotions";
 
-export { clearMoods } from "./seedUtils";
+export { clearMoodData, clearMoods } from "./seedUtils";
 
 export async function seedMoods() {
   const db = await getDb();

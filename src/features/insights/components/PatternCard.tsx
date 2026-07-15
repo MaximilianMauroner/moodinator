@@ -104,7 +104,7 @@ function PatternItem({ pattern, isLast }: { pattern: Pattern; isLast: boolean })
           </Text>
           <ConfidenceIndicator confidence={pattern.confidence} />
         </View>
-        <Text className="text-sm text-sand-500 dark:text-sand-400 leading-5">
+        <Text className="text-sm text-paper-700 dark:text-sand-400 leading-5">
           {pattern.description}
         </Text>
       </View>
@@ -130,7 +130,7 @@ export function PatternCard({ patterns }: PatternCardProps) {
             <Text className="text-paper-800 dark:text-paper-200" style={typography.bodyMd}>
               Patterns Detected
             </Text>
-            <Text className="text-sand-500 dark:text-sand-400 mt-0.5" style={typography.bodySm}>
+            <Text className="text-paper-700 dark:text-sand-400 mt-0.5" style={typography.bodySm}>
               Insights from your mood history
             </Text>
           </View>

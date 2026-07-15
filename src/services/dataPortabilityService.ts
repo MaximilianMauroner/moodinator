@@ -5,8 +5,17 @@ import {
   setBackupFolder,
   type BackupResult,
 } from "@db/backup";
-import { exportMoods, importMoods, type ImportResult } from "@db/db";
+import {
+  clearMoodData,
+  exportMoods,
+  importMoods,
+  previewImportMoods,
+  type ImportPreviewResult,
+  type ImportResult,
+} from "@db/db";
 import type { MoodDateRange } from "@db/moods/range";
+import type { Emotion } from "@db/types";
+import { presetSyncService } from "@/services/presetSyncService";
 import { useMoodsStore } from "@/shared/state/moodsStore";
 
 export type ExportRange = "week" | "month" | "custom" | "full";
@@ -43,6 +52,11 @@ export type ExportRequestResolution =
 export type CreateExportOutcome =
   | { ok: true; payload: ExportRangePayload; fileName: string; jsonData: string }
   | { ok: false; title: string; message: string };
+
+export type DataImportResult = ImportResult & {
+  addedEmotions: Emotion[];
+  addedContexts: string[];
+};
 
 function formatDateSlug(date: Date) {
   return date.toISOString().split("T")[0];
@@ -127,18 +141,50 @@ export const dataPortabilityService = {
     };
   },
 
-  async importData(jsonData: string): Promise<ImportResult> {
+  async importData(jsonData: string): Promise<DataImportResult> {
     const result = await importMoods(jsonData);
+    const syncResult = await presetSyncService.addMissingFromHistory("all");
     useMoodsStore.getState().invalidate();
     void useMoodsStore.getState().ensureFresh();
-    return result;
+    return {
+      ...result,
+      addedEmotions: syncResult.addedEmotions,
+      addedContexts: syncResult.addedContexts,
+    };
   },
 
-  summarizeImportResult(importResult: ImportResult): string {
+  previewImportData(jsonData: string): ImportPreviewResult {
+    return previewImportMoods(jsonData);
+  },
+
+  summarizeImportPreview(preview: ImportPreviewResult): string {
+    const entryLabel = `${preview.entryCount} entr${preview.entryCount === 1 ? "y" : "ies"}`;
+    return `The selected file contains ${entryLabel}. Importing replaces your current local Moodinator data.`;
+  },
+
+  async deleteLocalMoodData(): Promise<void> {
+    await clearMoodData();
+    useMoodsStore.getState().invalidate();
+    await useMoodsStore.getState().ensureFresh();
+  },
+
+  summarizeImportResult(
+    importResult: ImportResult &
+      Partial<Pick<DataImportResult, "addedEmotions" | "addedContexts">>
+  ): string {
+    const addedEmotionCount = importResult.addedEmotions?.length ?? 0;
+    const addedContextCount = importResult.addedContexts?.length ?? 0;
+
     return [
       `Imported ${importResult.imported} entr${importResult.imported === 1 ? "y" : "ies"}.`,
       importResult.skipped > 0
         ? `Skipped ${importResult.skipped} invalid entr${importResult.skipped === 1 ? "y" : "ies"}.`
+        : null,
+      addedEmotionCount > 0
+        ? `Added ${addedEmotionCount} emotion${addedEmotionCount === 1 ? "" : "s"} to your Emotion List.`
+        : null,
+      addedContextCount > 0
+        ? `Added ${addedContextCount} context tag${addedContextCount === 1 ? "" : "s"} to your Context Tag List.`
         : null,
       importResult.errors.length > 0
         ? importResult.errors.slice(0, 2).join("\n")

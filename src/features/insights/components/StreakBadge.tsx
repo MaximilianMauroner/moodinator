@@ -133,7 +133,7 @@ function StreakBadgeBase({ current, longest, compact }: StreakBadgeBaseProps) {
             </View>
 
             <View>
-              <Text className="text-sand-500 dark:text-sand-400 mb-1" style={typography.eyebrow}>
+              <Text className="text-paper-700 dark:text-sand-400 mb-1" style={typography.eyebrow}>
                 Current Streak
               </Text>
               <View className="flex-row items-baseline">
@@ -146,7 +146,7 @@ function StreakBadgeBase({ current, longest, compact }: StreakBadgeBaseProps) {
                 >
                   {current}
                 </Text>
-                <Text className="ml-2 text-sand-500 dark:text-sand-400" style={typography.bodyMd}>
+                <Text className="ml-2 text-paper-700 dark:text-sand-400" style={typography.bodyMd}>
                   {current === 1 ? "day" : "days"}
                 </Text>
               </View>
@@ -177,10 +177,10 @@ function StreakBadgeBase({ current, longest, compact }: StreakBadgeBaseProps) {
         {longest > 0 && !isNewRecord && (
           <View className="mt-5">
             <View className="flex-row justify-between items-center mb-2">
-              <Text className="text-xs font-medium text-sand-500 dark:text-sand-400">
+              <Text className="text-xs font-medium text-paper-700 dark:text-sand-400">
                 Progress to personal best
               </Text>
-              <Text className="text-xs font-bold text-sand-600 dark:text-sand-300">
+              <Text className="text-xs font-bold text-paper-700 dark:text-sand-300">
                 {longest} days
               </Text>
             </View>
@@ -211,7 +211,7 @@ function StreakBadgeBase({ current, longest, compact }: StreakBadgeBaseProps) {
         >
           <View className="flex-1 items-center">
             <IconBadge icon="trophy-outline" tone="sand" size="sm" style={{ marginBottom: 8 }} />
-            <Text className="text-xs text-sand-500 dark:text-sand-400 mb-0.5">
+            <Text className="text-xs text-paper-700 dark:text-sand-400 mb-0.5">
               Personal Best
             </Text>
             <Text className="text-lg font-bold text-paper-700 dark:text-paper-300">
@@ -231,7 +231,7 @@ function StreakBadgeBase({ current, longest, compact }: StreakBadgeBaseProps) {
               size="sm"
               style={{ marginBottom: 8 }}
             />
-            <Text className="text-xs text-sand-500 dark:text-sand-400 mb-0.5">
+            <Text className="text-xs text-paper-700 dark:text-sand-400 mb-0.5">
               Status
             </Text>
             <Text

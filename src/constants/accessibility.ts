@@ -8,24 +8,24 @@
  * Maps numeric mood values (0-10) to descriptive labels.
  */
 export const MOOD_ACCESSIBILITY_LABELS: Record<number, string> = {
-  0: "Very Low, needs immediate support",
-  1: "Low, struggling",
-  2: "Poor, feeling down",
-  3: "Below average, not great",
-  4: "Fair, could be better",
-  5: "Neutral, okay",
-  6: "Good, feeling alright",
-  7: "Very good, positive",
-  8: "Great, feeling happy",
-  9: "Excellent, very happy",
-  10: "Exceptional, best possible",
+  0: "Elated, best possible",
+  1: "Very Happy, high spirits",
+  2: "Good, feeling well",
+  3: "Positive, generally fine",
+  4: "Okay, some good moments",
+  5: "Neutral, neither good nor bad",
+  6: "Low, motivation dipping",
+  7: "Struggling, intense distress",
+  8: "Overwhelmed, tasks feel impossible",
+  9: "Crisis, needs support",
+  10: "Emergency, needs immediate support",
 };
 
 /**
  * Get accessibility label for a mood button.
  */
 export function getMoodButtonLabel(moodValue: number, moodLabel: string): string {
-  return `Mood level ${moodValue}, ${moodLabel}`;
+  return `Mood Rating ${moodValue} of 10, ${moodLabel}. Lower numbers are better.`;
 }
 
 /**
@@ -68,7 +68,7 @@ export function getMoodItemLabel(
  * Get accessibility hint for a mood list item.
  */
 export function getMoodItemHint(): string {
-  return "Swipe left to delete, swipe right to edit, long press to change date";
+  return "Tap for details. Use the actions button to edit, change date and time, or delete";
 }
 
 /**

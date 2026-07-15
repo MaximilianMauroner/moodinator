@@ -7,7 +7,6 @@ import {
   Platform,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   StyleSheet,
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -15,6 +14,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import * as Clipboard from "expo-clipboard";
 import { Ionicons } from "@expo/vector-icons";
+import { Alert } from "@/components/ui/AppAlert";
 import {
   dataPortabilityService,
   type ExportRange,
@@ -58,15 +58,21 @@ async function shareJsonData(
       dialogTitle: "Moodinator Export",
     });
   } else {
-    try {
-      await Clipboard.setStringAsync(jsonData);
-      Alert.alert(
-        "Copied",
-        "Sharing isn't available, so the JSON was copied to your clipboard."
-      );
-    } catch {
-      Alert.alert("Error", "Export file created but could not be shared.");
-    }
+    Alert.alert(
+      "Copy sensitive data?",
+      "Sharing is unavailable. Copying puts the full JSON export on your clipboard, where other apps may be able to read it.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Copy JSON",
+          onPress: () => {
+            void Clipboard.setStringAsync(jsonData)
+              .then(() => Alert.alert("Copied", "The JSON export was copied to your clipboard."))
+              .catch(() => Alert.alert("Error", "The export could not be copied."));
+          },
+        },
+      ]
+    );
   }
 
   try {
@@ -108,7 +114,7 @@ export function ExportModal({
     setLoading(false);
   }, [visible]);
 
-  const handleExportShare = async () => {
+  const performExportShare = async () => {
     try {
       setLoading(true);
       const exportResult = await dataPortabilityService.createExport({
@@ -132,6 +138,22 @@ export function ExportModal({
     }
   };
 
+  const handleExportShare = () => {
+    const rangeLabel =
+      exportRange === "week" ? "Last 7 days" :
+      exportRange === "month" ? "Last 30 days" :
+      exportRange === "full" ? "All Moodinator data" :
+      `${customStartDate.toLocaleDateString()} to ${customEndDate.toLocaleDateString()}`;
+    Alert.alert(
+      "Review data export",
+      `${rangeLabel}\n\nThis JSON may include sensitive mood entries, notes, presets, and settings. After saving or sharing it, Moodinator cannot control where it is stored or forwarded.`,
+      [
+        { text: "Back and edit", style: "cancel" },
+        { text: "Create export", onPress: () => void performExportShare() },
+      ]
+    );
+  };
+
   return (
     <Modal
       visible={visible}
@@ -148,6 +170,12 @@ export function ExportModal({
             </Text>
           </View>
 
+          <View className="rounded-xl p-3 mb-4 bg-coral-50 dark:bg-coral-900/20 border border-coral-200 dark:border-coral-700">
+            <Text className="text-xs leading-5 text-coral-700 dark:text-coral-200">
+              Your data stays local until you save, share, or copy this export. Review the range before continuing.
+            </Text>
+          </View>
+
           <View className="flex-row p-1 rounded-xl mb-6 bg-paper-200 dark:bg-paper-800">
             {(["week", "month", "custom", "full"] as const).map((opt) => (
               <Pressable
@@ -157,12 +185,14 @@ export function ExportModal({
                   exportRange === opt ? "bg-white dark:bg-sand-800" : ""
                 }`}
                 style={exportRange === opt ? localStyles.segmentShadow : undefined}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: exportRange === opt }}
               >
                 <Text
                   className={`text-center font-medium capitalize ${
                     exportRange === opt
                       ? "text-paper-800 dark:text-paper-200"
-                      : "text-sand-600 dark:text-paper-400"
+                      : "text-paper-700 dark:text-paper-400"
                   }`}
                 >
                   {opt === "week"
@@ -182,8 +212,10 @@ export function ExportModal({
               <Pressable
                 onPress={() => setShowStartDatePicker(true)}
                 className="flex-1 p-3 rounded-xl bg-paper-200 dark:bg-paper-800 border border-sand-300 dark:border-sand-800"
+                accessibilityRole="button"
+                accessibilityLabel={`Choose start date, currently ${customStartDate.toLocaleDateString()}`}
               >
-                    <Text className="text-xs mb-1 text-sand-600 dark:text-paper-400">
+                    <Text className="text-xs mb-1 text-paper-700 dark:text-paper-400">
                       From
                     </Text>
                 <Text className="text-base font-medium text-paper-800 dark:text-paper-200">
@@ -193,8 +225,10 @@ export function ExportModal({
               <Pressable
                 onPress={() => setShowEndDatePicker(true)}
                 className="flex-1 p-3 rounded-xl bg-paper-200 dark:bg-paper-800 border border-sand-300 dark:border-sand-800"
+                accessibilityRole="button"
+                accessibilityLabel={`Choose end date, currently ${customEndDate.toLocaleDateString()}`}
               >
-                    <Text className="text-xs mb-1 text-sand-600 dark:text-paper-400">
+                    <Text className="text-xs mb-1 text-paper-700 dark:text-paper-400">
                       To
                     </Text>
                 <Text className="text-base font-medium text-paper-800 dark:text-paper-200">
@@ -242,7 +276,7 @@ export function ExportModal({
             <TouchableOpacity
               onPress={handleExportShare}
               disabled={loading}
-              className="p-4 rounded-xl flex-row justify-center items-center bg-sage-500 dark:bg-sage-600"
+              className="p-4 rounded-xl flex-row justify-center items-center bg-sage-600 dark:bg-sage-600"
             >
               {loading ? (
                 <ActivityIndicator color="white" />
@@ -265,7 +299,7 @@ export function ExportModal({
               onPress={onClose}
               className="p-4 rounded-xl items-center bg-paper-200 dark:bg-paper-800"
             >
-              <Text className="font-semibold text-sand-600 dark:text-sand-400">
+              <Text className="font-semibold text-paper-700 dark:text-sand-400">
                 Cancel
               </Text>
             </TouchableOpacity>

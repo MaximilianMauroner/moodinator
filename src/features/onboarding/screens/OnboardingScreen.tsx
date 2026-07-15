@@ -1,5 +1,5 @@
-import React, { useState, useCallback } from "react";
-import { View, Text, Pressable } from "react-native";
+import React, { useEffect, useState, useCallback } from "react";
+import { AccessibilityInfo, BackHandler, View, Text, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Animated from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
@@ -13,6 +13,7 @@ import { onboardingPages } from "../content";
 export function OnboardingScreen() {
   const { isDark, get } = useThemeColors();
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [reduceMotion, setReduceMotion] = useState(false);
   const { complete } = useOnboardingStore();
 
   const isFirstPage = currentIndex === 0;
@@ -45,6 +46,31 @@ export function OnboardingScreen() {
     void complete();
   }, [complete]);
 
+  useEffect(() => {
+    void AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion);
+    const subscription = AccessibilityInfo.addEventListener("reduceMotionChanged", setReduceMotion);
+    return () => subscription.remove();
+  }, []);
+
+  useEffect(() => {
+    AccessibilityInfo.announceForAccessibility(
+      `Page ${currentIndex + 1} of ${onboardingPages.length}: ${currentPage.title}`
+    );
+  }, [currentIndex, currentPage.title]);
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (isFirstPage) {
+        return false;
+      }
+
+      handleBack();
+      return true;
+    });
+
+    return () => subscription.remove();
+  }, [handleBack, isFirstPage]);
+
   return (
     <SafeAreaView
       className="flex-1"
@@ -52,7 +78,7 @@ export function OnboardingScreen() {
       edges={["top", "bottom"]}
     >
       {/* Top controls */}
-      <View className="absolute top-16 left-6 right-6 z-10 flex-row items-center justify-between">
+      <View className="px-6 pt-2 flex-row items-center justify-between">
         {!isFirstPage ? (
           <Pressable
             onPress={handleBack}
@@ -106,6 +132,7 @@ export function OnboardingScreen() {
         key={currentPage.id}
         page={currentPage}
         isActive
+        reduceMotion={reduceMotion}
       />
 
       {/* Bottom section */}
@@ -115,6 +142,13 @@ export function OnboardingScreen() {
           total={onboardingPages.length}
           current={currentIndex}
         />
+        <Text
+          className="text-xs text-center mb-3"
+          style={{ color: get("textMuted") }}
+          accessibilityLiveRegion="polite"
+        >
+          Page {currentIndex + 1} of {onboardingPages.length}
+        </Text>
 
         {/* Action button */}
         <Animated.View>
@@ -132,13 +166,13 @@ export function OnboardingScreen() {
             accessibilityRole="button"
             accessibilityLabel={isLastPage ? "Get started" : "Next onboarding page"}
           >
-            <Text className="text-base font-bold text-white mr-2">
+            <Text className="text-base font-bold mr-2" style={{ color: get("onPrimary") }}>
               {isLastPage ? "Get Started" : "Next"}
             </Text>
             <Ionicons
               name={isLastPage ? "checkmark" : "arrow-forward"}
               size={20}
-              color="#FFFFFF"
+              color={get("onPrimary")}
             />
           </Pressable>
         </Animated.View>

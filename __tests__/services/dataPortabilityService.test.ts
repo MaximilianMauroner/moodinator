@@ -3,10 +3,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   exportMoods: vi.fn(),
   importMoods: vi.fn(),
+  previewImportMoods: vi.fn(),
+  clearMoodData: vi.fn(),
   createBackup: vi.fn(),
   getBackupInfo: vi.fn(),
   getBackupFolder: vi.fn(),
   setBackupFolder: vi.fn(),
+  addMissingFromHistory: vi.fn(),
   invalidate: vi.fn(),
   ensureFresh: vi.fn(),
 }));
@@ -14,6 +17,14 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@db/db", () => ({
   exportMoods: mocks.exportMoods,
   importMoods: mocks.importMoods,
+  previewImportMoods: mocks.previewImportMoods,
+  clearMoodData: mocks.clearMoodData,
+}));
+
+vi.mock("@/services/presetSyncService", () => ({
+  presetSyncService: {
+    addMissingFromHistory: mocks.addMissingFromHistory,
+  },
 }));
 
 vi.mock("@db/backup", () => ({
@@ -84,14 +95,58 @@ describe("dataPortabilityService", () => {
     );
   });
 
-  it("invalidates mood history after importing data", async () => {
+  it("summarizes imported preset additions for the UI", () => {
+    expect(
+      dataPortabilityService.summarizeImportResult({
+        imported: 2,
+        skipped: 0,
+        errors: [],
+        addedEmotions: [{ name: "Calm", category: "positive" }],
+        addedContexts: ["Work", "Doctor"],
+      })
+    ).toBe(
+      "Imported 2 entries.\n\nAdded 1 emotion to your Emotion List.\n\nAdded 2 context tags to your Context Tag List."
+    );
+  });
+
+  it("syncs presets and invalidates mood history after importing data", async () => {
     mocks.importMoods.mockResolvedValue({ imported: 1, skipped: 0, errors: [] });
+    mocks.addMissingFromHistory.mockResolvedValue({
+      addedEmotions: [{ name: "Calm", category: "positive" }],
+      addedContexts: ["Work"],
+    });
 
     await expect(dataPortabilityService.importData("[]")).resolves.toEqual({
       imported: 1,
       skipped: 0,
       errors: [],
+      addedEmotions: [{ name: "Calm", category: "positive" }],
+      addedContexts: ["Work"],
     });
+    expect(mocks.addMissingFromHistory).toHaveBeenCalledWith("all");
+    expect(mocks.invalidate).toHaveBeenCalledTimes(1);
+    expect(mocks.ensureFresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("previews imports for the destructive replacement prompt", () => {
+    mocks.previewImportMoods.mockReturnValue({ entryCount: 3 });
+
+    const preview = dataPortabilityService.previewImportData("[{\"mood\":3}]");
+
+    expect(preview).toEqual({ entryCount: 3 });
+    expect(mocks.previewImportMoods).toHaveBeenCalledWith("[{\"mood\":3}]");
+    expect(dataPortabilityService.summarizeImportPreview(preview)).toBe(
+      "The selected file contains 3 entries. Importing replaces your current local Moodinator data."
+    );
+  });
+
+  it("deletes local mood data and refreshes mood history", async () => {
+    mocks.clearMoodData.mockResolvedValue(undefined);
+    mocks.ensureFresh.mockResolvedValue(undefined);
+
+    await dataPortabilityService.deleteLocalMoodData();
+
+    expect(mocks.clearMoodData).toHaveBeenCalledTimes(1);
     expect(mocks.invalidate).toHaveBeenCalledTimes(1);
     expect(mocks.ensureFresh).toHaveBeenCalledTimes(1);
   });

@@ -26,28 +26,34 @@ const SectionLabel: React.FC<{
     isDark: boolean;
     badge?: string;
     badgeColor?: string;
-}> = ({ label, isDark, badge, badgeColor }) => (
+    action?: React.ReactNode;
+}> = ({ label, isDark, badge, badgeColor, action }) => (
     <View className="flex-row items-center justify-between mb-3">
         <Text
             style={[
                 typography.eyebrow,
-                { color: isDark ? "#5C4E3D" : "#B0A090" },
+                { color: isDark ? colors.textSubtle.dark : colors.textSubtle.light },
             ]}
         >
             {label}
         </Text>
-        {badge && (
-            <Text
-                style={{
-                    fontSize: 11,
-                    fontWeight: "600",
-                    color:
-                        badgeColor ??
-                        (isDark ? colors.sand.text.dark : colors.sand.text.light),
-                }}
-            >
-                {badge}
-            </Text>
+        {(badge || action) && (
+            <View className="flex-row items-center gap-2">
+                {badge && (
+                    <Text
+                        style={{
+                            fontSize: 12,
+                            fontWeight: "600",
+                            color:
+                                badgeColor ??
+                                (isDark ? colors.sand.text.dark : colors.sand.text.light),
+                        }}
+                    >
+                        {badge}
+                    </Text>
+                )}
+                {action}
+            </View>
         )}
     </View>
 );
@@ -160,7 +166,6 @@ const MoodAdjustRow: React.FC<{
                         fontSize: 12,
                         fontWeight: "600",
                         color: textHex,
-                        opacity: 0.8,
                         marginTop: 1,
                     }}
                 >
@@ -291,7 +296,7 @@ const ContextTagChip: React.FC<{
                 onPressOut={() => {
                     scale.value = withSpring(isSelected ? 1.04 : 1, { damping: 18, stiffness: 380 });
                 }}
-                className="px-3 py-2 rounded-xl"
+                className="flex-row items-center px-3 py-2 rounded-xl gap-1.5"
                 style={{
                     backgroundColor: bgColor,
                     borderWidth: 1,
@@ -301,6 +306,13 @@ const ContextTagChip: React.FC<{
                 accessibilityLabel={`Context: ${label}, ${isSelected ? "selected" : "not selected"}`}
                 accessibilityState={{ selected: isSelected }}
             >
+                {isSelected && (
+                    <Ionicons
+                        name="checkmark-circle"
+                        size={13}
+                        color={textColor}
+                    />
+                )}
                 <Text className="text-sm font-medium" style={{ color: textColor }}>
                     {label}
                 </Text>

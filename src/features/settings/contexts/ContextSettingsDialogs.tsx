@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeIn, FadeInUp, FadeOut, SlideOutDown } from "react-native-reanimated";
 import { CONTEXT_THEME } from "./contextSettingsConfig";
 import { styles } from "./contextSettingsStyles";
+import { colors } from "@/constants/colors";
 
 function AddContextModal({
   visible,
@@ -157,7 +158,7 @@ function AddContextModal({
                 onChangeText={setName}
                 placeholder="Context name..."
                 placeholderTextColor={
-                  isDark ? "rgba(255,255,255,0.30)" : "rgba(0,0,0,0.30)"
+                  isDark ? colors.textSubtle.dark : colors.textSubtle.light
                 }
                 style={[
                   styles.modalInput,
@@ -194,8 +195,8 @@ function AddContextModal({
                     styles.modalBtnText,
                     {
                       color: isDark
-                        ? "rgba(255,255,255,0.60)"
-                        : "rgba(0,0,0,0.50)",
+                        ? colors.textMuted.dark
+                        : colors.textMuted.light,
                     },
                   ]}
                 >
@@ -211,13 +212,22 @@ function AddContextModal({
                     backgroundColor: name.trim()
                       ? CONTEXT_THEME.lightPrimary
                       : isDark
-                        ? "rgba(105,92,120,0.30)"
-                        : "rgba(105,92,120,0.25)",
+                        ? colors.surfaceAlt.dark
+                        : colors.surfaceAlt.light,
                   },
                 ]}
               >
-                <Ionicons name="add" size={18} color="#FFFFFF" />
-                <Text style={styles.modalSaveBtnText}>Add</Text>
+                <Ionicons
+                  name="add"
+                  size={18}
+                  color={name.trim() ? "#FFFFFF" : isDark ? colors.textMuted.dark : colors.textMuted.light}
+                />
+                <Text
+                  style={[
+                    styles.modalSaveBtnText,
+                    { color: name.trim() ? "#FFFFFF" : isDark ? colors.textMuted.dark : colors.textMuted.light },
+                  ]}
+                >Add</Text>
               </Pressable>
             </View>
           </ScrollView>
@@ -344,7 +354,7 @@ function RemoveContextDialog({
               style={[
                 styles.confirmButton,
                 {
-                  backgroundColor: isDark ? "#9D8660" : "#BDA77D",
+                  backgroundColor: "#7A6545",
                   borderColor: "transparent",
                 },
               ]}

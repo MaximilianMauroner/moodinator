@@ -8,6 +8,7 @@ import Animated, {
   withTiming,
   useSharedValue,
   withDelay,
+  useReducedMotion,
 } from "react-native-reanimated";
 import { useThemeColors } from "@/constants/colors";
 import { haptics } from "@/lib/haptics";
@@ -22,9 +23,13 @@ type BiometricButtonProps = {
 export function BiometricButton({ onPress, label, icon, disabled }: BiometricButtonProps) {
   const { isDark, get } = useThemeColors();
   const scale = useSharedValue(1);
+  const reduceMotion = useReducedMotion();
 
   React.useEffect(() => {
-    // Subtle pulse animation to draw attention
+    if (reduceMotion) {
+      scale.value = 1;
+      return;
+    }
     scale.value = withDelay(
       500,
       withRepeat(
@@ -36,7 +41,7 @@ export function BiometricButton({ onPress, label, icon, disabled }: BiometricBut
         true
       )
     );
-  }, [scale]);
+  }, [reduceMotion, scale]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -58,6 +63,7 @@ export function BiometricButton({ onPress, label, icon, disabled }: BiometricBut
         })}
         accessibilityRole="button"
         accessibilityLabel={`Unlock with ${label}`}
+        accessibilityState={{ disabled: Boolean(disabled), busy: Boolean(disabled) }}
       >
         <View
           className="w-20 h-20 rounded-3xl items-center justify-center mb-4"
@@ -78,7 +84,7 @@ export function BiometricButton({ onPress, label, icon, disabled }: BiometricBut
         </View>
         <Text
           className="text-base font-semibold"
-          style={{ color: get("primary") }}
+          style={{ color: isDark ? get("primary") : "#476D47" }}
         >
           {label}
         </Text>

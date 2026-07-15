@@ -5,12 +5,12 @@ import {
   Pressable,
   ScrollView,
   TextInput,
-  Alert,
   Platform,
   ActivityIndicator,
   Switch,
   KeyboardAvoidingView,
 } from "react-native";
+import type { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -20,9 +20,14 @@ import {
   updateNotification,
 } from "@/hooks/useNotifications";
 import { IconSymbol } from "@/components/ui/IconSymbol";
+import { Alert } from "@/components/ui/AppAlert";
 import { Ionicons } from "@expo/vector-icons";
 import { useThemeColors } from "@/constants/colors";
 import { haptics } from "@/lib/haptics";
+import {
+  getReminderScheduleResultWarning,
+  getReminderScheduleWarning,
+} from "@/lib/reminderSchedulePresentation";
 
 export default function NotificationDetailScreen() {
   const router = useRouter();
@@ -69,7 +74,7 @@ export default function NotificationDetailScreen() {
     }
   }, [isNew, loadNotification]);
 
-  const handleTimeChange = (event: any, selectedDate?: Date) => {
+  const handleTimeChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
     if (Platform.OS === "android") {
       setShowTimePicker(false);
     }
@@ -95,22 +100,32 @@ export default function NotificationDetailScreen() {
     try {
       setSaving(true);
       haptics.success();
+      let scheduleWarning: ReturnType<typeof getReminderScheduleWarning> = null;
       if (isNew) {
-        await addNotification({
+        const createdNotification = await addNotification({
           title: title.trim(),
           body: body.trim(),
           hour,
           minute,
           enabled,
         });
+        scheduleWarning = getReminderScheduleWarning(createdNotification);
       } else {
-        await updateNotification(id, {
+        const result = await updateNotification(id, {
           title: title.trim(),
           body: body.trim(),
           hour,
           minute,
           enabled,
         });
+        scheduleWarning = getReminderScheduleResultWarning(result);
+      }
+
+      if (enabled && scheduleWarning) {
+        Alert.alert(scheduleWarning.title, scheduleWarning.message, [
+          { text: "OK", onPress: () => router.back() },
+        ]);
+        return;
       }
       router.back();
     } catch (error) {
@@ -168,13 +183,15 @@ export default function NotificationDetailScreen() {
               }}
               className="p-2 -ml-2 rounded-xl"
               style={{ backgroundColor: get("primaryBg") }}
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
             >
               <IconSymbol name="chevron.left" size={20} color={get("primary")} />
             </Pressable>
             <View className="flex-1 ml-4">
               <Text
                 className="text-xs font-medium mb-0.5"
-                style={{ color: get("primary") }}
+                style={{ color: isDark ? get("primary") : "#476D47" }}
               >
                 {isNew ? "Create new" : "Edit"}
               </Text>
@@ -266,6 +283,7 @@ export default function NotificationDetailScreen() {
                   borderWidth: 1,
                   borderColor: get("border"),
                 }}
+                accessibilityLabel="Reminder title"
               />
             </View>
 
@@ -293,6 +311,7 @@ export default function NotificationDetailScreen() {
                   minHeight: 100,
                   textAlignVertical: "top",
                 }}
+                accessibilityLabel="Reminder message"
               />
             </View>
 
@@ -315,6 +334,8 @@ export default function NotificationDetailScreen() {
                   borderWidth: 1,
                   borderColor: get("border"),
                 }}
+                accessibilityRole="button"
+                accessibilityLabel={`Choose reminder time, currently ${formatTime()}`}
               >
                 <View className="flex-row items-center">
                   <Ionicons name={getTimeOfDayIcon()} size={24} color={get("text")} style={{ marginRight: 12 }} />
@@ -331,7 +352,7 @@ export default function NotificationDetailScreen() {
                 >
                   <Text
                     className="text-xs font-medium"
-                    style={{ color: get("primary") }}
+                    style={{ color: isDark ? get("primary") : "#476D47" }}
                   >
                     Change
                   </Text>
@@ -367,7 +388,7 @@ export default function NotificationDetailScreen() {
                     >
                       <Text
                         className="font-semibold"
-                        style={{ color: get("primary") }}
+                        style={{ color: isDark ? get("primary") : "#476D47" }}
                       >
                         Done
                       </Text>
@@ -405,8 +426,8 @@ export default function NotificationDetailScreen() {
                   style={{ color: get("textMuted") }}
                 >
                   {enabled
-                    ? "You'll receive this reminder daily"
-                    : "This reminder is paused"}
+                    ? "Your device may ask for notification permission when you save"
+                    : "This reminder is paused and will not schedule notifications"}
                 </Text>
               </View>
               <Switch
@@ -421,6 +442,8 @@ export default function NotificationDetailScreen() {
                 }}
                 thumbColor={enabled ? get("primary") : (isDark ? "#8AAE98" : "#BDA77D")}
                 ios_backgroundColor={isDark ? "#3D352A" : "#E5D9BF"}
+                accessibilityLabel="Reminder active"
+                accessibilityHint={enabled ? "Double tap to save this reminder paused" : "Double tap to save this reminder active"}
               />
             </View>
           </ScrollView>
@@ -446,17 +469,19 @@ export default function NotificationDetailScreen() {
                 shadowRadius: 8,
                 elevation: 4,
               }}
+              accessibilityRole="button"
+              accessibilityLabel={isNew ? "Create reminder" : "Save reminder changes"}
             >
               {saving ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={get("onPrimary")} />
               ) : (
                 <>
                   <IconSymbol
                     name={isNew ? "plus.circle.fill" : "checkmark.circle.fill"}
                     size={18}
-                    color="#FFFFFF"
+                    color={get("onPrimary")}
                   />
-                  <Text className="text-white font-semibold text-base ml-2">
+                  <Text className="font-semibold text-base ml-2" style={{ color: get("onPrimary") }}>
                     {isNew ? "Create Reminder" : "Save Changes"}
                   </Text>
                 </>

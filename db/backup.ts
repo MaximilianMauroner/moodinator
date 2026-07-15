@@ -2,6 +2,15 @@ import * as FileSystem from "expo-file-system/legacy";
 import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { exportMoods } from "./db";
+import {
+  BACKUP_INTERVAL_MS,
+  getBackupFilename,
+  parseBackupFilename,
+  parseBackupUri,
+  selectBackupsForDeletion,
+  sortBackupsNewestFirst,
+  type BackupFileSummary,
+} from "./backupPolicy";
 
 export type BackupResult<T> =
   | { success: true; data: T }
@@ -9,8 +18,6 @@ export type BackupResult<T> =
 
 const LAST_BACKUP_KEY = "lastBackupTimestamp";
 const BACKUP_FOLDER_KEY = "backupFolderUri"; // User-selected backup folder URI
-const WEEKS_TO_KEEP = 8; // Keep backups for 8 weeks (rolling)
-const BACKUP_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
 
 // Default backup directory (fallback if user hasn't selected one).
 // Use documentDirectory so automatic backups are durable and survive OS cache eviction.
@@ -192,15 +199,6 @@ async function setLastBackupTimestamp(timestamp: number): Promise<void> {
 }
 
 /**
- * Creates a backup filename with timestamp
- */
-function getBackupFilename(timestamp: number): string {
-  const date = new Date(timestamp);
-  const dateStr = date.toISOString().split("T")[0]; // YYYY-MM-DD
-  return `moodinator-backup-${dateStr}.json`;
-}
-
-/**
  * Creates a new backup of all mood data
  * Saves to user-selected backup folder (or default if not selected)
  */
@@ -324,17 +322,11 @@ export async function isBackupNeeded(): Promise<boolean> {
  * Gets all backup files sorted by date (newest first)
  * Checks both user-selected folder and default folder
  */
-async function getBackupFiles(): Promise<
-  Array<{ uri: string; timestamp: number; filename: string }>
-> {
+async function getBackupFiles(): Promise<BackupFileSummary[]> {
   try {
     const backupDir = await getBackupDirectory();
     await migrateLegacyIosCacheBackupsIfNeeded(backupDir);
-    const backupFiles: Array<{
-      uri: string;
-      timestamp: number;
-      filename: string;
-    }> = [];
+    const backupFiles: BackupFileSummary[] = [];
     const seenFilenames = new Set<string>();
 
     // Check user-selected folder
@@ -360,24 +352,10 @@ async function getBackupFiles(): Promise<
 
           // Optimization: just return the URI, handle details later
           // Or, we can try to parse the URI if it contains the name
-          const uriDecoded = decodeURIComponent(fileUri);
-          if (uriDecoded.includes("moodinator-backup-")) {
-            // Try to extract timestamp
-            const match = uriDecoded.match(
-              /moodinator-backup-(\d{4}-\d{2}-\d{2})/
-            );
-            if (match) {
-              const dateStr = match[1];
-              const timestamp = new Date(dateStr).getTime();
-              if (!isNaN(timestamp)) {
-                backupFiles.push({
-                  uri: fileUri,
-                  timestamp,
-                  filename: `moodinator-backup-${dateStr}.json`, // Reconstruct name
-                });
-                seenFilenames.add(`moodinator-backup-${dateStr}.json`);
-              }
-            }
+          const backupFile = parseBackupUri(fileUri);
+          if (backupFile && !seenFilenames.has(backupFile.filename)) {
+            backupFiles.push(backupFile);
+            seenFilenames.add(backupFile.filename);
           }
         }
       } else {
@@ -391,16 +369,9 @@ async function getBackupFiles(): Promise<
               file.endsWith(".json") &&
               !seenFilenames.has(file)
             ) {
-              const dateStr = file
-                .replace("moodinator-backup-", "")
-                .replace(".json", "");
-              const timestamp = new Date(dateStr).getTime();
-              if (!isNaN(timestamp)) {
-                backupFiles.push({
-                  uri: `${backupDir}${file}`,
-                  timestamp,
-                  filename: file,
-                });
+              const backupFile = parseBackupFilename(file, `${backupDir}${file}`);
+              if (backupFile) {
+                backupFiles.push(backupFile);
                 seenFilenames.add(file);
               }
             }
@@ -425,16 +396,9 @@ async function getBackupFiles(): Promise<
               file.endsWith(".json") &&
               !seenFilenames.has(file)
             ) {
-              const dateStr = file
-                .replace("moodinator-backup-", "")
-                .replace(".json", "");
-              const timestamp = new Date(dateStr).getTime();
-              if (!isNaN(timestamp)) {
-                backupFiles.push({
-                  uri: `${DEFAULT_BACKUP_DIR}${file}`,
-                  timestamp,
-                  filename: file,
-                });
+              const backupFile = parseBackupFilename(file, `${DEFAULT_BACKUP_DIR}${file}`);
+              if (backupFile) {
+                backupFiles.push(backupFile);
                 seenFilenames.add(file);
               }
             }
@@ -445,8 +409,7 @@ async function getBackupFiles(): Promise<
       }
     }
 
-    // Sort by timestamp (newest first)
-    return backupFiles.sort((a, b) => b.timestamp - a.timestamp);
+    return sortBackupsNewestFirst(backupFiles);
   } catch (error) {
     console.error("Error getting backup files:", error);
     return [];
@@ -462,14 +425,12 @@ export async function cleanupOldBackups(): Promise<number> {
   try {
     const backupFiles = await getBackupFiles();
 
-    if (backupFiles.length <= WEEKS_TO_KEEP) {
+    const filesToDelete = selectBackupsForDeletion(backupFiles);
+
+    if (filesToDelete.length === 0) {
       return 0;
     }
 
-    // Identify files to delete:
-    // 1. Everything after the first WEEKS_TO_KEEP (since they are sorted by date descending)
-    // 2. Any file older than the cutoff date (though 1 should cover most cases)
-    const filesToDelete = backupFiles.slice(WEEKS_TO_KEEP);
     let deletedCount = 0;
 
     for (const file of filesToDelete) {

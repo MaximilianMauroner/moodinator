@@ -133,7 +133,11 @@ function CategorySection({
             onEdit={chip.isCustom ? () => onEdit(chip.name, category) : undefined}
           />
         ))}
-        <PresetAddChip isDark={isDark} onPress={onAddNew} />
+        <PresetAddChip
+          isDark={isDark}
+          onPress={onAddNew}
+          accessibilityLabel="Add custom emotion"
+        />
       </PresetChipsGrid>
 
       {chips.length === 0 && (

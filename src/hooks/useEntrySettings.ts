@@ -1,5 +1,6 @@
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { useSettingsStore } from "@/shared/state/settingsStore";
+import type { Emotion } from "@db/types";
 
 // detailedFieldConfig never changes — all fields are always shown in
 // detailed mode. Module-level constant avoids re-creating it each render.
@@ -9,6 +10,15 @@ const detailedFieldConfig = {
     energy: true,
     notes: true,
 } as const;
+
+export type EntryPresetCreateResult<T> = {
+    value: T;
+    created: boolean;
+};
+
+function normalizePresetKey(value: string): string {
+    return value.trim().toLowerCase();
+}
 
 /**
  * Selector hook for entry form settings.
@@ -21,6 +31,48 @@ export function useEntrySettings() {
     const contexts = useSettingsStore((state) => state.contexts);
     const quickEntryPrefs = useSettingsStore((state) => state.quickEntryPrefs);
     const showDetailedLabels = useSettingsStore((state) => state.showDetailedLabels);
+
+    const createEmotionOption = useCallback(
+        async (
+            name: string,
+            category: Emotion["category"]
+        ): Promise<EntryPresetCreateResult<Emotion> | null> => {
+            const trimmed = name.trim();
+            if (!trimmed) return null;
+
+            const settings = useSettingsStore.getState();
+            const existing = settings.emotions.find(
+                (emotion) => normalizePresetKey(emotion.name) === normalizePresetKey(trimmed)
+            );
+            if (existing) {
+                return { value: existing, created: false };
+            }
+
+            const value: Emotion = { name: trimmed, category };
+            await settings.setEmotions([...settings.emotions, value]);
+            return { value, created: true };
+        },
+        []
+    );
+
+    const createContextOption = useCallback(
+        async (name: string): Promise<EntryPresetCreateResult<string> | null> => {
+            const trimmed = name.trim();
+            if (!trimmed) return null;
+
+            const settings = useSettingsStore.getState();
+            const existing = settings.contexts.find(
+                (context) => normalizePresetKey(context) === normalizePresetKey(trimmed)
+            );
+            if (existing) {
+                return { value: existing, created: false };
+            }
+
+            await settings.setContexts([...settings.contexts, trimmed]);
+            return { value: trimmed, created: true };
+        },
+        []
+    );
 
     const quickEntryFieldConfig = useMemo(
         () => ({
@@ -39,6 +91,8 @@ export function useEntrySettings() {
         quickEntryPrefs,
         quickEntryFieldConfig,
         detailedFieldConfig,
+        createEmotionOption,
+        createContextOption,
     };
 }
 

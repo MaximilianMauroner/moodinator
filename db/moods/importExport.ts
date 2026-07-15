@@ -23,6 +23,83 @@ function sanitizeBasedOnEntryId(value: unknown): number | null {
   return value;
 }
 
+type NormalizedImportedMood = {
+  mood: number;
+  note: string | null;
+  timestamp: number;
+  emotions: Emotion[];
+  contextTags: string[];
+  energy: number | null;
+  moodScale: ReturnType<typeof sanitizeImportedMoodScale>;
+  basedOnEntryId: number | null;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function validateImportedMoodValue(value: unknown): number | null {
+  if (
+    typeof value !== "number" ||
+    !Number.isFinite(value) ||
+    !Number.isInteger(value) ||
+    value < 0 ||
+    value > 10
+  ) {
+    return null;
+  }
+
+  return value;
+}
+
+function normalizeReplacementImportEntries(parsed: unknown[]): {
+  entries: NormalizedImportedMood[];
+  errors: string[];
+} {
+  const entries: NormalizedImportedMood[] = [];
+  const errors: string[] = [];
+
+  for (let i = 0; i < parsed.length; i++) {
+    const rawMood = parsed[i];
+    if (!isRecord(rawMood)) {
+      errors.push(`Entry ${i}: Entry must be an object`);
+      continue;
+    }
+
+    if (rawMood.mood === undefined || rawMood.mood === null) {
+      errors.push(`Entry ${i}: Missing mood value`);
+      continue;
+    }
+
+    const moodValue = validateImportedMoodValue(rawMood.mood);
+    if (moodValue === null) {
+      errors.push(`Entry ${i}: Mood value must be an integer between 0 and 10`);
+      continue;
+    }
+
+    const note = (rawMood.notes ?? rawMood.note ?? null) as string | null;
+    const contextSource = rawMood.contextTags ?? rawMood.context ?? [];
+
+    entries.push({
+      mood: moodValue,
+      note,
+      timestamp: sanitizeTimestamp(rawMood.timestamp),
+      emotions: sanitizeImportedEmotions(rawMood.emotions),
+      contextTags: sanitizeImportedArray(contextSource),
+      energy: sanitizeEnergy(rawMood.energy),
+      moodScale: sanitizeImportedMoodScale(rawMood.moodScale),
+      basedOnEntryId: sanitizeBasedOnEntryId(rawMood.basedOnEntryId),
+    });
+  }
+
+  return { entries, errors };
+}
+
+async function clearImportedMoodData(db: Awaited<ReturnType<typeof getDb>>) {
+  await db.runAsync("DELETE FROM mood_emotions;");
+  await db.runAsync("DELETE FROM moods;");
+}
+
 export async function exportMoods(range?: MoodDateRange): Promise<string> {
   const moods = await getMoodsWithinRange(range);
   return JSON.stringify(
@@ -47,7 +124,11 @@ export type ImportResult = {
   errors: string[];
 };
 
-export async function importMoods(jsonData: string): Promise<ImportResult> {
+export type ImportPreviewResult = {
+  entryCount: number;
+};
+
+function normalizeReplacementImportData(jsonData: string): NormalizedImportedMood[] {
   let parsed: unknown;
   try {
     parsed = JSON.parse(jsonData);
@@ -59,57 +140,50 @@ export async function importMoods(jsonData: string): Promise<ImportResult> {
     throw new Error("Import data must be an array");
   }
 
+  const normalized = normalizeReplacementImportEntries(parsed);
+  if (normalized.errors.length > 0) {
+    throw new Error(
+      `Import contains invalid entries: ${normalized.errors.slice(0, 5).join("; ")}`
+    );
+  }
+
+  return normalized.entries;
+}
+
+export function previewImportMoods(jsonData: string): ImportPreviewResult {
+  return {
+    entryCount: normalizeReplacementImportData(jsonData).length,
+  };
+}
+
+export async function importMoods(jsonData: string): Promise<ImportResult> {
+  const entries = normalizeReplacementImportData(jsonData);
+
   const db = await getDb();
   const result: ImportResult = { imported: 0, skipped: 0, errors: [] };
 
   await db.execAsync("BEGIN TRANSACTION;");
   try {
-    for (let i = 0; i < parsed.length; i++) {
-      const rawMood = parsed[i] as Record<string, unknown>;
+    await clearImportedMoodData(db);
 
-      // Validate mood value is present (required field)
-      if (rawMood?.mood === undefined || rawMood?.mood === null) {
-        result.skipped++;
-        result.errors.push(`Entry ${i}: Missing mood value`);
-        continue;
-      }
-
-      // Validate mood is in range
-      const moodValue = sanitizeMoodValue(rawMood.mood);
-      if (typeof rawMood.mood === "number" && (rawMood.mood < 0 || rawMood.mood > 10)) {
-        result.skipped++;
-        result.errors.push(`Entry ${i}: Mood value ${rawMood.mood} is out of range (0-10)`);
-        continue;
-      }
-
-      // Normalize and sanitize other fields
-      const note = (rawMood?.notes ?? rawMood?.note ?? null) as string | null;
-      const timestamp = sanitizeTimestamp(rawMood?.timestamp);
-      const emotions = sanitizeImportedEmotions(rawMood?.emotions);
-      const contextSource = rawMood?.contextTags ?? rawMood?.context ?? [];
-      const contextTags = sanitizeImportedArray(contextSource);
-      const energy = sanitizeEnergy(rawMood?.energy);
-      const basedOnEntryId = sanitizeBasedOnEntryId(rawMood?.basedOnEntryId);
-      // Legacy exports did not carry moodScale; assume the current local scale.
-      const moodScale = sanitizeImportedMoodScale(rawMood?.moodScale);
-
+    for (const entry of entries) {
       const dbResult = await db.runAsync(
         "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy, mood_scale_json, photos_json, location_json, voice_memos_json, based_on_entry_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
-        moodValue,
-        note,
-        timestamp,
-        serializeEmotions(emotions),
-        serializeArray(contextTags),
-        energy,
-        serializeMoodScale(moodScale),
+        entry.mood,
+        entry.note,
+        entry.timestamp,
+        serializeEmotions(entry.emotions),
+        serializeArray(entry.contextTags),
+        entry.energy,
+        serializeMoodScale(entry.moodScale),
         "[]",
         null,
         "[]",
-        basedOnEntryId
+        entry.basedOnEntryId
       );
 
-      if (emotions.length > 0) {
-        await linkEmotionsToMood(db, dbResult.lastInsertRowId, emotions);
+      if (entry.emotions.length > 0) {
+        await linkEmotionsToMood(db, dbResult.lastInsertRowId, entry.emotions);
       }
 
       result.imported++;

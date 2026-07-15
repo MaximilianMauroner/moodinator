@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useMemo } from "react";
-import { View, Text, ActivityIndicator } from "react-native";
+import { View, Text, ActivityIndicator, Pressable } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { GestureDetector, Gesture } from "react-native-gesture-handler";
 import Animated, {
   Easing,
@@ -44,6 +45,7 @@ export function MoodCalendar({
     monthName,
     monthData,
     loading,
+    error,
     goToPreviousMonth,
     goToNextMonth,
     goToToday,
@@ -106,6 +108,7 @@ export function MoodCalendar({
       averageMood,
       averageMoodInfo,
       bestDay,
+      bestMood,
       busiestDay,
       busiestCount,
       coverage: Math.round((loggedDays / monthData.daysInMonth) * 100),
@@ -218,7 +221,6 @@ export function MoodCalendar({
           day={day}
           data={dayData}
           isToday={isToday}
-          isCurrentMonth={isCurrentMonth}
           onPress={handleDayPress}
           onLongPress={onAddEntry ? handleDayLongPress : undefined}
         />
@@ -280,6 +282,21 @@ export function MoodCalendar({
             <View className="items-center justify-center py-16">
               <ActivityIndicator size="small" color={get("primary")} />
             </View>
+          ) : error && !monthData ? (
+            <View className="items-center justify-center py-12 px-4">
+              <Ionicons name="warning-outline" size={28} color={get("textMuted")} />
+              <Text className="mt-3 text-center" style={[typography.bodyMd, { color: get("text") }]}>Calendar could not load</Text>
+              <Text className="mt-1 text-center" style={[typography.bodySm, { color: get("textMuted") }]}>{error}</Text>
+              <Pressable
+                onPress={() => void refresh()}
+                accessibilityRole="button"
+                accessibilityLabel="Retry loading calendar"
+                className="mt-4 rounded-xl px-4 py-2"
+                style={{ backgroundColor: get("primary") }}
+              >
+                <Text style={[typography.bodySm, { color: get("onPrimary"), fontWeight: "700" }]}>Try again</Text>
+              </Pressable>
+            </View>
           ) : (
             <Animated.View
               key={`${year}-${month}`}
@@ -300,6 +317,32 @@ export function MoodCalendar({
           )}
         </View>
       </GestureDetector>
+
+      {monthData && !loading ? (
+        <View
+          className="mt-3 flex-row items-center justify-center"
+          accessibilityRole="text"
+          accessibilityLabel="Calendar legend: a dot marks a day with multiple entries."
+        >
+          <View
+            className="mr-2 rounded-full"
+            style={{ width: 7, height: 7, backgroundColor: get("primary") }}
+          />
+          <Text style={[typography.bodySm, { color: get("textSubtle") }]}>
+            Multiple entries
+          </Text>
+        </View>
+      ) : null}
+
+      {error && monthData ? (
+        <View className="mt-3 flex-row items-center rounded-2xl px-3 py-2" style={{ backgroundColor: get("surfaceElevated") }} accessibilityRole="alert">
+          <Ionicons name="warning-outline" size={18} color={get("textMuted")} />
+          <Text className="ml-2 flex-1" style={[typography.bodySm, { color: get("textMuted") }]}>Showing saved calendar data.</Text>
+          <Pressable onPress={() => void refresh()} accessibilityRole="button" accessibilityLabel="Retry refreshing calendar">
+            <Text style={[typography.bodySm, { color: isDark ? get("primary") : "#476D47", fontWeight: "700" }]}>Retry</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       {!loading && monthSummary && (
         <View
@@ -410,7 +453,9 @@ export function MoodCalendar({
                 {monthSummary.bestDay ? `${monthName.slice(0, 3)} ${monthSummary.bestDay}` : "None"}
               </Text>
               <Text style={[typography.bodySm, { color: get("textSubtle") }]}>
-                {monthSummary.averageMoodInfo?.label ?? "No mood average yet"}
+                {monthSummary.bestMood !== null
+                  ? getMoodRatingDisplay(monthSummary.bestMood, isDark).label
+                  : "No mood average yet"}
               </Text>
             </View>
           </View>

@@ -41,11 +41,11 @@ import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import type { MoodEntry } from "@db/types";
 import { getInterpretedMoodRating } from "@/constants/moodScaleInterpretation";
 
-type ViewMode = "calendar" | "charts";
+type ViewMode = "calendar" | "summary";
 
 const viewModes: { id: ViewMode; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { id: "calendar", label: "Calendar", icon: "calendar" },
-  { id: "charts", label: "Charts", icon: "bar-chart" },
+  { id: "summary", label: "Summary", icon: "analytics" },
 ];
 
 export function InsightsScreen() {
@@ -60,6 +60,7 @@ export function InsightsScreen() {
     allMoods,
     periodMoods,
     loading,
+    error,
     period,
     currentDate,
     setPeriod,
@@ -114,6 +115,35 @@ export function InsightsScreen() {
     );
   }
 
+  if (error && allMoods.length === 0) {
+    return (
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaView
+          className="flex-1"
+          style={{ backgroundColor: isDark ? "#08150F" : "#FAF8F4" }}
+          edges={["top"]}
+        >
+          <ScreenBackgroundAccent />
+          <InsightsHeader
+            moods={allMoods}
+            totalEntries={allMoods.length}
+            onRefresh={refresh}
+          />
+          <EmptyState
+            icon="warning-outline"
+            tone="coral"
+            title="Insights could not load"
+            description={error}
+            actionLabel="Try Again"
+            onAction={() => {
+              void refresh();
+            }}
+          />
+        </SafeAreaView>
+      </GestureHandlerRootView>
+    );
+  }
+
   const hasData = allMoods.length > 0;
   const hasPeriodData = periodMoods.length > 0;
   const reveal = (index: number) =>
@@ -132,6 +162,26 @@ export function InsightsScreen() {
           totalEntries={allMoods.length}
           onRefresh={onRefresh}
         />
+
+        {error && hasData ? (
+          <View
+            accessibilityRole="alert"
+            className="mx-4 mb-2 flex-row items-center rounded-2xl px-3 py-2"
+            style={{ backgroundColor: isDark ? "#2B251B" : "#F4ECDC" }}
+          >
+            <Ionicons name="warning-outline" size={18} color={isDark ? "#D4C49C" : "#9D8660"} />
+            <Text className="ml-2 flex-1 text-xs text-paper-700 dark:text-sand-300">
+              Showing saved insights. Refresh failed.
+            </Text>
+            <Pressable
+              onPress={() => void refresh()}
+              accessibilityRole="button"
+              accessibilityLabel="Retry refreshing insights"
+            >
+              <Text className="text-xs font-bold text-sage-600 dark:text-sage-300">Retry</Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         {/* View Mode Toggle */}
         {hasData && (
@@ -181,7 +231,7 @@ export function InsightsScreen() {
           </Animated.View>
         ) : (
           <Animated.View
-            key="charts-view"
+            key="summary-view"
             entering={FadeIn.duration(motion.duration.normal)}
             exiting={FadeOut.duration(motion.duration.fast)}
             style={{ flex: 1 }}
@@ -237,6 +287,7 @@ export function InsightsScreen() {
                       metricColor={getMoodColor(stats.averageMood)}
                       variant="accent"
                     />
+                    <Text className="mt-2 text-center" style={[typography.bodySm, { color: isDark ? "#9FB39A" : "#7A6545" }]}>Mood Rating: 0 is best, 10 is worst.</Text>
                   </Animated.View>
 
                   {/* Supporting metrics */}
@@ -265,7 +316,7 @@ export function InsightsScreen() {
                             ? `${Math.min(...periodMoods.map(getInterpretedMoodRating))}-${Math.max(...periodMoods.map(getInterpretedMoodRating))}`
                             : "-"
                         }
-                        interpretation="spread"
+                        interpretation="best to most difficult"
                       />
                     </View>
                   </Animated.View>
@@ -353,6 +404,8 @@ export function InsightsScreen() {
                                 ? "border-b border-paper-200 dark:border-paper-800"
                                 : ""
                             }`}
+                            accessibilityRole="button"
+                            accessibilityLabel={`${getMoodLabel(mood.mood, mood.moodScale)}, Mood Rating ${getInterpretedMoodRating(mood)} of 10, ${format(new Date(mood.timestamp), "EEE, MMM d 'at' h:mm a")}`}
                           >
                             <View
                               className="w-10 h-10 rounded-2xl items-center justify-center mr-3"
@@ -362,14 +415,14 @@ export function InsightsScreen() {
                                 className="text-lg font-bold"
                                 style={{ color: getMoodColor(mood.mood, mood.moodScale) }}
                               >
-                                {mood.mood}
+                                {getInterpretedMoodRating(mood)}
                               </Text>
                             </View>
                             <View className="flex-1">
                               <Text className="text-paper-800 dark:text-paper-200" style={typography.bodyMd}>
                                 {getMoodLabel(mood.mood, mood.moodScale)}
                               </Text>
-                              <Text className="text-sand-500 dark:text-sand-400" style={typography.bodySm}>
+                              <Text className="text-paper-700 dark:text-sand-400" style={typography.bodySm}>
                                 {period === "week"
                                   ? format(new Date(mood.timestamp), "EEE 'at' h:mm a")
                                   : format(new Date(mood.timestamp), "EEE, MMM d 'at' h:mm a")}

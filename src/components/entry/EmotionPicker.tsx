@@ -6,6 +6,7 @@ import Animated, {
     withSpring,
     FadeIn,
 } from "react-native-reanimated";
+import { Ionicons } from "@expo/vector-icons";
 import { useThemeColors } from "@/constants/colors";
 import type { Emotion } from "@db/types";
 
@@ -14,6 +15,10 @@ interface EmotionPickerProps {
     selected: Emotion[];
     onChange: (emotions: Emotion[]) => void;
     maxSelections?: number;
+    showCategoryHeaders?: boolean;
+    reserveSummarySpace?: boolean;
+    disabledOpacity?: number;
+    categoryOrder?: readonly EmotionCategory[];
 }
 
 const CATEGORY_ORDER = ["positive", "negative", "neutral"] as const;
@@ -30,6 +35,7 @@ interface EmotionChipProps {
     emotion: Emotion;
     isSelected: boolean;
     disabled: boolean;
+    disabledOpacity: number;
     bgColor: string;
     borderColor: string;
     textColor: string;
@@ -40,20 +46,21 @@ const EmotionChip: React.FC<EmotionChipProps> = ({
     emotion,
     isSelected,
     disabled,
+    disabledOpacity,
     bgColor,
     borderColor,
     textColor,
     onPress,
 }) => {
-    const scale = useSharedValue(isSelected ? 1.04 : 1);
+    const scale = useSharedValue(1);
 
     useEffect(() => {
-        scale.value = withSpring(isSelected ? 1.04 : 1, {
+        scale.value = withSpring(1, {
             damping: 20,
             stiffness: 380,
             overshootClamping: true,
         });
-    }, [isSelected, scale]);
+    }, [scale]);
 
     const chipAnimatedStyle = useAnimatedStyle(() => ({
         transform: [{ scale: scale.value }],
@@ -67,7 +74,7 @@ const EmotionChip: React.FC<EmotionChipProps> = ({
                     if (!disabled) scale.value = withSpring(0.93, { damping: 20, stiffness: 500 });
                 }}
                 onPressOut={() => {
-                    scale.value = withSpring(isSelected ? 1.04 : 1, { damping: 18, stiffness: 380 });
+                    scale.value = withSpring(1, { damping: 18, stiffness: 380 });
                 }}
                 disabled={disabled}
                 className="px-3 py-2 rounded-xl"
@@ -76,7 +83,7 @@ const EmotionChip: React.FC<EmotionChipProps> = ({
                     // Keep layout stable: borderWidth must NOT change on select.
                     borderWidth: 1,
                     borderColor,
-                    opacity: disabled ? 0.28 : 1,
+                    opacity: disabled ? disabledOpacity : 1,
                     // Selection emphasis uses transform + shadow (no layout change)
                     shadowColor: isSelected ? textColor : "transparent",
                     shadowOffset: { width: 0, height: 2 },
@@ -94,6 +101,18 @@ const EmotionChip: React.FC<EmotionChipProps> = ({
                         : "tap to select"
                 }`}
             >
+                <Ionicons
+                    name="checkmark-circle"
+                    size={13}
+                    color={textColor}
+                    accessible={false}
+                    style={{
+                        position: "absolute",
+                        right: -4,
+                        top: -4,
+                        opacity: isSelected ? 1 : 0,
+                    }}
+                />
                 <Text className="text-sm font-medium" style={{ color: textColor }}>
                     {emotion.name}
                 </Text>
@@ -133,7 +152,7 @@ const SelectedChip: React.FC<{
                 </Text>
                 <Text
                     className="text-sm"
-                    style={{ color: textColor, opacity: 0.55, lineHeight: 14 }}
+                    style={{ color: textColor, lineHeight: 14 }}
                 >
                     ×
                 </Text>
@@ -147,6 +166,10 @@ export const EmotionPicker: React.FC<EmotionPickerProps> = ({
     selected,
     onChange,
     maxSelections = 3,
+    showCategoryHeaders = true,
+    reserveSummarySpace = true,
+    disabledOpacity = 0.28,
+    categoryOrder = CATEGORY_ORDER,
 }) => {
     const { isDark, getCategoryColors } = useThemeColors();
 
@@ -155,6 +178,7 @@ export const EmotionPicker: React.FC<EmotionPickerProps> = ({
         [selected]
     );
     const atLimit = selected.length >= maxSelections;
+    const shouldRenderSummary = reserveSummarySpace || selected.length > 0;
 
     const grouped = useMemo(() => {
         const map: Record<EmotionCategory, Emotion[]> = {
@@ -184,138 +208,180 @@ export const EmotionPicker: React.FC<EmotionPickerProps> = ({
         [selectedNames, atLimit, selected, onChange]
     );
 
+    const renderEmotionChip = (emotion: Emotion) => {
+        const isSelected = selectedNames.has(emotion.name);
+        const disabled = !isSelected && atLimit;
+        const catColors = getCategoryColors(emotion.category, isSelected);
+
+        return (
+            <EmotionChip
+                key={emotion.name}
+                emotion={emotion}
+                isSelected={isSelected}
+                disabled={disabled}
+                disabledOpacity={disabledOpacity}
+                bgColor={catColors.bg}
+                borderColor={catColors.border ?? catColors.bg}
+                textColor={catColors.text}
+                onPress={() => toggle(emotion)}
+            />
+        );
+    };
+
+    const orderedCategories = useMemo(() => {
+        const seen = new Set<EmotionCategory>();
+        const preferred = categoryOrder.filter((cat) => {
+            if (!CATEGORY_ORDER.includes(cat) || seen.has(cat)) return false;
+            seen.add(cat);
+            return true;
+        });
+        return [
+            ...preferred,
+            ...CATEGORY_ORDER.filter((cat) => !seen.has(cat)),
+        ];
+    }, [categoryOrder]);
+    const flatOptions = orderedCategories.flatMap((cat) => grouped[cat]);
+
     return (
         <View>
-            {/* Selected summary — fixed-height, always present (no up/down coupling). */}
-            <View
-                className="mb-4"
-                style={{
-                    minHeight: 54,
-                    paddingTop: 2,
-                    paddingBottom: 2,
-                }}
-            >
-                {selected.length > 0 ? (
-                    <View style={{ flex: 1 }}>
-                        <ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={{
-                                flexDirection: "row",
-                                alignItems: "center",
-                                gap: 8,
-                                paddingVertical: 6,
-                            }}
-                        >
-                            {selected.map((e) => {
-                                const catColors = getCategoryColors(e.category, true);
-                                return (
-                                    <SelectedChip
-                                        key={e.name}
-                                        emotion={e}
-                                        bgColor={catColors.bg}
-                                        textColor={catColors.text}
-                                        onRemove={() => toggle(e)}
-                                    />
-                                );
-                            })}
-                        </ScrollView>
-                    </View>
-                ) : (
-                    <Animated.View
-                        entering={FadeIn.duration(160)}
-                        style={{
-                            flex: 1,
-                            justifyContent: "center",
-                        }}
-                    >
-                        <Text
-                            className="text-xs"
+            {/* Selected summary. Detailed mode reserves height; quick mode stays compact. */}
+            {shouldRenderSummary && (
+                <View
+                    className={reserveSummarySpace ? "mb-4" : "mb-3"}
+                    style={
+                        reserveSummarySpace
+                            ? {
+                                  minHeight: 54,
+                                  paddingTop: 2,
+                                  paddingBottom: 2,
+                              }
+                            : undefined
+                    }
+                >
+                    {selected.length > 0 ? (
+                        <View style={reserveSummarySpace ? { flex: 1 } : undefined}>
+                            <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                contentContainerStyle={{
+                                    flexDirection: "row",
+                                    alignItems: "center",
+                                    gap: 8,
+                                    paddingVertical: reserveSummarySpace ? 6 : 2,
+                                }}
+                            >
+                                {selected.map((e) => {
+                                    const catColors = getCategoryColors(e.category, true);
+                                    return (
+                                        <SelectedChip
+                                            key={e.name}
+                                            emotion={e}
+                                            bgColor={catColors.bg}
+                                            textColor={catColors.text}
+                                            onRemove={() => toggle(e)}
+                                        />
+                                    );
+                                })}
+                            </ScrollView>
+                        </View>
+                    ) : (
+                        <Animated.View
+                            entering={FadeIn.duration(160)}
                             style={{
-                                color: isDark ? "#6B5C48" : "#B0A090",
-                                fontStyle: "italic",
-                                opacity: 0.95,
-                            }}
-                        >
-                            Pick up to {maxSelections}
-                        </Text>
-                    </Animated.View>
-                )}
-
-                {/* Hint is overlayed so it never changes layout */}
-                {atLimit && (
-                    <Animated.Text
-                        entering={FadeIn.duration(160)}
-                        style={{
-                            position: "absolute",
-                            bottom: 0,
-                            left: 0,
-                            right: 0,
-                            fontSize: 12,
-                            color: isDark ? "#8C7A60" : "#9D8660",
-                            fontStyle: "italic",
-                        }}
-                    >
-                        Tap any chip above to swap it out
-                    </Animated.Text>
-                )}
-            </View>
-
-            {/* Category groups — no layout animation (avoid “related” vertical movement). */}
-            {CATEGORY_ORDER.map((cat) => {
-                const list = grouped[cat];
-                if (!list.length) return null;
-
-                return (
-                    <View key={cat} className="mb-4">
-                        {/* Category header */}
-                        <View
-                            className="flex-row items-center mb-2.5 gap-2"
-                            style={{
-                                borderBottomWidth: 1,
-                                borderBottomColor: isDark
-                                    ? "rgba(61, 53, 42, 0.25)"
-                                    : "rgba(229, 217, 191, 0.5)",
-                                paddingBottom: 5,
+                                flex: 1,
+                                justifyContent: "center",
                             }}
                         >
                             <Text
+                                className="text-xs"
                                 style={{
-                                    fontSize: 10,
-                                    fontWeight: "700",
-                                    letterSpacing: 1.2,
-                                    textTransform: "uppercase",
-                                    color: isDark ? "#5C4E3D" : "#B0A090",
+                                    color: isDark ? "#9EB894" : "#7A6B55",
+                                    fontStyle: "italic",
+                                    opacity: 0.95,
                                 }}
                             >
-                                {CATEGORY_LABELS[cat]}
+                                Pick up to {maxSelections}
                             </Text>
-                        </View>
+                        </Animated.View>
+                    )}
 
-                        {/* Chips */}
-                        <View className="flex-row flex-wrap gap-2">
-                            {list.map((emotion) => {
-                                const isSelected = selectedNames.has(emotion.name);
-                                const disabled = !isSelected && atLimit;
-                                const catColors = getCategoryColors(emotion.category, isSelected);
+                    {/* Hint is overlayed in the full picker so it never changes layout. */}
+                    {atLimit && reserveSummarySpace && (
+                        <Animated.Text
+                            entering={FadeIn.duration(160)}
+                            style={{
+                                position: "absolute",
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                fontSize: 12,
+                                color: isDark ? "#9EB894" : "#7A6B55",
+                                fontStyle: "italic",
+                            }}
+                        >
+                            Tap any chip above to swap it out
+                        </Animated.Text>
+                    )}
+                    {atLimit && !reserveSummarySpace && (
+                        <Animated.Text
+                            entering={FadeIn.duration(160)}
+                            style={{
+                                fontSize: 12,
+                                color: isDark ? "#9EB894" : "#7A6B55",
+                                fontStyle: "italic",
+                                marginTop: 2,
+                            }}
+                        >
+                            Tap a selected chip to swap it out
+                        </Animated.Text>
+                    )}
+                </View>
+            )}
 
-                                return (
-                                    <EmotionChip
-                                        key={emotion.name}
-                                        emotion={emotion}
-                                        isSelected={isSelected}
-                                        disabled={disabled}
-                                        bgColor={catColors.bg}
-                                        borderColor={catColors.border ?? catColors.bg}
-                                        textColor={catColors.text}
-                                        onPress={() => toggle(emotion)}
-                                    />
-                                );
-                            })}
+            {!showCategoryHeaders ? (
+                <View className="flex-row flex-wrap gap-2">
+                    {flatOptions.map(renderEmotionChip)}
+                </View>
+            ) : (
+                /* Category groups — no layout animation (avoid “related” vertical movement). */
+                orderedCategories.map((cat) => {
+                    const list = grouped[cat];
+                    if (!list.length) return null;
+
+                    return (
+                        <View key={cat} className="mb-4">
+                            {/* Category header */}
+                            <View
+                                className="flex-row items-center mb-2.5 gap-2"
+                                style={{
+                                    borderBottomWidth: 1,
+                                    borderBottomColor: isDark
+                                        ? "rgba(61, 53, 42, 0.25)"
+                                        : "rgba(229, 217, 191, 0.5)",
+                                    paddingBottom: 5,
+                                }}
+                            >
+                                <Text
+                                    style={{
+                                        fontSize: 12,
+                                        fontWeight: "700",
+                                        letterSpacing: 1.2,
+                                        textTransform: "uppercase",
+                                        color: isDark ? "#9EB894" : "#7A6B55",
+                                    }}
+                                >
+                                    {CATEGORY_LABELS[cat]}
+                                </Text>
+                            </View>
+
+                            {/* Chips */}
+                            <View className="flex-row flex-wrap gap-2">
+                                {list.map(renderEmotionChip)}
+                            </View>
                         </View>
-                    </View>
-                );
-            })}
+                    );
+                })
+            )}
         </View>
     );
 };

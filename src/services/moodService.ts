@@ -20,7 +20,7 @@ import {
   hasMoodBeenLoggedToday,
   updateEmotionCategoryInMoods,
   getEmotionNamesFromMoods,
-  clearMoods,
+  clearMoodData,
   seedMoods,
   type PaginationOptions,
   type PaginatedResult,
@@ -206,7 +206,7 @@ export const moodService: MoodServiceInterface = {
   },
 
   async clearAll(): Promise<void> {
-    await clearMoods();
+    await clearMoodData();
   },
 
   async seedSampleData(): Promise<number> {

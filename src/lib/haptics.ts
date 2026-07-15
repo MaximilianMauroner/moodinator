@@ -7,7 +7,17 @@ import { Platform, Vibration } from "react-native";
 
 // Lazy-load the native haptic module so the app works in Expo Go
 // (which doesn't bundle RNHapticFeedback in its binary).
-let _haptic: { default: any; HapticFeedbackTypes: any } | null = null;
+type HapticOptions = {
+  enableVibrateFallback: boolean;
+  ignoreAndroidSystemSettings: boolean;
+};
+
+type HapticModule = {
+  default: { trigger: (type: string, options: HapticOptions) => void } | null;
+  HapticFeedbackTypes: Record<string, string>;
+};
+
+let _haptic: HapticModule | null = null;
 function getHapticModule() {
   if (!_haptic) {
     try {
@@ -31,7 +41,7 @@ const isHapticsSupported = Platform.OS !== "web";
 
 let hapticsEnabled = true;
 
-const options = {
+const options: HapticOptions = {
   enableVibrateFallback: true,
   ignoreAndroidSystemSettings: true,
 };

@@ -43,7 +43,7 @@ export function ProfileCard({ entryCount, daysTracking }: ProfileCardProps) {
             <Text className="text-xl font-bold text-paper-800 dark:text-paper-200 tracking-tight">
               Moodinator
             </Text>
-            <Text className="text-sm text-sand-600 dark:text-paper-400 mt-0.5">
+            <Text className="text-sm text-paper-700 dark:text-paper-400 mt-0.5">
               Your wellness companion
             </Text>
           </View>
@@ -61,11 +61,11 @@ export function ProfileCard({ entryCount, daysTracking }: ProfileCardProps) {
                   color={isDark ? colors.positive.text.dark : colors.positive.text.light}
                 />
               </View>
-              <Text className="text-xs font-medium uppercase tracking-wider text-sage-500 dark:text-sage-300">
+              <Text className="text-xs font-medium uppercase tracking-wider text-sage-600 dark:text-sage-300">
                 Entries
               </Text>
             </View>
-            <Text className="text-2xl font-extrabold text-sage-500 dark:text-sage-300 tracking-tighter">
+            <Text className="text-2xl font-extrabold text-sage-600 dark:text-sage-300 tracking-tighter">
               {entryCount.toLocaleString()}
             </Text>
           </View>
@@ -80,11 +80,11 @@ export function ProfileCard({ entryCount, daysTracking }: ProfileCardProps) {
                   color={isDark ? colors.sand.text.dark : colors.sand.bgSelected.light}
                 />
               </View>
-              <Text className="text-xs font-medium uppercase tracking-wider text-sand-600 dark:text-paper-400">
+              <Text className="text-xs font-medium uppercase tracking-wider text-paper-700 dark:text-paper-400">
                 Days
               </Text>
             </View>
-            <Text className="text-2xl font-extrabold text-sand-600 dark:text-sand-300 tracking-tighter">
+            <Text className="text-2xl font-extrabold text-paper-700 dark:text-sand-300 tracking-tighter">
               {daysTracking.toLocaleString()}
             </Text>
           </View>

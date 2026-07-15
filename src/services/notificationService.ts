@@ -563,17 +563,16 @@ export async function deleteNotification(id: string): Promise<ReminderScheduleRe
 }
 
 
-export async function ensureMoodReminderScheduled(): Promise<void> {
+export async function ensureMoodReminderScheduled(): Promise<ReminderScheduleResult | null> {
     const notifications = await getAllNotifications();
     const enabledNotifications = notifications.filter((notification) => notification.enabled);
     if (enabledNotifications.length === 0) {
-        await saveAllNotifications(notifications);
-        return;
+        return saveAllNotifications(notifications);
     }
 
     const Notifications = await getNotificationsModule();
     if (!Notifications) {
-        return;
+        return saveAllNotifications(notifications);
     }
 
     const scheduledIds = await getScheduledMoodReminderIds(Notifications);
@@ -584,8 +583,10 @@ export async function ensureMoodReminderScheduled(): Promise<void> {
     );
 
     if (!allEnabledScheduled) {
-        await saveAllNotifications(notifications);
+        return saveAllNotifications(notifications);
     }
+
+    return null;
 }
 
 export async function addNotificationResponseReceivedListener(

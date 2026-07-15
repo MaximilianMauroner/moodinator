@@ -5,6 +5,8 @@ import { useFocusEffect } from "expo-router";
 import { dataPortabilityService } from "@/services/dataPortabilityService";
 import { useSettingsStore } from "@/shared/state/settingsStore";
 import { useMoodsStore } from "@/shared/state/moodsStore";
+import { useAppLockStore } from "@/features/appLock";
+import { Ionicons } from "@expo/vector-icons";
 
 import { ProfileCard } from "../components/ProfileCard";
 import { SettingsCategoryCard } from "../components/SettingsCategoryCard";
@@ -13,6 +15,8 @@ import { ScreenBackgroundAccent } from "@/components/layout/ScreenBackgroundAcce
 
 export function SettingsScreen() {
   const [backupCount, setBackupCount] = useState(0);
+  const [statsError, setStatsError] = useState(false);
+  const appLockEnabled = useAppLockStore((state) => state.isEnabled);
 
   const moods = useMoodsStore((state) => state.moods);
   const ensureFresh = useMoodsStore((state) => state.ensureFresh);
@@ -22,10 +26,12 @@ export function SettingsScreen() {
 
   const loadStats = useCallback(async () => {
     try {
+      setStatsError(false);
       await ensureFresh();
       const backupInfo = await dataPortabilityService.getBackupInfo();
       setBackupCount(backupInfo.count);
     } catch (error) {
+      setStatsError(true);
       console.error("Failed to load stats:", error);
     }
   }, [ensureFresh]);
@@ -72,8 +78,28 @@ export function SettingsScreen() {
         {/* Profile Card */}
         <ProfileCard entryCount={entryCount} daysTracking={daysTracking} />
 
+        <View className="mb-5 rounded-2xl border border-sage-200 dark:border-sage-700 bg-sage-50 dark:bg-sage-900/20 p-4">
+          <View className="flex-row items-center">
+            <Ionicons name="lock-closed" size={20} color="#5B8A5B" />
+            <View className="ml-3 flex-1">
+              <Text className="text-sm font-semibold text-paper-800 dark:text-paper-100">Local privacy</Text>
+              <Text className="text-xs mt-0.5 text-paper-700 dark:text-sand-400">
+                Stored on this device · App lock {appLockEnabled ? "on" : "off"}
+              </Text>
+              <Text className="text-xs mt-0.5 text-paper-700 dark:text-sand-400">
+                {backupCount > 0 ? `${backupCount} local backup${backupCount === 1 ? "" : "s"} saved` : "No local backups yet"}
+              </Text>
+            </View>
+          </View>
+          {statsError && (
+            <Text className="text-xs mt-2 text-coral-700 dark:text-coral-300">
+              Some local status details could not be refreshed.
+            </Text>
+          )}
+        </View>
+
         {/* Categories */}
-        <Text className="text-xs font-semibold uppercase tracking-wider text-sand-600 dark:text-paper-400 mb-3 mt-2 ml-1">
+        <Text className="text-xs font-semibold uppercase tracking-wider text-paper-700 dark:text-paper-400 mb-3 mt-2 ml-1">
           Mood Tracking
         </Text>
 
@@ -106,13 +132,13 @@ export function SettingsScreen() {
           />
         </View>
 
-        <Text className="text-xs font-semibold uppercase tracking-wider text-sand-600 dark:text-paper-400 mb-3 mt-6 ml-1">
+        <Text className="text-xs font-semibold uppercase tracking-wider text-paper-700 dark:text-paper-400 mb-3 mt-6 ml-1">
           App Experience
         </Text>
 
         <View className="gap-3">
           <SettingsCategoryCard
-            title="Notifications"
+            title="Reminders"
             description="Manage check-in reminders"
             icon="notifications-outline"
             href="/notifications"
@@ -128,7 +154,7 @@ export function SettingsScreen() {
           />
         </View>
 
-        <Text className="text-xs font-semibold uppercase tracking-wider text-sand-600 dark:text-paper-400 mb-3 mt-6 ml-1">
+        <Text className="text-xs font-semibold uppercase tracking-wider text-paper-700 dark:text-paper-400 mb-3 mt-6 ml-1">
           Privacy & Data
         </Text>
 
@@ -144,7 +170,7 @@ export function SettingsScreen() {
           <SettingsCategoryCard
             title="Data & Backups"
             description="Data export, import, and backups"
-            icon="cloud-outline"
+            icon="folder-outline"
             href="/settings/data"
             accentColor="sage"
             preview={backupCount > 0 ? `${backupCount} backup${backupCount === 1 ? "" : "s"} saved` : undefined}
@@ -159,7 +185,7 @@ export function SettingsScreen() {
           />
         </View>
 
-        <Text className="text-xs font-semibold uppercase tracking-wider text-sand-600 dark:text-paper-400 mb-3 mt-6 ml-1">
+        <Text className="text-xs font-semibold uppercase tracking-wider text-paper-700 dark:text-paper-400 mb-3 mt-6 ml-1">
           Support & Advanced
         </Text>
 
@@ -172,13 +198,15 @@ export function SettingsScreen() {
             accentColor="dusk"
           />
 
-          <SettingsCategoryCard
-            title="Developer"
-            description="Advanced options and testing"
-            icon="code-slash-outline"
-            href="/settings/developer"
-            accentColor="sand"
-          />
+          {__DEV__ && (
+            <SettingsCategoryCard
+              title="Developer"
+              description="Advanced options and testing"
+              icon="code-slash-outline"
+              href="/settings/developer"
+              accentColor="sand"
+            />
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>

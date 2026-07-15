@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { View, Text, useWindowDimensions } from "react-native";
+import { ScrollView, View, Text, useWindowDimensions } from "react-native";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -16,18 +16,24 @@ import type { OnboardingPage as OnboardingPageType } from "../content";
 type OnboardingPageProps = {
   page: OnboardingPageType;
   isActive: boolean;
+  reduceMotion?: boolean;
 };
 
-export function OnboardingPage({ page, isActive }: OnboardingPageProps) {
-  const { get } = useThemeColors();
-  const { width } = useWindowDimensions();
+export function OnboardingPage({ page, isActive, reduceMotion = false }: OnboardingPageProps) {
+  const { get, isDark } = useThemeColors();
+  const { width, height } = useWindowDimensions();
+  const compact = height < 700;
+  const accentColor = isDark ? page.accentColorDark : page.accentColor;
 
   // Float animation for the icon
   const translateY = useSharedValue(0);
   const scale = useSharedValue(1);
 
   useEffect(() => {
-    if (isActive) {
+    if (reduceMotion) {
+      translateY.value = 0;
+      scale.value = 1;
+    } else if (isActive) {
       translateY.value = withDelay(
         300,
         withRepeat(
@@ -46,7 +52,7 @@ export function OnboardingPage({ page, isActive }: OnboardingPageProps) {
     } else {
       scale.value = withTiming(0.9, { duration: 200 });
     }
-  }, [isActive, translateY, scale]);
+  }, [isActive, reduceMotion, translateY, scale]);
 
   const iconAnimatedStyle = useAnimatedStyle(() => ({
     transform: [
@@ -56,17 +62,19 @@ export function OnboardingPage({ page, isActive }: OnboardingPageProps) {
   }));
 
   return (
-    <View
+    <ScrollView
       style={{ width }}
-      className="flex-1 justify-center items-center px-8"
+      className="flex-1"
+      contentContainerStyle={{ flexGrow: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 32, paddingVertical: compact ? 16 : 32 }}
+      showsVerticalScrollIndicator={false}
     >
       {/* Icon container with glow effect */}
       <Animated.View style={iconAnimatedStyle}>
         <View
-          className="w-32 h-32 rounded-[40px] items-center justify-center mb-8"
+          className={`${compact ? "w-24 h-24 rounded-3xl mb-4" : "w-32 h-32 rounded-[40px] mb-8"} items-center justify-center`}
           style={{
-            backgroundColor: `${page.accentColor}20`,
-            shadowColor: page.accentColor,
+            backgroundColor: `${accentColor}20`,
+            shadowColor: accentColor,
             shadowOffset: { width: 0, height: 12 },
             shadowOpacity: 0.3,
             shadowRadius: 24,
@@ -74,15 +82,15 @@ export function OnboardingPage({ page, isActive }: OnboardingPageProps) {
           }}
         >
           <View
-            className="w-24 h-24 rounded-3xl items-center justify-center"
+            className={`${compact ? "w-16 h-16 rounded-2xl" : "w-24 h-24 rounded-3xl"} items-center justify-center`}
             style={{
-              backgroundColor: `${page.accentColor}30`,
+              backgroundColor: `${accentColor}30`,
             }}
           >
             <Ionicons
               name={page.icon as keyof typeof Ionicons.glyphMap}
-              size={48}
-              color={page.accentColor}
+              size={compact ? 36 : 48}
+              color={accentColor}
             />
           </View>
         </View>
@@ -90,7 +98,7 @@ export function OnboardingPage({ page, isActive }: OnboardingPageProps) {
 
       {/* Title */}
       <Text
-        className="text-3xl font-bold text-center mb-2"
+        className={`${compact ? "text-2xl" : "text-3xl"} font-bold text-center mb-2`}
         style={{ color: get("text") }}
       >
         {page.title}
@@ -99,7 +107,7 @@ export function OnboardingPage({ page, isActive }: OnboardingPageProps) {
       {/* Subtitle */}
       <Text
         className="text-base font-medium text-center mb-6"
-        style={{ color: page.accentColor }}
+        style={{ color: accentColor }}
       >
         {page.subtitle}
       </Text>
@@ -111,6 +119,6 @@ export function OnboardingPage({ page, isActive }: OnboardingPageProps) {
       >
         {page.description}
       </Text>
-    </View>
+    </ScrollView>
   );
 }

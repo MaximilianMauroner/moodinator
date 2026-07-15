@@ -94,7 +94,7 @@ function DefaultErrorFallback({ error, resetError }: ErrorFallbackProps) {
       <Pressable
         onPress={resetError}
         style={{
-          backgroundColor: "#5B8A5B",
+          backgroundColor: "#476D47",
           paddingVertical: 14,
           paddingHorizontal: 32,
           borderRadius: 16,

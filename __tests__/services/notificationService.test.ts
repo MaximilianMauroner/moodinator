@@ -247,4 +247,65 @@ describe("notificationService scheduling persistence", () => {
       }),
     ]);
   });
+
+  it("persists unavailable state during startup recovery when notifications cannot run", async () => {
+    await AsyncStorage.setItem(
+      "notificationsList",
+      JSON.stringify([
+        {
+          ...reminder("a"),
+          scheduledId: "stale-schedule",
+          scheduleStatus: "scheduled",
+        },
+      ])
+    );
+    platformMock.Platform.OS = "android";
+    constantsMock.default.executionEnvironment = "storeClient";
+    constantsMock.default.appOwnership = "expo";
+    const { ensureMoodReminderScheduled } = await loadService();
+
+    const result = await ensureMoodReminderScheduled();
+
+    expect(result?.status).toBe("unavailable");
+    expect(notificationMocks.scheduleNotificationAsync).not.toHaveBeenCalled();
+    const stored = await storedNotifications();
+    expect(stored).toEqual([
+      expect.objectContaining({
+        id: "a",
+        scheduleStatus: "unavailable",
+      }),
+    ]);
+    expect(stored[0]).not.toHaveProperty("scheduledId");
+  });
+
+  it("persists permission-denied state during startup recovery when permission was revoked", async () => {
+    await AsyncStorage.setItem(
+      "notificationsList",
+      JSON.stringify([
+        {
+          ...reminder("a"),
+          scheduledId: "missing-schedule",
+          scheduleStatus: "scheduled",
+        },
+      ])
+    );
+    notificationMocks.getAllScheduledNotificationsAsync.mockResolvedValue([]);
+    notificationMocks.getPermissionsAsync.mockResolvedValue({ status: "denied" });
+    notificationMocks.requestPermissionsAsync.mockResolvedValue({ status: "denied" });
+    const { ensureMoodReminderScheduled } = await loadService();
+
+    const result = await ensureMoodReminderScheduled();
+
+    expect(result?.status).toBe("permission-denied");
+    expect(notificationMocks.scheduleNotificationAsync).not.toHaveBeenCalled();
+    const stored = await storedNotifications();
+    expect(stored).toEqual([
+      expect.objectContaining({
+        id: "a",
+        scheduleStatus: "permission-denied",
+        unscheduledReason: "Notification permission was not granted.",
+      }),
+    ]);
+    expect(stored[0]).not.toHaveProperty("scheduledId");
+  });
 });

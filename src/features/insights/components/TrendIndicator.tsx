@@ -63,6 +63,8 @@ export function TrendIndicator({
     <View
       className={`flex-row items-center rounded-full ${config.padding}`}
       style={{ backgroundColor: colors.bg }}
+      accessible
+      accessibilityLabel={`${colors.label}${value !== undefined ? ` by ${Math.abs(value).toFixed(1)} Mood Rating points` : ""}. Lower ratings are better.`}
     >
       <Ionicons name={colors.icon} size={config.icon} color={colors.text} />
       {(showLabel || value !== undefined) && (

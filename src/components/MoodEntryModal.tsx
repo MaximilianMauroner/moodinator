@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useMemo, useState, useCallback, useRef } from "react";
+import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import {
     Modal,
     View,
@@ -6,21 +6,20 @@ import {
     Pressable,
     ScrollView,
     TextInput,
-    Alert,
+    Linking,
     useWindowDimensions,
     Keyboard,
+    KeyboardAvoidingView,
     Platform,
 } from "react-native";
+import PagerView, { type PagerViewOnPageSelectedEvent } from "react-native-pager-view";
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
-    withTiming,
     withSpring,
-    runOnJS,
-    Easing,
-    FadeIn,
 } from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
+import { Alert } from "@/components/ui/AppAlert";
 import {
     getAllMoodRatingDisplays,
     getMoodRatingDisplay,
@@ -44,24 +43,33 @@ import {
     Separator,
     StepDots,
 } from "./MoodEntryModalParts";
+import {
+    buildMoodEntrySubmitValues,
+    createMoodEntryFormValues,
+    getMoodEntrySteps,
+    getNotesPlaceholder,
+    resolveMoodEntryBackAction,
+    type MoodEntryFlow,
+    type MoodEntryFieldConfig,
+    type MoodEntryFormValues,
+    type MoodEntryStepId,
+} from "./entry/moodEntryDraft";
 
-export type MoodEntryFormValues = {
-    mood: number;
-    emotions: Emotion[];
-    contextTags: string[];
-    energy: number | null;
-    note: string;
-    basedOnEntryId: number | null;
+export type { MoodEntryFieldConfig, MoodEntryFormValues } from "./entry/moodEntryDraft";
+
+type EntryPresetCreateResult<T> = {
+    value: T;
+    created: boolean;
 };
 
-export type MoodEntryFieldConfig = {
-    emotions: boolean;
-    context: boolean;
-    energy: boolean;
-    notes: boolean;
-};
+type CreateEmotionOption = (
+    name: string,
+    category: Emotion["category"]
+) => Promise<EntryPresetCreateResult<Emotion> | null> | EntryPresetCreateResult<Emotion> | null;
 
-type StepId = "mood" | "emotions" | "details";
+type CreateContextOption = (
+    name: string
+) => Promise<EntryPresetCreateResult<string> | null> | EntryPresetCreateResult<string> | null;
 
 type BaseMoodEntryModalProps = {
     visible: boolean;
@@ -74,21 +82,55 @@ type BaseMoodEntryModalProps = {
     onSubmit: (values: MoodEntryFormValues) => Promise<void> | void;
     initialValues?: Partial<MoodEntryFormValues>;
     showMoodSelector?: boolean;
+    flow?: MoodEntryFlow;
+    onCreateEmotion?: CreateEmotionOption;
+    onCreateContextTag?: CreateContextOption;
 };
 
 // ─── Step title map ────────────────────────────────────────────────────────
-const STEP_TITLES: Record<StepId, string> = {
+const STEP_TITLES: Record<MoodEntryStepId, string> = {
     mood: "How are you feeling?",
     emotions: "What emotions are present?",
     details: "Any more context?",
 };
 
-// ─── Adaptive notes placeholders ───────────────────────────────────────────
-function getNotesPlaceholder(mood: number): string {
-    if (mood <= 2) return "What's making this day so good?";
-    if (mood <= 4) return "What's on your mind today?";
-    if (mood <= 6) return "What's weighing on you? Capturing it can help.";
-    return "What's happening right now? You don't have to hold it alone.";
+function getDefaultEmotionCategory(mood: number): Emotion["category"] {
+    if (mood <= 4) return "positive";
+    if (mood >= 6) return "negative";
+    return "neutral";
+}
+
+function normalizeEntryPresetKey(value: string): string {
+    return value.trim().toLowerCase();
+}
+
+const EMOTION_CATEGORIES = ["positive", "negative", "neutral"] as const;
+const EMOTION_CATEGORY_LABELS: Record<Emotion["category"], string> = {
+    positive: "Positive",
+    negative: "Negative",
+    neutral: "Neutral",
+};
+
+function shouldOfferCrisisSupport(mood: number): boolean {
+    return mood >= 9;
+}
+
+function showCrisisSupportAlert() {
+    Alert.alert(
+        "Support is available",
+        "If you might harm yourself or someone else, contact local emergency services now. In the U.S., call or text 988 for crisis support.",
+        [
+            { text: "Not now", style: "cancel" },
+            {
+                text: "Call 988",
+                onPress: () => {
+                    Linking.openURL("tel:988").catch(() => {
+                        Alert.alert("Call 988", "Call or text 988 for crisis support in the U.S.");
+                    });
+                },
+            },
+        ]
+    );
 }
 
 const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
@@ -102,9 +144,13 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     onSubmit,
     initialValues,
     showMoodSelector = true,
+    flow = "detailed",
+    onCreateEmotion,
+    onCreateContextTag,
 }) => {
-    const { isDark, get, getCategoryColors } = useThemeColors();
+    const { isDark, get } = useThemeColors();
     const { height: windowHeight } = useWindowDimensions();
+    const pagerRef = useRef<PagerView>(null);
     const scrollViewRef = useRef<ScrollView>(null);
     const notesFocusedRef = useRef(false);
     const notesContainerYRef = useRef(0);
@@ -120,26 +166,26 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     const [isSaving, setIsSaving] = useState(false);
     const [keyboardHeight, setKeyboardHeight] = useState(0);
     const [isNotesFocused, setIsNotesFocused] = useState(false);
+    const [newEmotionName, setNewEmotionName] = useState("");
+    const [newEmotionCategory, setNewEmotionCategory] = useState<Emotion["category"]>(
+        getDefaultEmotionCategory(initialMood)
+    );
+    const [newEmotionError, setNewEmotionError] = useState<string | null>(null);
+    const [newContextName, setNewContextName] = useState("");
+    const [newContextError, setNewContextError] = useState<string | null>(null);
+    const [isAddingEmotion, setIsAddingEmotion] = useState(false);
+    const [isAddingContext, setIsAddingContext] = useState(false);
+    const [createPresetModal, setCreatePresetModal] = useState<
+        "emotion" | "context" | null
+    >(null);
 
     // ── Step state
     const [currentStep, setCurrentStep] = useState(0);
-
-    // ── Step transition animation
-    const stepOpacity = useSharedValue(1);
-
-    // ── Step title crossfade (matches body; no horizontal slide)
-    const titleOpacity = useSharedValue(1);
 
     // ── Footer button press feedback
     const nextBtnScale = useSharedValue(1);
     const backBtnScale = useSharedValue(1);
 
-    const titleOpacityStyle = useAnimatedStyle(() => ({
-        opacity: titleOpacity.value,
-    }));
-    const stepOpacityStyle = useAnimatedStyle(() => ({
-        opacity: stepOpacity.value,
-    }));
     const backBtnAnimatedStyle = useAnimatedStyle(() => ({
         flex: 1,
         transform: [{ scale: backBtnScale.value }],
@@ -210,110 +256,84 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     ]);
 
     // ── Compute steps
-    const steps = useMemo<StepId[]>(() => {
-        const s: StepId[] = [];
-        if (showMoodSelector) s.push("mood");
-        if (fieldConfig.emotions) s.push("emotions");
-        const hasDetails =
-            fieldConfig.context ||
-            fieldConfig.energy ||
-            fieldConfig.notes;
-        if (hasDetails) s.push("details");
-        return s.length ? s : ["details"];
-    }, [showMoodSelector, fieldConfig]);
+    const steps = useMemo(
+        () => getMoodEntrySteps(fieldConfig, showMoodSelector, flow),
+        [showMoodSelector, fieldConfig, flow]
+    );
 
     const isFirstStep = currentStep === 0;
     const isLastStep = currentStep === steps.length - 1;
-    const isMultiStep = steps.length > 1;
     const currentStepId = steps[currentStep];
+    const currentStepTitle = STEP_TITLES[currentStepId];
+    const primaryActionSaves = isLastStep;
     const isNotesKeyboardActive = isNotesFocused && keyboardHeight > 0;
 
     // ── Adaptive placeholder
     const notesPlaceholder = useMemo(() => getNotesPlaceholder(mood), [mood]);
+    const initialDraft = useMemo(
+        () => createMoodEntryFormValues(initialMood, initialValues),
+        [initialMood, initialValues]
+    );
+    const isDirty = useMemo(
+        () =>
+            JSON.stringify({ mood, emotions, contextTags, energy, note, basedOnEntryId }) !==
+            JSON.stringify(initialDraft),
+        [basedOnEntryId, contextTags, emotions, energy, initialDraft, mood, note]
+    );
 
     // ── Reset on open
     useEffect(() => {
         if (visible) {
-            setMood(initialValues?.mood ?? initialMood);
-            setEmotions(initialValues?.emotions ?? []);
-            setContextTags(initialValues?.contextTags ?? []);
-            setEnergy(
-                initialValues && typeof initialValues.energy === "number"
-                    ? initialValues.energy
-                    : null
-            );
-            setNote(initialValues?.note ?? "");
-            setBasedOnEntryId(initialValues?.basedOnEntryId ?? null);
+            const draft = initialDraft;
+            setMood(draft.mood);
+            setEmotions(draft.emotions);
+            setContextTags(draft.contextTags);
+            setEnergy(draft.energy);
+            setNote(draft.note);
+            setBasedOnEntryId(draft.basedOnEntryId);
             setIsSaving(false);
             setCurrentStep(0);
             setIsNotesFocused(false);
+            setNewEmotionName("");
+            setNewEmotionCategory(getDefaultEmotionCategory(draft.mood));
+            setNewEmotionError(null);
+            setNewContextName("");
+            setNewContextError(null);
+            setIsAddingEmotion(false);
+            setIsAddingContext(false);
+            setCreatePresetModal(null);
             notesFocusedRef.current = false;
-            // Reset transition state when modal opens
-            stepOpacity.value = 1;
-            titleOpacity.value = 1;
+            requestAnimationFrame(() => {
+                pagerRef.current?.setPageWithoutAnimation(0);
+            });
         }
-    }, [visible, initialMood, initialValues, stepOpacity, titleOpacity]);
-
-    // ── Animated step navigation (opacity dissolve only)
-    // Horizontal slide + dense grids (emotion chips) reads as “chips streaming away”.
-    // Fade out → setCurrentStep → useLayoutEffect fades back in.
-    // useLayoutEffect fires after React commits new content but before paint —
-    // no frames at opacity-0 with wrong content, no double-flicker race.
-    const prevStepRef = useRef(currentStep);
-    useLayoutEffect(() => {
-        if (prevStepRef.current !== currentStep) {
-            prevStepRef.current = currentStep;
-            stepOpacity.value = withTiming(1, { duration: 155, easing: Easing.out(Easing.cubic) });
-            titleOpacity.value = withTiming(1, { duration: 155, easing: Easing.out(Easing.cubic) });
-        }
-    }, [currentStep, stepOpacity, titleOpacity]);
+    }, [initialDraft, visible]);
 
     const goToStep = useCallback(
         (newStep: number) => {
-            titleOpacity.value = withTiming(0, { duration: 115, easing: Easing.in(Easing.cubic) });
-            stepOpacity.value = withTiming(0, { duration: 115, easing: Easing.in(Easing.cubic) },
-                (finished) => {
-                    if (finished) runOnJS(setCurrentStep)(newStep);
-                }
-            );
+            const nextStep = Math.max(0, Math.min(newStep, steps.length - 1));
+            setCurrentStep(nextStep);
+            pagerRef.current?.setPage(nextStep);
         },
-        [stepOpacity, titleOpacity]
+        [steps.length]
     );
 
-    const handleNext = () => {
-        if (isLastStep) {
-            handleSave();
-        } else {
-            haptics.light();
-            goToStep(currentStep + 1);
-        }
-    };
-
-    const handleBack = () => {
-        if (isFirstStep) {
-            haptics.light();
-            onClose();
-        } else {
-            haptics.light();
-            goToStep(currentStep - 1);
-        }
-    };
-
     // ── Save
-    const handleSave = async () => {
+    const handleSave = useCallback(async () => {
         if (isSaving) return;
         setIsSaving(true);
         try {
-            await onSubmit({
-                mood,
-                emotions: fieldConfig.emotions ? emotions : [],
-                contextTags: fieldConfig.context ? contextTags : [],
-                energy: fieldConfig.energy ? energy : null,
-                note: fieldConfig.notes ? note.trim() : "",
-                basedOnEntryId,
-            });
+            await onSubmit(
+                buildMoodEntrySubmitValues(
+                    { mood, emotions, contextTags, energy, note, basedOnEntryId },
+                    fieldConfig
+                )
+            );
             haptics.moodLogged();
             onClose();
+            if (shouldOfferCrisisSupport(mood)) {
+                setTimeout(showCrisisSupportAlert, 250);
+            }
         } catch (error) {
             console.error("Failed to save mood entry:", error);
             haptics.error();
@@ -324,7 +344,73 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
         } finally {
             setIsSaving(false);
         }
-    };
+    }, [
+        basedOnEntryId,
+        contextTags,
+        emotions,
+        energy,
+        fieldConfig,
+        isSaving,
+        mood,
+        note,
+        onClose,
+        onSubmit,
+    ]);
+
+    const handleNext = useCallback(() => {
+        if (isLastStep) {
+            handleSave();
+        } else {
+            haptics.light();
+            goToStep(currentStep + 1);
+        }
+    }, [currentStep, goToStep, handleSave, isLastStep]);
+
+    const handlePrimaryAction = useCallback(() => {
+        if (primaryActionSaves) {
+            handleSave();
+            return;
+        }
+
+        handleNext();
+    }, [handleNext, handleSave, primaryActionSaves]);
+
+    const closeWithConfirmation = useCallback(() => {
+        if (!isDirty) {
+            onClose();
+            return;
+        }
+
+        Alert.alert(
+            "Discard changes?",
+            "Your unsaved changes will be lost.",
+            [
+                { text: "Keep editing", style: "cancel" },
+                { text: "Discard", style: "destructive", onPress: onClose },
+            ]
+        );
+    }, [isDirty, onClose]);
+
+    const handleBack = useCallback(() => {
+        if (isFirstStep) {
+            haptics.light();
+            closeWithConfirmation();
+        } else {
+            haptics.light();
+            goToStep(currentStep - 1);
+        }
+    }, [closeWithConfirmation, currentStep, goToStep, isFirstStep]);
+
+    const handlePageSelected = useCallback(
+        (event: PagerViewOnPageSelectedEvent) => {
+            const nextStep = event.nativeEvent.position;
+            if (nextStep === currentStep) return;
+
+            haptics.light();
+            setCurrentStep(nextStep);
+        },
+        [currentStep]
+    );
 
     const handleCopyYesterday = (entry: MoodEntry) => {
         setMood(entry.mood);
@@ -352,6 +438,173 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                 : [...prev, value]
         );
     }, []);
+
+    const handleCreateEmotion = useCallback(async () => {
+        const trimmed = newEmotionName.trim();
+        if (!trimmed || isAddingEmotion) return false;
+
+        if (!onCreateEmotion) {
+            setNewEmotionError("Emotion list is not available.");
+            haptics.error();
+            return false;
+        }
+
+        const alreadySelected = emotions.some(
+            (emotion) =>
+                normalizeEntryPresetKey(emotion.name) === normalizeEntryPresetKey(trimmed)
+        );
+        if (!alreadySelected && emotions.length >= 3) {
+            setNewEmotionError("Remove one selected emotion first.");
+            haptics.warning();
+            return false;
+        }
+
+        setIsAddingEmotion(true);
+        setNewEmotionError(null);
+
+        try {
+            const result = await onCreateEmotion(trimmed, newEmotionCategory);
+            if (!result) {
+                setNewEmotionError("Enter an emotion name.");
+                return false;
+            }
+
+            setEmotions((current) => {
+                const exists = current.some(
+                    (emotion) =>
+                        normalizeEntryPresetKey(emotion.name) ===
+                        normalizeEntryPresetKey(result.value.name)
+                );
+                if (exists || current.length >= 3) return current;
+                return [...current, result.value];
+            });
+            setNewEmotionName("");
+            haptics[result.created ? "medium" : "light"]();
+            return true;
+        } catch {
+            setNewEmotionError("Could not add emotion.");
+            haptics.error();
+            return false;
+        } finally {
+            setIsAddingEmotion(false);
+        }
+    }, [
+        emotions,
+        isAddingEmotion,
+        newEmotionCategory,
+        newEmotionName,
+        onCreateEmotion,
+    ]);
+
+    const handleCreateContextTag = useCallback(async () => {
+        const trimmed = newContextName.trim();
+        if (!trimmed || isAddingContext) return false;
+
+        if (!onCreateContextTag) {
+            setNewContextError("Context Tag List is not available.");
+            haptics.error();
+            return false;
+        }
+
+        setIsAddingContext(true);
+        setNewContextError(null);
+
+        try {
+            const result = await onCreateContextTag(trimmed);
+            if (!result) {
+                setNewContextError("Enter a context tag.");
+                return false;
+            }
+
+            setContextTags((current) => {
+                const exists = current.some(
+                    (context) =>
+                        normalizeEntryPresetKey(context) ===
+                        normalizeEntryPresetKey(result.value)
+                );
+                return exists ? current : [...current, result.value];
+            });
+            setNewContextName("");
+            haptics[result.created ? "medium" : "light"]();
+            return true;
+        } catch {
+            setNewContextError("Could not add context tag.");
+            haptics.error();
+            return false;
+        } finally {
+            setIsAddingContext(false);
+        }
+    }, [isAddingContext, newContextName, onCreateContextTag]);
+
+    const openCreateEmotionModal = useCallback(() => {
+        setNewEmotionName("");
+        setNewEmotionCategory(getDefaultEmotionCategory(mood));
+        setNewEmotionError(null);
+        setCreatePresetModal("emotion");
+        haptics.light();
+    }, [mood]);
+
+    const openCreateContextModal = useCallback(() => {
+        setNewContextName("");
+        setNewContextError(null);
+        setCreatePresetModal("context");
+        haptics.light();
+    }, []);
+
+    const closeCreatePresetModal = useCallback(() => {
+        if (isAddingEmotion || isAddingContext) return;
+        setCreatePresetModal(null);
+        setNewEmotionError(null);
+        setNewContextError(null);
+    }, [isAddingContext, isAddingEmotion]);
+
+    const handleRequestClose = useCallback(() => {
+        const backAction = resolveMoodEntryBackAction({
+            isSaving,
+            isPresetModalOpen: createPresetModal !== null,
+            isNotesKeyboardActive,
+            isFirstStep,
+        });
+
+        switch (backAction) {
+            case "ignore":
+                return;
+            case "closePreset":
+                closeCreatePresetModal();
+                return;
+            case "dismissKeyboard":
+                Keyboard.dismiss();
+                setIsNotesFocused(false);
+                notesFocusedRef.current = false;
+                clearScheduledNotesScrolls();
+                return;
+            case "previousStep":
+            case "closeEntry":
+                handleBack();
+                return;
+        }
+    }, [
+        clearScheduledNotesScrolls,
+        closeCreatePresetModal,
+        createPresetModal,
+        handleBack,
+        isFirstStep,
+        isNotesKeyboardActive,
+        isSaving,
+    ]);
+
+    const submitCreatePresetModal = useCallback(async () => {
+        const didCreate =
+            createPresetModal === "emotion"
+                ? await handleCreateEmotion()
+                : createPresetModal === "context"
+                ? await handleCreateContextTag()
+                : false;
+
+        if (didCreate) {
+            setCreatePresetModal(null);
+        }
+    }, [createPresetModal, handleCreateContextTag, handleCreateEmotion]);
 
     // ── Mood selector grid (Edit mode)
     const moodButtons = useMemo(
@@ -407,10 +660,9 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                             </Text>
                             <Text
                                 style={{
-                                    fontSize: 9,
+                                    fontSize: 12,
                                     fontWeight: "600",
                                     color: item.textHex,
-                                    opacity: 0.85,
                                     textAlign: "center",
                                     marginTop: 1,
                                 }}
@@ -425,54 +677,421 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
         </View>
     );
 
-    const renderEmotionsStep = () => (
-        <EmotionPicker
-            options={emotionOptions}
-            selected={emotions}
-            onChange={setEmotions}
-            maxSelections={3}
-        />
+    const renderAddPresetButton = ({
+        onPress,
+        color,
+        textColor,
+        label,
+    }: {
+        onPress: () => void;
+        color: string;
+        textColor: string;
+        label: string;
+    }) => (
+        <Pressable
+            onPress={onPress}
+            className="items-center justify-center rounded-xl"
+            style={{
+                width: 32,
+                height: 32,
+                backgroundColor: color,
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={label}
+        >
+            <Ionicons name="add" size={18} color={textColor} />
+        </Pressable>
     );
 
+    const renderEmotionCategoryControl = () => (
+        <View className="flex-row gap-2 mt-2">
+            {EMOTION_CATEGORIES.map((category) => {
+                const isSelected = newEmotionCategory === category;
+                const catColors = isSelected
+                    ? {
+                          bg: isDark
+                              ? colors[category].bgSelected.dark
+                              : colors[category].bgSelected.light,
+                          border: isDark
+                              ? colors[category].bgSelected.dark
+                              : colors[category].bgSelected.light,
+                          text: isDark
+                              ? colors[category].textSelected.dark
+                              : colors[category].textSelected.light,
+                      }
+                    : {
+                          bg: isDark
+                              ? colors[category].bg.dark
+                              : colors[category].bg.light,
+                          border: isDark
+                              ? colors[category].border.dark
+                              : colors[category].border.light,
+                          text: isDark
+                              ? colors[category].text.dark
+                              : colors[category].text.light,
+                      };
+
+                return (
+                    <Pressable
+                        key={category}
+                        onPress={() => {
+                            setNewEmotionCategory(category);
+                            haptics.selection();
+                        }}
+                        className="flex-1 items-center rounded-xl px-2 py-2"
+                        style={{
+                            backgroundColor: catColors.bg,
+                            borderWidth: 1,
+                            borderColor: catColors.border,
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${EMOTION_CATEGORY_LABELS[category]} emotion category`}
+                        accessibilityState={{ selected: isSelected }}
+                    >
+                        <Text
+                            numberOfLines={1}
+                            style={{
+                                color: catColors.text,
+                                fontSize: 12,
+                                fontWeight: "700",
+                            }}
+                        >
+                            {EMOTION_CATEGORY_LABELS[category]}
+                        </Text>
+                    </Pressable>
+                );
+            })}
+        </View>
+    );
+
+    const renderCreatePresetModal = () => {
+        if (!createPresetModal) return null;
+
+        const isEmotionModal = createPresetModal === "emotion";
+        const inputValue = isEmotionModal ? newEmotionName : newContextName;
+        const inputError = isEmotionModal ? newEmotionError : newContextError;
+        const isAdding = isEmotionModal ? isAddingEmotion : isAddingContext;
+        const titleText = isEmotionModal ? "New Emotion" : "New Context Tag";
+        const placeholder = isEmotionModal
+            ? "Name the emotion"
+            : "Name the context tag";
+        const actionColor = isEmotionModal
+            ? isDark
+                ? colors.negative.bgSelected.dark
+                : colors.negative.bgSelected.light
+            : isDark
+            ? colors.dusk.bgSelected.dark
+            : colors.dusk.bgSelected.light;
+        const actionTextColor = isEmotionModal
+            ? isDark
+                ? colors.negative.textSelected.dark
+                : colors.negative.textSelected.light
+            : isDark
+            ? colors.neutral.textSelected.dark
+            : colors.neutral.textSelected.light;
+
+        return (
+            <KeyboardAvoidingView
+                behavior={Platform.OS === "ios" ? "padding" : "height"}
+                style={{
+                    position: "absolute",
+                    top: 0,
+                    right: 0,
+                    bottom: 0,
+                    left: 0,
+                    justifyContent: "flex-end",
+                    backgroundColor: colors.overlay,
+                    zIndex: 20,
+                    elevation: 20,
+                }}
+                accessibilityViewIsModal
+                accessibilityLabel={`${titleText} form`}
+            >
+                <Pressable
+                    style={{ flex: 1 }}
+                    onPress={closeCreatePresetModal}
+                    accessibilityRole="button"
+                    accessibilityLabel="Close add form"
+                />
+                <View
+                    className="rounded-t-3xl px-5 pt-4 pb-6"
+                    style={{
+                        backgroundColor: get("background"),
+                        borderTopWidth: 1,
+                        borderColor: isDark
+                            ? "rgba(61, 53, 42, 0.35)"
+                            : "rgba(229, 217, 191, 0.65)",
+                    }}
+                >
+                    <View className="flex-row items-center justify-between mb-4">
+                        <Text
+                            style={{
+                                fontSize: 18,
+                                fontWeight: "700",
+                                color: get("text"),
+                            }}
+                        >
+                            {titleText}
+                        </Text>
+                        <Pressable
+                            onPress={closeCreatePresetModal}
+                            className="items-center justify-center rounded-xl"
+                            style={{
+                                width: 36,
+                                height: 36,
+                                backgroundColor: isDark
+                                    ? "rgba(42, 37, 32, 0.8)"
+                                    : "rgba(245, 241, 232, 0.9)",
+                            }}
+                            accessibilityRole="button"
+                            accessibilityLabel="Cancel"
+                        >
+                            <Ionicons
+                                name="close"
+                                size={18}
+                                color={get("textMuted")}
+                            />
+                        </Pressable>
+                    </View>
+
+                    <TextInput
+                        value={inputValue}
+                        onChangeText={(text) => {
+                            if (isEmotionModal) {
+                                setNewEmotionName(text);
+                                if (newEmotionError) setNewEmotionError(null);
+                            } else {
+                                setNewContextName(text);
+                                if (newContextError) setNewContextError(null);
+                            }
+                        }}
+                        onSubmitEditing={() => {
+                            void submitCreatePresetModal();
+                        }}
+                        placeholder={placeholder}
+                        placeholderTextColor={get("textMuted")}
+                        returnKeyType="done"
+                        autoCorrect
+                        autoFocus
+                        style={{
+                            minHeight: 48,
+                            backgroundColor: isDark
+                                ? "rgba(48, 42, 34, 0.5)"
+                                : "rgba(249, 245, 237, 0.8)",
+                            borderWidth: 1,
+                            borderColor: inputError
+                                ? isDark
+                                    ? colors.negative.border.dark
+                                    : colors.negative.border.light
+                                : isDark
+                                ? "rgba(61, 53, 42, 0.4)"
+                                : "rgba(229, 217, 191, 0.6)",
+                            borderRadius: 14,
+                            color: get("text"),
+                            fontSize: 15,
+                            paddingHorizontal: 14,
+                            paddingVertical: 12,
+                        }}
+                        cursorColor={get("primary")}
+                        selectionColor={
+                            isDark
+                                ? "rgba(166, 227, 155, 0.32)"
+                                : "rgba(91, 138, 91, 0.24)"
+                        }
+                        accessibilityLabel={
+                            isEmotionModal
+                                ? "New emotion name"
+                                : "New context tag name"
+                        }
+                    />
+
+                    {isEmotionModal && renderEmotionCategoryControl()}
+
+                    {inputError && (
+                        <Text
+                            style={{
+                                color: isDark
+                                    ? colors.negative.text.dark
+                                    : colors.negative.text.light,
+                                fontSize: 12,
+                                marginTop: 8,
+                            }}
+                        >
+                            {inputError}
+                        </Text>
+                    )}
+
+                    <View className="flex-row gap-3 mt-5">
+                        <Pressable
+                            onPress={closeCreatePresetModal}
+                            disabled={isAdding}
+                            className="flex-1 rounded-2xl py-4 items-center"
+                            style={{
+                                backgroundColor: isDark
+                                    ? "rgba(42, 37, 32, 0.8)"
+                                    : "rgba(245, 241, 232, 0.9)",
+                                borderWidth: 1,
+                                borderColor: isDark
+                                    ? "rgba(61, 53, 42, 0.5)"
+                                    : "rgba(229, 217, 191, 0.6)",
+                            }}
+                            accessibilityRole="button"
+                            accessibilityLabel="Cancel"
+                        >
+                            <Text
+                                style={{
+                                    fontSize: 15,
+                                    fontWeight: "600",
+                                    color: get("textMuted"),
+                                }}
+                            >
+                                Cancel
+                            </Text>
+                        </Pressable>
+                        <Pressable
+                            onPress={() => {
+                                void submitCreatePresetModal();
+                            }}
+                            disabled={isAdding || !inputValue.trim()}
+                            className="flex-1 rounded-2xl py-4 items-center"
+                            style={{
+                                backgroundColor: actionColor,
+                                opacity: isAdding || !inputValue.trim() ? 0.45 : 1,
+                            }}
+                            accessibilityRole="button"
+                            accessibilityLabel={isEmotionModal ? "Add emotion" : "Add context tag"}
+                            accessibilityState={{
+                                disabled: isAdding || !inputValue.trim(),
+                            }}
+                        >
+                            <Text
+                                style={{
+                                    fontSize: 15,
+                                    fontWeight: "700",
+                                    color: actionTextColor,
+                                }}
+                            >
+                                {isAdding ? "Adding..." : "Add"}
+                            </Text>
+                        </Pressable>
+                    </View>
+                </View>
+            </KeyboardAvoidingView>
+        );
+    };
+
+    const renderEmotionsStep = () => (
+        <View>
+            <SectionLabel
+                label="Emotions"
+                isDark={isDark}
+                badge={
+                    emotions.length > 0
+                        ? `${emotions.length}/3 selected`
+                        : undefined
+                }
+                action={
+                    onCreateEmotion
+                        ? renderAddPresetButton({
+                              onPress: openCreateEmotionModal,
+                              color: isDark
+                                  ? colors.negative.bgSelected.dark
+                                  : colors.negative.bgSelected.light,
+                              textColor: isDark
+                                  ? colors.negative.textSelected.dark
+                                  : colors.negative.textSelected.light,
+                              label: "Add new emotion",
+                          })
+                        : undefined
+                }
+            />
+            <EmotionPicker
+                options={emotionOptions}
+                selected={emotions}
+                onChange={setEmotions}
+                maxSelections={3}
+            />
+        </View>
+    );
+
+    const getContextTagColors = (isSelected: boolean) => {
+        if (isSelected) {
+            return {
+                bg: isDark ? colors.dusk.bgSelected.dark : colors.dusk.bgSelected.light,
+                border: undefined,
+                text: isDark
+                    ? colors.neutral.textSelected.dark
+                    : colors.neutral.textSelected.light,
+            };
+        }
+
+        return {
+            bg: isDark ? colors.dusk.bg.dark : colors.dusk.bg.light,
+            border: isDark ? colors.dusk.border.dark : colors.dusk.border.light,
+            text: isDark ? colors.dusk.text.dark : colors.dusk.text.light,
+        };
+    };
+
+    const renderContextSection = (options?: { compact?: boolean }) => {
+        if (!fieldConfig.context) return null;
+
+        return (
+            <View className={options?.compact ? "mt-5" : "mb-2"}>
+                <SectionLabel
+                    label="Context Tags"
+                    isDark={isDark}
+                    badge={
+                        contextTags.length > 0
+                            ? `${contextTags.length} selected`
+                            : undefined
+                    }
+                    action={
+                        onCreateContextTag
+                            ? renderAddPresetButton({
+                                  onPress: openCreateContextModal,
+                                  color: isDark
+                                      ? colors.dusk.bgSelected.dark
+                                      : colors.dusk.bgSelected.light,
+                                  textColor: isDark
+                                      ? colors.neutral.textSelected.dark
+                                      : colors.neutral.textSelected.light,
+                                  label: "Add new context tag",
+                              })
+                            : undefined
+                    }
+                />
+                <View className="flex-row flex-wrap gap-2">
+                    {contextOptions.map((ctx) => {
+                        const isSelected = contextTags.includes(ctx);
+                        const ctxColors = getContextTagColors(isSelected);
+                        return (
+                            <ContextTagChip
+                                key={ctx}
+                                label={ctx}
+                                isSelected={isSelected}
+                                bgColor={ctxColors.bg}
+                                borderColor={ctxColors.border ?? ctxColors.bg}
+                                textColor={ctxColors.text}
+                                onPress={() => toggleContext(ctx)}
+                            />
+                        );
+                    })}
+                </View>
+            </View>
+        );
+    };
+
     const renderDetailsStep = () => {
+        const showContextInDetails = fieldConfig.context;
         return (
             <View>
                 {/* Context Tags */}
-                        {fieldConfig.context && (
-                            <View className="mb-2">
-                                <SectionLabel
-                                    label="Context"
-                                    isDark={isDark}
-                                    badge={
-                                        contextTags.length > 0
-                                            ? `${contextTags.length} selected`
-                                            : undefined
-                                    }
-                                />
-                                <View className="flex-row flex-wrap gap-2">
-                                    {contextOptions.map((ctx) => {
-                                        const isSelected = contextTags.includes(ctx);
-                                        const ctxColors = getCategoryColors("neutral", isSelected);
-                                        return (
-                                            <ContextTagChip
-                                                key={ctx}
-                                                label={ctx}
-                                                isSelected={isSelected}
-                                                bgColor={ctxColors.bg}
-                                                borderColor={ctxColors.border ?? ctxColors.bg}
-                                                textColor={ctxColors.text}
-                                                onPress={() => toggleContext(ctx)}
-                                            />
-                                        );
-                                    })}
-                                </View>
-                            </View>
-                        )}
+                {showContextInDetails && renderContextSection()}
 
                 {/* Energy */}
                 {fieldConfig.energy && (
                     <>
-                        {fieldConfig.context && <Separator isDark={isDark} />}
+                        {showContextInDetails && <Separator isDark={isDark} />}
                         <View>
                             <SectionLabel
                                 label="Energy"
@@ -489,7 +1108,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                 {/* Notes */}
                 {fieldConfig.notes && (
                     <>
-                        {(fieldConfig.context || fieldConfig.energy) && (
+                        {(showContextInDetails || fieldConfig.energy) && (
                             <Separator isDark={isDark} />
                         )}
                         <View
@@ -550,8 +1169,8 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
         );
     };
 
-    const renderCurrentStep = () => {
-        switch (currentStepId) {
+    const renderStepContent = (stepId: MoodEntryStepId) => {
+        switch (stepId) {
             case "mood":
                 return renderMoodStep();
             case "emotions":
@@ -561,6 +1180,21 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
         }
     };
 
+    const renderStepPage = (stepId: MoodEntryStepId) => (
+        <View key={stepId} style={{ flex: 1 }}>
+            <ScrollView
+                ref={stepId === "details" ? scrollViewRef : undefined}
+                className="px-5 pt-5"
+                contentContainerStyle={{ paddingBottom: scrollBottomPadding }}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+            >
+                {renderStepContent(stepId)}
+            </ScrollView>
+        </View>
+    );
+
     // ── Moodinator color for save button
     const moodData = getMoodRatingDisplay(mood, isDark);
     const saveBgColor = isSaving
@@ -568,6 +1202,9 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
             ? "#3D5A3D"
             : colors.primaryMuted.light
         : get("primary");
+    const saveContentColor = isSaving && isDark
+        ? colors.textInverse.dark
+        : get("onPrimary");
     // Keyboard-aware sheet sizing. Transparent modals do not reliably receive
     // Android's usual adjustResize behavior, so lift and shrink the sheet
     // ourselves on both platforms when the keyboard is visible.
@@ -590,7 +1227,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
             visible={visible}
             transparent
             animationType="slide"
-            onRequestClose={onClose}
+            onRequestClose={handleRequestClose}
             accessibilityViewIsModal
             accessibilityLabel={`${title} form`}
         >
@@ -631,6 +1268,23 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                     />
                                 </View>
 
+                                <View className="flex-row items-center px-4 pb-2">
+                                    <Text
+                                        className="flex-1 text-lg font-bold"
+                                        style={{ color: get("text") }}
+                                    >
+                                        {title}
+                                    </Text>
+                                    <Pressable
+                                        onPress={closeWithConfirmation}
+                                        className="h-11 w-11 items-center justify-center rounded-full"
+                                        accessibilityRole="button"
+                                        accessibilityLabel={`Close ${title}`}
+                                    >
+                                        <Ionicons name="close" size={24} color={get("textMuted")} />
+                                    </Pressable>
+                                </View>
+
                                 {/* Mood adjust row + Last Entry */}
                                 <View className="flex-row items-center px-4 pb-1">
                                     <View className="flex-1">
@@ -654,17 +1308,14 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                     />
                                     {/* Step title — matches step body direction */}
                                     <Animated.Text
-                                        style={[
-                                            titleOpacityStyle,
-                                            {
-                                                ...typography.eyebrow,
-                                                textAlign: "center",
-                                                color: isDark ? "#5C4E3D" : "#B0A090",
-                                                marginTop: 6,
-                                            },
-                                        ]}
+                                        style={{
+                                            ...typography.eyebrow,
+                                            textAlign: "center",
+                                            color: get("textSubtle"),
+                                            marginTop: 6,
+                                        }}
                                     >
-                                        {STEP_TITLES[currentStepId]}
+                                        {currentStepTitle}
                                     </Animated.Text>
                                 </View>
                             </View>
@@ -672,18 +1323,16 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                     )}
 
                     {/* ── Step content ────────────────────────────────────── */}
-                    <Animated.View style={[{ flex: 1 }, stepOpacityStyle]}>
-                        <ScrollView
-                            ref={scrollViewRef}
-                            className="px-5 pt-5"
-                            contentContainerStyle={{ paddingBottom: scrollBottomPadding }}
-                            showsVerticalScrollIndicator={false}
-                            keyboardShouldPersistTaps="handled"
-                            keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
-                        >
-                            {renderCurrentStep()}
-                        </ScrollView>
-                    </Animated.View>
+                    <PagerView
+                        ref={pagerRef}
+                        style={{ flex: 1 }}
+                        initialPage={0}
+                        scrollEnabled={!isSaving && !isNotesKeyboardActive}
+                        onPageSelected={handlePageSelected}
+                        offscreenPageLimit={1}
+                    >
+                        {steps.map(renderStepPage)}
+                    </PagerView>
 
                     {!isNotesKeyboardActive && (
                         <View
@@ -749,7 +1398,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                             {/* Next / Save */}
                             <Animated.View style={nextBtnAnimatedStyle}>
                                 <Pressable
-                                    onPress={handleNext}
+                                    onPress={handlePrimaryAction}
                                     onPressIn={() => {
                                         if (!isSaving) nextBtnScale.value = withSpring(0.96, { damping: 20, stiffness: 500 });
                                     }}
@@ -772,81 +1421,57 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                     accessibilityLabel={
                                         isSaving
                                             ? "Saving"
-                                            : isLastStep
+                                            : primaryActionSaves
                                             ? "Save entry"
                                             : "Next step"
                                     }
                                     accessibilityState={{ disabled: isSaving }}
                                     accessibilityHint={
-                                        isLastStep ? BUTTON_HINTS.save : "Proceed to next step"
+                                        primaryActionSaves ? BUTTON_HINTS.save : "Proceed to next step"
                                     }
                                 >
                                     <Text
                                         style={{
                                             fontSize: 15,
                                             fontWeight: "700",
-                                            color: "#FFFFFF",
+                                            color: saveContentColor,
                                         }}
                                     >
                                         {isSaving
                                             ? "Saving…"
-                                            : isLastStep
+                                            : primaryActionSaves
                                             ? "Save Entry"
                                             : "Next"}
                                     </Text>
-                                    {!isSaving && !isLastStep && (
+                                    {!isSaving && !primaryActionSaves && (
                                         <Ionicons
                                             name="chevron-forward"
                                             size={14}
-                                            color="#FFFFFF"
+                                            color={saveContentColor}
                                         />
                                     )}
-                                    {!isSaving && isLastStep && (
+                                    {!isSaving && primaryActionSaves && (
                                         <Ionicons
                                             name="checkmark"
                                             size={15}
-                                            color="#FFFFFF"
+                                            color={saveContentColor}
                                         />
                                     )}
                                     {isSaving && (
                                         <Ionicons
                                             name="hourglass"
                                             size={14}
-                                            color="#FFFFFF"
+                                            color={saveContentColor}
                                         />
                                     )}
                                 </Pressable>
                             </Animated.View>
                         </View>
 
-                        {/* "Save now" shortcut — only when not on last step */}
-                        {isMultiStep && !isLastStep && (
-                            <Animated.View
-                                entering={FadeIn.duration(180)}
-                                exiting={FadeIn.duration(120)}
-                            >
-                                <Pressable
-                                    onPress={handleSave}
-                                    disabled={isSaving}
-                                    className="items-center mt-3"
-                                    accessibilityRole="button"
-                                    accessibilityLabel="Save entry now without completing all steps"
-                                >
-                                    <Text
-                                        style={{
-                                            fontSize: 12,
-                                            color: isDark ? "#5C4E3D" : "#B0A090",
-                                            fontWeight: "500",
-                                        }}
-                                    >
-                                        Save now
-                                    </Text>
-                                </Pressable>
-                            </Animated.View>
-                        )}
                         </View>
                     )}
                 </View>
+                {renderCreatePresetModal()}
             </View>
         </Modal>
     );
@@ -861,6 +1486,8 @@ type MoodEntryModalSharedProps = {
     onClose: () => void;
     onSubmit: (values: MoodEntryFormValues) => Promise<void> | void;
     initialValues?: Partial<MoodEntryFormValues>;
+    onCreateEmotion?: CreateEmotionOption;
+    onCreateContextTag?: CreateContextOption;
 };
 
 type MoodEntryModalVariantProps = MoodEntryModalSharedProps & {
@@ -873,7 +1500,7 @@ export type EditMoodEntryModalProps = MoodEntryModalVariantProps;
 
 export const QuickMoodEntryModal: React.FC<QuickMoodEntryModalProps> = (
     props
-) => <BaseMoodEntryModal {...props} title="Quick Entry" showMoodSelector={false} />;
+) => <BaseMoodEntryModal {...props} title="Quick Entry" showMoodSelector={false} flow="quick" />;
 
 export const DetailedMoodEntryModal: React.FC<DetailedMoodEntryModalProps> = (
     props

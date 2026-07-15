@@ -18,7 +18,7 @@ export default function TermsOfServiceScreen() {
         contentContainerStyle={{ paddingBottom: 40, paddingTop: 16 }}
         showsVerticalScrollIndicator={false}
       >
-        <Text className="text-xs text-sand-500 dark:text-sand-400 mb-4">
+        <Text className="text-xs text-paper-700 dark:text-sand-400 mb-4">
           Last Updated: May 22, 2026
         </Text>
 
@@ -73,10 +73,10 @@ export default function TermsOfServiceScreen() {
           <Text className="text-sm font-semibold text-coral-700 dark:text-coral-300 mb-2">
             Medical Disclaimer
           </Text>
-          <Text className="text-sm text-coral-600 dark:text-coral-400 leading-5 mb-2">
+          <Text className="text-sm text-coral-700 dark:text-coral-400 leading-5 mb-2">
             Moodinator is not a medical device or healthcare service. The app is intended for personal wellness tracking only and does not provide medical advice, diagnosis, or treatment.
           </Text>
-          <Text className="text-sm text-coral-600 dark:text-coral-400 leading-5 font-medium">
+          <Text className="text-sm text-coral-700 dark:text-coral-400 leading-5 font-medium">
             If you are experiencing a mental health crisis, please contact a healthcare professional or crisis helpline immediately.
           </Text>
         </View>

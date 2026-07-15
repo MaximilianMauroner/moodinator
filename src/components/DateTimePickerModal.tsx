@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from "react";
 import { View, Text, Modal, Pressable, Platform, ScrollView } from "react-native";
-import DateTimePicker from "@react-native-community/datetimepicker";
+import DateTimePicker, {
+  type DateTimePickerEvent,
+} from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
 import { MoodEntry } from "@db/types";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -13,6 +15,7 @@ interface Props {
   mood: MoodEntry | null;
   onClose: () => void;
   onSave: (moodId: number, newTimestamp: number) => void;
+  onEdit?: (mood: MoodEntry) => void;
 }
 
 export const DateTimePickerModal: React.FC<Props> = ({
@@ -20,6 +23,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
   mood,
   onClose,
   onSave,
+  onEdit,
 }) => {
   const { isDark, get, getCategoryColors } = useThemeColors();
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -49,7 +53,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
       : [];
   }, [mood?.emotions]);
 
-  const handleDateChange = (event: any, date?: Date) => {
+  const handleDateChange = (_event: DateTimePickerEvent, date?: Date) => {
     if (Platform.OS === "android") {
       setShowDatePicker(false);
     }
@@ -58,7 +62,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
     }
   };
 
-  const handleTimeChange = (event: any, time?: Date) => {
+  const handleTimeChange = (_event: DateTimePickerEvent, time?: Date) => {
     if (Platform.OS === "android") {
       setShowTimePicker(false);
     }
@@ -124,7 +128,9 @@ export const DateTimePickerModal: React.FC<Props> = ({
                 </Text>
                 <Pressable
                   onPress={handleCancel}
-                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  className="h-11 w-11 items-center justify-center rounded-full"
+                  accessibilityRole="button"
+                  accessibilityLabel="Close entry details"
                 >
                   <Ionicons
                     name="close-circle"
@@ -300,11 +306,11 @@ export const DateTimePickerModal: React.FC<Props> = ({
                   {hasChanged && (
                     <View
                       className="ml-2 px-2 py-0.5 rounded-full"
-                      style={{ backgroundColor: isDark ? colors.primary.dark : colors.primaryBg.light }}
+                      style={{ backgroundColor: isDark ? colors.primaryBg.dark : colors.primaryBg.light }}
                     >
                       <Text
-                        className="text-[10px] font-semibold"
-                        style={{ color: isDark ? colors.primaryBg.light : colors.primary.light }}
+                        className="text-xs font-semibold"
+                        style={{ color: isDark ? colors.primary.dark : colors.positive.textDark.light }}
                       >
                         Modified
                       </Text>
@@ -322,6 +328,8 @@ export const DateTimePickerModal: React.FC<Props> = ({
                       borderWidth: 1.5,
                       borderColor: get("border"),
                     }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Change entry date"
                   >
                     <Ionicons
                       name="calendar-outline"
@@ -355,6 +363,8 @@ export const DateTimePickerModal: React.FC<Props> = ({
                       borderColor: get("border"),
                       minWidth: 110,
                     }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Change entry time"
                   >
                     <Ionicons
                       name="time-outline"
@@ -392,6 +402,8 @@ export const DateTimePickerModal: React.FC<Props> = ({
                 onPress={handleCancel}
                 className="flex-1 py-3.5 rounded-xl items-center"
                 style={{ backgroundColor: get("surfaceAlt") }}
+                accessibilityRole="button"
+                accessibilityLabel="Cancel date and time changes"
               >
                 <Text
                   className="font-semibold text-sm"
@@ -400,6 +412,23 @@ export const DateTimePickerModal: React.FC<Props> = ({
                   Cancel
                 </Text>
               </Pressable>
+
+              {onEdit ? (
+                <Pressable
+                  onPress={() => {
+                    onClose();
+                    onEdit(mood);
+                  }}
+                  className="flex-1 py-3.5 rounded-xl items-center"
+                  style={{ backgroundColor: get("surfaceAlt") }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Edit this entry"
+                >
+                  <Text className="font-semibold text-sm" style={{ color: isDark ? get("primary") : colors.positive.textDark.light }}>
+                    Edit
+                  </Text>
+                </Pressable>
+              ) : null}
 
               <Pressable
                 onPress={handleSave}
@@ -411,11 +440,14 @@ export const DateTimePickerModal: React.FC<Props> = ({
                     : get("surfaceAlt"),
                   opacity: hasChanged ? 1 : 0.5,
                 }}
+                accessibilityRole="button"
+                accessibilityLabel="Save date and time changes"
+                accessibilityState={{ disabled: !hasChanged }}
               >
                 <Text
                   className="font-semibold text-sm"
                   style={{
-                    color: hasChanged ? "#FFFFFF" : get("textMuted"),
+                    color: hasChanged ? get("onPrimary") : get("textMuted"),
                   }}
                 >
                   Save Changes

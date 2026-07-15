@@ -111,7 +111,10 @@ export function EmptyState({
               accessibilityRole="button"
               accessibilityLabel={actionLabel}
             >
-              <Text className="text-white font-semibold" style={typography.bodyMd}>
+              <Text
+                className="font-semibold"
+                style={[typography.bodyMd, { color: get("onPrimary") }]}
+              >
                 {actionLabel}
               </Text>
             </Pressable>

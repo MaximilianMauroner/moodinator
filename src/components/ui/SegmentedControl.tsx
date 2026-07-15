@@ -147,7 +147,7 @@ function getPalette(isDark: boolean, variant: SegmentedControlVariant) {
       trackBg: isDark ? colors.surface.dark : colors.surfaceAlt.light,
       trackBorder: isDark ? "rgba(166, 227, 155, 0.10)" : "rgba(229, 217, 191, 0.7)",
       sliderBg: isDark ? colors.positive.bgSelected.dark : colors.primary.light,
-      activeFg: colors.textInverse.light,
+      activeFg: isDark ? colors.textInverse.dark : colors.background.dark,
       inactiveFg: isDark ? colors.textSubtle.dark : colors.textMuted.light,
     };
   }
@@ -156,8 +156,8 @@ function getPalette(isDark: boolean, variant: SegmentedControlVariant) {
     trackBg: isDark ? colors.surfaceElevated.dark : colors.surfaceAlt.light,
     trackBorder: "transparent",
     sliderBg: isDark ? "#1E1B17" : colors.surface.light,
-    activeFg: isDark ? colors.primary.dark : colors.primary.light,
-    inactiveFg: isDark ? "#9FB39A" : colors.sand.bgSelected.dark,
+    activeFg: isDark ? colors.primary.dark : colors.positive.textDark.light,
+    inactiveFg: isDark ? colors.textSubtle.dark : colors.textMuted.light,
   };
 }
 

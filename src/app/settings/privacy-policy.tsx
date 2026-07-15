@@ -18,7 +18,7 @@ export default function PrivacyPolicyScreen() {
         contentContainerStyle={{ paddingBottom: 40, paddingTop: 16 }}
         showsVerticalScrollIndicator={false}
       >
-        <Text className="text-xs text-sand-500 dark:text-sand-400 mb-4">
+        <Text className="text-xs text-paper-700 dark:text-sand-400 mb-4">
           Last Updated: May 22, 2026
         </Text>
 

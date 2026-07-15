@@ -83,6 +83,7 @@ export const useMoodsStore = create<MoodsStore>((set, get) => {
         const moods = await moodService.getAll();
         set({
           status: "idle",
+          error: null,
           lastLoadedAt: Date.now(),
           isStale: false,
           ...applyCollectionState(moods),
@@ -98,7 +99,11 @@ export const useMoodsStore = create<MoodsStore>((set, get) => {
         }
 
         console.error("[moodsStore] Failed to refresh moods:", error);
-        set({ status: "idle" });
+        const message = error instanceof Error ? error.message : "Failed to refresh moods";
+        set((state) => ({
+          status: state.moods.length === 0 ? "error" : "idle",
+          error: message,
+        }));
       } finally {
         activeHydrationPromise = null;
       }
@@ -134,6 +139,8 @@ export const useMoodsStore = create<MoodsStore>((set, get) => {
 
     setLocal: (moods) =>
       set({
+        status: "idle",
+        error: null,
         isStale: false,
         ...applyCollectionState(moods),
       }),
@@ -153,13 +160,17 @@ export const useMoodsStore = create<MoodsStore>((set, get) => {
         set((state) => ({
           moods: [...state.moods, ...result.data],
           status: "idle",
+          error: null,
           totalCount: result.total,
           hasMore: result.hasMore,
           currentOffset: state.currentOffset + result.data.length,
         }));
       } catch (error) {
         console.error("[moodsStore] Failed to load more moods:", error);
-        set({ status: "idle" });
+        set({
+          status: "idle",
+          error: error instanceof Error ? error.message : "Failed to load more moods",
+        });
       }
     },
 

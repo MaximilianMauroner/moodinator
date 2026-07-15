@@ -39,9 +39,10 @@ export const ToggleRow = memo(function ToggleRow({
           }}
           thumbColor={Platform.OS === "ios" ? undefined : "#fff"}
           ios_backgroundColor={isDark ? "#3D352A" : "#E5D9BF"}
-          accessibilityLabel={SETTINGS_ACCESSIBILITY.toggle(value, title)}
+          accessibilityLabel={title}
           accessibilityHint={SETTINGS_ACCESSIBILITY.toggleHint(value)}
           accessibilityRole="switch"
+          accessibilityState={{ checked: value }}
         />
       }
     />

@@ -7,6 +7,7 @@ import type { Emotion } from "@db/types";
 import { haptics } from "@/lib/haptics";
 import { CATEGORIES, CATEGORY_CONFIG } from "./emotionSettingsConfig";
 import { styles } from "./emotionSettingsStyles";
+import { colors } from "@/constants/colors";
 
 // ─── EmotionModal Component ──────────────────────────────────────────────────
 
@@ -49,7 +50,9 @@ function EmotionModal({
   const [name, setName] = useState("");
   const [category, setCategory] = useState<Emotion["category"]>("positive");
   const inputRef = useRef<TextInput>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
   const focusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const insets = useSafeAreaInsets();
 
   React.useEffect(() => {
@@ -65,6 +68,9 @@ function EmotionModal({
     return () => {
       if (focusTimeoutRef.current) {
         clearTimeout(focusTimeoutRef.current);
+      }
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
       }
     };
   }, []);
@@ -82,6 +88,16 @@ function EmotionModal({
       inputRef.current?.focus();
     }, 220);
   }, [visible]);
+
+  const handleInputFocus = React.useCallback(() => {
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
+    }
+
+    scrollTimeoutRef.current = setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 250);
+  }, []);
 
   const handleSave = () => {
     if (!name.trim()) return;
@@ -123,6 +139,7 @@ function EmotionModal({
           style={[styles.modalCard, { backgroundColor: cardBg }]}
         >
           <ScrollView
+            ref={scrollViewRef}
             bounces={false}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
@@ -207,8 +224,8 @@ function EmotionModal({
                           color: isSelected
                             ? color
                             : isDark
-                              ? "rgba(255,255,255,0.50)"
-                              : "rgba(0,0,0,0.45)",
+                              ? colors.textMuted.dark
+                              : colors.textMuted.light,
                           fontWeight: isSelected ? "600" : "400",
                         },
                       ]}
@@ -226,9 +243,10 @@ function EmotionModal({
                 ref={inputRef}
                 value={name}
                 onChangeText={setName}
+                onFocus={handleInputFocus}
                 placeholder="Emotion name..."
                 placeholderTextColor={
-                  isDark ? "rgba(255,255,255,0.30)" : "rgba(0,0,0,0.30)"
+                  isDark ? colors.textSubtle.dark : colors.textSubtle.light
                 }
                 style={[
                   styles.modalInput,
@@ -267,8 +285,8 @@ function EmotionModal({
                     styles.modalBtnText,
                     {
                       color: isDark
-                        ? "rgba(255,255,255,0.60)"
-                        : "rgba(0,0,0,0.50)",
+                        ? colors.textMuted.dark
+                        : colors.textMuted.light,
                     },
                   ]}
                 >
@@ -283,19 +301,24 @@ function EmotionModal({
                   styles.modalSaveBtn,
                   {
                     backgroundColor: name.trim()
-                      ? "#5B8A5B"
+                      ? "#476D47"
                       : isDark
-                        ? "rgba(91,138,91,0.30)"
-                        : "rgba(91,138,91,0.25)",
+                        ? colors.surfaceAlt.dark
+                        : colors.surfaceAlt.light,
                   },
                 ]}
               >
                 <Ionicons
                   name={editingEmotion?.isNew ? "add" : "checkmark"}
                   size={18}
-                  color="#FFFFFF"
+                  color={name.trim() ? "#FFFFFF" : isDark ? colors.textMuted.dark : colors.textMuted.light}
                 />
-                <Text style={styles.modalSaveBtnText}>
+                <Text
+                  style={[
+                    styles.modalSaveBtnText,
+                    { color: name.trim() ? "#FFFFFF" : isDark ? colors.textMuted.dark : colors.textMuted.light },
+                  ]}
+                >
                   {editingEmotion?.isNew ? "Add" : "Save"}
                 </Text>
               </Pressable>
@@ -421,7 +444,7 @@ function RemoveEmotionDialog({
                 styles.confirmButton,
                 styles.confirmRemoveButton,
                 {
-                  backgroundColor: isDark ? "#B95747" : "#C75441",
+                  backgroundColor: isDark ? "#8E3F34" : "#A84335",
                 },
               ]}
             >

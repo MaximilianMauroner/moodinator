@@ -58,7 +58,7 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
 
 		return (
 		<HapticTab
-			key={mood.value}
+			key={`${isDark ? "dark" : "light"}-${mood.value}`}
 			className="items-center justify-center rounded-2xl"
 			style={cardStyle}
 			onPress={() => onMoodPress(mood.value)}
@@ -75,15 +75,15 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
 				{mood.value}
 			</Text>
 			<Text
-				className="mb-0.5 text-[10px] font-semibold"
+				className="mb-0.5 text-xs font-semibold"
 				style={{ color: mood.textHex || "#64748B" }}
 				numberOfLines={1}
 			>
 				{mood.label}
 			</Text>
 			<Text
-				className="px-1.5 text-center text-[10px] leading-tight"
-				style={{ color: mood.textHex || "#64748B", opacity: 0.7 }}
+				className="px-1.5 text-center text-xs leading-tight"
+				style={{ color: mood.textHex || "#64748B" }}
 				numberOfLines={2}
 			>
 				{mood.description}
@@ -147,15 +147,15 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
 					style={{ marginTop: 6 }}
 				>
 					<Text
-						className="text-[9px] font-medium"
+						className="text-xs font-medium"
 						style={{
-							color: isDark ? colors.primaryMuted.dark : colors.primary.light,
+							color: isDark ? colors.primaryMuted.dark : colors.positive.textDark.light,
 						}}
 					>
 						Great
 					</Text>
 					<Text
-						className="text-[9px] font-medium"
+						className="text-xs font-medium"
 						style={{
 							color: isDark
 								? colors.negative.text.dark
