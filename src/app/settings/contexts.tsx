@@ -1,6 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
 import {
-  Alert,
   Pressable,
   ScrollView,
 } from "react-native";
@@ -17,8 +16,10 @@ import {
   normalizePresetKey,
 } from "@/features/settings/utils/defaultPresetSelection";
 import { useSettingsStore } from "@/shared/state/settingsStore";
+import { presetSyncService } from "@/services/presetSyncService";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { haptics } from "@/lib/haptics";
+import { Alert } from "@/components/ui/AppAlert";
 import {
   AddContextModal,
   RemoveContextDialog,
@@ -29,6 +30,7 @@ import {
   PresetChip,
   PresetChipsGrid,
   PresetEmptyText,
+  PresetHistorySyncCard,
   PresetHeroStats,
   PresetSectionCard,
   PresetTipCard,
@@ -45,6 +47,7 @@ export default function ContextsSettingsScreen() {
   const [contextPendingRemoval, setContextPendingRemoval] = useState<string | null>(
     null
   );
+  const [historySyncLoading, setHistorySyncLoading] = useState(false);
 
   const presetModel = useMemo(
     () =>
@@ -96,6 +99,58 @@ export default function ContextsSettingsScreen() {
   const handleOpenAddModal = useCallback(() => {
     haptics.light();
     setIsAddModalVisible(true);
+  }, []);
+
+  const handleAddFromHistory = useCallback(async () => {
+    haptics.light();
+
+    try {
+      setHistorySyncLoading(true);
+      const diff = await presetSyncService.previewMissingFromHistory("contexts");
+      setHistorySyncLoading(false);
+
+      if (diff.contexts.length === 0) {
+        Alert.alert(
+          "Nothing to Add",
+          "Every context tag in your Mood Entry history is already in your Context Tag List."
+        );
+        return;
+      }
+
+      Alert.alert(
+        "Add from History",
+        `Add ${diff.contexts.length} context tag${diff.contexts.length === 1 ? "" : "s"} from past Mood Entries to your Context Tag List?`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Add",
+            onPress: async () => {
+              try {
+                setHistorySyncLoading(true);
+                const result =
+                  await presetSyncService.addMissingFromHistory("contexts");
+                haptics.success();
+                Alert.alert(
+                  "Added from History",
+                  result.addedContexts.length > 0
+                    ? `Added ${result.addedContexts.length} context tag${result.addedContexts.length === 1 ? "" : "s"}.`
+                    : "No new context tags were found."
+                );
+              } catch {
+                haptics.error();
+                Alert.alert("Error", "Could not add context tags from history.");
+              } finally {
+                setHistorySyncLoading(false);
+              }
+            },
+          },
+        ]
+      );
+    } catch {
+      haptics.error();
+      setHistorySyncLoading(false);
+      Alert.alert("Error", "Could not check your Mood Entry history.");
+    }
   }, []);
 
   const handleCloseAddModal = useCallback(() => {
@@ -163,7 +218,7 @@ export default function ContextsSettingsScreen() {
           <ContextHeroStats counts={counts} isDark={isDark} />
         </Animated.View>
 
-        <Animated.View entering={FadeInDown.delay(180).duration(260)}>
+        <Animated.View entering={FadeInDown.delay(220).duration(260)}>
           <DefaultContextsSection
             chips={defaultChips}
             isDark={isDark}
@@ -173,7 +228,7 @@ export default function ContextsSettingsScreen() {
           />
         </Animated.View>
 
-        <Animated.View entering={FadeInDown.delay(260).duration(260)}>
+        <Animated.View entering={FadeInDown.delay(300).duration(260)}>
           <CustomContextsSection
             contexts={customContexts}
             isDark={isDark}
@@ -183,12 +238,24 @@ export default function ContextsSettingsScreen() {
         </Animated.View>
 
         <Animated.View
-          entering={FadeInDown.delay(340).duration(260)}
+          entering={FadeInDown.delay(380).duration(260)}
         >
           <PresetTipCard isDark={isDark}>
             Use context tags for places, social settings, and recurring routines
             you want to compare over time.
           </PresetTipCard>
+        </Animated.View>
+
+        <Animated.View entering={FadeInDown.delay(440).duration(260)}>
+          <PresetHistorySyncCard
+            title="Add from History"
+            description="Find logged context tags missing from this list"
+            icon="time-outline"
+            isDark={isDark}
+            tone={contextTone(isDark)}
+            loading={historySyncLoading}
+            onPress={handleAddFromHistory}
+          />
         </Animated.View>
       </ScrollView>
 
@@ -377,7 +444,11 @@ function CustomContextsSection({
             onPress={() => onRemove(context)}
           />
         ))}
-        <PresetAddChip isDark={isDark} onPress={onAddNew} />
+        <PresetAddChip
+          isDark={isDark}
+          onPress={onAddNew}
+          accessibilityLabel="Add custom context tag"
+        />
       </PresetChipsGrid>
 
       {contexts.length === 0 && (

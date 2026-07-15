@@ -13,6 +13,7 @@ import type { PeriodStats } from "../utils/periodStats";
 import { getMoodRatingLabel } from "@/constants/moodScaleInterpretation";
 import { getMoodHex } from "@/lib/moodPresentation";
 import { useMoodsStore } from "@/shared/state/moodsStore";
+import { useThemeColors } from "@/constants/colors";
 
 export type { PeriodStats };
 
@@ -21,6 +22,7 @@ export interface InsightsData {
   allMoods: MoodEntry[];
   periodMoods: MoodEntry[];
   loading: boolean;
+  error: string | null;
 
   // Period navigation
   period: TimePeriod;
@@ -46,10 +48,12 @@ export interface InsightsData {
 }
 
 export function useInsightsData(): InsightsData {
+  const { isDark } = useThemeColors();
   const [period, setPeriod] = useState<TimePeriod>("week");
   const [currentDate, setCurrentDate] = useState(new Date());
   const allMoods = useMoodsStore((state) => state.moods);
   const status = useMoodsStore((state) => state.status);
+  const error = useMoodsStore((state) => state.error);
   const isStale = useMoodsStore((state) => state.isStale);
   const ensureFresh = useMoodsStore((state) => state.ensureFresh);
   const refreshMoods = useMoodsStore((state) => state.refreshMoods);
@@ -125,14 +129,15 @@ export function useInsightsData(): InsightsData {
 
   const getMoodColor = useCallback(
     (value: number, sourceScale?: MoodScaleSnapshot) =>
-      getMoodHex(value, false, sourceScale),
-    []
+      getMoodHex(value, isDark, sourceScale),
+    [isDark]
   );
 
   return {
     allMoods,
     periodMoods,
     loading,
+    error,
     period,
     currentDate,
     setPeriod,

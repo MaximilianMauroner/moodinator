@@ -4,26 +4,41 @@ import { AppState, Platform } from "react-native";
 
 export type BiometricType = "fingerprint" | "facial" | "iris" | "none";
 
+export function isStrongBiometricLevel(
+  platform: typeof Platform.OS,
+  securityLevel: LocalAuthentication.SecurityLevel
+): boolean {
+  return platform !== "android"
+    || securityLevel === LocalAuthentication.SecurityLevel.BIOMETRIC_STRONG;
+}
+
 export function useBiometrics() {
+  const [isChecking, setIsChecking] = useState(true);
   const [isAvailable, setIsAvailable] = useState(false);
   const [biometricType, setBiometricType] = useState<BiometricType>("none");
   const [isEnrolled, setIsEnrolled] = useState(false);
 
   const checkBiometrics = useCallback(async () => {
+    setIsChecking(true);
     try {
       const compatible = await LocalAuthentication.hasHardwareAsync();
-      setIsAvailable(compatible);
 
       if (!compatible) {
+        setIsAvailable(false);
         setIsEnrolled(false);
         setBiometricType("none");
         return;
       }
 
       const enrolled = await LocalAuthentication.isEnrolledAsync();
-      setIsEnrolled(enrolled);
+      const securityLevel = enrolled
+        ? await LocalAuthentication.getEnrolledLevelAsync()
+        : LocalAuthentication.SecurityLevel.NONE;
+      const strongEnough = isStrongBiometricLevel(Platform.OS, securityLevel);
+      setIsAvailable(strongEnough);
+      setIsEnrolled(enrolled && strongEnough);
 
-      if (!enrolled) {
+      if (!enrolled || !strongEnough) {
         setBiometricType("none");
         return;
       }
@@ -43,6 +58,8 @@ export function useBiometrics() {
       setIsAvailable(false);
       setIsEnrolled(false);
       setBiometricType("none");
+    } finally {
+      setIsChecking(false);
     }
   }, []);
 
@@ -71,6 +88,7 @@ export function useBiometrics() {
         cancelLabel: "Use PIN",
         disableDeviceFallback: true,
         fallbackLabel: "Use PIN",
+        biometricsSecurityLevel: "strong",
       });
 
       return result.success;
@@ -81,6 +99,11 @@ export function useBiometrics() {
   }, [isAvailable, isEnrolled]);
 
   const getBiometricLabel = (): string => {
+    if (biometricType === "facial") {
+      return Platform.OS === "ios" ? "Face ID" : "Face recognition";
+    }
+    if (biometricType === "fingerprint") return "Fingerprint";
+    if (biometricType === "iris") return "Iris";
     return "Biometrics";
   };
 
@@ -92,6 +115,7 @@ export function useBiometrics() {
   };
 
   return {
+    isChecking,
     isAvailable,
     isEnrolled,
     biometricType,

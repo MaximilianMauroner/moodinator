@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, ScrollView, Alert, Linking, StyleSheet } from "react-native";
+import { View, Text, ScrollView, Linking, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useColorScheme } from "nativewind";
 import { useRouter } from "expo-router";
@@ -10,6 +10,7 @@ import { SettingsSection } from "@/features/settings/components/SettingsSection"
 import { SettingRow } from "@/features/settings/components/SettingRow";
 import { IconBadge } from "@/components/ui/IconBadge";
 import { typography } from "@/constants/typography";
+import { Alert } from "@/components/ui/AppAlert";
 
 const SUPPORT_EMAIL = "support.moodinator@lab4code.com";
 const ANDROID_PACKAGE = "com.lab4code.moodinator";
@@ -93,11 +94,11 @@ export default function AboutSettingsScreen() {
             {appName}
           </Text>
 
-          <Text className="text-sand-500 dark:text-sand-400 mb-4" style={typography.bodyMd}>
+          <Text className="text-paper-700 dark:text-sand-400 mb-4" style={typography.bodyMd}>
             Version {appVersion}
           </Text>
 
-          <Text className="text-center text-sand-500 dark:text-sand-400 px-4" style={typography.bodySm}>
+          <Text className="text-center text-paper-700 dark:text-sand-400 px-4" style={typography.bodySm}>
             Track your moods, understand your patterns, and gain insights into your emotional wellbeing.
           </Text>
         </View>
@@ -150,7 +151,7 @@ export default function AboutSettingsScreen() {
 
         {/* Footer */}
         <View className="items-center mt-6 px-4">
-          <Text className="text-xs text-sand-400 dark:text-sand-600 text-center">
+          <Text className="text-xs text-sand-400 dark:text-paper-400 text-center">
             Made for your mental wellness
           </Text>
         </View>

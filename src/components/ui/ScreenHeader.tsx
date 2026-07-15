@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useColorScheme } from "nativewind";
+import { semanticToneColors, useThemeColors } from "@/constants/colors";
 import { typography } from "@/constants/typography";
 import { IconBadge } from "./IconBadge";
 
@@ -30,16 +30,8 @@ export function ScreenHeader({
   trailing,
   compact = false,
 }: ScreenHeaderProps) {
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === "dark";
-
-  const accentText = {
-    sage: isDark ? "#A8C5A8" : "#5B8A5B",
-    sand: isDark ? "#D4C4A0" : "#7A6545",
-    coral: isDark ? "#F5A899" : "#E06B55",
-    dusk: isDark ? "#C4BBCF" : "#847596",
-    neutral: isDark ? "#BDA77D" : "#6B5C4A",
-  }[tone];
+  const { isDark, get } = useThemeColors();
+  const accentText = semanticToneColors[tone][isDark ? "dark" : "light"].fg;
 
   return (
     <View className={compact ? "px-4 pt-2 pb-3" : "px-6 pt-4 pb-4"}>
@@ -85,8 +77,8 @@ export function ScreenHeader({
             </Text>
             {subtitle ? (
               <Text
-                className="text-sand-600 dark:text-sand-400 mt-1"
-                style={typography.subtitle}
+                className="mt-1"
+                style={[typography.subtitle, { color: get("textMuted") }]}
               >
                 {subtitle}
               </Text>

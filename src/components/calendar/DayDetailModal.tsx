@@ -39,6 +39,7 @@ export function DayDetailModal({
   const getMoodData = (mood: number, sourceScale?: MoodScaleSnapshot) => {
     const info = getMoodRatingDisplay(mood, isDark, sourceScale);
     return {
+      value: info.value,
       label: info.label,
       textHex: info.colorHex,
       bgHex: info.backgroundHex,
@@ -147,6 +148,8 @@ export function DayDetailModal({
                         shadowRadius: 12,
                         elevation: 3,
                       }}
+                      accessibilityRole={onEditEntry ? "button" : undefined}
+                      accessibilityLabel={`Mood Rating ${moodData.value} of 10, ${moodData.label}, ${format(new Date(entry.timestamp), "h:mm a")}`}
                     >
                       <View className="flex-row">
                         {/* Left accent bar */}
@@ -168,7 +171,7 @@ export function DayDetailModal({
                                 className="text-lg font-bold mr-1.5"
                                 style={{ color: moodData.textHex }}
                               >
-                                {entry.mood}
+                                {moodData.value}
                               </Text>
                               <Text
                                 className="text-sm font-semibold"

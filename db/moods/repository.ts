@@ -321,6 +321,119 @@ export async function getEmotionNamesFromMoods(): Promise<string[]> {
   return Array.from(seen.values()).sort((a, b) => a.localeCompare(b));
 }
 
+function toHistoryEmotion(item: unknown): Emotion | null {
+  if (typeof item === "string") {
+    const name = item.trim();
+    return name ? { name, category: "neutral" } : null;
+  }
+
+  if (typeof item !== "object" || item === null) {
+    return null;
+  }
+
+  const raw = item as Record<string, unknown>;
+  if (typeof raw.name !== "string") {
+    return null;
+  }
+
+  const name = raw.name.trim();
+  if (!name) {
+    return null;
+  }
+
+  const category =
+    raw.category === "positive" ||
+    raw.category === "negative" ||
+    raw.category === "neutral"
+      ? raw.category
+      : "neutral";
+
+  return { name, category };
+}
+
+function parseHistoryEmotions(value: unknown): Emotion[] {
+  if (typeof value !== "string" || value.length === 0) {
+    return [];
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return [];
+  }
+
+  if (!Array.isArray(parsed)) {
+    return [];
+  }
+
+  return parsed
+    .map(toHistoryEmotion)
+    .filter((emotion): emotion is Emotion => emotion !== null);
+}
+
+function parseHistoryContextTags(value: unknown): string[] {
+  if (typeof value !== "string" || value.length === 0) {
+    return [];
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return [];
+  }
+
+  if (!Array.isArray(parsed)) {
+    return [];
+  }
+
+  return parsed
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+export async function getEmotionsFromMoods(): Promise<Emotion[]> {
+  const db = await getDb();
+  const rows = await db.getAllAsync<Pick<MoodRow, "emotions">>(
+    "SELECT emotions FROM moods ORDER BY timestamp DESC, id DESC;"
+  );
+  const seen = new Map<string, Emotion>();
+
+  for (const row of rows) {
+    for (const emotion of parseHistoryEmotions(row.emotions)) {
+      const key = emotion.name.trim().toLowerCase();
+      if (!key || seen.has(key)) {
+        continue;
+      }
+      seen.set(key, emotion);
+    }
+  }
+
+  return Array.from(seen.values());
+}
+
+export async function getContextTagsFromMoods(): Promise<string[]> {
+  const db = await getDb();
+  const rows = await db.getAllAsync<Pick<MoodRow, "context_tags">>(
+    "SELECT context_tags FROM moods ORDER BY timestamp DESC, id DESC;"
+  );
+  const seen = new Map<string, string>();
+
+  for (const row of rows) {
+    for (const tag of parseHistoryContextTags(row.context_tags)) {
+      const key = tag.toLowerCase();
+      if (!key || seen.has(key)) {
+        continue;
+      }
+      seen.set(key, tag);
+    }
+  }
+
+  return Array.from(seen.values());
+}
+
 export async function getMoodsWithinRange(
   range?: MoodDateRange
 ): Promise<MoodEntry[]> {

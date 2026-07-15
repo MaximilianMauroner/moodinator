@@ -25,7 +25,12 @@ vi.mock("../../db/moods/emotions", () => ({
 }));
 
 // Import after mocking
-import { exportMoods, importMoods, importOldBackup } from "../../db/moods/importExport";
+import {
+  exportMoods,
+  importMoods,
+  importOldBackup,
+  previewImportMoods,
+} from "../../db/moods/importExport";
 import { linkEmotionsToMood } from "../../db/moods/emotions";
 
 describe("Import/Export", () => {
@@ -114,6 +119,31 @@ describe("Import/Export", () => {
   });
 
   describe("importMoods", () => {
+    it("replaces existing mood entries instead of appending to them", async () => {
+      mockDb.__addMood({ mood: 9, timestamp: 1000 });
+
+      const result = await importMoods(
+        JSON.stringify([{ mood: 2, timestamp: 1705320000000 }])
+      );
+
+      expect(result.imported).toBe(1);
+      expect(mockDb.__getMoods()).toHaveLength(1);
+      expect(mockDb.__getMoods()[0]).toMatchObject({
+        mood: 2,
+        timestamp: 1705320000000,
+      });
+    });
+
+    it("clears stale mood emotion links before importing replacement data", async () => {
+      const mood = mockDb.__addMood({ mood: 9 });
+      const emotion = mockDb.__addEmotion({ name: "Stale", category: "negative" });
+      mockDb.__addMoodEmotion(mood.id, emotion.id);
+
+      await importMoods(JSON.stringify([{ mood: 3 }]));
+
+      expect(mockDb.__getMoodEmotions()).toEqual([]);
+    });
+
     it("imports supported mood fields and ignores legacy media fields", async () => {
       const data = JSON.stringify([
         {
@@ -218,11 +248,15 @@ describe("Import/Export", () => {
       expect(linkEmotionsToMood).toHaveBeenCalled();
     });
 
-    it("handles note vs notes field", async () => {
+    it("handles note vs notes field within one replacement file", async () => {
       const dataWithNotes = JSON.stringify([{ mood: 5, notes: "Using notes" }]);
-      const dataWithNote = JSON.stringify([{ mood: 6, note: "Using note" }]);
+      const dataWithNote = JSON.stringify([
+        { mood: 5, notes: "Using notes" },
+        { mood: 6, note: "Using note" },
+      ]);
 
-      await importMoods(dataWithNotes);
+      const firstResult = await importMoods(dataWithNotes);
+      expect(firstResult.imported).toBe(1);
       await importMoods(dataWithNote);
 
       const moods = mockDb.__getMoods();
@@ -230,16 +264,13 @@ describe("Import/Export", () => {
       expect(moods[1].note).toBe("Using note");
     });
 
-    it("handles contextTags vs context field", async () => {
-      const dataWithContext = JSON.stringify([
+    it("handles contextTags vs context field within one replacement file", async () => {
+      const data = JSON.stringify([
         { mood: 5, context: ["work"] },
-      ]);
-      const dataWithContextTags = JSON.stringify([
         { mood: 6, contextTags: ["home"] },
       ]);
 
-      await importMoods(dataWithContext);
-      await importMoods(dataWithContextTags);
+      await importMoods(data);
 
       const moods = mockDb.__getMoods();
       expect(JSON.parse(moods[0].context_tags)).toEqual(["work"]);
@@ -286,18 +317,40 @@ describe("Import/Export", () => {
       expect(result.skipped).toBe(0);
     });
 
-    it("skips invalid entries and reports errors", async () => {
+    it("rejects invalid replacement files without clearing current data", async () => {
+      mockDb.__addMood({ mood: 4, timestamp: 1000 });
       const data = JSON.stringify([
         { mood: 5 }, // valid
         { mood: 15 }, // invalid - out of range
         { mood: 7 }, // valid
       ]);
 
-      const result = await importMoods(data);
+      await expect(importMoods(data)).rejects.toThrow(
+        "Import contains invalid entries"
+      );
 
-      expect(result.imported).toBe(2);
-      expect(result.skipped).toBe(1);
-      expect(result.errors.length).toBeGreaterThan(0);
+      expect(mockDb.__getMoods()).toHaveLength(1);
+      expect(mockDb.__getMoods()[0]).toMatchObject({
+        mood: 4,
+        timestamp: 1000,
+      });
+      expect(mockDb.execAsync).not.toHaveBeenCalledWith("BEGIN TRANSACTION;");
+    });
+
+    it("previews replacement imports without opening a database transaction", () => {
+      const data = JSON.stringify([{ mood: 1 }, { mood: 8 }]);
+
+      expect(previewImportMoods(data)).toEqual({ entryCount: 2 });
+      expect(mockDb.execAsync).not.toHaveBeenCalledWith("BEGIN TRANSACTION;");
+    });
+
+    it("rejects invalid replacement previews before confirmation", () => {
+      const data = JSON.stringify([{ mood: 3 }, { mood: 12 }]);
+
+      expect(() => previewImportMoods(data)).toThrow(
+        "Import contains invalid entries"
+      );
+      expect(mockDb.execAsync).not.toHaveBeenCalledWith("BEGIN TRANSACTION;");
     });
   });
 

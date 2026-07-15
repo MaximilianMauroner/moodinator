@@ -5,6 +5,7 @@ import Animated, {
   withSpring,
   withSequence,
   withTiming,
+  useReducedMotion,
 } from "react-native-reanimated";
 import { useThemeColors } from "@/constants/colors";
 
@@ -18,7 +19,11 @@ export function PinDots({ pinLength, enteredLength, error }: PinDotsProps) {
   const { isDark, get } = useThemeColors();
 
   return (
-    <View className="flex-row justify-center gap-4 py-8">
+    <View
+      accessible
+      accessibilityLabel={`${enteredLength} of ${pinLength} PIN digits entered`}
+      className="flex-row justify-center gap-4 py-6"
+    >
       {Array.from({ length: pinLength }).map((_, index) => (
         <PinDot
           key={index}
@@ -42,12 +47,15 @@ type PinDotProps = {
 };
 
 function PinDot({ filled, error, isDark, primaryColor, borderColor }: PinDotProps) {
+  const reduceMotion = useReducedMotion();
   const animatedStyle = useAnimatedStyle(() => {
-    const scale = filled
+    const scale = reduceMotion
+      ? filled ? 1 : 0.8
+      : filled
       ? withSpring(1, { damping: 22, stiffness: 320, overshootClamping: true })
       : withSpring(0.8, { damping: 22, stiffness: 320, overshootClamping: true });
 
-    const translateX = error
+    const translateX = error && !reduceMotion
       ? withSequence(
           withTiming(-8, { duration: 50 }),
           withTiming(8, { duration: 50 }),
@@ -62,7 +70,7 @@ function PinDot({ filled, error, isDark, primaryColor, borderColor }: PinDotProp
     return {
       transform: [{ scale }, { translateX }],
     };
-  }, [filled, error]);
+  }, [filled, error, reduceMotion]);
 
   const errorColor = isDark ? "#ED8370" : "#E06B55";
 

@@ -1,24 +1,11 @@
 import type { Emotion, MoodEntry, MoodEntryInput, MoodScaleSnapshot } from "../types";
 import type { MoodRow, RawEmotionItem } from "../types/rows";
-
-export const CURRENT_MOOD_SCALE_SNAPSHOT: MoodScaleSnapshot = {
-  version: 1,
-  min: 0,
-  max: 10,
-  lowerIsBetter: true,
-};
-
-export const LEGACY_HIGHER_IS_BETTER_MOOD_SCALE_SNAPSHOT: MoodScaleSnapshot = {
-  version: 2,
-  min: 0,
-  max: 10,
-  lowerIsBetter: false,
-};
-
-const SUPPORTED_MOOD_SCALE_SNAPSHOTS = [
+import {
   CURRENT_MOOD_SCALE_SNAPSHOT,
-  LEGACY_HIGHER_IS_BETTER_MOOD_SCALE_SNAPSHOT,
-];
+  getSupportedMoodScaleSnapshot,
+} from "../../domain/moodScale";
+
+export { CURRENT_MOOD_SCALE_SNAPSHOT } from "../../domain/moodScale";
 
 export function serializeArray(value?: string[]): string {
   if (!value || value.length === 0) {
@@ -36,21 +23,6 @@ export function serializeEmotions(value?: Emotion[]): string {
 
 export function serializeMoodScale(value?: MoodScaleSnapshot): string {
   return JSON.stringify(value ?? CURRENT_MOOD_SCALE_SNAPSHOT);
-}
-
-function getSupportedMoodScaleSnapshot(value: unknown): MoodScaleSnapshot | null {
-  if (typeof value !== "object" || value === null) {
-    return null;
-  }
-  const candidate = value as Record<string, unknown>;
-  const scale = SUPPORTED_MOOD_SCALE_SNAPSHOTS.find(
-    (scale) =>
-      candidate.version === scale.version &&
-      candidate.min === scale.min &&
-      candidate.max === scale.max &&
-      candidate.lowerIsBetter === scale.lowerIsBetter
-  );
-  return scale ? { ...scale } : null;
 }
 
 export function isValidMoodScaleSnapshot(value: unknown): value is MoodScaleSnapshot {

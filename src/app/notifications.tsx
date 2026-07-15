@@ -4,7 +4,6 @@ import {
   Text,
   Pressable,
   ScrollView,
-  Alert,
   Switch,
   ActivityIndicator,
 } from "react-native";
@@ -19,9 +18,14 @@ import {
 import { IconSymbol } from "@/components/ui/IconSymbol";
 import { Ionicons } from "@expo/vector-icons";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { Alert } from "@/components/ui/AppAlert";
 import { createScreenErrorFallback } from "@/components/ScreenErrorFallback";
 import { useThemeColors } from "@/constants/colors";
 import { haptics } from "@/lib/haptics";
+import {
+  getReminderScheduleResultWarning,
+  getReminderScheduleWarning,
+} from "@/lib/reminderSchedulePresentation";
 
 const NotificationsErrorFallback = createScreenErrorFallback("Notifications");
 
@@ -51,6 +55,36 @@ function NotificationsScreenContent() {
   );
 
   const handleToggleEnabled = async (id: string, enabled: boolean) => {
+    if (enabled) {
+      Alert.alert(
+        "Enable Reminder?",
+        "Your device may ask for notification permission. Moodinator uses it only for local check-in reminders.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Enable",
+            onPress: () => {
+              void (async () => {
+                try {
+                  haptics.selection();
+                  const result = await updateNotification(id, { enabled: true });
+                  await loadNotifications();
+                  const warning = getReminderScheduleResultWarning(result);
+                  if (warning) {
+                    Alert.alert(warning.title, warning.message);
+                  }
+                } catch (error) {
+                  console.error("Failed to update notification:", error);
+                  Alert.alert("Error", "Failed to update notification");
+                }
+              })();
+            },
+          },
+        ]
+      );
+      return;
+    }
+
     try {
       haptics.selection();
       await updateNotification(id, { enabled });
@@ -124,13 +158,15 @@ function NotificationsScreenContent() {
             }}
             className="p-2 -ml-2 rounded-xl"
             style={{ backgroundColor: get("primaryBg") }}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
           >
             <IconSymbol name="chevron.left" size={20} color={get("primary")} />
           </Pressable>
           <View className="flex-1 ml-4">
             <Text
               className="text-xs font-medium mb-0.5"
-              style={{ color: get("primary") }}
+              style={{ color: isDark ? get("primary") : "#476D47" }}
             >
               Stay on track
             </Text>
@@ -162,14 +198,16 @@ function NotificationsScreenContent() {
                 shadowRadius: 12,
                 elevation: 6,
               }}
+              accessibilityRole="button"
+              accessibilityLabel="Add new reminder"
             >
               <View
                 className="w-7 h-7 rounded-full items-center justify-center mr-3"
                 style={{ backgroundColor: "rgba(255,255,255,0.2)" }}
               >
-                <IconSymbol name="plus" size={16} color="#FFFFFF" />
+                <IconSymbol name="plus" size={16} color={get("onPrimary")} />
               </View>
-              <Text className="text-white font-semibold text-base">
+              <Text className="font-semibold text-base" style={{ color: get("onPrimary") }}>
                 Add New Reminder
               </Text>
             </Pressable>
@@ -209,19 +247,22 @@ function NotificationsScreenContent() {
             </View>
           ) : (
             <View className="gap-3">
-              {notifications.map((notification, index) => (
-                <View
-                  key={notification.id}
-                  className="rounded-2xl overflow-hidden"
-                  style={{
-                    backgroundColor: get("surface"),
-                    shadowColor: isDark ? "#000" : "#9D8660",
-                    shadowOffset: { width: 0, height: 3 },
-                    shadowOpacity: isDark ? 0.15 : 0.06,
-                    shadowRadius: 10,
-                    elevation: 2,
-                  }}
-                >
+              {notifications.map((notification) => {
+                const scheduleWarning = getReminderScheduleWarning(notification);
+
+                return (
+                  <View
+                    key={notification.id}
+                    className="rounded-2xl overflow-hidden"
+                    style={{
+                      backgroundColor: get("surface"),
+                      shadowColor: isDark ? "#000" : "#9D8660",
+                      shadowOffset: { width: 0, height: 3 },
+                      shadowOpacity: isDark ? 0.15 : 0.06,
+                      shadowRadius: 10,
+                      elevation: 2,
+                    }}
+                  >
                   {/* Time badge at top */}
                   <View
                     className="px-4 py-2.5 flex-row items-center justify-between"
@@ -259,6 +300,8 @@ function NotificationsScreenContent() {
                       }}
                       thumbColor={notification.enabled ? get("primary") : (isDark ? "#8AAE98" : "#BDA77D")}
                       ios_backgroundColor={isDark ? "#3D352A" : "#E5D9BF"}
+                      accessibilityLabel={`${notification.title} reminder`}
+                      accessibilityHint={notification.enabled ? "Double tap to pause" : "Double tap to enable"}
                     />
                   </View>
 
@@ -281,6 +324,37 @@ function NotificationsScreenContent() {
                     >
                       {notification.body}
                     </Text>
+                    {scheduleWarning && (
+                      <View
+                        className="mt-3 rounded-xl p-3 flex-row items-start"
+                        style={{
+                          backgroundColor: isDark ? "rgba(60, 26, 20, 0.45)" : "#FDE8E4",
+                          borderWidth: 1,
+                          borderColor: isDark ? "rgba(245, 168, 153, 0.25)" : "#F5A899",
+                        }}
+                      >
+                        <Ionicons
+                          name="alert-circle-outline"
+                          size={16}
+                          color={isDark ? "#F5A899" : "#C75441"}
+                          style={{ marginRight: 8, marginTop: 1 }}
+                        />
+                        <View className="flex-1">
+                          <Text
+                            className="text-xs font-semibold"
+                            style={{ color: isDark ? "#F5A899" : "#C75441" }}
+                          >
+                            Not scheduled
+                          </Text>
+                          <Text
+                            className="text-xs leading-4 mt-0.5"
+                            style={{ color: isDark ? "#F7C1B7" : "#8E3D31" }}
+                          >
+                            {scheduleWarning.message}
+                          </Text>
+                        </View>
+                      </View>
+                    )}
                   </View>
 
                   {/* Actions */}
@@ -296,11 +370,13 @@ function NotificationsScreenContent() {
                         onPress={() => haptics.light()}
                         className="flex-1 rounded-xl py-2.5 items-center flex-row justify-center"
                         style={{ backgroundColor: get("primaryBg") }}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Edit ${notification.title} reminder`}
                       >
                         <IconSymbol name="pencil" size={14} color={get("primary")} />
                         <Text
                           className="font-medium text-sm ml-1.5"
-                          style={{ color: get("primary") }}
+                          style={{ color: isDark ? get("primary") : "#476D47" }}
                         >
                           Edit
                         </Text>
@@ -312,6 +388,8 @@ function NotificationsScreenContent() {
                       }
                       className="flex-1 rounded-xl py-2.5 items-center flex-row justify-center"
                       style={{ backgroundColor: isDark ? "#3C1A14" : "#FDE8E4" }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Delete ${notification.title} reminder`}
                     >
                       <IconSymbol
                         name="trash"
@@ -327,7 +405,8 @@ function NotificationsScreenContent() {
                     </Pressable>
                   </View>
                 </View>
-              ))}
+                );
+              })}
             </View>
           )}
 

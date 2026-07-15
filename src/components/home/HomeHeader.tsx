@@ -63,7 +63,15 @@ export function HomeHeader() {
 				marginBottom: 4,
 			}}
 		>
-			<View style={{ flexDirection: "row", alignItems: "center", flex: 1, paddingRight: 12 }}>
+			<View
+				style={{
+					flexDirection: "row",
+					alignItems: "center",
+					flex: 1,
+					minWidth: 0,
+					paddingRight: 12,
+				}}
+			>
 				{/* Sage halo + app icon */}
 				<View
 					style={{
@@ -91,21 +99,35 @@ export function HomeHeader() {
 					/>
 				</View>
 
-				<View style={{ flex: 1 }}>
+				<View style={{ flex: 1, minWidth: 0 }}>
 					<Text
 						numberOfLines={1}
+						adjustsFontSizeToFit
+						minimumFontScale={0.82}
 						style={[
 							typography.titleMd,
-							{ color: titleColor, fontSize: 24, lineHeight: 28 },
+							{
+								color: titleColor,
+								fontSize: 24,
+								lineHeight: 28,
+								flexShrink: 1,
+							},
 						]}
 					>
 						{greeting}
 					</Text>
 					<Text
 						numberOfLines={1}
+						adjustsFontSizeToFit
+						minimumFontScale={0.9}
 						style={[
 							typography.bodySm,
-							{ color: captionColor, marginTop: 2, letterSpacing: 0.1 },
+							{
+								color: captionColor,
+								marginTop: 2,
+								letterSpacing: 0.1,
+								flexShrink: 1,
+							},
 						]}
 					>
 						{dateLabel}
@@ -125,6 +147,7 @@ export function HomeHeader() {
 						borderWidth: 1,
 						borderColor: streakPalette.border,
 						gap: 5,
+						flexShrink: 0,
 					}}
 					accessibilityLabel={`Streak: ${streak.current} ${
 						streak.current === 1 ? "day" : "days"
@@ -135,7 +158,7 @@ export function HomeHeader() {
 						style={[
 							typography.eyebrow,
 							{
-								fontSize: 11,
+								fontSize: 12,
 								letterSpacing: 0.6,
 								color: streakPalette.fg,
 								fontWeight: "700",

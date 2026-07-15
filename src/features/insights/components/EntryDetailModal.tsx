@@ -14,6 +14,7 @@ import Animated, { FadeInUp } from "react-native-reanimated";
 import type { MoodEntry, MoodScaleSnapshot } from "@db/types";
 import { getEnergySegmentColor } from "@/constants/colors";
 import { motion } from "@/constants/motion";
+import { getInterpretedMoodRating } from "@/constants/moodScaleInterpretation";
 
 const sectionReveal = (index: number) =>
   FadeInUp.duration(motion.duration.normal).delay(index * motion.stagger.tight);
@@ -40,6 +41,7 @@ export function EntryDetailModal({
   const hasContextTags = entry.contextTags && entry.contextTags.length > 0;
   const hasNote = entry.note && entry.note.trim().length > 0;
   const hasEnergy = entry.energy !== null && entry.energy !== undefined;
+  const interpretedMood = getInterpretedMoodRating(entry);
 
   return (
     <Modal
@@ -68,6 +70,8 @@ export function EntryDetailModal({
             onPress={onClose}
             className="w-10 h-10 items-center justify-center rounded-full"
             style={{ backgroundColor: isDark ? "#364C44" : "#F0EBE0" }}
+            accessibilityRole="button"
+            accessibilityLabel="Close entry details"
           >
             <Ionicons
               name="close"
@@ -106,7 +110,7 @@ export function EntryDetailModal({
                   className="text-3xl font-bold"
                   style={{ color: getMoodColor(entry.mood, entry.moodScale) }}
                 >
-                  {entry.mood}
+                  {interpretedMood}
                 </Text>
               </View>
               <View className="flex-1">

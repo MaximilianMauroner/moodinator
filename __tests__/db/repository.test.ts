@@ -31,6 +31,8 @@ import {
   updateMoodTimestamp,
   updateMoodEntry,
   getMoodCount,
+  getContextTagsFromMoods,
+  getEmotionsFromMoods,
   hasMoodBeenLoggedToday,
   updateEmotionCategoryInMoods,
 } from "../../db/moods/repository";
@@ -343,6 +345,51 @@ describe("Repository", () => {
       const entry = toMoodEntry(row);
 
       expect(entry.contextTags).toEqual(["Home", "Work"]);
+    });
+
+    it("extracts unique history emotions using the most recent saved category", async () => {
+      mockDb.__addMood({
+        timestamp: 1000,
+        emotions: JSON.stringify([{ name: "Calm", category: "neutral" }]),
+      });
+      mockDb.__addMood({
+        timestamp: 3000,
+        emotions: JSON.stringify([{ name: "calm", category: "positive" }]),
+      });
+      mockDb.__addMood({
+        timestamp: 2000,
+        emotions: JSON.stringify(["Legacy"]),
+      });
+      mockDb.__addMood({
+        timestamp: 4000,
+        emotions: "not valid json",
+      });
+
+      await expect(getEmotionsFromMoods()).resolves.toEqual([
+        { name: "calm", category: "positive" },
+        { name: "Legacy", category: "neutral" },
+      ]);
+    });
+
+    it("extracts unique history context tags and skips malformed snapshots", async () => {
+      mockDb.__addMood({
+        timestamp: 1000,
+        context_tags: JSON.stringify([" Home ", "Work"]),
+      });
+      mockDb.__addMood({
+        timestamp: 3000,
+        context_tags: JSON.stringify(["home", "Social"]),
+      });
+      mockDb.__addMood({
+        timestamp: 4000,
+        context_tags: "not valid json",
+      });
+
+      await expect(getContextTagsFromMoods()).resolves.toEqual([
+        "home",
+        "Social",
+        "Work",
+      ]);
     });
   });
 

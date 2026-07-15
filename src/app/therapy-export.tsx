@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Platform,
   Pressable,
   ScrollView,
@@ -13,6 +12,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
+import { Alert } from "@/components/ui/AppAlert";
 import { Ionicons } from "@expo/vector-icons";
 import { useColorScheme } from "nativewind";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -27,12 +27,12 @@ import {
   getTherapyExportPrefs,
   saveTherapyExportPrefs,
 } from "@/lib/therapyExportPrefs";
-import type { MoodEntry } from "@db/types";
 import {
   moodService,
   type MoodDateRange,
   type MoodRangePreset,
 } from "@/services/moodService";
+import { buildTherapyExportCsv } from "@/services/therapyExportService";
 
 type RangeOption = MoodRangePreset | "custom";
 
@@ -50,8 +50,8 @@ const FIELD_OPTIONS: {
   },
   {
     key: "mood",
-    label: "Mood Score",
-    description: "0-10 rating selected for the entry",
+    label: "Mood Rating",
+    description: "Rating, label, and Mood Scale context",
     icon: "happy-outline",
   },
   {
@@ -107,61 +107,8 @@ const RANGE_OPTIONS: {
   },
 ];
 
-function csvEscape(value: string | number | null | undefined) {
-  if (value === null || value === undefined) {
-    return "";
-  }
-  const str = String(value);
-  if (/[",\n]/.test(str)) {
-    return `"${str.replace(/"/g, '""')}"`;
-  }
-  return str;
-}
-
-function formatTimestamp(value: number) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "" : date.toLocaleString();
-}
-
 function formatDateSlug(date: Date) {
   return date.toISOString().split("T")[0];
-}
-
-function buildCsv(
-  rows: MoodEntry[],
-  fields: TherapyExportField[]
-) {
-  const header = fields.map((field) => {
-    const option = FIELD_OPTIONS.find((item) => item.key === field);
-    return option ? option.label : field;
-  });
-
-  const body = rows.map((entry) => {
-    return fields.map((field) => {
-      switch (field) {
-        case "timestamp":
-          return csvEscape(formatTimestamp(entry.timestamp));
-        case "mood":
-          return csvEscape(entry.mood);
-        case "emotions":
-          return csvEscape(entry.emotions.map((emotion) => emotion.name).join("; "));
-        case "context":
-          return csvEscape(entry.contextTags.join("; "));
-        case "energy":
-          return csvEscape(
-            entry.energy === null || entry.energy === undefined
-              ? ""
-              : entry.energy
-          );
-        case "notes":
-          return csvEscape(entry.note ?? "");
-        default:
-          return "";
-      }
-    });
-  });
-
-  return [header, ...body].map((cells) => cells.join(",")).join("\n");
 }
 
 export default function TherapyExportScreen() {
@@ -234,7 +181,7 @@ export default function TherapyExportScreen() {
     return { preset: rangeOption };
   };
 
-  const handleExport = async () => {
+  const performExport = async () => {
     if (!selectedFields.length) {
       Alert.alert("Select fields", "Choose at least one field to export.");
       return;
@@ -250,7 +197,7 @@ export default function TherapyExportScreen() {
         Alert.alert("No entries", "No mood entries found for this range.");
         return;
       }
-      const csv = buildCsv(rows, selectedFields);
+      const csv = buildTherapyExportCsv(rows, selectedFields);
       const fileSuffix =
         rangeOption === "custom"
           ? `${formatDateSlug(customStartDate)}-to-${formatDateSlug(customEndDate)}`
@@ -266,10 +213,23 @@ export default function TherapyExportScreen() {
           dialogTitle: "Share Therapy Export",
         });
       } else {
-        await Clipboard.setStringAsync(csv);
         Alert.alert(
-          "Copied instead",
-          "CSV export copied to clipboard (sharing unavailable)."
+          "Copy sensitive data?",
+          "Sharing is unavailable. Copying puts the full report on your device clipboard, where other apps may be able to read it.",
+          [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Copy CSV",
+              onPress: () => {
+                void Clipboard.setStringAsync(csv).then(() => {
+                  Alert.alert("Copied", "The therapy CSV was copied to your clipboard.");
+                }).catch((error) => {
+                  console.error("Therapy export clipboard copy failed", error);
+                  Alert.alert("Copy failed", "We couldn't copy the therapy CSV. Please try again.");
+                });
+              },
+            },
+          ]
         );
       }
       await FileSystem.deleteAsync(fileUri, { idempotent: true });
@@ -282,6 +242,21 @@ export default function TherapyExportScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleExport = () => {
+    const includedFields = FIELD_OPTIONS
+      .filter((field) => selectedFields.includes(field.key))
+      .map((field) => field.label)
+      .join(", ");
+    Alert.alert(
+      "Review therapy export",
+      `${rangeSummary}\n\nIncludes: ${includedFields}\n\nThis report may contain sensitive health notes. After sharing it, Moodinator cannot control how it is stored or forwarded.`,
+      [
+        { text: "Back and edit", style: "cancel" },
+        { text: "Create report", onPress: () => void performExport() },
+      ]
+    );
   };
 
   const selectedCount = selectedFields.length;
@@ -301,7 +276,7 @@ export default function TherapyExportScreen() {
             size={24}
             color={isDark ? "#A8C5A8" : "#5B8A5B"}
           />
-          <Text className="text-base font-medium ml-1 text-sage-500 dark:text-sage-300">
+          <Text className="text-base font-medium ml-1 text-sage-600 dark:text-sage-300">
             Settings
           </Text>
         </TouchableOpacity>
@@ -312,7 +287,7 @@ export default function TherapyExportScreen() {
             <Ionicons name="medical-outline" size={28} color={isDark ? "#C4BBCF" : "#847596"} />
           </View>
           <View className="flex-1">
-            <Text className="text-xs font-medium mb-0.5 text-dusk-500 dark:text-dusk-300">
+            <Text className="text-xs font-medium mb-0.5 text-dusk-600 dark:text-dusk-300">
               Data
             </Text>
             <Text className="text-2xl font-bold text-paper-800 dark:text-paper-200 tracking-tight">
@@ -331,24 +306,34 @@ export default function TherapyExportScreen() {
         <View className="mx-4 mb-4 p-4 rounded-2xl bg-dusk-100 dark:bg-dusk-800">
           <View className="flex-row items-center mb-2">
             <Ionicons name="clipboard-outline" size={20} color={isDark ? "#C4BBCF" : "#847596"} style={{ marginRight: 8 }} />
-            <Text className="text-base font-bold text-dusk-500 dark:text-dusk-300">
+            <Text className="text-base font-bold text-dusk-600 dark:text-dusk-300">
               Share what matters
             </Text>
           </View>
-          <Text className="text-xs text-sand-500 dark:text-sand-400 mb-2">
+          <Text className="text-xs text-paper-700 dark:text-sand-400 mb-2">
             Customize the CSV your therapist receives. Pick the fields to include, choose a timeframe, and export a spreadsheet-ready file.
           </Text>
           <View className="flex-row items-center mt-1">
             <Ionicons name="calendar-outline" size={14} color={isDark ? "#C4BBCF" : "#847596"} />
-            <Text className="text-xs font-medium ml-1 text-dusk-500 dark:text-dusk-300">
+            <Text className="text-xs font-medium ml-1 text-dusk-600 dark:text-dusk-300">
               {rangeSummary}
             </Text>
           </View>
         </View>
 
+        <View className="mx-4 mb-4 p-4 rounded-2xl border border-coral-200 dark:border-coral-700 bg-coral-50 dark:bg-coral-900/20">
+          <View className="flex-row items-center mb-2">
+            <Ionicons name="lock-open-outline" size={18} color={isDark ? "#F5A899" : "#C75441"} />
+            <Text className="ml-2 text-sm font-semibold text-coral-700 dark:text-coral-300">Before you share</Text>
+          </View>
+          <Text className="text-xs leading-5 text-paper-700 dark:text-sand-300">
+            Your data stays local until you choose to share or copy this report. Once shared, Moodinator cannot control where it is stored or forwarded.
+          </Text>
+        </View>
+
         {/* Fields Section */}
         <View className="mx-4 mb-4">
-          <Text className="text-xs font-semibold uppercase tracking-wider text-sand-500 dark:text-sand-400 mb-2 ml-1">
+          <Text className="text-xs font-semibold uppercase tracking-wider text-paper-700 dark:text-sand-400 mb-2 ml-1">
             Fields to Include ({selectedCount}/6)
           </Text>
           <View
@@ -374,7 +359,7 @@ export default function TherapyExportScreen() {
                     <Text className="text-base font-medium text-paper-800 dark:text-paper-200">
                       {field.label}
                     </Text>
-                    <Text className="text-sm text-sand-500 dark:text-sand-400 mt-0.5">
+                    <Text className="text-sm text-paper-700 dark:text-sand-400 mt-0.5">
                       {field.description}
                     </Text>
                   </View>
@@ -396,7 +381,7 @@ export default function TherapyExportScreen() {
 
         {/* Time Range Section */}
         <View className="mx-4 mb-4">
-          <Text className="text-xs font-semibold uppercase tracking-wider text-sand-500 dark:text-sand-400 mb-2 ml-1">
+          <Text className="text-xs font-semibold uppercase tracking-wider text-paper-700 dark:text-sand-400 mb-2 ml-1">
             Time Range
           </Text>
           <View
@@ -419,13 +404,13 @@ export default function TherapyExportScreen() {
                     <Text
                       className={`font-semibold ${
                         isSelected
-                          ? "text-sage-500 dark:text-sage-300"
+                          ? "text-sage-600 dark:text-sage-300"
                           : "text-paper-800 dark:text-paper-200"
                       }`}
                     >
                       {option.label}
                     </Text>
-                    <Text className="text-xs text-sand-500 dark:text-sand-400 mt-1">
+                    <Text className="text-xs text-paper-700 dark:text-sand-400 mt-1">
                       {option.description}
                     </Text>
                   </Pressable>
@@ -558,7 +543,7 @@ export default function TherapyExportScreen() {
             onPress={handleExport}
             disabled={loading}
             className={`rounded-2xl py-4 items-center flex-row justify-center ${
-              loading ? "bg-sage-400" : "bg-sage-500"
+              loading ? "bg-sage-600" : "bg-sage-600"
             }`}
             style={isDark ? styles.buttonShadowDark : styles.buttonShadowLight}
           >
@@ -573,7 +558,7 @@ export default function TherapyExportScreen() {
               </>
             )}
           </Pressable>
-          <Text className="text-xs text-center text-sand-500 dark:text-sand-400 mt-3">
+          <Text className="text-xs text-center text-paper-700 dark:text-paper-400 mt-3">
             CSV files include column headers. Arrays are joined with semicolons.
           </Text>
         </View>

@@ -1,5 +1,5 @@
 import React, { useEffect, useCallback } from "react";
-import { View, Text, ScrollView, Alert } from "react-native";
+import { ActivityIndicator, Pressable, View, Text, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -9,6 +9,7 @@ import { SettingsPageHeader } from "@/features/settings/components/SettingsPageH
 import { SettingsSection } from "@/features/settings/components/SettingsSection";
 import { SettingRow } from "@/features/settings/components/SettingRow";
 import { ToggleRow } from "@/features/settings/components/ToggleRow";
+import { Alert } from "@/components/ui/AppAlert";
 
 export default function SecuritySettingsScreen() {
   const { colorScheme } = useColorScheme();
@@ -16,17 +17,16 @@ export default function SecuritySettingsScreen() {
 
   const {
     hydrated,
+    hydrationError,
     hydrate,
     isEnabled,
     biometricsEnabled,
     hasPinSet,
     pinLength,
-    setEnabled,
-    setBiometricsEnabled,
-    clearPin,
   } = useAppLockStore();
 
   const {
+    isChecking: biometricsChecking,
     isAvailable: biometricsAvailable,
     isEnrolled: biometricsEnrolled,
     getBiometricLabel,
@@ -41,19 +41,21 @@ export default function SecuritySettingsScreen() {
   }, [hydrate, hydrated]);
 
   const handleToggleAppLock = useCallback(
-    async (enabled: boolean) => {
+    (enabled: boolean) => {
       if (enabled && !hasPinSet) {
-        // Need to set up PIN first
         router.push("./setup-pin");
       } else {
-        await setEnabled(enabled);
+        router.push({
+          pathname: "./setup-pin",
+          params: { action: enabled ? "enable" : "disable" },
+        });
       }
     },
-    [hasPinSet, setEnabled]
+    [hasPinSet]
   );
 
   const handleChangePin = useCallback(() => {
-    router.push("./setup-pin");
+    router.push({ pathname: "./setup-pin", params: { action: "change" } });
   }, []);
 
   const handleClearPin = useCallback(() => {
@@ -65,16 +67,22 @@ export default function SecuritySettingsScreen() {
         {
           text: "Remove",
           style: "destructive",
-          onPress: async () => {
-            await clearPin();
-            Alert.alert("PIN Removed", "App lock has been disabled.");
+          onPress: () => {
+            router.push({ pathname: "./setup-pin", params: { action: "remove" } });
           },
         },
       ]
     );
-  }, [clearPin]);
+  }, []);
 
-  if (!hydrated) {
+  const handleToggleBiometrics = useCallback((enabled: boolean) => {
+    router.push({
+      pathname: "./setup-pin",
+      params: { action: "biometrics", value: String(enabled) },
+    });
+  }, []);
+
+  if (!hydrated || hydrationError) {
     return (
       <SafeAreaView className="flex-1 bg-paper-100 dark:bg-paper-900" edges={["top"]}>
         <SettingsPageHeader
@@ -83,6 +91,32 @@ export default function SecuritySettingsScreen() {
           icon="shield-checkmark-outline"
           accentColor="sage"
         />
+        <View className="flex-1 items-center justify-center">
+          {hydrationError ? (
+            <>
+              <Ionicons name="warning-outline" size={30} color={isDark ? "#F2B4A6" : "#A53F30"} />
+              <Text accessibilityRole="header" className="mt-3 text-lg font-semibold text-paper-800 dark:text-paper-100">
+                Security settings unavailable
+              </Text>
+              <Text className="mt-2 px-8 text-sm text-center text-paper-700 dark:text-paper-300">
+                Moodinator could not safely read your app lock settings.
+              </Text>
+              <Pressable
+                onPress={() => void hydrate()}
+                className="mt-5 min-h-11 px-6 rounded-xl items-center justify-center bg-sage-600 dark:bg-sage-400"
+                accessibilityRole="button"
+                accessibilityLabel="Retry loading security settings"
+              >
+                <Text className="font-semibold text-white dark:text-paper-900">Try again</Text>
+              </Pressable>
+            </>
+          ) : (
+            <>
+              <ActivityIndicator size="small" color={isDark ? "#A8C5A8" : "#5B8A5B"} />
+              <Text className="mt-3 text-sm text-paper-700 dark:text-sand-400">Loading security settings…</Text>
+            </>
+          )}
+        </View>
       </SafeAreaView>
     );
   }
@@ -109,7 +143,7 @@ export default function SecuritySettingsScreen() {
               Protect Your Data
             </Text>
           </View>
-          <Text className="text-xs text-sage-500 dark:text-sage-400">
+          <Text className="text-xs text-sage-600 dark:text-sage-400">
             Enable app lock to require authentication when opening Moodinator. Your mood data stays private.
           </Text>
         </View>
@@ -128,7 +162,7 @@ export default function SecuritySettingsScreen() {
               title={`Use ${getBiometricLabel()}`}
               description="Unlock with biometrics instead of PIN"
               value={biometricsEnabled}
-              onChange={setBiometricsEnabled}
+              onChange={handleToggleBiometrics}
               icon="finger-print"
               isLast={!hasPinSet}
             />
@@ -154,15 +188,15 @@ export default function SecuritySettingsScreen() {
           )}
         </SettingsSection>
 
-        {!canUseBiometrics && (
+        {!biometricsChecking && !canUseBiometrics && (
           <View className="mx-4 mt-4 p-4 rounded-2xl bg-sand-100 dark:bg-sand-800/30">
             <View className="flex-row items-center mb-2">
               <Ionicons name="information-circle-outline" size={20} color="#9D8660" style={{ marginRight: 8 }} />
-              <Text className="text-sm font-semibold text-sand-600 dark:text-sand-400">
+              <Text className="text-sm font-semibold text-paper-700 dark:text-sand-400">
                 Biometrics Not Available
               </Text>
             </View>
-            <Text className="text-xs text-sand-500 dark:text-sand-400">
+            <Text className="text-xs text-paper-700 dark:text-sand-400">
               {!biometricsAvailable
                 ? "Your device doesn't support biometric authentication."
                 : "No biometrics enrolled. Set up biometrics in your device settings to use biometric unlock."}

@@ -220,7 +220,7 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
             />
             <Text
               className="text-[11px] font-bold tracking-wide"
-              style={{ color: get("primary") }}
+              style={{ color: isDark ? get("primary") : colors.positive.textDark.light }}
             >
               LAST ENTRY
             </Text>
@@ -473,8 +473,8 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
                         elevation: 3,
                       }}
                     >
-                      <Ionicons name="copy" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
-                      <Text className="text-sm font-semibold text-white">
+                      <Ionicons name="copy" size={14} color={get("onPrimary")} style={{ marginRight: 6 }} />
+                      <Text className="text-sm font-semibold" style={{ color: get("onPrimary") }}>
                         Use This
                       </Text>
                     </Pressable>

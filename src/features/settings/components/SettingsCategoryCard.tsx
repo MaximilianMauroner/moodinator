@@ -125,14 +125,14 @@ export function SettingsCategoryCard({
                   )}
                 </View>
                 <Text
-                  className="text-xs text-sand-600 dark:text-paper-400"
+                  className="text-xs text-paper-700 dark:text-paper-400"
                   numberOfLines={1}
                 >
                   {description}
                 </Text>
                 {preview && (
                   <Text
-                    className="text-xs text-sage-500 dark:text-sage-300 mt-1"
+                    className="text-xs text-sage-600 dark:text-sage-300 mt-1"
                     numberOfLines={1}
                   >
                     {preview}

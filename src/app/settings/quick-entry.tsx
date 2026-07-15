@@ -50,11 +50,11 @@ export default function QuickEntrySettingsScreen() {
               color="#9D8660"
               style={{ marginRight: 8 }}
             />
-            <Text className="text-base font-bold text-sand-600 dark:text-sand-400">
+            <Text className="text-base font-bold text-paper-700 dark:text-sand-400">
               {activeCount} of 4 fields enabled
             </Text>
           </View>
-          <Text className="text-xs text-sand-500 dark:text-sand-400">
+          <Text className="text-xs text-paper-700 dark:text-sand-400">
             Quick entry appears when you tap the mood button. Long-press the button for detailed entry with all fields.
           </Text>
         </View>

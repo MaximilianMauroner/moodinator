@@ -1,16 +1,15 @@
 import { moodScale } from "./moodScale";
 import type { MoodEntry, MoodScaleSnapshot } from "../../db/types";
 import type { MoodScale } from "@/types/mood";
+import {
+  CURRENT_MOOD_SCALE_SNAPSHOT,
+  getCurrentMoodScaleSnapshot as getDomainCurrentMoodScaleSnapshot,
+} from "../../domain/moodScale";
 
-export const CURRENT_MOOD_SCALE: MoodScaleSnapshot = {
-  version: 1,
-  min: 0,
-  max: 10,
-  lowerIsBetter: true,
-};
+export const CURRENT_MOOD_SCALE: MoodScaleSnapshot = CURRENT_MOOD_SCALE_SNAPSHOT;
 
 export function getCurrentMoodScaleSnapshot(): MoodScaleSnapshot {
-  return { ...CURRENT_MOOD_SCALE };
+  return getDomainCurrentMoodScaleSnapshot();
 }
 
 export function clampMoodRating(

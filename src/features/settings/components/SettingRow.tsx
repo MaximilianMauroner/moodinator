@@ -33,13 +33,15 @@ export function SettingRow({
 
   return (
     <Pressable
-      onPress={handlePress}
+      onPress={onPress ? handlePress : undefined}
+      accessible={Boolean(onPress)}
+      focusable={Boolean(onPress)}
       className={`flex-row items-center justify-between p-4 ${
         !isLast ? "border-b border-paper-200 dark:border-paper-800" : ""
       }`}
       style={onPress && { opacity: 1 }}
       accessibilityRole={onPress ? "button" : undefined}
-      accessibilityLabel={subLabel ? `${label}, ${subLabel}` : label}
+      accessibilityLabel={onPress ? (subLabel ? `${label}, ${subLabel}` : label) : undefined}
       accessibilityHint={onPress ? "Tap to open" : undefined}
     >
       <View className="flex-row items-center flex-1 mr-4">
@@ -66,14 +68,14 @@ export function SettingRow({
           <Text
             className={`text-base font-medium ${
               destructive
-                ? "text-coral-600 dark:text-coral-300"
+                ? "text-coral-700 dark:text-coral-300"
                 : "text-paper-800 dark:text-paper-200"
             }`}
           >
             {label}
           </Text>
           {subLabel && (
-            <Text className="text-sm mt-0.5 leading-5 text-sand-600 dark:text-paper-400">
+            <Text className="text-sm mt-0.5 leading-5 text-paper-700 dark:text-paper-400">
               {subLabel}
             </Text>
           )}

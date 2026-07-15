@@ -15,7 +15,7 @@ export function SettingsSection({ title, footer, children }: SettingsSectionProp
   return (
     <View className="mx-4 mb-4">
       {title && (
-        <Text className="text-xs font-semibold uppercase tracking-wider text-sand-600 dark:text-paper-400 mb-2 ml-1">
+        <Text className="text-xs font-semibold uppercase tracking-wider text-paper-700 dark:text-paper-300 mb-2 ml-1">
           {title}
         </Text>
       )}
@@ -26,7 +26,7 @@ export function SettingsSection({ title, footer, children }: SettingsSectionProp
         {children}
       </View>
       {footer && (
-        <Text className="text-xs text-sand-500 dark:text-paper-500 mt-2 ml-1 leading-5">
+        <Text className="text-xs text-paper-700 dark:text-paper-400 mt-2 ml-1 leading-5">
           {footer}
         </Text>
       )}

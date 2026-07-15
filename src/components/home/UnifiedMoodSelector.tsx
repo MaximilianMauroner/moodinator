@@ -140,7 +140,7 @@ function MoodButton({
     height: interpolate(
       collapseProgress.value,
       [0, 0.45],
-      [10, 0],
+      [16, 0],
       Extrapolation.CLAMP
     ),
   }));
@@ -177,9 +177,9 @@ function MoodButton({
           style={[
             {
               color: mood.colorHex,
-              fontSize: 8,
+              fontSize: 12,
               fontWeight: "600",
-              opacity: 0.85,
+              lineHeight: 16,
               textAlign: "center",
             },
             labelStyle,
@@ -216,7 +216,7 @@ export function UnifiedMoodSelector({
   const trackBgColor = isDark ? colors.surface.dark : colors.surface.light;
   const trackBorderColor = isDark ? colors.border.dark : colors.border.light;
   const textMutedColor = isDark ? colors.sand.textMuted.dark : colors.textMuted.light;
-  const accentColor = isDark ? colors.primaryMuted.dark : colors.primary.light;
+  const accentColor = isDark ? colors.primaryMuted.dark : colors.positive.textDark.light;
   const negativeColor = isDark
     ? colors.negative.text.dark
     : colors.negative.text.light;
@@ -416,12 +416,12 @@ export function UnifiedMoodSelector({
           }}
         >
           <Text
-            style={{ fontSize: 10, fontWeight: "500", color: accentColor }}
+            style={{ fontSize: 12, fontWeight: "500", color: accentColor }}
           >
             Great
           </Text>
           <Text
-            style={{ fontSize: 10, fontWeight: "500", color: negativeColor }}
+            style={{ fontSize: 12, fontWeight: "500", color: negativeColor }}
           >
             Need support
           </Text>

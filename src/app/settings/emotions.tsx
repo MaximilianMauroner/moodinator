@@ -1,7 +1,6 @@
 import React, { useCallback, useMemo, useState } from "react";
 import {
   ScrollView,
-  Alert,
   Pressable,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -19,8 +18,10 @@ import {
   normalizePresetKey,
 } from "@/features/settings/utils/defaultPresetSelection";
 import { emotionService } from "@/services/emotionService";
+import { presetSyncService } from "@/services/presetSyncService";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { haptics } from "@/lib/haptics";
+import { Alert } from "@/components/ui/AppAlert";
 import { CATEGORIES } from "@/features/settings/emotions/emotionSettingsConfig";
 import { HeroStats, CategorySection } from "@/features/settings/emotions/EmotionSettingsParts";
 import {
@@ -29,9 +30,37 @@ import {
   RemoveEmotionDialog,
 } from "@/features/settings/emotions/EmotionSettingsDialogs";
 import {
+  PresetHistorySyncCard,
   PresetTipCard,
   presetListStyles,
 } from "@/features/settings/presets/PresetListPrimitives";
+
+async function promptHistoricalUpdate(options: {
+  affectedMoodEntryCount: number;
+  message: string;
+  apply: () => Promise<void>;
+  fallbackMessage: string;
+}) {
+  if (options.affectedMoodEntryCount === 0) return;
+
+  Alert.alert(
+    "Update Past Entries?",
+    options.message,
+    [
+      { text: "Future Only", style: "cancel" },
+      {
+        text: "Update All",
+        onPress: async () => {
+          try {
+            await options.apply();
+          } catch {
+            Alert.alert("Error", options.fallbackMessage);
+          }
+        },
+      },
+    ]
+  );
+}
 
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
@@ -54,6 +83,7 @@ export default function EmotionsSettingsScreen() {
   const [emotionPendingRemoval, setEmotionPendingRemoval] = useState<string | null>(
     null
   );
+  const [historySyncLoading, setHistorySyncLoading] = useState(false);
 
   const presetModel = useMemo(
     () =>
@@ -72,6 +102,17 @@ export default function EmotionsSettingsScreen() {
     const neutral = emotions.filter((e) => e.category === "neutral").length;
     return { positive, negative, neutral, total: positive + negative + neutral };
   }, [emotions]);
+  const historySyncTone = useMemo(
+    () => ({
+      primary: isDark ? "#A8C5A8" : "#5B8A5B",
+      cardBg: isDark ? "rgba(30,45,38,0.48)" : "#FDFCFA",
+      border: isDark ? "rgba(58,84,72,0.36)" : "rgba(221,212,196,0.80)",
+      accentBg: isDark ? "rgba(91,138,91,0.20)" : "rgba(91,138,91,0.12)",
+      chipActive: isDark ? "rgba(91,138,91,0.45)" : "#C8E0C8",
+      chipBorder: isDark ? "#7BA87B" : "#5B8A5B",
+    }),
+    [isDark]
+  );
 
   // Chip data by category
   const chipsByCategory = useMemo(() => {
@@ -162,27 +203,12 @@ export default function EmotionsSettingsScreen() {
           name,
           category
         );
-        if (preview.affectedMoodEntryCount === 0) return;
-        Alert.alert(
-          "Update Past Entries?",
-          `Apply this category change to ${preview.affectedMoodEntryCount} past ${preview.affectedMoodEntryCount === 1 ? "entry" : "entries"}?`,
-          [
-            { text: "Future Only", style: "cancel" },
-            {
-              text: "Update All",
-              onPress: async () => {
-                try {
-                  await emotionService.applyCategoryHistoricalUpdate(
-                    name,
-                    category
-                  );
-                } catch {
-                  Alert.alert("Error", "Category saved for future entries only.");
-                }
-              },
-            },
-          ]
-        );
+        await promptHistoricalUpdate({
+          affectedMoodEntryCount: preview.affectedMoodEntryCount,
+          message: `Apply this category change to ${preview.affectedMoodEntryCount} past ${preview.affectedMoodEntryCount === 1 ? "entry" : "entries"}?`,
+          apply: () => emotionService.applyCategoryHistoricalUpdate(name, category),
+          fallbackMessage: "Category saved for future entries only.",
+        });
       } catch {
         /* skip */
       }
@@ -229,6 +255,58 @@ export default function EmotionsSettingsScreen() {
     []
   );
 
+  const handleAddFromHistory = useCallback(async () => {
+    haptics.light();
+
+    try {
+      setHistorySyncLoading(true);
+      const diff = await presetSyncService.previewMissingFromHistory("emotions");
+      setHistorySyncLoading(false);
+
+      if (diff.emotions.length === 0) {
+        Alert.alert(
+          "Nothing to Add",
+          "Every emotion in your Mood Entry history is already in your Emotion List."
+        );
+        return;
+      }
+
+      Alert.alert(
+        "Add from History",
+        `Add ${diff.emotions.length} emotion${diff.emotions.length === 1 ? "" : "s"} from past Mood Entries to your Emotion List?`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Add",
+            onPress: async () => {
+              try {
+                setHistorySyncLoading(true);
+                const result =
+                  await presetSyncService.addMissingFromHistory("emotions");
+                haptics.success();
+                Alert.alert(
+                  "Added from History",
+                  result.addedEmotions.length > 0
+                    ? `Added ${result.addedEmotions.length} emotion${result.addedEmotions.length === 1 ? "" : "s"}.`
+                    : "No new emotions were found."
+                );
+              } catch {
+                haptics.error();
+                Alert.alert("Error", "Could not add emotions from history.");
+              } finally {
+                setHistorySyncLoading(false);
+              }
+            },
+          },
+        ]
+      );
+    } catch {
+      haptics.error();
+      setHistorySyncLoading(false);
+      Alert.alert("Error", "Could not check your Mood Entry history.");
+    }
+  }, []);
+
   const handleEditEmotion = useCallback(
     (name: string, category: Emotion["category"]) => {
       haptics.light();
@@ -258,6 +336,12 @@ export default function EmotionsSettingsScreen() {
       haptics.medium();
 
       if (originalName && normalizedOld) {
+        const originalEmotion = emotions.find(
+          (emotion) => normalizePresetKey(emotion.name) === normalizedOld
+        );
+        const renamed = normalizePresetKey(trimmed) !== normalizedOld;
+        const recategorized = originalEmotion?.category !== category;
+
         // Renaming existing emotion
         await setEmotions(
           emotions.map((e) =>
@@ -266,6 +350,50 @@ export default function EmotionsSettingsScreen() {
               : e
           )
         );
+
+        if (renamed) {
+          try {
+            const preview = await emotionService.previewRenameHistoricalUpdate(
+              originalName,
+              trimmed
+            );
+            await promptHistoricalUpdate({
+              affectedMoodEntryCount: preview.affectedMoodEntryCount,
+              message: `Apply this name change to ${preview.affectedMoodEntryCount} past ${preview.affectedMoodEntryCount === 1 ? "entry" : "entries"}?`,
+              apply: async () => {
+                await emotionService.applyRenameHistoricalUpdate(
+                  originalName,
+                  trimmed
+                );
+                if (recategorized) {
+                  await emotionService.applyCategoryHistoricalUpdate(
+                    trimmed,
+                    category
+                  );
+                }
+              },
+              fallbackMessage: "Emotion saved for future entries only.",
+            });
+          } catch {
+            /* skip */
+          }
+        } else if (recategorized) {
+          try {
+            const preview = await emotionService.previewCategoryHistoricalUpdate(
+              trimmed,
+              category
+            );
+            await promptHistoricalUpdate({
+              affectedMoodEntryCount: preview.affectedMoodEntryCount,
+              message: `Apply this category change to ${preview.affectedMoodEntryCount} past ${preview.affectedMoodEntryCount === 1 ? "entry" : "entries"}?`,
+              apply: () =>
+                emotionService.applyCategoryHistoricalUpdate(trimmed, category),
+              fallbackMessage: "Category saved for future entries only.",
+            });
+          } catch {
+            /* skip */
+          }
+        }
       } else {
         // Adding new emotion
         const result = presetModel.addCustom({ name: trimmed, category });
@@ -316,7 +444,7 @@ export default function EmotionsSettingsScreen() {
         {CATEGORIES.map((cat, index) => (
           <Animated.View
             key={cat}
-            entering={FadeInDown.delay(200 + index * 80).duration(260)}
+            entering={FadeInDown.delay(240 + index * 80).duration(260)}
           >
             <CategorySection
               category={cat}
@@ -335,12 +463,24 @@ export default function EmotionsSettingsScreen() {
 
         {/* Tips Section */}
         <Animated.View
-          entering={FadeInDown.delay(500).duration(260)}
+          entering={FadeInDown.delay(560).duration(260)}
         >
           <PresetTipCard isDark={isDark}>
             Long-press custom emotions to move them between categories. Tap the
             edit icon to rename.
           </PresetTipCard>
+        </Animated.View>
+
+        <Animated.View entering={FadeInDown.delay(620).duration(260)}>
+          <PresetHistorySyncCard
+            title="Add from History"
+            description="Find logged emotions missing from this list"
+            icon="time-outline"
+            isDark={isDark}
+            tone={historySyncTone}
+            loading={historySyncLoading}
+            onPress={handleAddFromHistory}
+          />
         </Animated.View>
       </ScrollView>
 
@@ -354,7 +494,7 @@ export default function EmotionsSettingsScreen() {
           style={({ pressed }) => [
             presetListStyles.fab,
             {
-              backgroundColor: isDark ? "#5B8A5B" : "#5B8A5B",
+              backgroundColor: "#476D47",
               transform: [{ scale: pressed ? 0.95 : 1 }],
               shadowColor: "#5B8A5B",
             },

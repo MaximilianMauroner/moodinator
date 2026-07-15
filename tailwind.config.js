@@ -18,6 +18,9 @@ module.exports = {
           200: "#F5F1E8",
           300: "#EDE7DA",
           400: "#DDD4C4",
+          500: "#9A8D78",
+          600: "#766957",
+          700: "#5C5042",
           // Dark mode variants: clean eucalyptus ink with lifted green paper layers.
           800: "#182C20",
           850: "#14251C",
@@ -32,6 +35,9 @@ module.exports = {
           400: "#7BA87B",
           500: "#5B8A5B",
           600: "#476D47",
+          700: "#365536",
+          800: "#263E28",
+          900: "#17291B",
         },
         coral: {
           50: "#FEF6F4",
@@ -41,6 +47,9 @@ module.exports = {
           400: "#ED8370",
           500: "#E06B55",
           600: "#C75441",
+          700: "#A53F30",
+          800: "#813126",
+          900: "#4A211C",
         },
         sand: {
           50: "#FDFBF7",
@@ -50,6 +59,7 @@ module.exports = {
           400: "#D4C4A0",
           500: "#BDA77D",
           600: "#9D8660",
+          700: "#796545",
           // Dark variants
           800: "#342B1D",
           900: "#241E15",

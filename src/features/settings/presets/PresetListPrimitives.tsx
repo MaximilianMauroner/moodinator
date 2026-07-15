@@ -1,11 +1,12 @@
 import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
+import { colors } from "@/constants/colors";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -201,8 +202,8 @@ export function PresetSectionCard({
                   styles.sectionDescription,
                   {
                     color: isDark
-                      ? "rgba(255,255,255,0.45)"
-                      : "rgba(0,0,0,0.40)",
+                      ? colors.textMuted.dark
+                      : colors.textMuted.light,
                   },
                 ]}
               >
@@ -256,8 +257,8 @@ export function PresetSectionCard({
                     styles.actionText,
                     {
                       color: isDark
-                        ? "rgba(255,255,255,0.40)"
-                        : "rgba(0,0,0,0.35)",
+                        ? colors.textSubtle.dark
+                        : colors.textSubtle.light,
                     },
                   ]}
                 >
@@ -340,8 +341,8 @@ export function PresetChip({
   const textColor = isActive
     ? activeTone.primary
     : isDark
-      ? "rgba(255,255,255,0.40)"
-      : "rgba(0,0,0,0.35)";
+      ? colors.textMuted.dark
+      : colors.textMuted.light;
 
   return (
     <AnimatedPressable
@@ -371,7 +372,7 @@ export function PresetChip({
           <Ionicons
             name={isCustom ? "close" : "checkmark"}
             size={10}
-            color="#FDFCFA"
+            color={isDark ? colors.background.dark : colors.textInverse.light}
           />
         </View>
       )}
@@ -396,7 +397,7 @@ export function PresetChip({
           <Ionicons
             name="pencil"
             size={12}
-            color={isDark ? "rgba(255,255,255,0.50)" : "rgba(0,0,0,0.35)"}
+            color={isDark ? colors.textSubtle.dark : colors.textSubtle.light}
           />
         </Pressable>
       )}
@@ -407,19 +408,26 @@ export function PresetChip({
 export function PresetAddChip({
   isDark,
   onPress,
+  accessibilityLabel = "Add custom preset",
 }: {
   isDark: boolean;
   onPress: () => void;
+  accessibilityLabel?: string;
 }) {
-  const color = isDark ? "rgba(255,255,255,0.40)" : "rgba(0,0,0,0.35)";
+  // Keep the affordance legible on both the warm paper cards and dark theme
+  // surfaces. The previous low-opacity foreground made this control read as
+  // disabled, especially on the preset screens' light cards.
+  const color = isDark ? "#C8F5BE" : "#31543A";
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       style={[
         styles.addChip,
         {
-          borderColor: isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.10)",
-          backgroundColor: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.02)",
+          borderColor: isDark ? "#A6E39B" : "#5B8A5B",
+          backgroundColor: isDark ? "#1B3423" : "#E6EEE1",
         },
       ]}
     >
@@ -440,7 +448,7 @@ export function PresetEmptyText({
     <Text
       style={[
         styles.emptyText,
-        { color: isDark ? "rgba(255,255,255,0.35)" : "rgba(0,0,0,0.30)" },
+        { color: isDark ? colors.textSubtle.dark : colors.textSubtle.light },
       ]}
     >
       {children}
@@ -496,6 +504,71 @@ export function PresetTipCard({
           </Text>
         </View>
       </View>
+    </View>
+  );
+}
+
+export function PresetHistorySyncCard({
+  title,
+  description,
+  icon,
+  isDark,
+  tone,
+  loading,
+  onPress,
+}: {
+  title: string;
+  description: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  isDark: boolean;
+  tone: PresetTone;
+  loading?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <View className="px-4 pt-2">
+      <Pressable
+        onPress={onPress}
+        disabled={loading}
+        accessibilityRole="button"
+        accessibilityLabel={`${title}, ${description}`}
+        className="flex-row items-center rounded-2xl border p-3.5"
+        style={({ pressed }) => ({
+          backgroundColor: tone.cardBg,
+          borderColor: tone.border,
+          opacity: loading ? 0.72 : pressed ? 0.86 : 1,
+        })}
+      >
+        <View
+          className="w-9 h-9 rounded-xl items-center justify-center mr-3"
+          style={{ backgroundColor: tone.accentBg }}
+        >
+          <Ionicons name={icon} size={17} color={tone.primary} />
+        </View>
+        <View className="flex-1 pr-3">
+          <Text
+            className="text-sm font-bold"
+            style={{ color: isDark ? "#F0EDE6" : "#3D352A" }}
+            numberOfLines={1}
+          >
+            {title}
+          </Text>
+          <Text
+            className="text-xs mt-0.5"
+            style={{
+              color: isDark ? "rgba(255,255,255,0.48)" : "rgba(0,0,0,0.44)",
+            }}
+            numberOfLines={2}
+          >
+            {description}
+          </Text>
+        </View>
+        {loading ? (
+          <ActivityIndicator size="small" color={tone.primary} />
+        ) : (
+          <Ionicons name="add-circle" size={22} color={tone.primary} />
+        )}
+      </Pressable>
     </View>
   );
 }

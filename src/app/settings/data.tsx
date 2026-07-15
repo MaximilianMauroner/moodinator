@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { View, Text, ScrollView, Alert, TouchableOpacity, Platform, ActivityIndicator } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, Platform, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useColorScheme } from "nativewind";
 import { Ionicons } from "@expo/vector-icons";
@@ -10,13 +10,15 @@ import { SettingsSection } from "@/features/settings/components/SettingsSection"
 import { SettingRow } from "@/features/settings/components/SettingRow";
 import { ExportModal } from "@/features/settings/components/ExportModal";
 import { formatBackupDate, formatBackupFolderPath } from "@/features/settings/utils/backupFormat";
+import { confirmDeleteLocalMoodData } from "@/features/settings/utils/deleteLocalDataConfirmation";
 import { dataPortabilityService } from "@/services/dataPortabilityService";
+import { Alert } from "@/components/ui/AppAlert";
 
 export default function DataSettingsScreen() {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === "dark";
 
-  const [loading, setLoading] = useState<"import" | "backup" | null>(null);
+  const [loading, setLoading] = useState<"import" | "backup" | "delete" | null>(null);
   const [exportModalVisible, setExportModalVisible] = useState(false);
   const [backupInfo, setBackupInfo] = useState<{
     count: number;
@@ -81,14 +83,22 @@ export default function DataSettingsScreen() {
         return;
       }
       const fileContent = await FileSystem.readAsStringAsync(result.assets[0].uri);
+      const importPreview = dataPortabilityService.previewImportData(fileContent);
       Alert.alert(
         "Replace Current Data?",
-        "Data Import replaces your current local Moodinator data with the selected file. This cannot be undone unless you have a separate Data Export or Backup.",
+        `${dataPortabilityService.summarizeImportPreview(importPreview)} This cannot be undone unless you have a separate Data Export or Backup.`,
         [
           {
             text: "Cancel",
             style: "cancel",
             onPress: () => setLoading(null),
+          },
+          {
+            text: "Export Current Data First",
+            onPress: () => {
+              setLoading(null);
+              setExportModalVisible(true);
+            },
           },
           {
             text: "Replace Data",
@@ -101,7 +111,10 @@ export default function DataSettingsScreen() {
                   dataPortabilityService.summarizeImportResult(importResult)
                 );
               } catch (error) {
-                Alert.alert("Import Error", "Failed to import mood data.");
+                Alert.alert(
+                  "Import Error",
+                  error instanceof Error ? error.message : "Failed to import mood data."
+                );
                 console.error(error);
               } finally {
                 setLoading(null);
@@ -112,17 +125,31 @@ export default function DataSettingsScreen() {
       );
       return;
     } catch (error) {
-      Alert.alert("Import Error", "Failed to import mood data.");
+      Alert.alert(
+        "Import Error",
+        error instanceof Error ? error.message : "Failed to import mood data."
+      );
       console.error(error);
+      setLoading(null);
     }
   }, []);
+
+  const handleDeleteLocalMoodData = useCallback(() => {
+    confirmDeleteLocalMoodData({
+      showAlert: Alert.alert,
+      deleteLocalMoodData: dataPortabilityService.deleteLocalMoodData,
+      loadBackupInfo,
+      setLoading,
+      onError: console.error,
+    });
+  }, [loadBackupInfo]);
 
   return (
     <SafeAreaView className="flex-1 bg-paper-100 dark:bg-paper-900" edges={["top"]}>
       <SettingsPageHeader
         title="Data & Backups"
         subtitle="Data"
-        icon="cloud-outline"
+        icon="folder-outline"
         accentColor="sage"
       />
 
@@ -135,12 +162,12 @@ export default function DataSettingsScreen() {
         <View className="mx-4 mb-4 p-4 rounded-2xl bg-sage-100 dark:bg-sage-600/20">
           <View className="flex-row items-center mb-2">
             <Ionicons
-              name={backupInfo && backupInfo.count > 0 ? "cloud-done-outline" : "cube-outline"}
+              name={backupInfo && backupInfo.count > 0 ? "folder-open-outline" : "folder-outline"}
               size={20}
               color={isDark ? "#A8C5A8" : "#5B8A5B"}
               style={{ marginRight: 8 }}
             />
-            <Text className="text-base font-bold text-sage-500 dark:text-sage-300">
+            <Text className="text-base font-bold text-sage-600 dark:text-sage-300">
               {backupInfo
                 ? backupInfo.count > 0
                   ? `${backupInfo.count} backup${backupInfo.count === 1 ? "" : "s"} saved`
@@ -149,7 +176,7 @@ export default function DataSettingsScreen() {
             </Text>
           </View>
           {backupInfo?.latestBackup && (
-            <Text className="text-xs text-sand-500 dark:text-sand-400">
+            <Text className="text-xs text-paper-700 dark:text-sand-400">
               Last backup: {formatBackupDate(backupInfo.latestBackup)}
             </Text>
           )}
@@ -169,7 +196,7 @@ export default function DataSettingsScreen() {
           <SettingRow
             label="Import Data"
             subLabel="Replace current data from a JSON export or backup"
-            icon="cloud-upload-outline"
+            icon="document-outline"
             onPress={handleImport}
             isLast
             action={
@@ -181,8 +208,27 @@ export default function DataSettingsScreen() {
         </SettingsSection>
 
         <SettingsSection
+          title="Delete Local Data"
+          footer="This affects Moodinator data stored inside the app. It does not delete files you exported or backup files saved outside the app."
+        >
+          <SettingRow
+            label="Delete Mood Data"
+            subLabel="Permanently remove mood entries from this device"
+            icon="trash-outline"
+            destructive
+            onPress={handleDeleteLocalMoodData}
+            isLast
+            action={
+              loading === "delete" ? (
+                <ActivityIndicator size="small" color={isDark ? "#F5A899" : "#C75441"} />
+              ) : undefined
+            }
+          />
+        </SettingsSection>
+
+        <SettingsSection
           title="Periodic Backups"
-          footer="Backups run automatically when the system allows background work, usually with network available. The system decides when, so timing may vary."
+          footer="Backups are files saved on this device or in the folder you choose. The system may use network availability only to schedule background work; Moodinator does not upload your data."
         >
           {Platform.OS === "android" && (
             <SettingRow
@@ -211,7 +257,7 @@ export default function DataSettingsScreen() {
                   {loading === "backup" ? (
                     <ActivityIndicator size="small" color={isDark ? "#A8C5A8" : "#5B8A5B"} />
                   ) : (
-                    <Text className="font-semibold text-xs text-sage-500 dark:text-sage-300">
+                    <Text className="font-semibold text-xs text-sage-600 dark:text-sage-300">
                       Run Backup
                     </Text>
                   )}

@@ -100,7 +100,9 @@ On Expo SDK 53 with `expo-router` 5, toggling NativeWind `shadow-*` utilities du
 
 ## Roadmap
 
-See [improvements.md](./improvements.md) for planned features and enhancements.
+Use the task tracker for planned features, implementation slices, dependencies, and task
+status. See [AGENTS.md](./AGENTS.md) for the parent-task, vertical-slice,
+review, and merge workflow.
 
 ## Privacy & Legal
 
@@ -111,7 +113,8 @@ See [improvements.md](./improvements.md) for planned features and enhancements.
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit issues and pull requests.
+Contributions are welcome. Use the task tracker for planned work and implementation
+handoff; pull requests should reference the relevant task when one exists.
 
 ## Contact
 

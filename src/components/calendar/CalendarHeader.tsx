@@ -78,7 +78,7 @@ export function CalendarHeader({
           >
             <Text
               className="text-xs font-medium"
-              style={{ color: get("primary") }}
+              style={{ color: isDark ? get("primary") : "#476D47" }}
             >
               Today
             </Text>

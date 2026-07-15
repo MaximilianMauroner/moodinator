@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
-  Text,
   RefreshControl,
   ScrollView as RNScrollView,
   type LayoutChangeEvent,
@@ -43,6 +42,7 @@ import {
   DetailedMoodButtonSelector,
   HomeHeader,
   HistoryListHeader,
+  CollapsedMoodSelector,
   UnifiedMoodSelector,
   UNIFIED_COMPACT_EXPANDED_HEIGHT,
 } from "@/components/home";
@@ -58,10 +58,6 @@ import { getHomeHeaderSnapTarget } from "@/lib/homeHeaderSnap";
 import { addHomeTabDoublePressListener } from "@/lib/homeTabEvents";
 
 import type { MoodEntry } from "@db/types";
-import {
-  getAllMoodRatingDisplays,
-  getNeutralMoodRating,
-} from "@/constants/moodScaleInterpretation";
 
 const HomeErrorFallback = createScreenErrorFallback("Home");
 const COLLAPSED_SELECTOR_HEIGHT = 60;
@@ -99,6 +95,7 @@ function HomeScreenContent() {
 
   const moods = useMoodsStore((state) => state.moods);
   const status = useMoodsStore((state) => state.status);
+  const error = useMoodsStore((state) => state.error);
   const loadAll = useMoodsStore((state) => state.loadAll);
   const refreshMoods = useMoodsStore((state) => state.refreshMoods);
   const createMood = useMoodsStore((state) => state.create);
@@ -170,11 +167,14 @@ function HomeScreenContent() {
       <DisplayMoodItem
         mood={item}
         onSwipeableWillOpen={itemActions.onSwipeableWillOpen}
+        onPress={modals.openDateModal}
         onLongPress={handleMoodItemLongPress}
+        onEdit={modals.setEditingEntry}
+        onDelete={itemActions.handleDeleteMood}
         swipeThreshold={itemActions.SWIPE_THRESHOLD}
       />
     ),
-    [handleMoodItemLongPress, itemActions.SWIPE_THRESHOLD, itemActions.onSwipeableWillOpen]
+    [handleMoodItemLongPress, itemActions, modals]
   );
 
   const estimatedExpandedPanelHeight = entrySettings.showDetailedLabels
@@ -541,6 +541,17 @@ function HomeScreenContent() {
     () =>
       loading ? (
         <LoadingSpinner message="Loading..." />
+      ) : status === "error" ? (
+        <EmptyState
+          icon="warning-outline"
+          tone="coral"
+          title="Mood history could not load"
+          description={error ?? "Your local mood history is still on this device. Try loading it again."}
+          actionLabel="Try Again"
+          onAction={() => {
+            void loadAll();
+          }}
+        />
       ) : (
         <EmptyState
           icon="leaf-outline"
@@ -549,7 +560,7 @@ function HomeScreenContent() {
           description="Tap a mood above to log how you're feeling right now"
         />
       ),
-    [loading]
+    [error, loadAll, loading, status]
   );
 
   const listContentContainerStyle = useMemo(
@@ -728,7 +739,7 @@ function HomeScreenContent() {
                   <Ionicons
                     name="arrow-up"
                     size={23}
-                    color={isDark ? "#08150F" : "#FDFCFA"}
+                    color="#08150F"
                   />
                 </HapticTab>
               </View>
@@ -743,6 +754,10 @@ function HomeScreenContent() {
           mood={modals.selectedMood}
           onClose={modals.closeDateModal}
           onSave={handleDateTimeSave}
+          onEdit={(mood) => {
+            modals.closeDateModal();
+            modals.setEditingEntry(mood);
+          }}
         />
       )}
       <QuickMoodEntryModal
@@ -753,6 +768,8 @@ function HomeScreenContent() {
         fieldConfig={entrySettings.quickEntryFieldConfig}
         onClose={modals.closeQuickEntry}
         onSubmit={handleEntrySave}
+        onCreateEmotion={entrySettings.createEmotionOption}
+        onCreateContextTag={entrySettings.createContextOption}
       />
       <DetailedMoodEntryModal
         visible={modals.detailedEntryVisible}
@@ -762,6 +779,8 @@ function HomeScreenContent() {
         fieldConfig={entrySettings.detailedFieldConfig}
         onClose={modals.closeDetailedEntry}
         onSubmit={handleEntrySave}
+        onCreateEmotion={entrySettings.createEmotionOption}
+        onCreateContextTag={entrySettings.createContextOption}
       />
       <EditMoodEntryModal
         visible={Boolean(modals.editingEntry)}
@@ -772,146 +791,10 @@ function HomeScreenContent() {
         initialValues={modals.editingInitialValues}
         onClose={modals.closeEditEntry}
         onSubmit={handleEditEntrySave}
+        onCreateEmotion={entrySettings.createEmotionOption}
+        onCreateContextTag={entrySettings.createContextOption}
       />
     </>
-  );
-}
-
-interface CollapsedMoodSelectorProps {
-  isDark: boolean;
-  onMoodPress: (mood: number) => void;
-  onLongPress: (mood: number) => void;
-}
-
-const PILL_WIDTH = 52;
-const PILL_HEIGHT = 38;
-const PILL_GAP = 5;
-const PILL_STEP = PILL_WIDTH + PILL_GAP;
-const TRACK_EDGE_INSET = 16;
-const CENTER_INDEX = getNeutralMoodRating();
-const MIN_VISIBLE_PILLS = 4;
-const MAX_VISIBLE_PILLS = 7;
-const MOOD_RATING_COUNT = getAllMoodRatingDisplays(false).length;
-
-function CollapsedMoodSelector({
-  isDark,
-  onMoodPress,
-  onLongPress,
-}: CollapsedMoodSelectorProps) {
-  const scrollRef = useRef<RNScrollView>(null);
-  const [trackWidth, setTrackWidth] = useState(0);
-  const moodData = useMemo(() => getAllMoodRatingDisplays(isDark), [isDark]);
-
-  // Size the scroll viewport to fit a whole number of pills with NO horizontal
-  // padding inside. Combined with snap-to-start, this guarantees every resting
-  // position shows full pills only — no partial-pill slivers at the edges to
-  // mask. Anything outside this exact width becomes solid container background,
-  // which is visually quiet.
-  const availableScrollWidth = Math.max(0, trackWidth - TRACK_EDGE_INSET * 2);
-  const visiblePills =
-    availableScrollWidth > 0
-      ? Math.max(
-          MIN_VISIBLE_PILLS,
-          Math.min(
-            MAX_VISIBLE_PILLS,
-            Math.floor((availableScrollWidth + PILL_GAP) / PILL_STEP)
-          )
-        )
-      : MIN_VISIBLE_PILLS;
-  const scrollAreaWidth = visiblePills * PILL_STEP - PILL_GAP;
-  const fits = scrollAreaWidth >= MOOD_RATING_COUNT * PILL_STEP - PILL_GAP;
-
-  useEffect(() => {
-    if (trackWidth <= 0 || fits) return;
-
-    // Position CENTER_INDEX as centered as possible inside the visible slot.
-    const leftmostIndex = Math.max(
-      0,
-      Math.min(
-        MOOD_RATING_COUNT - visiblePills,
-        CENTER_INDEX - Math.floor(visiblePills / 2)
-      )
-    );
-    const x = leftmostIndex * PILL_STEP;
-
-    requestAnimationFrame(() => {
-      scrollRef.current?.scrollTo({ x, y: 0, animated: false });
-    });
-  }, [trackWidth, fits, visiblePills]);
-
-  return (
-    <View
-      onLayout={(event: LayoutChangeEvent) => setTrackWidth(event.nativeEvent.layout.width)}
-      style={{
-        backgroundColor: isDark ? "#14251C" : "#FDFCFA",
-        borderWidth: 1,
-        borderColor: isDark ? "#2F513B" : "#E5D9BF",
-        borderRadius: 18,
-        shadowColor: isDark ? "#09130E" : "#9D8660",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: isDark ? 0.22 : 0.08,
-        shadowRadius: 8,
-        elevation: 3,
-        overflow: "hidden",
-        paddingHorizontal: TRACK_EDGE_INSET,
-        paddingVertical: 6,
-      }}
-    >
-      <RNScrollView
-        ref={scrollRef}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        decelerationRate="fast"
-        snapToInterval={fits ? undefined : PILL_STEP}
-        snapToAlignment="start"
-        disableIntervalMomentum
-        removeClippedSubviews
-        style={{
-          width: "100%",
-          flexGrow: 0,
-          flexShrink: 0,
-          overflow: "hidden",
-        }}
-        contentContainerStyle={{
-          flexGrow: fits ? 1 : undefined,
-          justifyContent: fits ? "center" : "flex-start",
-          alignItems: "center",
-          gap: PILL_GAP,
-        }}
-      >
-        {moodData.map((mood) => {
-          return (
-            <HapticTab
-              key={mood.value}
-              className="items-center justify-center"
-              style={{
-                width: PILL_WIDTH,
-                height: PILL_HEIGHT,
-                backgroundColor: mood.backgroundHex,
-                borderRadius: 12,
-              }}
-              onPress={() => onMoodPress(mood.value)}
-              onLongPress={() => onLongPress(mood.value)}
-              delayLongPress={500}
-              accessibilityRole="button"
-              accessibilityLabel={mood.accessibilityText}
-            >
-              <Text
-                style={{
-                  color: mood.colorHex,
-                  fontSize: 14,
-                  fontWeight: "700",
-                  fontVariant: ["tabular-nums"],
-                  letterSpacing: -0.2,
-                }}
-              >
-                {mood.value}
-              </Text>
-            </HapticTab>
-          );
-        })}
-      </RNScrollView>
-    </View>
   );
 }
 

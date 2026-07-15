@@ -9,3 +9,4 @@ export {
   UnifiedMoodSelector,
   UNIFIED_COMPACT_EXPANDED_HEIGHT,
 } from "./UnifiedMoodSelector";
+export { CollapsedMoodSelector } from "./CollapsedMoodSelector";

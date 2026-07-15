@@ -9,6 +9,16 @@ export async function getString(key: string): Promise<string | null> {
   }
 }
 
+/** Read storage without treating an I/O failure as a missing value. */
+export async function getStringStrict(key: string): Promise<string | null> {
+  try {
+    return await AsyncStorage.getItem(key);
+  } catch (error) {
+    console.error(`[storage] Failed to read key "${key}":`, error);
+    throw error;
+  }
+}
+
 export async function setString(key: string, value: string): Promise<void> {
   try {
     await AsyncStorage.setItem(key, value);
@@ -52,4 +62,3 @@ export async function getJson<T>(key: string): Promise<T | null> {
 export async function setJson(key: string, value: unknown): Promise<void> {
   await setString(key, JSON.stringify(value));
 }
-

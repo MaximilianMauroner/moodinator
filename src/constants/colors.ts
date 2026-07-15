@@ -20,6 +20,7 @@ export const colors = {
 
   // Primary accent (sage green)
   primary: { light: "#5B8A5B", dark: "#A6E39B" },
+  onPrimary: { light: "#08150F", dark: "#08150F" },
   primaryMuted: { light: "#7BA87B", dark: "#C8F5BE" },
   primaryBg: { light: "#E8EFE8", dark: "#122A1A" },
   primaryBgHover: { light: "#D1DFD1", dark: "#193622" },
@@ -34,25 +35,25 @@ export const colors = {
   // Category colors - for emotions and tags
   positive: {
     bg: { light: "#E8EFE8", dark: "#122A1A" },
-    bgSelected: { light: "#5B8A5B", dark: "#34703D" },
+    bgSelected: { light: "#476D47", dark: "#34703D" },
     border: { light: "#D1DFD1", dark: "#2F5A39" },
-    text: { light: "#5B8A5B", dark: "#C8F5BE" },
+    text: { light: "#476D47", dark: "#C8F5BE" },
     textSelected: { light: "#FDFCFA", dark: "#FDFCFA" },
     textDark: { light: "#476D47", dark: "#C8F5BE" },
   },
   negative: {
     bg: { light: "#FDE8E4", dark: "#482721" },
-    bgSelected: { light: "#E06B55", dark: "#D87561" },
+    bgSelected: { light: "#A53F30", dark: "#D87561" },
     border: { light: "#FACFC7", dark: "#693930" },
-    text: { light: "#C75441", dark: "#F2B4A6" },
-    textSelected: { light: "#FDFCFA", dark: "#FDFCFA" },
+    text: { light: "#A53F30", dark: "#F2B4A6" },
+    textSelected: { light: "#FDFCFA", dark: "#08150F" },
   },
   neutral: {
     bg: { light: "#EFECF2", dark: "#332D3D" },
-    bgSelected: { light: "#847596", dark: "#8A7AA0" },
+    bgSelected: { light: "#695C78", dark: "#8A7AA0" },
     border: { light: "#DDD8E5", dark: "#51485F" },
     text: { light: "#695C78", dark: "#D5CCDD" },
-    textSelected: { light: "#FDFCFA", dark: "#FDFCFA" },
+    textSelected: { light: "#FDFCFA", dark: "#08150F" },
   },
 
   // Sand/warm tones (for energy, timestamps, etc.)
@@ -162,7 +163,7 @@ export const chartColors = {
 
 export const semanticToneColors = {
   sage: {
-    light: { bg: "#E8EFE8", fg: "#5B8A5B", ring: "rgba(91, 138, 91, 0.16)", border: "#D1DFD1" },
+    light: { bg: "#E8EFE8", fg: "#476D47", ring: "rgba(91, 138, 91, 0.16)", border: "#D1DFD1" },
     dark: { bg: "#122A1A", fg: "#C8F5BE", ring: "rgba(200, 245, 190, 0.12)", border: "#2F5A39" },
   },
   sand: {
@@ -170,11 +171,11 @@ export const semanticToneColors = {
     dark: { bg: "#3D321F", fg: "#E0C993", ring: "rgba(224, 201, 147, 0.14)", border: "#5B5036" },
   },
   coral: {
-    light: { bg: "#FDE8E4", fg: "#E06B55", ring: "rgba(224, 107, 85, 0.16)", border: "#FACFC7" },
+    light: { bg: "#FDE8E4", fg: "#A53F30", ring: "rgba(224, 107, 85, 0.16)", border: "#FACFC7" },
     dark: { bg: "#4B2A22", fg: "#F2B4A6", ring: "rgba(242, 180, 166, 0.16)", border: "#6B3B31" },
   },
   dusk: {
-    light: { bg: "#EFECF2", fg: "#847596", ring: "rgba(132, 117, 150, 0.16)", border: "#DDD8E5" },
+    light: { bg: "#EFECF2", fg: "#695C78", ring: "rgba(132, 117, 150, 0.16)", border: "#DDD8E5" },
     dark: { bg: "#332D3D", fg: "#D5CCDD", ring: "rgba(213, 204, 221, 0.16)", border: "#51485F" },
   },
   neutral: {
@@ -242,6 +243,7 @@ export function useThemeColors() {
       | "textSubtle"
       | "textInverse"
       | "primary"
+      | "onPrimary"
       | "primaryMuted"
       | "primaryBg"
       | "primaryBgHover"

@@ -43,7 +43,7 @@ export default function TabLayout() {
   // Soft Organic palette: tab chrome follows the same botanical night tokens
   // as the screens so dark mode keeps the warm field-journal feel.
   const colors = {
-    active: isDark ? "#A6E39B" : "#5B8A5B",
+    active: isDark ? "#A6E39B" : "#476D47",
     inactive: isDark ? "#9EB894" : "#7A6B55",
     background: isDark ? "#08150F" : "#FAF8F4",
     border: isDark ? "#233D2D" : "#E5D9BF",
@@ -76,9 +76,9 @@ export default function TabLayout() {
             borderTopColor: colors.border,
             borderTopWidth: 1,
             elevation: 0,
-            height: compactTabBarHeight + 10,
+            height: compactTabBarHeight + insets.bottom,
             paddingTop: compactTopPadding,
-            paddingBottom: 8,
+            paddingBottom: Math.max(insets.bottom, 8),
           },
         }),
         tabBarItemStyle: {
@@ -86,7 +86,7 @@ export default function TabLayout() {
         },
         tabBarLabelStyle: {
           fontWeight: "600",
-          fontSize: 10,
+          fontSize: 12,
           marginTop: -1,
         },
       }}

@@ -132,7 +132,7 @@ function CardStyleOption({
           <View className="flex-row items-center gap-3">
             <View
               className="h-8 w-8 items-center justify-center rounded-full"
-              style={{ backgroundColor: "#B88958" }}
+              style={{ backgroundColor: "#7A6545" }}
             >
               <Text className="text-sm font-bold text-white">6</Text>
             </View>

@@ -34,7 +34,7 @@ export const MoodButtonsCompact: React.FC<MoodButtonsCompactProps> = ({
 
   const renderMoodButton = (mood: typeof moodData[0]) => (
     <HapticTab
-      key={mood.value}
+      key={`${isDark ? "dark" : "light"}-${mood.value}`}
       className="flex-1 items-center justify-center py-2.5 mx-1 rounded-2xl"
       style={{
         backgroundColor: mood.bgHex || get("surfaceAlt"),
@@ -61,8 +61,8 @@ export const MoodButtonsCompact: React.FC<MoodButtonsCompactProps> = ({
         {mood.value}
       </Text>
       <Text
-        className="text-[8px] font-semibold text-center tracking-wide"
-        style={{ color: mood.textHex || (isDark ? colors.sand.text.dark : colors.sand.text.light), opacity: 0.85 }}
+        className="text-xs font-semibold text-center tracking-wide"
+        style={{ color: mood.textHex || (isDark ? colors.sand.text.dark : colors.sand.text.light) }}
         numberOfLines={1}
       >
         {mood.label}
@@ -115,13 +115,13 @@ export const MoodButtonsCompact: React.FC<MoodButtonsCompactProps> = ({
         </View>
         <View className="flex-row justify-between mt-2 px-0.5">
           <Text
-            className="text-[10px] font-medium"
-            style={{ color: isDark ? colors.primaryMuted.dark : colors.primary.light }}
+            className="text-xs font-medium"
+            style={{ color: isDark ? colors.primaryMuted.dark : colors.positive.textDark.light }}
           >
             Great
           </Text>
           <Text
-            className="text-[10px] font-medium"
+            className="text-xs font-medium"
             style={{ color: isDark ? colors.negative.text.dark : colors.negative.text.light }}
           >
             Need support

@@ -30,6 +30,7 @@ export function useCalendarData(initialYear?: number, initialMonth?: number) {
   ));
   const [monthData, setMonthData] = useState<CalendarMonthData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const latestRequestIdRef = useRef(0);
 
   const year = displayDate.getFullYear();
@@ -38,6 +39,7 @@ export function useCalendarData(initialYear?: number, initialMonth?: number) {
   const loadMonthData = useCallback(async () => {
     const requestId = ++latestRequestIdRef.current;
     setLoading(true);
+    setError(null);
     try {
       const moodsByDay = await moodService.getByMonth(year, month);
 
@@ -82,8 +84,11 @@ export function useCalendarData(initialYear?: number, initialMonth?: number) {
         daysInMonth,
         firstDayOfWeek,
       });
-    } catch (error) {
-      console.error("Failed to load calendar data:", error);
+    } catch (loadError) {
+      console.error("Failed to load calendar data:", loadError);
+      if (requestId === latestRequestIdRef.current) {
+        setError("Calendar data could not load. Your existing entries are still safe.");
+      }
     } finally {
       if (requestId === latestRequestIdRef.current) {
         setLoading(false);
@@ -140,6 +145,7 @@ export function useCalendarData(initialYear?: number, initialMonth?: number) {
     monthName,
     monthData,
     loading,
+    error,
     goToPreviousMonth,
     goToNextMonth,
     goToToday,

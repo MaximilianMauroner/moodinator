@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, AppState, AppStateStatus, ActivityIndicator } from "react-native";
+import { View, Text, AppState, AppStateStatus, ActivityIndicator, Pressable } from "react-native";
 import { Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -7,8 +7,10 @@ import { registerBackgroundBackupTask } from "@db/backgroundBackup";
 import { LockScreen, useAppLockStore } from "@/features/appLock";
 import { OnboardingScreen, useOnboardingStore } from "@/features/onboarding";
 import { AppToaster } from "@/components/ui/AppToaster";
+import { AppAlertProvider } from "@/components/ui/AppAlert";
 import { useSettingsStore } from "@/shared/state/settingsStore";
 import { runAppBootstrap, type AppBootstrapStatus } from "@/services/bootstrapService";
+import { useNotifications } from "@/hooks/useNotifications";
 
 import "./global.css";
 
@@ -21,7 +23,7 @@ function AppBootSplash() {
       <Text className="text-2xl font-bold text-paper-800 dark:text-paper-100 mb-2">
         Moodinator
       </Text>
-      <Text className="text-sm text-sand-600 dark:text-sand-400 mb-5 text-center">
+      <Text className="text-sm text-paper-700 dark:text-sand-400 mb-5 text-center">
         Preparing your private space...
       </Text>
       <ActivityIndicator size="small" color="#5B8A5B" />
@@ -29,12 +31,47 @@ function AppBootSplash() {
   );
 }
 
+function AppLockRecovery({ retry }: { retry: () => void }) {
+  return (
+    <View
+      accessibilityViewIsModal
+      className="flex-1 bg-paper-100 dark:bg-paper-900 justify-center items-center px-8"
+    >
+      <View className="w-16 h-16 rounded-2xl items-center justify-center mb-5 bg-coral-100 dark:bg-coral-600/20">
+        <Ionicons name="warning-outline" size={30} color="#C75441" />
+      </View>
+      <Text accessibilityRole="header" className="text-xl font-bold text-paper-800 dark:text-paper-100 text-center">
+        App lock needs attention
+      </Text>
+      <Text className="text-sm text-paper-700 dark:text-paper-300 mt-2 mb-5 text-center">
+        Moodinator could not safely read your security settings. Your private content remains hidden.
+      </Text>
+      <Pressable
+        onPress={retry}
+        className="min-h-11 px-6 rounded-xl items-center justify-center bg-sage-600 dark:bg-sage-400"
+        accessibilityRole="button"
+        accessibilityLabel="Retry loading app lock settings"
+      >
+        <Text className="font-semibold text-white dark:text-paper-900">Try again</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 export default function Layout() {
   const [bootstrapStatus, setBootstrapStatus] =
     useState<AppBootstrapStatus>("running");
-  const { hydrated: lockHydrated, hydrate: hydrateLock, isEnabled, isLocked, lock } = useAppLockStore();
+  const {
+    hydrated: lockHydrated,
+    hydrationError: lockHydrationError,
+    hydrate: hydrateLock,
+    isEnabled,
+    isLocked,
+    lock,
+  } = useAppLockStore();
   const { hydrated: onboardingHydrated, hydrate: hydrateOnboarding, hasCompletedOnboarding } = useOnboardingStore();
   const { hydrated: settingsHydrated, hydrate: hydrateSettings } = useSettingsStore();
+  useNotifications();
 
   // Hydrate all stores on mount before any screen renders.
   // AppBootSplash is shown until all three resolve.
@@ -46,6 +83,10 @@ export default function Layout() {
 
   const hydrated =
     lockHydrated && onboardingHydrated && settingsHydrated && bootstrapStatus !== "running";
+  const showLockScreen =
+    hydrated && !lockHydrationError && hasCompletedOnboarding && isEnabled && isLocked;
+  const shouldMountNavigator = hydrated && !lockHydrationError && hasCompletedOnboarding;
+  const blocksNavigator = !hydrated || Boolean(lockHydrationError) || !hasCompletedOnboarding || showLockScreen;
 
   // Lock app when it goes to background
   useEffect(() => {
@@ -87,34 +128,50 @@ export default function Layout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <View className="flex-1 bg-paper-100 dark:bg-paper-900">
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: {
-              backgroundColor: "transparent",
-            },
-          }}
-        />
+        <View
+          className="flex-1"
+          style={blocksNavigator ? { display: "none" } : undefined}
+          accessibilityElementsHidden={blocksNavigator}
+          importantForAccessibility={blocksNavigator ? "no-hide-descendants" : "auto"}
+        >
+          {shouldMountNavigator && (
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: "transparent",
+                },
+              }}
+            />
+          )}
+        </View>
 
-        {!hydrated && (
+        {!hydrated && !lockHydrationError && (
           <View className="absolute inset-0">
             <AppBootSplash />
           </View>
         )}
 
-        {hydrated && !hasCompletedOnboarding && (
+        {hydrated && !lockHydrationError && !hasCompletedOnboarding && (
           <View className="absolute inset-0">
             <OnboardingScreen />
           </View>
         )}
 
-        {hydrated && hasCompletedOnboarding && isEnabled && isLocked && (
+        {showLockScreen && (
           <View className="absolute inset-0">
             <LockScreen />
           </View>
         )}
 
-        <AppToaster />
+        {lockHydrationError && (
+          <View className="absolute inset-0">
+            <AppLockRecovery retry={() => void hydrateLock()} />
+          </View>
+        )}
+
+        {!blocksNavigator && <AppToaster />}
+        {!blocksNavigator && <AppAlertProvider />}
       </View>
     </GestureHandlerRootView>
   );

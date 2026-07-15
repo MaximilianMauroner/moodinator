@@ -16,10 +16,12 @@ import Animated, {
   withSpring,
   withTiming,
 } from "react-native-reanimated";
+import { Ionicons } from "@expo/vector-icons";
 import type { SwipeDirection } from "../types/mood";
 import { MoodEntry } from "@db/types";
 import { getMoodRatingDisplay } from "@/constants/moodScaleInterpretation";
 import { useThemeColors, colors } from "@/constants/colors";
+import { Alert } from "@/components/ui/AppAlert";
 import { getMoodItemLabel, getMoodItemHint } from "@/constants/accessibility";
 import { motion, springs } from "@/constants/motion";
 import { haptics } from "@/lib/haptics";
@@ -29,6 +31,9 @@ interface Props {
   mood: MoodEntry;
   onSwipeableWillOpen: (direction: SwipeDirection, mood: MoodEntry) => void;
   onLongPress?: (mood: MoodEntry) => void;
+  onPress?: (mood: MoodEntry) => void;
+  onEdit?: (mood: MoodEntry) => void;
+  onDelete?: (mood: MoodEntry) => void;
   swipeThreshold: number;
 }
 
@@ -77,7 +82,7 @@ function CommentBlock({
         className="mb-2 text-[10px] font-bold uppercase tracking-wide"
         style={{ color: get("textMuted") }}
       >
-        Comments
+        Notes
       </Text>
       <Text
         className="text-sm leading-5"
@@ -91,7 +96,7 @@ function CommentBlock({
 }
 
 export const DisplayMoodItem = React.memo(function DisplayMoodItem(
-  { mood, onSwipeableWillOpen, onLongPress, swipeThreshold }: Props
+  { mood, onSwipeableWillOpen, onLongPress, onPress, onEdit, onDelete, swipeThreshold }: Props
 ) {
     const swipeActionPendingRef = useRef(false);
     const { isDark, get, getCategoryColors } = useThemeColors();
@@ -279,6 +284,39 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
       [isDeleting, measuredHeight]
     );
 
+    const showActions = useCallback(() => {
+      Alert.alert(
+        "Entry actions",
+        formattedDate,
+        [
+          { text: "Edit entry", onPress: () => onEdit?.(mood) },
+          { text: "Change date & time", onPress: () => onLongPress?.(mood) },
+          { text: "Delete entry", style: "destructive", onPress: () => onDelete?.(mood) },
+        ],
+        { cancelable: true }
+      );
+    }, [formattedDate, mood, onDelete, onEdit, onLongPress]);
+
+    const handleAccessibilityAction = useCallback(
+      (event: { nativeEvent: { actionName: string } }) => {
+        switch (event.nativeEvent.actionName) {
+          case "activate":
+            onPress?.(mood);
+            break;
+          case "edit":
+            onEdit?.(mood);
+            break;
+          case "changeDate":
+            onLongPress?.(mood);
+            break;
+          case "delete":
+            onDelete?.(mood);
+            break;
+        }
+      },
+      [mood, onDelete, onEdit, onLongPress, onPress]
+    );
+
     return (
       <Animated.View
         onLayout={handleContainerLayout}
@@ -315,6 +353,7 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
         <GestureDetector gesture={panGesture}>
           <Animated.View style={cardAnimatedStyle}>
             <Pressable
+              onPress={() => onPress?.(mood)}
               onPressIn={() => {
                 pressScale.value = withSpring(0.985, springs.snap);
               }}
@@ -328,6 +367,13 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
               accessibilityRole="button"
               accessibilityLabel={accessibilityLabel}
               accessibilityHint={getMoodItemHint()}
+              accessibilityActions={[
+                { name: "activate", label: "View entry details" },
+                { name: "edit", label: "Edit entry" },
+                { name: "changeDate", label: "Change date and time" },
+                { name: "delete", label: "Delete entry" },
+              ]}
+              onAccessibilityAction={handleAccessibilityAction}
             >
               <View
                 style={{
@@ -353,11 +399,15 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
                     <View className="flex-row items-center gap-3">
                       <View
                         className="h-8 w-8 items-center justify-center rounded-full"
-                        style={{ backgroundColor: moodData.textHex }}
+                        style={{
+                          backgroundColor: moodData.bgHex,
+                          borderColor: moodData.textHex,
+                          borderWidth: StyleSheet.hairlineWidth,
+                        }}
                       >
                         <Text
                           className="text-sm font-bold"
-                          style={{ color: get("textInverse"), fontVariant: ["tabular-nums"] }}
+                          style={{ color: moodData.textHex, fontVariant: ["tabular-nums"] }}
                         >
                           {mood.mood}
                         </Text>
@@ -383,19 +433,35 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
                         <Text className="text-xs font-medium" style={{ color: get("textMuted") }}>
                           {formattedTime}
                         </Text>
+                        <Text className="text-[10px]" style={{ color: get("textMuted") }}>
+                          {formattedDate}
+                        </Text>
                         {typeof mood.energy === "number" ? (
                           <Text className="text-[10px]" style={{ color: get("textMuted") }}>
                             Energy {mood.energy}/10
                           </Text>
                         ) : null}
                       </View>
+
+                      <Pressable
+                        onPress={(event) => {
+                          event.stopPropagation();
+                          showActions();
+                        }}
+                        className="h-11 w-11 items-center justify-center rounded-full"
+                        accessibilityRole="button"
+                        accessibilityLabel={`Actions for ${moodData.label} entry`}
+                        accessibilityHint="Edit, change date and time, or delete this entry"
+                      >
+                        <Ionicons name="ellipsis-horizontal" size={22} color={get("textMuted")} />
+                      </Pressable>
                     </View>
 
                     <CommentBlock note={mood.note} get={get} variant="compact" />
                   </View>
                 ) : (
                   <View className="p-4">
-                    <View className="mb-2 flex-row items-baseline justify-between">
+                    <View className="mb-2 flex-row items-center justify-between">
                       <View className="flex-row items-baseline gap-2">
                         <Text
                           style={{
@@ -415,9 +481,23 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
                           {moodData.label}
                         </Text>
                       </View>
-                      <Text className="text-xs" style={{ color: get("textMuted") }}>
-                        {formattedTime}
-                      </Text>
+                      <View className="flex-row items-center">
+                        <Text className="text-xs" style={{ color: get("textMuted") }}>
+                          {formattedTime}
+                        </Text>
+                        <Pressable
+                          onPress={(event) => {
+                            event.stopPropagation();
+                            showActions();
+                          }}
+                          className="ml-1 h-11 w-11 items-center justify-center rounded-full"
+                          accessibilityRole="button"
+                          accessibilityLabel={`Actions for ${moodData.label} entry`}
+                          accessibilityHint="Edit, change date and time, or delete this entry"
+                        >
+                          <Ionicons name="ellipsis-horizontal" size={22} color={get("textMuted")} />
+                        </Pressable>
+                      </View>
                     </View>
 
                     <Text className="mb-3 text-xs" style={{ color: get("textMuted") }}>

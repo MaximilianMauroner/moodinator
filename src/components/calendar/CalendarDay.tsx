@@ -2,13 +2,13 @@ import React from "react";
 import { View, Text, Pressable } from "react-native";
 import { useThemeColors } from "@/constants/colors";
 import { haptics } from "@/lib/haptics";
+import { getMoodRatingLabel } from "@/constants/moodScaleInterpretation";
 import type { CalendarDayData } from "./useCalendarData";
 
 type CalendarDayProps = {
   day: number;
   data?: CalendarDayData;
   isToday: boolean;
-  isCurrentMonth: boolean;
   onPress: (day: number, data?: CalendarDayData) => void;
   onLongPress?: (day: number) => void;
 };
@@ -17,7 +17,6 @@ export function CalendarDay({
   day,
   data,
   isToday,
-  isCurrentMonth,
   onPress,
   onLongPress,
 }: CalendarDayProps) {
@@ -50,6 +49,9 @@ export function CalendarDay({
     : onLongPress
     ? "Tap to view day details or long press to add entry"
     : "Tap to view day details";
+  const moodSummary = data?.averageMood !== null && data?.averageMood !== undefined
+    ? `, average Mood Rating ${data.averageMood.toFixed(1)} of 10, ${getMoodRatingLabel(data.averageMood)}`
+    : "";
 
   return (
     <View style={{ flex: 1, alignItems: "center", paddingVertical: 2 }}>
@@ -70,21 +72,22 @@ export function CalendarDay({
             : backgroundColor,
           borderWidth: isToday ? 2.5 : 0,
           borderColor: get("primary"),
-          opacity: isCurrentMonth ? 1 : 0.4,
         })}
         accessibilityRole="button"
-        accessibilityLabel={`Day ${day}${hasMood ? `, has ${data!.entries.length} mood entries` : ""}`}
+        accessibilityLabel={`Day ${day}${hasMood ? `, has ${data!.entries.length} mood entries${moodSummary}` : ", no mood entries"}`}
         accessibilityHint={accessibilityHint}
       >
         <Text
           className="text-sm font-semibold"
           style={{
-            color: isToday
-              ? get("primary")
-              : hasMood
+            color: hasMood
               ? isDark
                 ? "#F5F1E8"
                 : "#3D352A"
+              : isToday
+              ? isDark
+                ? get("primary")
+                : "#476D47"
               : get("textMuted"),
           }}
         >
@@ -101,7 +104,6 @@ export function CalendarDay({
               height: 6,
               borderRadius: 3,
               backgroundColor: get("primary"),
-              opacity: isCurrentMonth ? 1 : 0.4,
             }}
           />
         )}

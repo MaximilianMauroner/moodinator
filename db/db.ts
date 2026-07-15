@@ -13,14 +13,23 @@ export {
   insertMoodEntry,
   updateMoodEntry,
   updateEmotionCategoryInMoods,
+  getContextTagsFromMoods,
+  getEmotionsFromMoods,
   getEmotionNamesFromMoods,
   updateMoodNote,
   updateMoodTimestamp,
   type PaginationOptions,
   type PaginatedResult,
 } from "./moods/repository";
-export { exportMoods, importMoods, importOldBackup, type ImportResult } from "./moods/importExport";
-export { clearMoods, seedMoods, seedMoodsFromFile } from "./moods/seed";
+export {
+  exportMoods,
+  importMoods,
+  importOldBackup,
+  previewImportMoods,
+  type ImportPreviewResult,
+  type ImportResult,
+} from "./moods/importExport";
+export { clearMoodData, clearMoods, seedMoods, seedMoodsFromFile } from "./moods/seed";
 export { backfillMoodScaleJson, migrateEmotionsToCategories } from "./moods/migrations";
 export {
   createEmotionsTable,

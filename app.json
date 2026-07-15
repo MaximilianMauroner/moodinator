@@ -2,7 +2,7 @@
   "expo": {
     "name": "Moodinator",
     "slug": "moodinator",
-    "version": "1.4.0",
+    "version": "1.5.0",
     "orientation": "portrait",
     "icon": "./assets/images/app-icons/app-icon.png",
     "scheme": "myapp",
@@ -19,6 +19,7 @@
       }
     },
     "android": {
+      "allowBackup": false,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/app-icons/adaptive-foreground.png",
         "backgroundColor": "#9EAD7F"

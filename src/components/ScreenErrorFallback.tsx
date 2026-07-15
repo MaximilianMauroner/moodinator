@@ -111,7 +111,7 @@ export function ScreenErrorFallback({
               onPress={resetError}
               className="rounded-2xl py-4 items-center"
               style={{
-                backgroundColor: isDark ? "#5B8A5B" : "#5B8A5B",
+                backgroundColor: "#476D47",
                 shadowColor: isDark ? "#000" : "#5B8A5B",
                 shadowOffset: { width: 0, height: 4 },
                 shadowOpacity: isDark ? 0.3 : 0.25,

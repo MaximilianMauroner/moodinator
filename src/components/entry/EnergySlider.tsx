@@ -123,8 +123,8 @@ export const EnergySlider: React.FC<EnergySliderProps> = ({ value, onChange }) =
             <View className="flex-row items-center justify-between px-0.5 mb-2">
                 <Text
                     style={{
-                        fontSize: 10,
-                        color: isDark ? "#5C4E3D" : "#B0A090",
+                        fontSize: 12,
+                        color: get("textSubtle"),
                         fontWeight: "500",
                     }}
                 >
@@ -138,7 +138,7 @@ export const EnergySlider: React.FC<EnergySliderProps> = ({ value, onChange }) =
                         style={{
                             fontSize: 12,
                             fontWeight: "600",
-                            color: fillColors[value],
+                            color: get("text"),
                         }}
                     >
                         {ENERGY_LABELS[value]} · {value}/10
@@ -146,8 +146,8 @@ export const EnergySlider: React.FC<EnergySliderProps> = ({ value, onChange }) =
                 ) : (
                     <Text
                         style={{
-                            fontSize: 11,
-                            color: isDark ? "#4D453A" : "#C0B090",
+                            fontSize: 12,
+                            color: get("textSubtle"),
                             fontStyle: "italic",
                         }}
                     >
@@ -157,8 +157,8 @@ export const EnergySlider: React.FC<EnergySliderProps> = ({ value, onChange }) =
 
                 <Text
                     style={{
-                        fontSize: 10,
-                        color: isDark ? "#5C4E3D" : "#B0A090",
+                        fontSize: 12,
+                        color: get("textSubtle"),
                         fontWeight: "500",
                     }}
                 >
@@ -189,7 +189,7 @@ export const EnergySlider: React.FC<EnergySliderProps> = ({ value, onChange }) =
                     >
                         <Text
                             style={{
-                                fontSize: 11,
+                                fontSize: 12,
                                 fontWeight: "500",
                                 color: get("textMuted"),
                             }}
