@@ -553,6 +553,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
 
     const closeCreatePresetModal = useCallback(() => {
         if (isAddingEmotion || isAddingContext) return;
+        Keyboard.dismiss();
         setCreatePresetModal(null);
         setNewEmotionError(null);
         setNewContextError(null);
@@ -602,6 +603,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                 : false;
 
         if (didCreate) {
+            Keyboard.dismiss();
             setCreatePresetModal(null);
         }
     }, [createPresetModal, handleCreateContextTag, handleCreateEmotion]);
