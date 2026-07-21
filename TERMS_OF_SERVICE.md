@@ -1,125 +1,57 @@
 # Terms of Service
 
-**Last Updated: May 22, 2026**
+**Last Updated: July 21, 2026**
 
 ## Agreement to Terms
 
-By downloading, installing, or using Moodinator ("the app"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, do not use the app.
+By downloading, installing, or using Moodinator ("the app"), you agree to these Terms of Service ("Terms"). If you do not agree, do not use the app.
 
-## Description of Service
+## Description and Permitted Use
 
-Moodinator is a personal mood tracking application that allows you to:
+Moodinator is a personal wellness tool that lets you record moods on a 0–10 scale, add notes and tags, configure local reminders, view on-device patterns and insights, and create exports and backups. On this scale, lower ratings are better; 9 is Crisis and 10 is Emergency.
 
-- Record daily mood entries on a 0-10 scale
-- Tag entries with emotions and contexts
-- Add emotions, context tags, energy, and notes to entries
-- View analytics and insights about your mood patterns
-- Export your data for personal use
+You may use the app for lawful personal purposes. Do not use it to violate applicable law, interfere with the app's operation, or misrepresent the app or its source. Rights to use, copy, modify, merge, publish, distribute, sublicense, or sell copies of the open-source software are governed by the MIT License described below.
 
-## Use of the App
+## Your Data and Local Storage
 
-### Permitted Use
+You retain your rights in the mood entries, notes, tags, settings, exports, and backups you create. Moodinator has no developer-operated account or server copy. Its working data is stored locally, and you are responsible for device security and for protecting plaintext JSON mood exports/backups and plaintext CSV therapy exports.
 
-You may use Moodinator for personal, non-commercial purposes to track and understand your emotional wellbeing.
+The **Delete Mood Data** control deletes mood history, including mood rows, mood–emotion link records, and database emotion records used by that history. It retains the user-visible Emotion List presets, context-tag presets, other settings, reminders, and app-lock configuration. It does not delete exports, backups, clipboard contents, or other copies outside the app.
 
-### Prohibited Use
+Export flows may use a temporary app-cache file and the operating-system share sheet, or offer an explicit clipboard copy when sharing is unavailable. An interrupted or failed share can leave a temporary file until the operating system clears the cache. Periodic backups are scheduled by the operating system, are not guaranteed to run, and may run automatically after backup storage is available; the automatic background task limits its successful backups to at most once per week. Manual backups are not subject to that cadence. Android backup requires a selected folder. Moodinator keeps the eight newest app-managed backup files it can identify and removes older identified managed backups; it cannot remove arbitrary exports, renamed copies, or copies held by another app or provider. Uninstalling normally removes app-sandbox data, but external files remain and operating-system secure storage, backup, or device-transfer behavior can vary. We cannot recover lost data or delete external copies.
 
-You agree not to:
+## Health and Medical Disclaimer
 
-- Use the app for any unlawful purpose
-- Attempt to reverse engineer, decompile, or disassemble the app
-- Remove or alter any proprietary notices or labels
-- Use the app in any way that could damage or impair its functionality
+**Moodinator is a personal wellness journal. It is not a medical device and does not diagnose, treat, cure, or prevent any medical condition.** It does not provide medical advice, diagnosis, or treatment. Mood ratings, patterns, and insights are informational and may be incomplete or inaccurate. Consult a doctor or other qualified healthcare professional for medical advice, diagnosis, or treatment, and do not disregard professional advice because of information in the app.
 
-## Your Data
+Moodinator does not monitor entries, provide live crisis support, contact emergency services, or dispatch help. If you or another person may be in immediate danger, call your local emergency number. In the United States, you can call or text 988. Elsewhere, you can use <https://findahelpline.com/> to look for local support. Availability and accuracy of third-party services are outside Moodinator's control.
 
-### Ownership
+## Open-Source Software
 
-You retain full ownership of all data you create within the app, including mood entries, notes, emotion tags, context tags, settings, exports, and backups.
-
-### Local Storage
-
-All data is stored locally on your device. You are responsible for:
-
-- Backing up your data regularly
-- Maintaining the security of your device
-- Any data loss due to device failure, theft, or accidental deletion
-
-### No Recovery
-
-Since we do not store your data on any servers, we cannot recover lost data. We strongly recommend using the app's Data Export and Backup features regularly.
-
-## Medical Disclaimer
-
-**Moodinator is not a medical device or healthcare service.**
-
-- The app is intended for personal wellness tracking only
-- It does not provide medical advice, diagnosis, or treatment
-- Mood insights and analytics are for informational purposes only
-- The app is not a substitute for professional mental health care
-
-**If you are experiencing a mental health crisis, please contact a healthcare professional or crisis helpline immediately.**
-
-## Intellectual Property
-
-### Our Rights
-
-Moodinator and its original content, features, and functionality are owned by us and are protected by international copyright, trademark, and other intellectual property laws.
-
-### Your Rights
-
-You retain all rights to the personal data and content you create within the app.
+Moodinator's source code is available at <https://github.com/MaximilianMauroner/moodinator>. The canonical MIT License text is tracked in the repository's `LICENSE` file with the notice "Copyright (c) 2026 Moodinator contributors." That license governs the open-source code; these Terms do not remove rights it grants. Third-party packages remain subject to their respective licenses.
 
 ## Disclaimers
 
-### "As Is" Provision
-
-The app is provided "as is" and "as available" without warranties of any kind, either express or implied, including but not limited to:
-
-- Merchantability
-- Fitness for a particular purpose
-- Non-infringement
-- Accuracy or reliability of any information
-
-### No Guarantee
-
-We do not guarantee that:
-
-- The app will meet your specific requirements
-- The app will be uninterrupted, timely, secure, or error-free
-- Any errors in the app will be corrected
+To the maximum extent permitted by law, the app is provided "as is" and "as available," without warranties of any kind, express or implied, including merchantability, fitness for a particular purpose, non-infringement, accuracy, reliability, availability, or security. We do not guarantee uninterrupted or error-free operation, preservation of local data, accuracy of insights, or availability of external support resources.
 
 ## Limitation of Liability
 
-To the maximum extent permitted by law, we shall not be liable for any indirect, incidental, special, consequential, or punitive damages, including but not limited to:
+To the maximum extent permitted by law, we are not liable for indirect, incidental, special, consequential, exemplary, or punitive damages arising from use of the app, including loss of data, loss of profits, personal injury, or emotional distress. Nothing in these Terms excludes liability that cannot legally be excluded.
 
-- Loss of data
-- Loss of profits
-- Personal injury or emotional distress
-- Any damages arising from your use of the app
+## Changes and Termination
 
-## Changes to Terms
-
-We reserve the right to modify these Terms at any time. We will notify you of any changes by updating the "Last Updated" date. Your continued use of the app after any changes constitutes acceptance of the new Terms.
-
-## Termination
-
-You may stop using the app at any time by uninstalling it from your device. Upon uninstallation, all locally stored data will be deleted unless you have saved a Data Export or external backup.
+We may update these Terms by changing the "Last Updated" date and making the revised Terms available. You may stop using Moodinator at any time and may uninstall it, subject to the data-retention caveats above.
 
 ## Governing Law
 
-These Terms shall be governed by and construed in accordance with the laws of the jurisdiction in which the app developer resides, without regard to conflict of law provisions.
+These Terms shall be governed by and construed in accordance with the laws of the jurisdiction in which the app developer resides, without regard to conflict-of-law provisions.
 
 ## Severability
 
-If any provision of these Terms is found to be unenforceable or invalid, that provision shall be limited or eliminated to the minimum extent necessary, and the remaining provisions shall remain in full force and effect.
+If a provision is found unenforceable or invalid, it will be limited or eliminated to the minimum extent necessary, and the remaining provisions will remain in effect.
 
-## Contact Us
+## Contact
 
-If you have any questions about these Terms, please contact us at:
+Questions about these Terms can be sent to **support.moodinator@lab4code.com**.
 
-**Email**: support.moodinator@lab4code.com
-
-## Acknowledgment
-
-By using Moodinator, you acknowledge that you have read, understood, and agree to be bound by these Terms of Service.
+By using Moodinator, you acknowledge that you have read, understood, and agree to these Terms.

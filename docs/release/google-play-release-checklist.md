@@ -39,6 +39,7 @@ Inspect the dumped `<uses-permission>` entries and confirm `android.permission.S
 - Install the production-signed build on a clean Android device or emulator.
 - Launch the app, complete onboarding, and confirm the scale explains that `0` is best and `10` needs the most support.
 - Add a low-severity entry and a `9` or `10` entry. Confirm the severe entry saves and shows support actions.
+- From the severe-entry support dialog, confirm **Call 988 (U.S.)** opens the dialer, **Text 988 (U.S.)** opens messaging, and **Find A Helpline** opens `https://findahelpline.com/`. Confirm the dialog says to use the local emergency number for immediate danger and says Moodinator does not monitor entries or contact/dispatch emergency services.
 - Disable haptics in settings and confirm tab/mood button presses no longer vibrate.
 - Create a reminder. Confirm it is paused by default, then enable it and verify the permission prompt appears before scheduling.
 - Deny reminder permission, enable a reminder, and confirm the reminder row reports that it is not scheduled. Grant permission in Android settings, return to Moodinator, and confirm the app retries reminder recovery.
@@ -49,9 +50,53 @@ Inspect the dumped `<uses-permission>` entries and confirm `android.permission.S
 - Press Android Back during onboarding page 2+, PIN setup confirmation, lock-screen PIN entry, mood entry later steps, and mood entry add-emotion/context overlays. Confirm Back moves one step/sheet backward before exiting or exposing app content.
 - Background and relaunch the app. Confirm enabled reminders remain scheduled or report a recoverable unscheduled state.
 
+## Proposed Play Console answers
+
+These answers describe the source in this release candidate. Reconfirm them against the production-signed Android App Bundle and every bundled SDK before submitting.
+
+### Data Safety
+
+Google defines collection as transmitting data off the device. It documents a specific user-initiated exception for **sharing**, but that exception must not be treated as a blanket exemption from collection. See [Google Play's Data Safety guidance](https://support.google.com/googleplay/android-developer/answer/10787469).
+
+**Final Data Safety answers are unresolved. Do not submit the form until the Play owner and legal reviewer approve the classification against the final production AAB and SDK scan.**
+
+Use this conservative candidate for that review:
+
+- **Does your app collect or share any of the required user data types?** Candidate: **Yes** for collection because Moodinator can deliberately write user data to a user-selected cloud-backed destination.
+- **Data collected:** Candidate: optional **Health info** and **Other user-generated content**, collected for **App functionality**, when the user deliberately exports or backs up mood history to a cloud-backed destination. Confirm the exact Play Console data-type mapping with the Play owner/legal reviewer.
+- **Data shared:** Unresolved. A transfer to another app or provider that occurs only after the user's specific export/share action may qualify for Google's user-initiated sharing exception. Confirm each flow and destination model; do not apply that exception to the separate collection question.
+- **Is all collected user data encrypted in transit?** Candidate: **No**. Moodinator writes plaintext JSON or CSV through operating-system destinations and does not control every selected provider or its transit behavior. Do not claim encryption in transit or use this answer to imply data-at-rest encryption.
+- **Can users request deletion of collected data?** Unresolved for the form classification. Moodinator has no account or developer-held server copy. Its in-app Delete Mood Data control cannot delete files or copies in user-selected destinations; users must delete those through the destination provider.
+- **Account creation / account deletion URL:** No account creation; no account-deletion URL.
+- **Independent security review:** No, unless a qualifying review is completed before submission.
+- **Ads:** No ads.
+
+Relevant implementation facts that must remain consistent with the form:
+
+- Android Auto Backup is disabled.
+- The Android SQLite mood database is app-sandboxed but not encrypted by Moodinator.
+- JSON exports/backups and therapy CSV exports are plaintext.
+- Moodinator has no remote-notification registration, developer API, analytics SDK, or advertising SDK.
+
+### Health apps declaration
+
+Google requires every Play app to complete the declaration and lists mood/mental-health tools under health features. See [Health apps declaration guidance](https://support.google.com/googleplay/android-developer/answer/14738291) and [Health Content and Services policy](https://support.google.com/googleplay/android-developer/answer/16679511).
+
+- **Does the app provide health features?** Yes.
+- **Feature category:** Mental and Behavioral Health.
+- **Medical device app:** No. Moodinator is a personal wellness journal and is not presented as regulated medical-device software.
+- **Health Connect or health permissions/data APIs:** None.
+- **Clinical, diagnostic, treatment, or emergency-service functionality:** None. Moodinator does not diagnose, treat, cure, or prevent a medical condition; it does not monitor users or contact/dispatch emergency services.
+- **Store-listing disclaimer:** Include this exact sentence in the app description: "Moodinator is not a medical device and does not diagnose, treat, cure, or prevent any medical condition. Consult a healthcare professional for medical advice, diagnosis, or treatment."
+- **Privacy policy:** Supply the final public, active, non-geofenced HTML URL in Play Console and retain the in-app policy screen.
+
 ## Human gates still required
 
-- Decide Android backup and data-at-rest policy before final Data Safety answers.
-- Publish or confirm the public privacy policy URL.
-- Complete the Play Console Data Safety form from the final approved policy.
+- Confirm the release keeps Android Auto Backup disabled and explicitly accepts an app-sandboxed but non-encrypted Android SQLite database. Any decision to add encryption is a separate implementation and legal-review task.
+- Scan the final production AAB and its dependency/SDK report for undeclared transmission, permissions, analytics, advertising, crash reporting, and push-token behavior. If findings differ, revise the app or the proposed answers before submission.
+- Publish and verify the public privacy policy as active, non-geofenced HTML (not a PDF), then enter its URL in Play Console.
+- Have the publisher/legal owner approve the privacy policy, health disclaimer, publisher identity, and the still-generic governing-law provision before release. Do not invent an entity or jurisdiction in the repository.
+- Complete and save the Data Safety and Health apps declarations in Play Console using the approved final build and policy; treat the answers above as proposed, not pre-approved by Google.
+- Add the required medical-device disclaimer to the Play Store description and verify it matches the in-app and root Terms.
+- Confirm the Play Store target audience. If children are included, run a separate Families-policy review before submission.
 - Confirm production signing credentials and Play app version code in EAS/Play Console before submission.
