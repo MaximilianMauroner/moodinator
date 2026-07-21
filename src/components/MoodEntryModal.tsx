@@ -6,7 +6,6 @@ import {
     Pressable,
     ScrollView,
     TextInput,
-    Linking,
     useWindowDimensions,
     Keyboard,
     KeyboardAvoidingView,
@@ -36,6 +35,8 @@ import {
     BUTTON_HINTS,
 } from "@/constants/accessibility";
 import { haptics } from "@/lib/haptics";
+import { shouldOfferCrisisSupport } from "@/lib/crisisSupport";
+import { showCrisisSupportAlert } from "@/lib/showCrisisSupportAlert";
 import {
     ContextTagChip,
     MoodAdjustRow,
@@ -110,28 +111,6 @@ const EMOTION_CATEGORY_LABELS: Record<Emotion["category"], string> = {
     negative: "Negative",
     neutral: "Neutral",
 };
-
-function shouldOfferCrisisSupport(mood: number): boolean {
-    return mood >= 9;
-}
-
-function showCrisisSupportAlert() {
-    Alert.alert(
-        "Support is available",
-        "If you might harm yourself or someone else, contact local emergency services now. In the U.S., call or text 988 for crisis support.",
-        [
-            { text: "Not now", style: "cancel" },
-            {
-                text: "Call 988",
-                onPress: () => {
-                    Linking.openURL("tel:988").catch(() => {
-                        Alert.alert("Call 988", "Call or text 988 for crisis support in the U.S.");
-                    });
-                },
-            },
-        ]
-    );
-}
 
 const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     visible,

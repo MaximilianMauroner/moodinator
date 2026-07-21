@@ -19,87 +19,101 @@ export default function PrivacyPolicyScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Text className="text-xs text-paper-700 dark:text-sand-400 mb-4">
-          Last Updated: May 22, 2026
+          Last Updated: July 21, 2026
         </Text>
 
         <Section title="Introduction">
           <Paragraph>
-            Moodinator is committed to protecting your privacy. This Privacy Policy explains how we handle your information when you use our mood tracking application.
+            Moodinator is a local-first mood tracking app. This policy explains what information the app handles, where it is stored, when it can leave your device, and what you can delete.
           </Paragraph>
         </Section>
 
-        <Section title="Data Collection and Storage">
-          <Subtitle>What We Collect</Subtitle>
+        <Section title="Information Stored on Your Device">
           <Paragraph>
-            Moodinator collects and stores the following information that you voluntarily provide:
+            Moodinator stores information you choose to enter or configure:
           </Paragraph>
           <BulletList items={[
-            "Mood Entries: Your mood ratings, timestamps, and notes",
-            "Emotions: Emotion tags you select for each entry",
-            "Contexts: Context tags describing your situation",
+            "Mood data: ratings, timestamps, notes, emotions, context tags, energy values, and history",
+            "Settings: entry and display preferences, onboarding state, and other app configuration",
+            "Reminders: local notification titles, messages, schedules, permission state, and identifiers",
+            "App lock: enabled settings, PIN length, failed-attempt state, and a salted hash of your PIN",
+            "Backup metadata: the selected folder and latest-backup time",
           ]} />
 
-          <Subtitle>Local-Only Storage</Subtitle>
+          <Subtitle>Local-First, No Account</Subtitle>
           <Paragraph>
-            All your data is stored locally on your device. We do not upload, transmit, or store your personal data on any external servers. Your mood entries, notes, emotions, contexts, and settings remain exclusively on your device.
-          </Paragraph>
-
-          <Subtitle>No Account Required</Subtitle>
-          <Paragraph>
-            Moodinator does not require you to create an account. There is no registration, no email collection, and no cloud synchronization.
+            Moodinator processes and stores this information locally. It has no developer-operated server, account system, cloud synchronization, advertising, or analytics. We do not receive your mood data or app settings.
           </Paragraph>
         </Section>
 
-        <Section title="Data Sharing">
+        <Section title="Storage and Security">
           <Paragraph>
-            We do not share your data with anyone. Since all data is stored locally on your device:
+            Mood data is stored in a local SQLite database inside the operating system app sandbox. On Android, Moodinator does not apply database-level encryption to that database. App lock is not database encryption.
           </Paragraph>
+          <Paragraph>
+            If you set an app-lock PIN, Moodinator stores a salted hash—not the plaintext PIN—in the operating system secure storage. Biometric enrollment and matching stay with the operating system; Moodinator does not receive or store your biometric template.
+          </Paragraph>
+        </Section>
+
+        <Section title="Local Notifications">
+          <Paragraph>
+            Moodinator schedules reminders locally after you enable them and grant permission. Reminder titles and messages may be visible on your lock screen or in notification history, depending on device settings. Moodinator does not use remote push notifications.
+          </Paragraph>
+        </Section>
+
+        <Section title="Exports and Backups">
+          <Paragraph>
+            Mood-history exports and backups are plaintext JSON; therapy exports are plaintext CSV. Moodinator does not encrypt them. Android JSON exports are written to a selected folder. Other export flows use a temporary app-cache file and the operating-system share sheet, or can offer to copy the full content to the clipboard when sharing is unavailable.
+          </Paragraph>
+          <Paragraph>
+            Moodinator attempts to delete temporary exports after the flow, but an interrupted or failed share can leave a file until the operating system clears the cache. Selected destinations can include cloud-backed providers. Anyone with access to a file or clipboard copy may be able to read it.
+          </Paragraph>
+          <Paragraph>
+            Periodic backups are scheduled by the operating system, which decides whether and when they run. After backup storage is available, the background task may run automatically and limits its successful backups to at most once per week; manual backups are not subject to that cadence. Android requires a selected folder first. Moodinator keeps the eight newest app-managed backup files it can identify and removes older identified managed backups. It cannot delete arbitrary exports, renamed copies, clipboard content, or copies held by another app or provider.
+          </Paragraph>
+        </Section>
+
+        <Section title="External Support Actions">
+          <Paragraph>
+            For ratings 9 and 10, Moodinator offers actions to call or text U.S. 988 or open findahelpline.com. These actions are user-initiated. Moodinator does not monitor entries, contact emergency services, or send your mood entry to a support provider.
+          </Paragraph>
+        </Section>
+
+        <Section title="Sharing and Sale">
+          <Paragraph>
+            We do not operate servers that receive your Moodinator data, sell it, or use advertising or analytics SDKs. Data can leave through a deliberate export, share, copy, import, or support action; when an OS-scheduled periodic backup runs after storage is available; or through platform backup or transfer behavior outside our control.
+          </Paragraph>
+        </Section>
+
+        <Section title="Your Control and Deletion">
           <BulletList items={[
-            "No data is sent to our servers",
-            "No data is shared with third parties",
-            "No data is used for advertising or analytics",
-            "No data is sold to anyone",
+            "Delete an individual mood entry.",
+            "Delete Mood Data removes mood history, including mood rows, mood–emotion link records, and database emotion records used by that history.",
+            "Delete Mood Data retains the user-visible Emotion List presets, context-tag presets, other settings, reminders, app-lock data, and files saved outside the app.",
           ]} />
-        </Section>
-
-        <Section title="Your Control Over Your Data">
           <Paragraph>
-            You have complete control over your data:
+            Uninstalling normally removes app-sandbox data, but external files remain, secure storage and platform backups can behave differently by operating system, and device backup or transfer features may retain or restore data.
           </Paragraph>
-          <BulletList items={[
-            "Data Export: Export your data anytime from Settings > Data",
-            "Delete: Delete individual entries or all data",
-            "Backup: Periodic local backups for recovery; you can also trigger one on demand",
-          ]} />
-        </Section>
-
-        <Section title="Third-Party Services">
           <Paragraph>
-            Moodinator does not integrate with any third-party analytics, advertising, or tracking services. The app functions entirely offline.
-          </Paragraph>
-        </Section>
-
-        <Section title="Data Security">
-          <Paragraph>
-            {"Your data is protected by your device's security features. We recommend using a device passcode or biometric lock, keeping your device updated, and not sharing your unlocked device with others."}
+            Because Moodinator has no account and we hold no server-side copy, there is no developer-side account or data-deletion request for us to perform. Delete data in the app, uninstall it, and remove external copies from their destinations.
           </Paragraph>
         </Section>
 
         <Section title="Children's Privacy">
           <Paragraph>
-            Moodinator is not directed at children under 13. We do not knowingly collect personal information from children under 13.
+            {"Moodinator is not directed at children under 13. Because we do not receive app data, we do not knowingly collect children's information through developer-operated servers."}
           </Paragraph>
         </Section>
 
         <Section title="Changes to This Policy">
           <Paragraph>
-            {'We may update this Privacy Policy from time to time. We will notify you of any changes by updating the "Last Updated" date at the top of this policy.'}
+            {'We may update this policy from time to time. We identify changes by updating the "Last Updated" date.'}
           </Paragraph>
         </Section>
 
         <Section title="Contact Us">
           <Paragraph>
-            If you have any questions about this Privacy Policy, please contact us at support.moodinator@lab4code.com
+            Questions: support.moodinator@lab4code.com. Source: https://github.com/MaximilianMauroner/moodinator
           </Paragraph>
         </Section>
 
@@ -109,10 +123,10 @@ export default function PrivacyPolicyScreen() {
           </Text>
           <BulletList
             items={[
-              "All data stays on your device",
-              "No accounts, no cloud, no tracking",
-              "You own and control your data completely",
-              "Export or delete your data anytime",
+              "No developer-operated account, data server, analytics, or ads",
+              "Android mood database is sandboxed but not encrypted by Moodinator",
+              "JSON and CSV exports and JSON backups are readable plaintext",
+              "Delete Mood Data has a limited, documented scope",
             ]}
             color="sage"
           />
