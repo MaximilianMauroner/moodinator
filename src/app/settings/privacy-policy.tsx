@@ -69,7 +69,7 @@ export default function PrivacyPolicyScreen() {
             Moodinator attempts to delete temporary exports after the flow, but an interrupted or failed share can leave a file until the operating system clears the cache. Selected destinations can include cloud-backed providers. Anyone with access to a file or clipboard copy may be able to read it.
           </Paragraph>
           <Paragraph>
-            Periodic backups are scheduled by the operating system, which decides whether and when they run. They may run automatically after backup storage is available, with successful backups limited to at most once per week. Android requires a selected folder first. Moodinator keeps the eight newest app-managed backup files it can identify and removes older identified managed backups. It cannot delete arbitrary exports, renamed copies, clipboard content, or copies held by another app or provider.
+            Periodic backups are scheduled by the operating system, which decides whether and when they run. After backup storage is available, the background task may run automatically and limits its successful backups to at most once per week; manual backups are not subject to that cadence. Android requires a selected folder first. Moodinator keeps the eight newest app-managed backup files it can identify and removes older identified managed backups. It cannot delete arbitrary exports, renamed copies, clipboard content, or copies held by another app or provider.
           </Paragraph>
         </Section>
 
