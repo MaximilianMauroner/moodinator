@@ -122,4 +122,4 @@ For support or feedback: support.moodinator@lab4code.com
 
 ## License
 
-MIT
+[MIT](./LICENSE)

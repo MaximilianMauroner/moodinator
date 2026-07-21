@@ -29,4 +29,20 @@ describe("Android privacy configuration", () => {
       "enableBackgroundRemoteNotifications"
     );
   });
+
+  it("keeps SQLCipher disabled for the Android SQLite database", () => {
+    const appConfig = JSON.parse(readFileSync("app.json", "utf8")) as {
+      expo: { plugins: (string | [string, Record<string, unknown>])[] };
+    };
+    const sqlitePlugin = appConfig.expo.plugins.find(
+      (plugin): plugin is [string, Record<string, unknown>] =>
+        Array.isArray(plugin) && plugin[0] === "expo-sqlite"
+    );
+    const androidOptions = sqlitePlugin?.[1].android as
+      | { useSQLCipher?: boolean }
+      | undefined;
+
+    expect(sqlitePlugin).toBeDefined();
+    expect(androidOptions?.useSQLCipher).toBe(false);
+  });
 });

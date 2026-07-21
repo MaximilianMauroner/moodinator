@@ -32,9 +32,11 @@ Moodinator schedules reminder notifications locally on your device after you ena
 
 ## Exports and Backups
 
-Data exports and backups are plaintext JSON files and are not encrypted by Moodinator. A temporary export remains local until you choose to save, share, or copy it. You may choose a destination or another app through the operating system; those choices can include cloud-backed storage providers. On Android, backup creation requires a user-selected folder. On iOS, the default backup location is the app's Documents area.
+Mood-history exports and backups are plaintext JSON files. Therapy exports are plaintext CSV files. Moodinator does not encrypt these files. On Android, a JSON export is written to a folder you select. On iOS, JSON exports are written temporarily to the app cache and offered to the operating-system share sheet. Therapy CSV exports are also written temporarily to the app cache and offered to the share sheet. If sharing is unavailable, the app can offer to copy the full JSON or CSV content to the device clipboard, where other apps may be able to read it.
 
-After data is exported, copied, shared, or saved outside Moodinator's private storage, the destination provider's and operating system's practices apply. Anyone with access to those files or the clipboard may be able to read their contents. Moodinator cannot control or delete copies stored outside the app.
+Moodinator attempts to delete its temporary cache export after the export flow, but an interrupted or failed share can leave a temporary file until the operating system clears the app cache. You may choose another app or destination through the operating system, including a cloud-backed storage provider. After data is copied, shared, or saved outside Moodinator's private storage, the destination provider's and operating system's practices apply.
+
+Moodinator registers a periodic backup task with the operating system. The operating system decides whether and when it runs; execution is not guaranteed. After backup storage is available, the task may create a backup automatically and throttles successful backups to at most once per week. On Android, no backup can be created until you select a folder. On iOS, the app's Documents area is the default. Moodinator's retention cleanup keeps the eight newest app-managed `moodinator-backup-*.json` files it can identify in its managed backup locations and deletes older identified backups. This cleanup does not delete arbitrary exports, renamed copies, clipboard contents, or copies held by another app or provider.
 
 ## External Support Actions
 
@@ -42,17 +44,17 @@ For ratings 9 and 10, Moodinator offers crisis-support actions. If you choose on
 
 ## Data Sharing and Sale
 
-We do not operate servers that receive your Moodinator data, and we do not sell it. Moodinator contains no advertising or analytics SDKs. Data leaves the app only when you deliberately export, share, copy, back up, import, or open an external support action as described above, or when the operating system handles device backup or transfer outside our control.
+We do not operate servers that receive your Moodinator data, and we do not sell it. Moodinator contains no advertising or analytics SDKs. Data can leave the app when you deliberately export, share, copy, import, or open an external support action; when an OS-scheduled periodic backup runs after backup storage is available; or when the operating system handles device backup or transfer outside our control.
 
 ## Your Control and Deletion
 
 You can:
 
 - Delete an individual mood entry.
-- Use **Settings > Data & Backups > Delete Mood Data** to delete mood entries, their mood–emotion links, and the app's saved emotion list from the local database.
+- Use **Settings > Data & Backups > Delete Mood Data** to delete mood history, including mood rows, mood–emotion link records, and database emotion records used by that history.
 - Export or back up mood history before deleting it.
 
-"Delete Mood Data" does **not** delete app settings, reminders, app-lock settings or secure-storage PIN hash, context-tag presets, or export and backup files saved outside the app. Uninstalling normally removes app-sandbox data, but external files remain, secure storage and platform backups may behave differently by operating system, and platform backup or device-transfer features may retain or restore data. Review and delete external files through the destination where you saved them.
+"Delete Mood Data" does **not** delete the user-visible Emotion List presets, context-tag presets, other app settings, reminders, app-lock settings or secure-storage PIN hash, or export and backup files saved outside the app. Uninstalling normally removes app-sandbox data, but external files remain, secure storage and platform backups may behave differently by operating system, and platform backup or device-transfer features may retain or restore data. Review and delete external files through the destination where you saved them.
 
 Because Moodinator has no account and we do not hold a server-side copy of your data, there is no developer-side account or data-deletion request for us to perform. Delete data in the app, uninstall it, and remove any external copies from their destinations.
 

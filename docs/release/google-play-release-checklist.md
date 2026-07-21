@@ -56,13 +56,17 @@ These answers describe the source in this release candidate. Reconfirm them agai
 
 ### Data Safety
 
-Google defines collection as transmitting data off the device and says purely on-device access does not need to be declared as collection. It also excludes a transfer initiated by a specific user action when the user reasonably expects the transfer. See [Google Play's Data Safety guidance](https://support.google.com/googleplay/android-developer/answer/10787469).
+Google defines collection as transmitting data off the device. It documents a specific user-initiated exception for **sharing**, but that exception must not be treated as a blanket exemption from collection. See [Google Play's Data Safety guidance](https://support.google.com/googleplay/android-developer/answer/10787469).
 
-- **Does your app collect or share any of the required user data types?** No.
-- **Data collected:** None. Mood entries, notes, emotions, context tags, energy, settings, reminders, and app-lock metadata are processed locally and are not transmitted by Moodinator or its SDKs.
-- **Data shared:** None under the Data Safety definition. Export, share-sheet, clipboard, user-selected backup-folder, 988, and Find A Helpline actions happen only after a specific user action and go to the destination the user selects.
-- **Is all collected user data encrypted in transit?** Not applicable; the proposed declaration reports no collected data. Do not use this answer to imply Android data-at-rest encryption.
-- **Can users request deletion of collected data?** Not applicable: there is no account and no developer-held copy. The in-app Delete Mood Data control has the narrower scope documented in the privacy policy.
+**Final Data Safety answers are unresolved. Do not submit the form until the Play owner and legal reviewer approve the classification against the final production AAB and SDK scan.**
+
+Use this conservative candidate for that review:
+
+- **Does your app collect or share any of the required user data types?** Candidate: **Yes** for collection because Moodinator can deliberately write user data to a user-selected cloud-backed destination.
+- **Data collected:** Candidate: optional **Health info** and **Other user-generated content**, collected for **App functionality**, when the user deliberately exports or backs up mood history to a cloud-backed destination. Confirm the exact Play Console data-type mapping with the Play owner/legal reviewer.
+- **Data shared:** Unresolved. A transfer to another app or provider that occurs only after the user's specific export/share action may qualify for Google's user-initiated sharing exception. Confirm each flow and destination model; do not apply that exception to the separate collection question.
+- **Is all collected user data encrypted in transit?** Candidate: **No**. Moodinator writes plaintext JSON or CSV through operating-system destinations and does not control every selected provider or its transit behavior. Do not claim encryption in transit or use this answer to imply data-at-rest encryption.
+- **Can users request deletion of collected data?** Unresolved for the form classification. Moodinator has no account or developer-held server copy. Its in-app Delete Mood Data control cannot delete files or copies in user-selected destinations; users must delete those through the destination provider.
 - **Account creation / account deletion URL:** No account creation; no account-deletion URL.
 - **Independent security review:** No, unless a qualifying review is completed before submission.
 - **Ads:** No ads.

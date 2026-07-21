@@ -36,7 +36,7 @@ export default function TermsOfServiceScreen() {
             "Record moods on a 0–10 scale, where lower is better and 9–10 require the most support",
             "Add notes, emotions, contexts, and energy values",
             "Configure local reminders and view on-device patterns",
-            "Create plaintext JSON exports and backups",
+            "Create plaintext JSON mood exports/backups and plaintext CSV therapy exports",
           ]} />
         </Section>
 
@@ -48,10 +48,13 @@ export default function TermsOfServiceScreen() {
 
         <Section title="Your Data">
           <Paragraph>
-            You retain your rights in mood entries, notes, tags, settings, exports, and backups you create. Moodinator has no developer-operated account or server copy. You are responsible for device security and protecting plaintext JSON exports and backups.
+            You retain your rights in mood entries, notes, tags, settings, exports, and backups you create. Moodinator has no developer-operated account or server copy. You are responsible for device security and protecting plaintext JSON mood exports/backups and plaintext CSV therapy exports.
           </Paragraph>
           <Paragraph>
-            Delete Mood Data removes mood entries, mood–emotion links, and the saved emotion list. It retains settings, reminders, app-lock data, context-tag presets, and external exports or backups. Uninstalling normally removes app-sandbox data, but external files remain and platform secure-storage, backup, and transfer behavior can vary. We cannot recover lost data or delete external copies.
+            Delete Mood Data removes mood history, including mood rows, mood–emotion link records, and database emotion records used by that history. It retains the user-visible Emotion List presets, context-tag presets, other settings, reminders, app-lock data, and external files.
+          </Paragraph>
+          <Paragraph>
+            Export flows may use a temporary app-cache file and share sheet, or offer a clipboard copy. Failed sharing can leave a temporary file until the operating system clears it. Periodic OS-scheduled backups are not guaranteed to run and may run automatically after storage is available; successful backups are limited to at most once per week and Android requires a selected folder. Moodinator keeps the eight newest app-managed backups it can identify and removes older identified managed backups, but cannot delete arbitrary exports, renamed copies, clipboard contents, or provider copies. Uninstall and platform backup or transfer behavior can vary. We cannot recover lost data or delete external copies.
           </Paragraph>
         </Section>
 
@@ -69,7 +72,7 @@ export default function TermsOfServiceScreen() {
 
         <Section title="Open-Source Software">
           <Paragraph>
-            Moodinator source code is available at https://github.com/MaximilianMauroner/moodinator under the MIT License. That license governs use, copying, modification, merging, publication, distribution, sublicensing, and sale of the open-source code and includes its own notices and warranty disclaimer. These Terms do not remove rights granted by that license. Third-party packages retain their own licenses.
+            Moodinator source code is available at https://github.com/MaximilianMauroner/moodinator. The canonical MIT License is tracked in the repository LICENSE file with the notice Copyright (c) 2026 Moodinator contributors. It governs the open-source code; these Terms do not remove its rights. Third-party packages retain their own licenses.
           </Paragraph>
         </Section>
 

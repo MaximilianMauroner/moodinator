@@ -63,10 +63,13 @@ export default function PrivacyPolicyScreen() {
 
         <Section title="Exports and Backups">
           <Paragraph>
-            Exports and backups are plaintext JSON files and are not encrypted by Moodinator. You choose when and where to save, share, or copy an export. Destinations selected through the operating system can include other apps and cloud-backed storage providers.
+            Mood-history exports and backups are plaintext JSON; therapy exports are plaintext CSV. Moodinator does not encrypt them. Android JSON exports are written to a selected folder. Other export flows use a temporary app-cache file and the operating-system share sheet, or can offer to copy the full content to the clipboard when sharing is unavailable.
           </Paragraph>
           <Paragraph>
-            Anyone with access to an exported file, backup, or copied JSON may be able to read it. Destination providers and the operating system apply their own practices, and Moodinator cannot control or delete copies stored outside the app.
+            Moodinator attempts to delete temporary exports after the flow, but an interrupted or failed share can leave a file until the operating system clears the cache. Selected destinations can include cloud-backed providers. Anyone with access to a file or clipboard copy may be able to read it.
+          </Paragraph>
+          <Paragraph>
+            Periodic backups are scheduled by the operating system, which decides whether and when they run. They may run automatically after backup storage is available, with successful backups limited to at most once per week. Android requires a selected folder first. Moodinator keeps the eight newest app-managed backup files it can identify and removes older identified managed backups. It cannot delete arbitrary exports, renamed copies, clipboard content, or copies held by another app or provider.
           </Paragraph>
         </Section>
 
@@ -78,15 +81,15 @@ export default function PrivacyPolicyScreen() {
 
         <Section title="Sharing and Sale">
           <Paragraph>
-            We do not operate servers that receive your Moodinator data, sell it, or use advertising or analytics SDKs. Data can leave the app only through a deliberate export, share, copy, backup, import, or external-support action, or through platform backup or transfer behavior outside our control.
+            We do not operate servers that receive your Moodinator data, sell it, or use advertising or analytics SDKs. Data can leave through a deliberate export, share, copy, import, or support action; when an OS-scheduled periodic backup runs after storage is available; or through platform backup or transfer behavior outside our control.
           </Paragraph>
         </Section>
 
         <Section title="Your Control and Deletion">
           <BulletList items={[
             "Delete an individual mood entry.",
-            "Delete Mood Data removes mood entries, mood–emotion links, and the saved emotion list from the local database.",
-            "Delete Mood Data retains settings, reminders, app-lock data, context-tag presets, and files saved outside the app.",
+            "Delete Mood Data removes mood history, including mood rows, mood–emotion link records, and database emotion records used by that history.",
+            "Delete Mood Data retains the user-visible Emotion List presets, context-tag presets, other settings, reminders, app-lock data, and files saved outside the app.",
           ]} />
           <Paragraph>
             Uninstalling normally removes app-sandbox data, but external files remain, secure storage and platform backups can behave differently by operating system, and device backup or transfer features may retain or restore data.
@@ -122,7 +125,7 @@ export default function PrivacyPolicyScreen() {
             items={[
               "No developer-operated account, data server, analytics, or ads",
               "Android mood database is sandboxed but not encrypted by Moodinator",
-              "Exports and backups are readable JSON files",
+              "JSON and CSV exports and JSON backups are readable plaintext",
               "Delete Mood Data has a limited, documented scope",
             ]}
             color="sage"

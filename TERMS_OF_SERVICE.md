@@ -14,9 +14,11 @@ You may use the app for lawful personal purposes. Do not use it to violate appli
 
 ## Your Data and Local Storage
 
-You retain your rights in the mood entries, notes, tags, settings, exports, and backups you create. Moodinator has no developer-operated account or server copy. Its working data is stored locally, and you are responsible for device security and for protecting any plaintext JSON exports or backups you create.
+You retain your rights in the mood entries, notes, tags, settings, exports, and backups you create. Moodinator has no developer-operated account or server copy. Its working data is stored locally, and you are responsible for device security and for protecting plaintext JSON mood exports/backups and plaintext CSV therapy exports.
 
-The **Delete Mood Data** control deletes mood entries, mood–emotion links, and the saved emotion list from the local database. It does not delete settings, reminders, app-lock configuration, context-tag presets, or exports and backups saved outside the app. Uninstalling normally removes app-sandbox data, but external files remain and operating-system secure storage, backup, or device-transfer behavior can vary. We cannot recover lost data or delete copies held by you or a destination provider.
+The **Delete Mood Data** control deletes mood history, including mood rows, mood–emotion link records, and database emotion records used by that history. It retains the user-visible Emotion List presets, context-tag presets, other settings, reminders, and app-lock configuration. It does not delete exports, backups, clipboard contents, or other copies outside the app.
+
+Export flows may use a temporary app-cache file and the operating-system share sheet, or offer an explicit clipboard copy when sharing is unavailable. An interrupted or failed share can leave a temporary file until the operating system clears the cache. Periodic backups are scheduled by the operating system, are not guaranteed to run, and may run automatically after backup storage is available; Moodinator limits successful backups to at most once per week. Android backup requires a selected folder. Moodinator keeps the eight newest app-managed backup files it can identify and removes older identified managed backups; it cannot remove arbitrary exports, renamed copies, or copies held by another app or provider. Uninstalling normally removes app-sandbox data, but external files remain and operating-system secure storage, backup, or device-transfer behavior can vary. We cannot recover lost data or delete external copies.
 
 ## Health and Medical Disclaimer
 
@@ -26,7 +28,7 @@ Moodinator does not monitor entries, provide live crisis support, contact emerge
 
 ## Open-Source Software
 
-Moodinator's source code is available at <https://github.com/MaximilianMauroner/moodinator> under the MIT License. The MIT License governs use, copying, modification, merging, publication, distribution, sublicensing, and sale of the open-source code and includes its own copyright notice, permission notice, and warranty disclaimer. These Terms do not remove rights granted by that license. Third-party packages remain subject to their respective licenses.
+Moodinator's source code is available at <https://github.com/MaximilianMauroner/moodinator>. The canonical MIT License text is tracked in the repository's `LICENSE` file with the notice "Copyright (c) 2026 Moodinator contributors." That license governs the open-source code; these Terms do not remove rights it grants. Third-party packages remain subject to their respective licenses.
 
 ## Disclaimers
 
