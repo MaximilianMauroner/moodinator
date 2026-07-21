@@ -21,7 +21,7 @@ A privacy-focused mood tracking app built with React Native. Track your emotiona
 - **Local-first storage**—no accounts, developer cloud sync, analytics, or ads
 - Mood data stays in the app unless you choose to export, share, copy, or back it up
 - Plaintext JSON exports and backups can be saved to user-selected destinations, including cloud-backed providers
-- Core mood tracking works offline; crisis-support links and user-selected sharing destinations may require connectivity
+- Core mood tracking works offline; user-selected sharing destinations may require connectivity
 
 ### User Experience
 - **Dark and light mode** with warm, organic color palette

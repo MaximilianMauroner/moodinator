@@ -73,9 +73,9 @@ export default function PrivacyPolicyScreen() {
           </Paragraph>
         </Section>
 
-        <Section title="External Support Actions">
+        <Section title="Support Reminder">
           <Paragraph>
-            For ratings 9 and 10, Moodinator offers actions to call or text U.S. 988 and advises users elsewhere to contact a local crisis helpline. Moodinator does not monitor entries, contact emergency services, or send your mood entry to a support service.
+            For ratings 9 and 10, Moodinator displays a passive reminder to call the local emergency number in immediate danger and consider contacting a local crisis helpline. The reminder has no buttons or links and does not initiate a call, message, website, or emergency response.
           </Paragraph>
         </Section>
 

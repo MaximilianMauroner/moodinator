@@ -35,8 +35,11 @@ import {
     BUTTON_HINTS,
 } from "@/constants/accessibility";
 import { haptics } from "@/lib/haptics";
-import { shouldOfferCrisisSupport } from "@/lib/crisisSupport";
-import { showCrisisSupportAlert } from "@/lib/showCrisisSupportAlert";
+import {
+    CRISIS_SUPPORT_MESSAGE,
+    CRISIS_SUPPORT_TITLE,
+    shouldShowCrisisSupportHint,
+} from "@/lib/crisisSupport";
 import {
     ContextTagChip,
     MoodAdjustRow,
@@ -310,9 +313,6 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
             );
             haptics.moodLogged();
             onClose();
-            if (shouldOfferCrisisSupport(mood)) {
-                setTimeout(showCrisisSupportAlert, 250);
-            }
         } catch (error) {
             console.error("Failed to save mood entry:", error);
             haptics.error();
@@ -1171,6 +1171,40 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                 keyboardShouldPersistTaps="handled"
                 keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
             >
+                {shouldShowCrisisSupportHint(mood) && (
+                    <View
+                        className="mb-5 flex-row rounded-2xl border p-3.5"
+                        style={{
+                            backgroundColor: isDark
+                                ? "rgba(126, 55, 44, 0.16)"
+                                : "rgba(224, 107, 85, 0.09)",
+                            borderColor: isDark
+                                ? "rgba(242, 180, 166, 0.28)"
+                                : "rgba(199, 84, 65, 0.2)",
+                        }}
+                        accessibilityRole="text"
+                        accessibilityLabel={`${CRISIS_SUPPORT_TITLE}. ${CRISIS_SUPPORT_MESSAGE}`}
+                    >
+                        <Ionicons
+                            name="heart-outline"
+                            size={20}
+                            color={isDark ? "#F2B4A6" : "#C75441"}
+                            style={{ marginRight: 10, marginTop: 1 }}
+                        />
+                        <View className="flex-1">
+                            <Text
+                                className="text-sm font-semibold text-coral-700 dark:text-coral-300"
+                            >
+                                {CRISIS_SUPPORT_TITLE}
+                            </Text>
+                            <Text
+                                className="mt-1 text-xs leading-5 text-paper-700 dark:text-paper-300"
+                            >
+                                {CRISIS_SUPPORT_MESSAGE}
+                            </Text>
+                        </View>
+                    </View>
+                )}
                 {renderStepContent(stepId)}
             </ScrollView>
         </View>

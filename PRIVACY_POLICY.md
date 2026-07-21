@@ -38,9 +38,9 @@ Moodinator attempts to delete its temporary cache export after the export flow, 
 
 Moodinator registers a periodic backup task with the operating system. The operating system decides whether and when it runs; execution is not guaranteed. After backup storage is available, the task may create a backup automatically and throttles successful backups to at most once per week. On Android, no backup can be created until you select a folder. On iOS, the app's Documents area is the default. Moodinator's retention cleanup keeps the eight newest app-managed `moodinator-backup-*.json` files it can identify in its managed backup locations and deletes older identified backups. This cleanup does not delete arbitrary exports, renamed copies, clipboard contents, or copies held by another app or provider.
 
-## External Support Actions
+## Support Reminder
 
-For ratings 9 and 10, Moodinator offers actions to call or text U.S. 988 and advises users elsewhere to contact a local crisis helpline. If you choose a 988 action, the app asks the operating system to open the phone or messaging app. Moodinator does not monitor entries, contact emergency services, or send your mood entry to a support service. Your carrier and operating system may process the call or message under their own terms and privacy policies.
+For ratings 9 and 10, Moodinator displays a passive reminder to call the local emergency number in immediate danger and consider contacting a local crisis helpline. The reminder has no buttons or links and does not initiate a call, message, website, or emergency response. Moodinator does not monitor entries or send your mood entry to a support service.
 
 ## Data Sharing and Sale
 
