@@ -11,9 +11,11 @@ import {
     KeyboardAvoidingView,
     Platform,
     AccessibilityInfo,
-    PanResponder,
 } from "react-native";
-import PagerView, { type PagerViewOnPageSelectedEvent } from "react-native-pager-view";
+import PagerView, {
+    type PageScrollStateChangedNativeEvent,
+    type PagerViewOnPageSelectedEvent,
+} from "react-native-pager-view";
 import Animated, {
     FadeIn,
     FadeOut,
@@ -44,7 +46,6 @@ import { haptics } from "@/lib/haptics";
 import {
     CRISIS_SUPPORT_MESSAGE,
     CRISIS_SUPPORT_TITLE,
-    isHorizontalSwipeAttempt,
     requiresCrisisSupportAcknowledgement,
 } from "@/lib/crisisSupport";
 import {
@@ -148,6 +149,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     const notesFocusedRef = useRef(false);
     const notesContainerYRef = useRef(0);
     const notesScrollTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+    const hasHandledBlockedPagerDragRef = useRef(false);
 
     // ── Form state
     const [mood, setMood] = useState(initialMood);
@@ -304,6 +306,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
             setHasDismissedCrisisSupportHint(false);
             setShowCrisisSupportContinueHint(false);
             crisisSupportNudge.value = 0;
+            hasHandledBlockedPagerDragRef.current = false;
             setIsNotesFocused(false);
             setNewEmotionName("");
             setNewEmotionCategory(getDefaultEmotionCategory(draft.mood));
@@ -415,20 +418,39 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
         setHasDismissedCrisisSupportHint(true);
         setShowCrisisSupportContinueHint(false);
         crisisSupportNudge.value = 0;
+        hasHandledBlockedPagerDragRef.current = false;
     }, [crisisSupportNudge]);
 
-    const blockedPagerPanResponder = useMemo(
-        () =>
-            PanResponder.create({
-                onMoveShouldSetPanResponderCapture: (_event, gestureState) =>
-                    mustDismissCrisisSupportHint &&
-                    isHorizontalSwipeAttempt(
-                        { x: 0, y: 0 },
-                        { x: gestureState.dx, y: gestureState.dy }
-                    ),
-                onPanResponderGrant: indicateCrisisSupportRequirement,
-            }),
-        [indicateCrisisSupportRequirement, mustDismissCrisisSupportHint]
+    const handlePageScrollStateChanged = useCallback(
+        (event: PageScrollStateChangedNativeEvent) => {
+            const scrollState = event.nativeEvent.pageScrollState;
+            if (!mustDismissCrisisSupportHint) {
+                hasHandledBlockedPagerDragRef.current = false;
+                return;
+            }
+
+            if (scrollState === "dragging") {
+                if (!hasHandledBlockedPagerDragRef.current) {
+                    hasHandledBlockedPagerDragRef.current = true;
+                    indicateCrisisSupportRequirement();
+                }
+                pagerRef.current?.setPageWithoutAnimation(currentStep);
+                return;
+            }
+
+            if (scrollState === "settling") {
+                pagerRef.current?.setPageWithoutAnimation(currentStep);
+                return;
+            }
+
+            hasHandledBlockedPagerDragRef.current = false;
+            pagerRef.current?.setPageWithoutAnimation(currentStep);
+        },
+        [
+            currentStep,
+            indicateCrisisSupportRequirement,
+            mustDismissCrisisSupportHint,
+        ]
     );
 
     const closeWithConfirmation = useCallback(() => {
@@ -460,12 +482,18 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     const handlePageSelected = useCallback(
         (event: PagerViewOnPageSelectedEvent) => {
             const nextStep = event.nativeEvent.position;
+            if (mustDismissCrisisSupportHint) {
+                if (nextStep !== currentStep) {
+                    pagerRef.current?.setPageWithoutAnimation(currentStep);
+                }
+                return;
+            }
             if (nextStep === currentStep) return;
 
             haptics.light();
             setCurrentStep(nextStep);
         },
-        [currentStep]
+        [currentStep, mustDismissCrisisSupportHint]
     );
 
     const handleCopyYesterday = (entry: MoodEntry) => {
@@ -1444,15 +1472,13 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                     )}
 
                     {/* ── Step content ────────────────────────────────────── */}
-                    <View
-                        style={{ flex: 1 }}
-                        {...blockedPagerPanResponder.panHandlers}
-                    >
+                    <View style={{ flex: 1 }}>
                         <PagerView
                             ref={pagerRef}
                             style={{ flex: 1 }}
                             initialPage={0}
-                            scrollEnabled={!isPrimaryActionDisabled && !isNotesKeyboardActive}
+                            scrollEnabled={!isSaving && !isNotesKeyboardActive}
+                            onPageScrollStateChanged={handlePageScrollStateChanged}
                             onPageSelected={handlePageSelected}
                             offscreenPageLimit={1}
                         >

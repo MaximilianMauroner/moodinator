@@ -2,10 +2,8 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import {
-  BLOCKED_SWIPE_THRESHOLD,
   CRISIS_SUPPORT_MESSAGE,
   CRISIS_SUPPORT_TITLE,
-  isHorizontalSwipeAttempt,
   requiresCrisisSupportAcknowledgement,
   shouldShowCrisisSupportHint,
 } from "../../src/lib/crisisSupport";
@@ -39,42 +37,6 @@ describe("crisis support", () => {
     expect(requiresCrisisSupportAcknowledgement(9, true)).toBe(false);
   });
 
-  it("recognizes horizontal swipe attempts in either direction", () => {
-    expect(
-      isHorizontalSwipeAttempt(
-        { x: 0, y: 0 },
-        { x: BLOCKED_SWIPE_THRESHOLD, y: 10 }
-      )
-    ).toBe(true);
-    expect(
-      isHorizontalSwipeAttempt(
-        { x: BLOCKED_SWIPE_THRESHOLD, y: 10 },
-        { x: 0, y: 0 }
-      )
-    ).toBe(true);
-  });
-
-  it("ignores short, vertical, and equally diagonal gestures", () => {
-    expect(
-      isHorizontalSwipeAttempt(
-        { x: 0, y: 0 },
-        { x: BLOCKED_SWIPE_THRESHOLD - 1, y: 0 }
-      )
-    ).toBe(false);
-    expect(
-      isHorizontalSwipeAttempt(
-        { x: 0, y: 0 },
-        { x: 10, y: BLOCKED_SWIPE_THRESHOLD }
-      )
-    ).toBe(false);
-    expect(
-      isHorizontalSwipeAttempt(
-        { x: 0, y: 0 },
-        { x: BLOCKED_SWIPE_THRESHOLD, y: BLOCKED_SWIPE_THRESHOLD }
-      )
-    ).toBe(false);
-  });
-
   it("renders the guidance inline without post-save alert behavior", () => {
     expect(moodEntryModal).toContain("requiresCrisisSupportAcknowledgement(");
     expect(moodEntryModal).toContain("CRISIS_SUPPORT_MESSAGE");
@@ -83,12 +45,17 @@ describe("crisis support", () => {
       "Close this reminder with the X to continue."
     );
     expect(moodEntryModal).toContain("disabled={isSaving}");
-    expect(moodEntryModal).toContain("PanResponder.create({");
     expect(moodEntryModal).toContain(
-      "onMoveShouldSetPanResponderCapture:"
+      "onPageScrollStateChanged={handlePageScrollStateChanged}"
     );
     expect(moodEntryModal).toContain(
-      "onPanResponderGrant: indicateCrisisSupportRequirement"
+      'if (scrollState === "dragging")'
+    );
+    expect(moodEntryModal).toContain(
+      "pagerRef.current?.setPageWithoutAnimation(currentStep)"
+    );
+    expect(moodEntryModal).toContain(
+      "scrollEnabled={!isSaving && !isNotesKeyboardActive}"
     );
     expect(moodEntryModal).toContain(
       "crisisSupportScrollViewRef.current?.scrollTo({ y: 0, animated: true })"
