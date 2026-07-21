@@ -11,7 +11,7 @@ import {
     KeyboardAvoidingView,
     Platform,
     AccessibilityInfo,
-    type GestureResponderEvent,
+    PanResponder,
 } from "react-native";
 import PagerView, { type PagerViewOnPageSelectedEvent } from "react-native-pager-view";
 import Animated, {
@@ -44,6 +44,7 @@ import { haptics } from "@/lib/haptics";
 import {
     CRISIS_SUPPORT_MESSAGE,
     CRISIS_SUPPORT_TITLE,
+    isHorizontalSwipeAttempt,
     requiresCrisisSupportAcknowledgement,
 } from "@/lib/crisisSupport";
 import {
@@ -106,7 +107,6 @@ const STEP_TITLES: Record<MoodEntryStepId, string> = {
 
 const CRISIS_SUPPORT_CONTINUE_HINT =
     "Close this reminder with the X to continue.";
-const BLOCKED_SWIPE_THRESHOLD = 40;
 
 function getDefaultEmotionCategory(mood: number): Emotion["category"] {
     if (mood <= 4) return "positive";
@@ -144,10 +144,10 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     const { height: windowHeight } = useWindowDimensions();
     const pagerRef = useRef<PagerView>(null);
     const scrollViewRef = useRef<ScrollView>(null);
+    const crisisSupportScrollViewRef = useRef<ScrollView>(null);
     const notesFocusedRef = useRef(false);
     const notesContainerYRef = useRef(0);
     const notesScrollTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
-    const pagerTouchStartRef = useRef<{ x: number; y: number } | null>(null);
 
     // ── Form state
     const [mood, setMood] = useState(initialMood);
@@ -304,7 +304,6 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
             setHasDismissedCrisisSupportHint(false);
             setShowCrisisSupportContinueHint(false);
             crisisSupportNudge.value = 0;
-            pagerTouchStartRef.current = null;
             setIsNotesFocused(false);
             setNewEmotionName("");
             setNewEmotionCategory(getDefaultEmotionCategory(draft.mood));
@@ -376,6 +375,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     }, [currentStep, goToStep, handleSave, isLastStep]);
 
     const indicateCrisisSupportRequirement = useCallback(() => {
+        crisisSupportScrollViewRef.current?.scrollTo({ y: 0, animated: true });
         setShowCrisisSupportContinueHint(true);
         crisisSupportNudge.value = withSequence(
             withTiming(-5, { duration: 45 }),
@@ -384,7 +384,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
             withTiming(3, { duration: 40 }),
             withTiming(0, { duration: 45 })
         );
-        haptics.warning();
+        haptics.light();
         AccessibilityInfo.announceForAccessibility(
             CRISIS_SUPPORT_CONTINUE_HINT
         );
@@ -417,43 +417,19 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
         crisisSupportNudge.value = 0;
     }, [crisisSupportNudge]);
 
-    const handlePagerTouchStart = useCallback(
-        (event: GestureResponderEvent) => {
-            if (!mustDismissCrisisSupportHint) return;
-
-            pagerTouchStartRef.current = {
-                x: event.nativeEvent.pageX,
-                y: event.nativeEvent.pageY,
-            };
-        },
-        [mustDismissCrisisSupportHint]
-    );
-
-    const handlePagerTouchEnd = useCallback(
-        (event: GestureResponderEvent) => {
-            const touchStart = pagerTouchStartRef.current;
-            pagerTouchStartRef.current = null;
-            if (!mustDismissCrisisSupportHint || !touchStart) return;
-
-            const horizontalDistance = Math.abs(
-                event.nativeEvent.pageX - touchStart.x
-            );
-            const verticalDistance = Math.abs(
-                event.nativeEvent.pageY - touchStart.y
-            );
-            if (
-                horizontalDistance >= BLOCKED_SWIPE_THRESHOLD &&
-                horizontalDistance > verticalDistance
-            ) {
-                indicateCrisisSupportRequirement();
-            }
-        },
+    const blockedPagerPanResponder = useMemo(
+        () =>
+            PanResponder.create({
+                onMoveShouldSetPanResponderCapture: (_event, gestureState) =>
+                    mustDismissCrisisSupportHint &&
+                    isHorizontalSwipeAttempt(
+                        { x: 0, y: 0 },
+                        { x: gestureState.dx, y: gestureState.dy }
+                    ),
+                onPanResponderGrant: indicateCrisisSupportRequirement,
+            }),
         [indicateCrisisSupportRequirement, mustDismissCrisisSupportHint]
     );
-
-    const clearPagerTouchStart = useCallback(() => {
-        pagerTouchStartRef.current = null;
-    }, []);
 
     const closeWithConfirmation = useCallback(() => {
         if (!isDirty) {
@@ -1262,10 +1238,15 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
         }
     };
 
-    const renderStepPage = (stepId: MoodEntryStepId) => (
+    const renderStepPage = (stepId: MoodEntryStepId, stepIndex: number) => (
         <View key={stepId} style={{ flex: 1 }}>
             <ScrollView
-                ref={stepId === "details" ? scrollViewRef : undefined}
+                ref={(instance) => {
+                    if (stepId === "details") scrollViewRef.current = instance;
+                    if (stepIndex === 0) {
+                        crisisSupportScrollViewRef.current = instance;
+                    }
+                }}
                 className="px-5 pt-5"
                 contentContainerStyle={{ paddingBottom: scrollBottomPadding }}
                 showsVerticalScrollIndicator={false}
@@ -1465,9 +1446,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                     {/* ── Step content ────────────────────────────────────── */}
                     <View
                         style={{ flex: 1 }}
-                        onTouchStart={handlePagerTouchStart}
-                        onTouchEnd={handlePagerTouchEnd}
-                        onTouchCancel={clearPagerTouchStart}
+                        {...blockedPagerPanResponder.panHandlers}
                     >
                         <PagerView
                             ref={pagerRef}

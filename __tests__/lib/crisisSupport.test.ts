@@ -2,13 +2,19 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import {
+  BLOCKED_SWIPE_THRESHOLD,
   CRISIS_SUPPORT_MESSAGE,
   CRISIS_SUPPORT_TITLE,
+  isHorizontalSwipeAttempt,
   requiresCrisisSupportAcknowledgement,
   shouldShowCrisisSupportHint,
 } from "../../src/lib/crisisSupport";
 
 const moodEntryModal = readFileSync("src/components/MoodEntryModal.tsx", "utf8");
+const crisisFeedbackHandler = moodEntryModal.slice(
+  moodEntryModal.indexOf("const indicateCrisisSupportRequirement"),
+  moodEntryModal.indexOf("const handlePrimaryAction")
+);
 
 describe("crisis support", () => {
   it("offers support for ratings 9 and 10 only", () => {
@@ -33,6 +39,42 @@ describe("crisis support", () => {
     expect(requiresCrisisSupportAcknowledgement(9, true)).toBe(false);
   });
 
+  it("recognizes horizontal swipe attempts in either direction", () => {
+    expect(
+      isHorizontalSwipeAttempt(
+        { x: 0, y: 0 },
+        { x: BLOCKED_SWIPE_THRESHOLD, y: 10 }
+      )
+    ).toBe(true);
+    expect(
+      isHorizontalSwipeAttempt(
+        { x: BLOCKED_SWIPE_THRESHOLD, y: 10 },
+        { x: 0, y: 0 }
+      )
+    ).toBe(true);
+  });
+
+  it("ignores short, vertical, and equally diagonal gestures", () => {
+    expect(
+      isHorizontalSwipeAttempt(
+        { x: 0, y: 0 },
+        { x: BLOCKED_SWIPE_THRESHOLD - 1, y: 0 }
+      )
+    ).toBe(false);
+    expect(
+      isHorizontalSwipeAttempt(
+        { x: 0, y: 0 },
+        { x: 10, y: BLOCKED_SWIPE_THRESHOLD }
+      )
+    ).toBe(false);
+    expect(
+      isHorizontalSwipeAttempt(
+        { x: 0, y: 0 },
+        { x: BLOCKED_SWIPE_THRESHOLD, y: BLOCKED_SWIPE_THRESHOLD }
+      )
+    ).toBe(false);
+  });
+
   it("renders the guidance inline without post-save alert behavior", () => {
     expect(moodEntryModal).toContain("requiresCrisisSupportAcknowledgement(");
     expect(moodEntryModal).toContain("CRISIS_SUPPORT_MESSAGE");
@@ -41,12 +83,22 @@ describe("crisis support", () => {
       "Close this reminder with the X to continue."
     );
     expect(moodEntryModal).toContain("disabled={isSaving}");
-    expect(moodEntryModal).toContain("onTouchStart={handlePagerTouchStart}");
-    expect(moodEntryModal).toContain("onTouchEnd={handlePagerTouchEnd}");
+    expect(moodEntryModal).toContain("PanResponder.create({");
+    expect(moodEntryModal).toContain(
+      "onMoveShouldSetPanResponderCapture:"
+    );
+    expect(moodEntryModal).toContain(
+      "onPanResponderGrant: indicateCrisisSupportRequirement"
+    );
+    expect(moodEntryModal).toContain(
+      "crisisSupportScrollViewRef.current?.scrollTo({ y: 0, animated: true })"
+    );
     expect(moodEntryModal).toContain(
       "AccessibilityInfo.announceForAccessibility("
     );
     expect(moodEntryModal).toContain("withSequence(");
+    expect(crisisFeedbackHandler).toContain("haptics.light()");
+    expect(crisisFeedbackHandler).not.toContain("haptics.warning()");
     expect(moodEntryModal).not.toContain("showCrisisSupportAlert");
     expect(moodEntryModal).not.toContain("setTimeout(showCrisisSupport");
   });
