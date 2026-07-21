@@ -66,7 +66,7 @@ export default function TermsOfServiceScreen() {
             Moodinator is not a medical device and does not diagnose, treat, cure, or prevent any medical condition. It does not provide medical advice, diagnosis, or treatment. Its ratings, patterns, and insights are informational and may be incomplete or inaccurate. Consult a qualified healthcare professional for medical advice, diagnosis, or treatment.
           </Text>
           <Text className="text-sm text-coral-700 dark:text-coral-400 leading-5 font-medium">
-            Moodinator does not monitor entries, provide live crisis support, contact emergency services, or dispatch help. If someone may be in immediate danger, call the local emergency number. In the U.S., call or text 988; elsewhere, findahelpline.com can help locate support.
+            Moodinator does not monitor entries, provide live crisis support, contact emergency services, or dispatch help. If someone may be in immediate danger, call the local emergency number. In the U.S., call or text 988; elsewhere, contact a local crisis helpline.
           </Text>
         </View>
 

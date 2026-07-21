@@ -24,7 +24,7 @@ Export flows may use a temporary app-cache file and the operating-system share s
 
 **Moodinator is a personal wellness journal. It is not a medical device and does not diagnose, treat, cure, or prevent any medical condition.** It does not provide medical advice, diagnosis, or treatment. Mood ratings, patterns, and insights are informational and may be incomplete or inaccurate. Consult a doctor or other qualified healthcare professional for medical advice, diagnosis, or treatment, and do not disregard professional advice because of information in the app.
 
-Moodinator does not monitor entries, provide live crisis support, contact emergency services, or dispatch help. If you or another person may be in immediate danger, call your local emergency number. In the United States, you can call or text 988. Elsewhere, you can use <https://findahelpline.com/> to look for local support. Availability and accuracy of third-party services are outside Moodinator's control.
+Moodinator does not monitor entries, provide live crisis support, contact emergency services, or dispatch help. If you or another person may be in immediate danger, call your local emergency number. In the United States, you can call or text 988. Elsewhere, contact a local crisis helpline. Availability of crisis services is outside Moodinator's control.
 
 ## Open-Source Software
 

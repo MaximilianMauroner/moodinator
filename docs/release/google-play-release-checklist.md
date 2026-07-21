@@ -39,7 +39,7 @@ Inspect the dumped `<uses-permission>` entries and confirm `android.permission.S
 - Install the production-signed build on a clean Android device or emulator.
 - Launch the app, complete onboarding, and confirm the scale explains that `0` is best and `10` needs the most support.
 - Add a low-severity entry and a `9` or `10` entry. Confirm the severe entry saves and shows support actions.
-- From the severe-entry support dialog, confirm **Call 988 (U.S.)** opens the dialer, **Text 988 (U.S.)** opens messaging, and **Find A Helpline** opens `https://findahelpline.com/`. Confirm the dialog says to use the local emergency number for immediate danger and says Moodinator does not monitor entries or contact/dispatch emergency services.
+- From the severe-entry support dialog, confirm **Call 988 (U.S.)** opens the dialer and **Text 988 (U.S.)** opens messaging. Confirm the dialog advises other users to contact a local crisis helpline, says to use the local emergency number for immediate danger, and says Moodinator does not monitor entries or contact/dispatch emergency services.
 - Disable haptics in settings and confirm tab/mood button presses no longer vibrate.
 - Create a reminder. Confirm it is paused by default, then enable it and verify the permission prompt appears before scheduling.
 - Deny reminder permission, enable a reminder, and confirm the reminder row reports that it is not scheduled. Grant permission in Android settings, return to Moodinator, and confirm the app retries reminder recovery.

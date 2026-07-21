@@ -40,7 +40,7 @@ Moodinator registers a periodic backup task with the operating system. The opera
 
 ## External Support Actions
 
-For ratings 9 and 10, Moodinator offers crisis-support actions. If you choose one, the app asks the operating system to open the phone or messaging app for U.S. 988, or opens Find A Helpline at <https://findahelpline.com/>. These actions are user-initiated. Moodinator does not monitor entries, contact emergency services, or send your mood entry to those services. Your carrier, browser, operating system, or selected service may process information under its own terms and privacy policy.
+For ratings 9 and 10, Moodinator offers actions to call or text U.S. 988 and advises users elsewhere to contact a local crisis helpline. If you choose a 988 action, the app asks the operating system to open the phone or messaging app. Moodinator does not monitor entries, contact emergency services, or send your mood entry to a support service. Your carrier and operating system may process the call or message under their own terms and privacy policies.
 
 ## Data Sharing and Sale
 

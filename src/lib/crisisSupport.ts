@@ -1,12 +1,10 @@
 export const CRISIS_SUPPORT_THRESHOLD = 9;
 export const CRISIS_SUPPORT_MAX_RATING = 10;
-export const FIND_A_HELPLINE_URL = "https://findahelpline.com/";
 
 export type CrisisSupportAction = {
-  id: "call-988" | "text-988" | "find-a-helpline";
+  id: "call-988" | "text-988";
   label: string;
   url: string;
-  fallbackMessage: string;
 };
 
 export type CrisisSupportAlertButton = {
@@ -26,25 +24,19 @@ export type CrisisSupportDependencies = {
 
 const LOCAL_EMERGENCY_GUIDANCE =
   "If you or someone else may be in immediate danger, call your local emergency number now.";
+const CRISIS_HELPLINE_GUIDANCE =
+  "In the United States, call or text 988. Elsewhere, contact a local crisis helpline.";
 
 export const CRISIS_SUPPORT_ACTIONS: readonly CrisisSupportAction[] = [
   {
     id: "call-988",
     label: "Call 988 (U.S.)",
     url: "tel:988",
-    fallbackMessage: "Call 988 for crisis support in the United States.",
   },
   {
     id: "text-988",
     label: "Text 988 (U.S.)",
     url: "sms:988",
-    fallbackMessage: "Text 988 for crisis support in the United States.",
-  },
-  {
-    id: "find-a-helpline",
-    label: "Find A Helpline",
-    url: FIND_A_HELPLINE_URL,
-    fallbackMessage: `Visit ${FIND_A_HELPLINE_URL} to look for support in your country.`,
   },
 ];
 
@@ -61,23 +53,12 @@ function openSupportAction(
   dependencies: CrisisSupportDependencies
 ): void {
   void dependencies.openUrl(action.url).catch(() => {
-    const findAHelplineAction = CRISIS_SUPPORT_ACTIONS.find(
-      (candidate) => candidate.id === "find-a-helpline"
-    );
-    const fallbackButtons: CrisisSupportAlertButton[] = [];
-
-    if (action.id !== "find-a-helpline" && findAHelplineAction) {
-      fallbackButtons.push({
-        text: findAHelplineAction.label,
-        onPress: () => openSupportAction(findAHelplineAction, dependencies),
-      });
-    }
-    fallbackButtons.push({ text: "Not now", style: "cancel" });
+    const appName = action.id === "call-988" ? "phone" : "messaging";
 
     dependencies.showAlert(
-      "Unable to open support",
-      `${LOCAL_EMERGENCY_GUIDANCE} ${action.fallbackMessage}`,
-      fallbackButtons
+      "Unable to open this action",
+      `This device could not open the ${appName} app. ${LOCAL_EMERGENCY_GUIDANCE} ${CRISIS_HELPLINE_GUIDANCE}`,
+      [{ text: "OK", style: "cancel" }]
     );
   });
 }
@@ -87,7 +68,7 @@ export function presentCrisisSupportAlert(
 ): void {
   dependencies.showAlert(
     "Support is available",
-    `${LOCAL_EMERGENCY_GUIDANCE} Moodinator does not monitor entries, contact emergency services, or dispatch help.`,
+    `${LOCAL_EMERGENCY_GUIDANCE} ${CRISIS_HELPLINE_GUIDANCE} Moodinator does not monitor entries, contact emergency services, or dispatch help.`,
     [
       ...CRISIS_SUPPORT_ACTIONS.map((action) => ({
         text: action.label,

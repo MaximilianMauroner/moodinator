@@ -75,7 +75,7 @@ export default function PrivacyPolicyScreen() {
 
         <Section title="External Support Actions">
           <Paragraph>
-            For ratings 9 and 10, Moodinator offers actions to call or text U.S. 988 or open findahelpline.com. These actions are user-initiated. Moodinator does not monitor entries, contact emergency services, or send your mood entry to a support provider.
+            For ratings 9 and 10, Moodinator offers actions to call or text U.S. 988 and advises users elsewhere to contact a local crisis helpline. Moodinator does not monitor entries, contact emergency services, or send your mood entry to a support service.
           </Paragraph>
         </Section>
 
