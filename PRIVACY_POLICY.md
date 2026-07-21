@@ -1,75 +1,71 @@
 # Privacy Policy
 
-**Last Updated: May 22, 2026**
+**Last Updated: July 21, 2026**
 
 ## Introduction
 
-Moodinator ("we", "our", or "the app") is committed to protecting your privacy. This Privacy Policy explains how we handle your information when you use our mood tracking application.
+Moodinator ("we", "our", or "the app") is a local-first mood tracking application. This Privacy Policy explains what information the app handles, where it is stored, when it can leave your device, and what you can delete.
 
-## Data Collection and Storage
+## Information Stored on Your Device
 
-### What We Collect
+Moodinator stores information you choose to enter or configure, including:
 
-Moodinator collects and stores the following information that you voluntarily provide:
+- **Mood data:** ratings on the 0–10 scale, timestamps, notes, emotions, context tags, energy values, and related history
+- **Settings:** entry preferences, display preferences, onboarding state, and other app configuration
+- **Reminders:** local notification titles, messages, schedules, permission state, and scheduling identifiers
+- **App lock data:** whether app lock and biometrics are enabled, PIN length, failed-attempt state, and a salted hash of your PIN
+- **Backup metadata:** the selected backup folder and the time of the latest backup
 
-- **Mood Entries**: Your mood ratings (0-10 scale), timestamps, and any notes you add
-- **Emotions**: Emotion tags you select for each entry
-- **Contexts**: Context tags describing your situation (e.g., work, home, social)
+This information is processed and stored locally. Moodinator has no developer-operated server, user account system, cloud synchronization, advertising, or analytics. We do not receive your mood data or app settings.
 
-### Local-Only Storage
+## Storage and Security
 
-**All your data is stored locally on your device.** We do not upload, transmit, or store your personal data on any external servers. Your mood entries and settings remain exclusively on your device.
+Mood data is stored in the app's local SQLite database inside the operating system's app sandbox. On Android, Moodinator does **not** apply database-level encryption to that SQLite database. The app sandbox, device encryption, screen lock, and other platform protections may reduce access, but app lock is not database encryption.
 
-### No Account Required
+If you set an app-lock PIN, Moodinator stores a salted hash—not the plaintext PIN—in the operating system's secure storage. Biometric enrollment and biometric matching are handled by the operating system; Moodinator does not receive or store your fingerprint, face, iris, or biometric template.
 
-Moodinator does not require you to create an account. There is no registration, no email collection, and no cloud synchronization by default.
+No security measure can guarantee absolute protection. Use a device passcode, keep the operating system updated, and protect access to unlocked devices and exported files.
 
-## Data Sharing
+## Local Notifications
 
-**We do not share your data with anyone.** Since all data is stored locally on your device:
+Moodinator schedules reminder notifications locally on your device after you enable them and grant permission. Reminder titles and messages may be visible on the lock screen or in notification history, depending on your device settings. Moodinator does not use remote push notifications.
 
-- No data is sent to our servers
-- No data is shared with third parties
-- No data is used for advertising or analytics
-- No data is sold to anyone
+## Exports and Backups
 
-## Your Control Over Your Data
+Data exports and backups are plaintext JSON files and are not encrypted by Moodinator. A temporary export remains local until you choose to save, share, or copy it. You may choose a destination or another app through the operating system; those choices can include cloud-backed storage providers. On Android, backup creation requires a user-selected folder. On iOS, the default backup location is the app's Documents area.
 
-You have complete control over your data:
+After data is exported, copied, shared, or saved outside Moodinator's private storage, the destination provider's and operating system's practices apply. Anyone with access to those files or the clipboard may be able to read their contents. Moodinator cannot control or delete copies stored outside the app.
 
-- **Data Export**: You can export your data at any time from Settings > Data
-- **Delete**: You can delete individual entries or all data from the app
-- **Backup**: Periodic backups are stored locally for recovery; you can also trigger one on demand
+## External Support Actions
 
-## Third-Party Services
+For ratings 9 and 10, Moodinator offers crisis-support actions. If you choose one, the app asks the operating system to open the phone or messaging app for U.S. 988, or opens Find A Helpline at <https://findahelpline.com/>. These actions are user-initiated. Moodinator does not monitor entries, contact emergency services, or send your mood entry to those services. Your carrier, browser, operating system, or selected service may process information under its own terms and privacy policy.
 
-Moodinator does not integrate with any third-party analytics, advertising, or tracking services. The app functions entirely offline.
+## Data Sharing and Sale
 
-## Data Security
+We do not operate servers that receive your Moodinator data, and we do not sell it. Moodinator contains no advertising or analytics SDKs. Data leaves the app only when you deliberately export, share, copy, back up, import, or open an external support action as described above, or when the operating system handles device backup or transfer outside our control.
 
-Your data is protected by your device's security features. We recommend:
+## Your Control and Deletion
 
-- Using a device passcode or biometric lock
-- Keeping your device's operating system updated
-- Not sharing your unlocked device with others
+You can:
+
+- Delete an individual mood entry.
+- Use **Settings > Data & Backups > Delete Mood Data** to delete mood entries, their mood–emotion links, and the app's saved emotion list from the local database.
+- Export or back up mood history before deleting it.
+
+"Delete Mood Data" does **not** delete app settings, reminders, app-lock settings or secure-storage PIN hash, context-tag presets, or export and backup files saved outside the app. Uninstalling normally removes app-sandbox data, but external files remain, secure storage and platform backups may behave differently by operating system, and platform backup or device-transfer features may retain or restore data. Review and delete external files through the destination where you saved them.
+
+Because Moodinator has no account and we do not hold a server-side copy of your data, there is no developer-side account or data-deletion request for us to perform. Delete data in the app, uninstall it, and remove any external copies from their destinations.
 
 ## Children's Privacy
 
-Moodinator is not directed at children under 13. We do not knowingly collect personal information from children under 13. If you are a parent or guardian and believe your child has provided us with personal information, please contact us.
+Moodinator is not directed at children under 13. Because we do not receive app data, we do not knowingly collect personal information from children through developer-operated servers.
 
 ## Changes to This Policy
 
-We may update this Privacy Policy from time to time. We will notify you of any changes by updating the "Last Updated" date at the top of this policy. We encourage you to review this Privacy Policy periodically.
+We may update this Privacy Policy from time to time. We will identify changes by updating the "Last Updated" date. Review this policy periodically.
 
-## Contact Us
+## Contact and Source
 
-If you have any questions about this Privacy Policy, please contact us at:
+Questions about this Privacy Policy can be sent to **support.moodinator@lab4code.com**.
 
-**Email**: support.moodinator@lab4code.com
-
-## Summary
-
-- All data stays on your device
-- No accounts, no cloud, no tracking
-- You own and control your data completely
-- Export or delete your data anytime
+Source repository: <https://github.com/MaximilianMauroner/moodinator>

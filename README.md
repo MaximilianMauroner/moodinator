@@ -1,11 +1,11 @@
 # Moodinator
 
-A privacy-focused mood tracking app built with React Native. Track your emotional wellbeing, identify patterns, and gain insights—all while keeping your data entirely on your device.
+A privacy-focused mood tracking app built with React Native. Track your emotional wellbeing, identify patterns, and gain insights without a Moodinator account or developer-operated data server.
 
 ## Features
 
 ### Mood Tracking
-- **10-point mood scale** from Elated (0) to Crisis (10)
+- **11-level mood scale** from Elated (0) to Emergency (10)
 - **Quick entry** with tap for fast logging
 - **Detailed entry** with long-press for comprehensive records
 - Attach **emotions**, **context tags**, **energy**, and **notes**
@@ -18,10 +18,10 @@ A privacy-focused mood tracking app built with React Native. Track your emotiona
 - Streak tracking and milestones
 
 ### Privacy First
-- **100% local storage**—no accounts, no cloud, no tracking
-- All data stays on your device
-- Export your data anytime
-- No internet connection required
+- **Local-first storage**—no accounts, developer cloud sync, analytics, or ads
+- Mood data stays in the app unless you choose to export, share, copy, or back it up
+- Plaintext JSON exports and backups can be saved to user-selected destinations, including cloud-backed providers
+- Core mood tracking works offline; crisis-support links and user-selected sharing destinations may require connectivity
 
 ### User Experience
 - **Dark and light mode** with warm, organic color palette
@@ -109,7 +109,7 @@ review, and merge workflow.
 - [Privacy Policy](./PRIVACY_POLICY.md)
 - [Terms of Service](./TERMS_OF_SERVICE.md)
 
-**Your data stays on your device.** Moodinator does not collect, transmit, or store any personal information on external servers.
+**Your working data is stored locally.** Moodinator has no developer-operated account or data server. Data can leave the app when you deliberately export, share, copy, or back it up to a destination you select. See the Privacy Policy for Android database-encryption, notification, deletion, and platform-backup details.
 
 ## Contributing
 

@@ -19,7 +19,7 @@ export default function TermsOfServiceScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Text className="text-xs text-paper-700 dark:text-sand-400 mb-4">
-          Last Updated: May 22, 2026
+          Last Updated: July 21, 2026
         </Text>
 
         <Section title="Agreement to Terms">
@@ -30,42 +30,28 @@ export default function TermsOfServiceScreen() {
 
         <Section title="Description of Service">
           <Paragraph>
-            Moodinator is a personal mood tracking application that allows you to:
+            Moodinator is a personal wellness tool that allows you to:
           </Paragraph>
           <BulletList items={[
-            "Record daily mood entries on a 0-10 scale",
-            "Tag entries with emotions and contexts",
-            "View analytics and insights about your mood patterns",
-            "Export your data for personal use",
+            "Record moods on a 0–10 scale, where lower is better and 9–10 require the most support",
+            "Add notes, emotions, contexts, and energy values",
+            "Configure local reminders and view on-device patterns",
+            "Create plaintext JSON exports and backups",
           ]} />
         </Section>
 
         <Section title="Use of the App">
-          <Subtitle>Permitted Use</Subtitle>
           <Paragraph>
-            You may use Moodinator for personal, non-commercial purposes to track and understand your emotional wellbeing.
-          </Paragraph>
-
-          <Subtitle>Prohibited Use</Subtitle>
-          <Paragraph>
-            You agree not to use the app for any unlawful purpose, attempt to reverse engineer the app, remove proprietary notices, or use the app in any way that could damage its functionality.
+            You may use Moodinator for lawful personal purposes. Do not use it to violate applicable law, interfere with the app, or misrepresent it or its source. Open-source code rights are governed by the MIT License described below.
           </Paragraph>
         </Section>
 
         <Section title="Your Data">
-          <Subtitle>Ownership</Subtitle>
           <Paragraph>
-            You retain full ownership of all data you create within the app, including mood entries, notes, emotion tags, context tags, settings, exports, and backups.
+            You retain your rights in mood entries, notes, tags, settings, exports, and backups you create. Moodinator has no developer-operated account or server copy. You are responsible for device security and protecting plaintext JSON exports and backups.
           </Paragraph>
-
-          <Subtitle>Local Storage</Subtitle>
           <Paragraph>
-            All data is stored locally on your device. You are responsible for backing up your data regularly, maintaining device security, and any data loss due to device failure or accidental deletion.
-          </Paragraph>
-
-          <Subtitle>No Recovery</Subtitle>
-          <Paragraph>
-            {"Since we do not store your data on any servers, we cannot recover lost data. We strongly recommend using the app's Data Export and Backup features regularly."}
+            Delete Mood Data removes mood entries, mood–emotion links, and the saved emotion list. It retains settings, reminders, app-lock data, context-tag presets, and external exports or backups. Uninstalling normally removes app-sandbox data, but external files remain and platform secure-storage, backup, and transfer behavior can vary. We cannot recover lost data or delete external copies.
           </Paragraph>
         </Section>
 
@@ -74,40 +60,46 @@ export default function TermsOfServiceScreen() {
             Medical Disclaimer
           </Text>
           <Text className="text-sm text-coral-700 dark:text-coral-400 leading-5 mb-2">
-            Moodinator is not a medical device or healthcare service. The app is intended for personal wellness tracking only and does not provide medical advice, diagnosis, or treatment.
+            Moodinator is not a medical device and does not diagnose, treat, cure, or prevent any medical condition. It does not provide medical advice, diagnosis, or treatment. Its ratings, patterns, and insights are informational and may be incomplete or inaccurate. Consult a qualified healthcare professional for medical advice, diagnosis, or treatment.
           </Text>
           <Text className="text-sm text-coral-700 dark:text-coral-400 leading-5 font-medium">
-            If you are experiencing a mental health crisis, please contact a healthcare professional or crisis helpline immediately.
+            Moodinator does not monitor entries, provide live crisis support, contact emergency services, or dispatch help. If someone may be in immediate danger, call the local emergency number. In the U.S., call or text 988; elsewhere, findahelpline.com can help locate support.
           </Text>
         </View>
 
-        <Section title="Intellectual Property">
+        <Section title="Open-Source Software">
           <Paragraph>
-            Moodinator and its original content, features, and functionality are protected by international copyright, trademark, and other intellectual property laws. You retain all rights to the personal data and content you create within the app.
+            Moodinator source code is available at https://github.com/MaximilianMauroner/moodinator under the MIT License. That license governs use, copying, modification, merging, publication, distribution, sublicensing, and sale of the open-source code and includes its own notices and warranty disclaimer. These Terms do not remove rights granted by that license. Third-party packages retain their own licenses.
           </Paragraph>
         </Section>
 
         <Section title="Disclaimers">
           <Paragraph>
-            {'The app is provided "as is" and "as available" without warranties of any kind. We do not guarantee that the app will meet your specific requirements, be uninterrupted or error-free, or that any errors will be corrected.'}
+            {'The app is provided "as is" and "as available" without warranties of any kind. We do not guarantee uninterrupted or error-free operation, preservation of local data, accuracy of insights, or availability of external support resources.'}
           </Paragraph>
         </Section>
 
         <Section title="Limitation of Liability">
           <Paragraph>
-            To the maximum extent permitted by law, we shall not be liable for any indirect, incidental, special, consequential, or punitive damages, including loss of data, loss of profits, or personal injury arising from your use of the app.
+            To the maximum extent permitted by law, we are not liable for indirect, incidental, special, consequential, exemplary, or punitive damages arising from app use, including loss of data, loss of profits, personal injury, or emotional distress. Nothing excludes liability that cannot legally be excluded.
           </Paragraph>
         </Section>
 
         <Section title="Changes to Terms">
           <Paragraph>
-            We reserve the right to modify these Terms at any time. Your continued use of the app after any changes constitutes acceptance of the new Terms.
+            We may update these Terms by changing the Last Updated date and making the revised Terms available.
           </Paragraph>
         </Section>
 
         <Section title="Termination">
           <Paragraph>
-            You may stop using the app at any time by uninstalling it from your device. Upon uninstallation, all locally stored data will be deleted unless you have saved a Data Export or external backup.
+            You may stop using Moodinator at any time and may uninstall it, subject to the data-retention caveats above.
+          </Paragraph>
+        </Section>
+
+        <Section title="Governing Law">
+          <Paragraph>
+            These Terms are governed by the laws of the jurisdiction in which the app developer resides, without regard to conflict-of-law provisions.
           </Paragraph>
         </Section>
 
@@ -135,14 +127,6 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       </Text>
       {children}
     </View>
-  );
-}
-
-function Subtitle({ children }: { children: string }) {
-  return (
-    <Text className="text-base font-medium text-paper-700 dark:text-paper-300 mt-3 mb-1">
-      {children}
-    </Text>
   );
 }
 

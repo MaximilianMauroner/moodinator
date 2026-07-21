@@ -14,4 +14,19 @@ describe("Android privacy configuration", () => {
       "android.permission.SYSTEM_ALERT_WINDOW"
     );
   });
+
+  it("does not enable background remote notifications", () => {
+    const appConfig = JSON.parse(readFileSync("app.json", "utf8")) as {
+      expo: { plugins: (string | [string, Record<string, unknown>])[] };
+    };
+    const notificationsPlugin = appConfig.expo.plugins.find(
+      (plugin): plugin is [string, Record<string, unknown>] =>
+        Array.isArray(plugin) && plugin[0] === "expo-notifications"
+    );
+
+    expect(notificationsPlugin).toBeDefined();
+    expect(notificationsPlugin?.[1]).not.toHaveProperty(
+      "enableBackgroundRemoteNotifications"
+    );
+  });
 });
