@@ -37,7 +37,16 @@ describe("crisis support", () => {
     expect(moodEntryModal).toContain("requiresCrisisSupportAcknowledgement(");
     expect(moodEntryModal).toContain("CRISIS_SUPPORT_MESSAGE");
     expect(moodEntryModal).toContain("Dismiss support reminder");
-    expect(moodEntryModal).toContain("disabled={isPrimaryActionDisabled}");
+    expect(moodEntryModal).toContain(
+      "Close this reminder with the X to continue."
+    );
+    expect(moodEntryModal).toContain("disabled={isSaving}");
+    expect(moodEntryModal).toContain("onTouchStart={handlePagerTouchStart}");
+    expect(moodEntryModal).toContain("onTouchEnd={handlePagerTouchEnd}");
+    expect(moodEntryModal).toContain(
+      "AccessibilityInfo.announceForAccessibility("
+    );
+    expect(moodEntryModal).toContain("withSequence(");
     expect(moodEntryModal).not.toContain("showCrisisSupportAlert");
     expect(moodEntryModal).not.toContain("setTimeout(showCrisisSupport");
   });

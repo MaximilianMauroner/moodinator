@@ -10,6 +10,8 @@ import {
     Keyboard,
     KeyboardAvoidingView,
     Platform,
+    AccessibilityInfo,
+    type GestureResponderEvent,
 } from "react-native";
 import PagerView, { type PagerViewOnPageSelectedEvent } from "react-native-pager-view";
 import Animated, {
@@ -18,6 +20,8 @@ import Animated, {
     useSharedValue,
     useAnimatedStyle,
     withSpring,
+    withSequence,
+    withTiming,
 } from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
 import { Alert } from "@/components/ui/AppAlert";
@@ -100,6 +104,10 @@ const STEP_TITLES: Record<MoodEntryStepId, string> = {
     details: "Any more context?",
 };
 
+const CRISIS_SUPPORT_CONTINUE_HINT =
+    "Close this reminder with the X to continue.";
+const BLOCKED_SWIPE_THRESHOLD = 40;
+
 function getDefaultEmotionCategory(mood: number): Emotion["category"] {
     if (mood <= 4) return "positive";
     if (mood >= 6) return "negative";
@@ -139,6 +147,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     const notesFocusedRef = useRef(false);
     const notesContainerYRef = useRef(0);
     const notesScrollTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+    const pagerTouchStartRef = useRef<{ x: number; y: number } | null>(null);
 
     // ── Form state
     const [mood, setMood] = useState(initialMood);
@@ -169,10 +178,13 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
         hasDismissedCrisisSupportHint,
         setHasDismissedCrisisSupportHint,
     ] = useState(false);
+    const [showCrisisSupportContinueHint, setShowCrisisSupportContinueHint] =
+        useState(false);
 
     // ── Footer button press feedback
     const nextBtnScale = useSharedValue(1);
     const backBtnScale = useSharedValue(1);
+    const crisisSupportNudge = useSharedValue(0);
 
     const backBtnAnimatedStyle = useAnimatedStyle(() => ({
         flex: 1,
@@ -181,6 +193,9 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     const nextBtnAnimatedStyle = useAnimatedStyle(() => ({
         flex: 1,
         transform: [{ scale: nextBtnScale.value }],
+    }));
+    const crisisSupportAnimatedStyle = useAnimatedStyle(() => ({
+        transform: [{ translateX: crisisSupportNudge.value }],
     }));
 
     const clearScheduledNotesScrolls = useCallback(() => {
@@ -287,6 +302,9 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
             setIsSaving(false);
             setCurrentStep(0);
             setHasDismissedCrisisSupportHint(false);
+            setShowCrisisSupportContinueHint(false);
+            crisisSupportNudge.value = 0;
+            pagerTouchStartRef.current = null;
             setIsNotesFocused(false);
             setNewEmotionName("");
             setNewEmotionCategory(getDefaultEmotionCategory(draft.mood));
@@ -301,7 +319,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                 pagerRef.current?.setPageWithoutAnimation(0);
             });
         }
-    }, [initialDraft, visible]);
+    }, [crisisSupportNudge, initialDraft, visible]);
 
     const goToStep = useCallback(
         (newStep: number) => {
@@ -357,8 +375,26 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
         }
     }, [currentStep, goToStep, handleSave, isLastStep]);
 
+    const indicateCrisisSupportRequirement = useCallback(() => {
+        setShowCrisisSupportContinueHint(true);
+        crisisSupportNudge.value = withSequence(
+            withTiming(-5, { duration: 45 }),
+            withTiming(5, { duration: 45 }),
+            withTiming(-3, { duration: 40 }),
+            withTiming(3, { duration: 40 }),
+            withTiming(0, { duration: 45 })
+        );
+        haptics.warning();
+        AccessibilityInfo.announceForAccessibility(
+            CRISIS_SUPPORT_CONTINUE_HINT
+        );
+    }, [crisisSupportNudge]);
+
     const handlePrimaryAction = useCallback(() => {
-        if (mustDismissCrisisSupportHint) return;
+        if (mustDismissCrisisSupportHint) {
+            indicateCrisisSupportRequirement();
+            return;
+        }
 
         if (primaryActionSaves) {
             handleSave();
@@ -366,11 +402,57 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
         }
 
         handleNext();
-    }, [handleNext, handleSave, mustDismissCrisisSupportHint, primaryActionSaves]);
+    }, [
+        handleNext,
+        handleSave,
+        indicateCrisisSupportRequirement,
+        mustDismissCrisisSupportHint,
+        primaryActionSaves,
+    ]);
 
     const handleDismissCrisisSupportHint = useCallback(() => {
         haptics.light();
         setHasDismissedCrisisSupportHint(true);
+        setShowCrisisSupportContinueHint(false);
+        crisisSupportNudge.value = 0;
+    }, [crisisSupportNudge]);
+
+    const handlePagerTouchStart = useCallback(
+        (event: GestureResponderEvent) => {
+            if (!mustDismissCrisisSupportHint) return;
+
+            pagerTouchStartRef.current = {
+                x: event.nativeEvent.pageX,
+                y: event.nativeEvent.pageY,
+            };
+        },
+        [mustDismissCrisisSupportHint]
+    );
+
+    const handlePagerTouchEnd = useCallback(
+        (event: GestureResponderEvent) => {
+            const touchStart = pagerTouchStartRef.current;
+            pagerTouchStartRef.current = null;
+            if (!mustDismissCrisisSupportHint || !touchStart) return;
+
+            const horizontalDistance = Math.abs(
+                event.nativeEvent.pageX - touchStart.x
+            );
+            const verticalDistance = Math.abs(
+                event.nativeEvent.pageY - touchStart.y
+            );
+            if (
+                horizontalDistance >= BLOCKED_SWIPE_THRESHOLD &&
+                horizontalDistance > verticalDistance
+            ) {
+                indicateCrisisSupportRequirement();
+            }
+        },
+        [indicateCrisisSupportRequirement, mustDismissCrisisSupportHint]
+    );
+
+    const clearPagerTouchStart = useCallback(() => {
+        pagerTouchStartRef.current = null;
     }, []);
 
     const closeWithConfirmation = useCallback(() => {
@@ -1195,14 +1277,17 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                         entering={FadeIn.duration(160)}
                         exiting={FadeOut.duration(120)}
                         className="mb-5 flex-row rounded-2xl border p-3.5"
-                        style={{
-                            backgroundColor: isDark
-                                ? "rgba(126, 55, 44, 0.16)"
-                                : "rgba(224, 107, 85, 0.09)",
-                            borderColor: isDark
-                                ? "rgba(242, 180, 166, 0.28)"
-                                : "rgba(199, 84, 65, 0.2)",
-                        }}
+                        style={[
+                            {
+                                backgroundColor: isDark
+                                    ? "rgba(126, 55, 44, 0.16)"
+                                    : "rgba(224, 107, 85, 0.09)",
+                                borderColor: isDark
+                                    ? "rgba(242, 180, 166, 0.28)"
+                                    : "rgba(199, 84, 65, 0.2)",
+                            },
+                            crisisSupportAnimatedStyle,
+                        ]}
                     >
                         <Ionicons
                             name="heart-outline"
@@ -1221,6 +1306,14 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                             >
                                 {CRISIS_SUPPORT_MESSAGE}
                             </Text>
+                            {showCrisisSupportContinueHint && (
+                                <Animated.Text
+                                    entering={FadeIn.duration(120)}
+                                    className="mt-2 text-xs font-semibold leading-5 text-coral-700 dark:text-coral-300"
+                                >
+                                    {CRISIS_SUPPORT_CONTINUE_HINT}
+                                </Animated.Text>
+                            )}
                         </View>
                         <Pressable
                             onPress={handleDismissCrisisSupportHint}
@@ -1370,16 +1463,23 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                     )}
 
                     {/* ── Step content ────────────────────────────────────── */}
-                    <PagerView
-                        ref={pagerRef}
+                    <View
                         style={{ flex: 1 }}
-                        initialPage={0}
-                        scrollEnabled={!isPrimaryActionDisabled && !isNotesKeyboardActive}
-                        onPageSelected={handlePageSelected}
-                        offscreenPageLimit={1}
+                        onTouchStart={handlePagerTouchStart}
+                        onTouchEnd={handlePagerTouchEnd}
+                        onTouchCancel={clearPagerTouchStart}
                     >
-                        {steps.map(renderStepPage)}
-                    </PagerView>
+                        <PagerView
+                            ref={pagerRef}
+                            style={{ flex: 1 }}
+                            initialPage={0}
+                            scrollEnabled={!isPrimaryActionDisabled && !isNotesKeyboardActive}
+                            onPageSelected={handlePageSelected}
+                            offscreenPageLimit={1}
+                        >
+                            {steps.map(renderStepPage)}
+                        </PagerView>
+                    </View>
 
                     {!isNotesKeyboardActive && (
                         <View
@@ -1447,12 +1547,12 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                 <Pressable
                                     onPress={handlePrimaryAction}
                                     onPressIn={() => {
-                                        if (!isPrimaryActionDisabled) nextBtnScale.value = withSpring(0.96, { damping: 20, stiffness: 500 });
+                                        if (!isSaving) nextBtnScale.value = withSpring(0.96, { damping: 20, stiffness: 500 });
                                     }}
                                     onPressOut={() => {
                                         nextBtnScale.value = withSpring(1, { damping: 14, stiffness: 350 });
                                     }}
-                                    disabled={isPrimaryActionDisabled}
+                                    disabled={isSaving}
                                     className="rounded-2xl py-4 items-center flex-row justify-center gap-1.5"
                                     style={{
                                         backgroundColor: saveBgColor,
@@ -1474,7 +1574,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                             ? "Save entry"
                                             : "Next step"
                                     }
-                                    accessibilityState={{ disabled: isPrimaryActionDisabled }}
+                                    accessibilityState={{ disabled: isSaving }}
                                     accessibilityHint={
                                         mustDismissCrisisSupportHint
                                             ? "Use the close button on the support reminder before continuing"
