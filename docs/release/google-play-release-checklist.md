@@ -12,7 +12,7 @@ bun run verify:android-release-config
 npx expo config --type public
 ```
 
-`bun run verify` runs lint, TypeScript, unit tests, and Expo Doctor. Expo Doctor must be green before release. `verify:android-release-config` checks the local Android label/version, confirms the main manifest does not request `SYSTEM_ALERT_WINDOW`, and confirms the production EAS profile is not configured as an APK.
+`bun run verify` runs lint, TypeScript, unit tests, and Expo Doctor. Expo Doctor must be green before release. `verify:android-release-config` requires Expo to block `android.permission.SYSTEM_ALERT_WINDOW`, confirms the production EAS profile is not configured as an APK, and checks any available native manifests. A main-manifest declaration is accepted only when it uses `tools:node="remove"`; generated release manifests under Gradle's `merged_manifest`, `merged_manifests`, and `packaged_manifests` outputs must not contain the permission at all. A clean managed checkout without an `android` directory is supported, so run the gate again after a local native release build whenever those generated manifests are available.
 
 ## Build
 
@@ -23,6 +23,16 @@ bun run build:production
 ```
 
 The Play Store submission artifact must be an Android App Bundle (`.aab`). Preview APKs are for internal testing only.
+
+After every production build, inspecting the final bundle manifest is mandatory. Use [bundletool](https://developer.android.com/tools/bundletool) with the actual artifact path:
+
+```sh
+java -jar /path/to/bundletool.jar dump manifest \
+  --bundle=/path/to/moodinator.aab \
+  --module=base
+```
+
+Inspect the dumped `<uses-permission>` entries and confirm `android.permission.SYSTEM_ALERT_WINDOW` is absent before uploading the bundle to Google Play. The config checker and intermediate Gradle manifests are safeguards, but the bundled manifest is the release authority.
 
 ## Android smoke test
 
