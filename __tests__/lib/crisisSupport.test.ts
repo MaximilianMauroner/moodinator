@@ -52,13 +52,22 @@ describe("crisis support", () => {
       'if (scrollState === "dragging")'
     );
     expect(moodEntryModal).toContain(
-      "pagerRef.current?.setPageWithoutAnimation(currentStep)"
+      "pagerRef.current?.setPageWithoutAnimation(currentStepRef.current)"
     );
     expect(moodEntryModal).toContain(
       "scrollEnabled={!isSaving && !isNotesKeyboardActive}"
     );
     expect(moodEntryModal).toContain(
-      "crisisSupportScrollViewRef.current?.scrollTo({ y: 0, animated: true })"
+      "stepScrollViewRefs.current[currentStepRef.current]?.scrollTo({"
+    );
+    expect(moodEntryModal).toContain(
+      "stepScrollViewRefs.current[stepIndex] = instance"
+    );
+    expect(crisisFeedbackHandler).toContain(
+      "CRISIS_SUPPORT_FEEDBACK_DEBOUNCE_MS"
+    );
+    expect(crisisFeedbackHandler).toContain(
+      "lastCrisisSupportIndicationAtRef.current = now"
     );
     expect(moodEntryModal).toContain(
       "AccessibilityInfo.announceForAccessibility("

@@ -108,6 +108,7 @@ const STEP_TITLES: Record<MoodEntryStepId, string> = {
 
 const CRISIS_SUPPORT_CONTINUE_HINT =
     "Close this reminder with the X to continue.";
+const CRISIS_SUPPORT_FEEDBACK_DEBOUNCE_MS = 1000;
 
 function getDefaultEmotionCategory(mood: number): Emotion["category"] {
     if (mood <= 4) return "positive";
@@ -145,11 +146,13 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     const { height: windowHeight } = useWindowDimensions();
     const pagerRef = useRef<PagerView>(null);
     const scrollViewRef = useRef<ScrollView>(null);
-    const crisisSupportScrollViewRef = useRef<ScrollView>(null);
+    const stepScrollViewRefs = useRef<(ScrollView | null)[]>([]);
+    const currentStepRef = useRef(0);
     const notesFocusedRef = useRef(false);
     const notesContainerYRef = useRef(0);
     const notesScrollTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
     const hasHandledBlockedPagerDragRef = useRef(false);
+    const lastCrisisSupportIndicationAtRef = useRef(0);
 
     // ── Form state
     const [mood, setMood] = useState(initialMood);
@@ -303,10 +306,12 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
             setBasedOnEntryId(draft.basedOnEntryId);
             setIsSaving(false);
             setCurrentStep(0);
+            currentStepRef.current = 0;
             setHasDismissedCrisisSupportHint(false);
             setShowCrisisSupportContinueHint(false);
             crisisSupportNudge.value = 0;
             hasHandledBlockedPagerDragRef.current = false;
+            lastCrisisSupportIndicationAtRef.current = 0;
             setIsNotesFocused(false);
             setNewEmotionName("");
             setNewEmotionCategory(getDefaultEmotionCategory(draft.mood));
@@ -326,6 +331,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     const goToStep = useCallback(
         (newStep: number) => {
             const nextStep = Math.max(0, Math.min(newStep, steps.length - 1));
+            currentStepRef.current = nextStep;
             setCurrentStep(nextStep);
             pagerRef.current?.setPage(nextStep);
         },
@@ -378,7 +384,19 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     }, [currentStep, goToStep, handleSave, isLastStep]);
 
     const indicateCrisisSupportRequirement = useCallback(() => {
-        crisisSupportScrollViewRef.current?.scrollTo({ y: 0, animated: true });
+        const now = Date.now();
+        if (
+            now - lastCrisisSupportIndicationAtRef.current <
+            CRISIS_SUPPORT_FEEDBACK_DEBOUNCE_MS
+        ) {
+            return;
+        }
+        lastCrisisSupportIndicationAtRef.current = now;
+
+        stepScrollViewRefs.current[currentStepRef.current]?.scrollTo({
+            y: 0,
+            animated: true,
+        });
         setShowCrisisSupportContinueHint(true);
         crisisSupportNudge.value = withSequence(
             withTiming(-5, { duration: 45 }),
@@ -419,6 +437,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
         setShowCrisisSupportContinueHint(false);
         crisisSupportNudge.value = 0;
         hasHandledBlockedPagerDragRef.current = false;
+        lastCrisisSupportIndicationAtRef.current = 0;
     }, [crisisSupportNudge]);
 
     const handlePageScrollStateChanged = useCallback(
@@ -434,23 +453,19 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                     hasHandledBlockedPagerDragRef.current = true;
                     indicateCrisisSupportRequirement();
                 }
-                pagerRef.current?.setPageWithoutAnimation(currentStep);
+                pagerRef.current?.setPageWithoutAnimation(currentStepRef.current);
                 return;
             }
 
             if (scrollState === "settling") {
-                pagerRef.current?.setPageWithoutAnimation(currentStep);
+                pagerRef.current?.setPageWithoutAnimation(currentStepRef.current);
                 return;
             }
 
             hasHandledBlockedPagerDragRef.current = false;
-            pagerRef.current?.setPageWithoutAnimation(currentStep);
+            pagerRef.current?.setPageWithoutAnimation(currentStepRef.current);
         },
-        [
-            currentStep,
-            indicateCrisisSupportRequirement,
-            mustDismissCrisisSupportHint,
-        ]
+        [indicateCrisisSupportRequirement, mustDismissCrisisSupportHint]
     );
 
     const closeWithConfirmation = useCallback(() => {
@@ -483,17 +498,20 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
         (event: PagerViewOnPageSelectedEvent) => {
             const nextStep = event.nativeEvent.position;
             if (mustDismissCrisisSupportHint) {
-                if (nextStep !== currentStep) {
-                    pagerRef.current?.setPageWithoutAnimation(currentStep);
+                if (nextStep !== currentStepRef.current) {
+                    pagerRef.current?.setPageWithoutAnimation(
+                        currentStepRef.current
+                    );
                 }
                 return;
             }
-            if (nextStep === currentStep) return;
+            if (nextStep === currentStepRef.current) return;
 
             haptics.light();
+            currentStepRef.current = nextStep;
             setCurrentStep(nextStep);
         },
-        [currentStep, mustDismissCrisisSupportHint]
+        [mustDismissCrisisSupportHint]
     );
 
     const handleCopyYesterday = (entry: MoodEntry) => {
@@ -1271,9 +1289,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
             <ScrollView
                 ref={(instance) => {
                     if (stepId === "details") scrollViewRef.current = instance;
-                    if (stepIndex === 0) {
-                        crisisSupportScrollViewRef.current = instance;
-                    }
+                    stepScrollViewRefs.current[stepIndex] = instance;
                 }}
                 className="px-5 pt-5"
                 contentContainerStyle={{ paddingBottom: scrollBottomPadding }}
