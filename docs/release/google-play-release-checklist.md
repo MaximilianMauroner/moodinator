@@ -39,7 +39,7 @@ Inspect the dumped `<uses-permission>` entries and confirm `android.permission.S
 - Install the production-signed build on a clean Android device or emulator.
 - Launch the app, complete onboarding, and confirm the scale explains that `0` is best and `10` needs the most support.
 - Add a low-severity entry and a `9` or `10` entry. Confirm the severe entry saves normally.
-- With rating 9 or 10 selected, confirm a passive support hint remains visible in the entry sheet. It should advise calling the local emergency number in immediate danger and considering a local crisis helpline. Confirm it has no buttons or links, does not appear as a post-save alert, and does not initiate a call, message, website, or emergency response.
+- With rating 9 or 10 selected, confirm a support reminder remains visible in the entry sheet and Next or Save is disabled. It should advise calling the local emergency number in immediate danger and considering a local crisis helpline. Confirm its only control is a close button, closing it enables Next or Save, and it does not initiate a call, message, website, or emergency response.
 - Disable haptics in settings and confirm tab/mood button presses no longer vibrate.
 - Create a reminder. Confirm it is paused by default, then enable it and verify the permission prompt appears before scheduling.
 - Deny reminder permission, enable a reminder, and confirm the reminder row reports that it is not scheduled. Grant permission in Android settings, return to Moodinator, and confirm the app retries reminder recovery.

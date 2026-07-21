@@ -40,7 +40,7 @@ Moodinator registers a periodic backup task with the operating system. The opera
 
 ## Support Reminder
 
-For ratings 9 and 10, Moodinator displays a passive reminder to call the local emergency number in immediate danger and consider contacting a local crisis helpline. The reminder has no buttons or links and does not initiate a call, message, website, or emergency response. Moodinator does not monitor entries or send your mood entry to a support service.
+For ratings 9 and 10, Moodinator displays a dismissible reminder to call the local emergency number in immediate danger and consider contacting a local crisis helpline. You must close the reminder before continuing the entry. Its only control is the close button; it has no external links and does not initiate a call, message, website, or emergency response. Moodinator does not monitor entries or send your mood entry to a support service.
 
 ## Data Sharing and Sale
 

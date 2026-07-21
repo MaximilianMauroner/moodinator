@@ -13,6 +13,8 @@ import {
 } from "react-native";
 import PagerView, { type PagerViewOnPageSelectedEvent } from "react-native-pager-view";
 import Animated, {
+    FadeIn,
+    FadeOut,
     useSharedValue,
     useAnimatedStyle,
     withSpring,
@@ -38,7 +40,7 @@ import { haptics } from "@/lib/haptics";
 import {
     CRISIS_SUPPORT_MESSAGE,
     CRISIS_SUPPORT_TITLE,
-    shouldShowCrisisSupportHint,
+    requiresCrisisSupportAcknowledgement,
 } from "@/lib/crisisSupport";
 import {
     ContextTagChip,
@@ -163,6 +165,10 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
 
     // ── Step state
     const [currentStep, setCurrentStep] = useState(0);
+    const [
+        hasDismissedCrisisSupportHint,
+        setHasDismissedCrisisSupportHint,
+    ] = useState(false);
 
     // ── Footer button press feedback
     const nextBtnScale = useSharedValue(1);
@@ -248,6 +254,11 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     const currentStepId = steps[currentStep];
     const currentStepTitle = STEP_TITLES[currentStepId];
     const primaryActionSaves = isLastStep;
+    const mustDismissCrisisSupportHint = requiresCrisisSupportAcknowledgement(
+        mood,
+        hasDismissedCrisisSupportHint
+    );
+    const isPrimaryActionDisabled = isSaving || mustDismissCrisisSupportHint;
     const isNotesKeyboardActive = isNotesFocused && keyboardHeight > 0;
 
     // ── Adaptive placeholder
@@ -275,6 +286,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
             setBasedOnEntryId(draft.basedOnEntryId);
             setIsSaving(false);
             setCurrentStep(0);
+            setHasDismissedCrisisSupportHint(false);
             setIsNotesFocused(false);
             setNewEmotionName("");
             setNewEmotionCategory(getDefaultEmotionCategory(draft.mood));
@@ -346,13 +358,20 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     }, [currentStep, goToStep, handleSave, isLastStep]);
 
     const handlePrimaryAction = useCallback(() => {
+        if (mustDismissCrisisSupportHint) return;
+
         if (primaryActionSaves) {
             handleSave();
             return;
         }
 
         handleNext();
-    }, [handleNext, handleSave, primaryActionSaves]);
+    }, [handleNext, handleSave, mustDismissCrisisSupportHint, primaryActionSaves]);
+
+    const handleDismissCrisisSupportHint = useCallback(() => {
+        haptics.light();
+        setHasDismissedCrisisSupportHint(true);
+    }, []);
 
     const closeWithConfirmation = useCallback(() => {
         if (!isDirty) {
@@ -1171,8 +1190,10 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                 keyboardShouldPersistTaps="handled"
                 keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
             >
-                {shouldShowCrisisSupportHint(mood) && (
-                    <View
+                {mustDismissCrisisSupportHint && (
+                    <Animated.View
+                        entering={FadeIn.duration(160)}
+                        exiting={FadeOut.duration(120)}
                         className="mb-5 flex-row rounded-2xl border p-3.5"
                         style={{
                             backgroundColor: isDark
@@ -1182,8 +1203,6 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                 ? "rgba(242, 180, 166, 0.28)"
                                 : "rgba(199, 84, 65, 0.2)",
                         }}
-                        accessibilityRole="text"
-                        accessibilityLabel={`${CRISIS_SUPPORT_TITLE}. ${CRISIS_SUPPORT_MESSAGE}`}
                     >
                         <Ionicons
                             name="heart-outline"
@@ -1203,7 +1222,20 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                 {CRISIS_SUPPORT_MESSAGE}
                             </Text>
                         </View>
-                    </View>
+                        <Pressable
+                            onPress={handleDismissCrisisSupportHint}
+                            className="-mr-2 -mt-2 h-11 w-11 items-center justify-center rounded-full"
+                            accessibilityRole="button"
+                            accessibilityLabel="Dismiss support reminder"
+                            accessibilityHint="Enables the next step"
+                        >
+                            <Ionicons
+                                name="close"
+                                size={20}
+                                color={isDark ? "#F2B4A6" : "#C75441"}
+                            />
+                        </Pressable>
+                    </Animated.View>
                 )}
                 {renderStepContent(stepId)}
             </ScrollView>
@@ -1212,12 +1244,12 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
 
     // ── Moodinator color for save button
     const moodData = getMoodRatingDisplay(mood, isDark);
-    const saveBgColor = isSaving
+    const saveBgColor = isPrimaryActionDisabled
         ? isDark
             ? "#3D5A3D"
             : colors.primaryMuted.light
         : get("primary");
-    const saveContentColor = isSaving && isDark
+    const saveContentColor = isPrimaryActionDisabled && isDark
         ? colors.textInverse.dark
         : get("onPrimary");
     // Keyboard-aware sheet sizing. Transparent modals do not reliably receive
@@ -1342,7 +1374,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                         ref={pagerRef}
                         style={{ flex: 1 }}
                         initialPage={0}
-                        scrollEnabled={!isSaving && !isNotesKeyboardActive}
+                        scrollEnabled={!isPrimaryActionDisabled && !isNotesKeyboardActive}
                         onPageSelected={handlePageSelected}
                         offscreenPageLimit={1}
                     >
@@ -1415,12 +1447,12 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                 <Pressable
                                     onPress={handlePrimaryAction}
                                     onPressIn={() => {
-                                        if (!isSaving) nextBtnScale.value = withSpring(0.96, { damping: 20, stiffness: 500 });
+                                        if (!isPrimaryActionDisabled) nextBtnScale.value = withSpring(0.96, { damping: 20, stiffness: 500 });
                                     }}
                                     onPressOut={() => {
                                         nextBtnScale.value = withSpring(1, { damping: 14, stiffness: 350 });
                                     }}
-                                    disabled={isSaving}
+                                    disabled={isPrimaryActionDisabled}
                                     className="rounded-2xl py-4 items-center flex-row justify-center gap-1.5"
                                     style={{
                                         backgroundColor: saveBgColor,
@@ -1434,15 +1466,21 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                     }}
                                     accessibilityRole="button"
                                     accessibilityLabel={
-                                        isSaving
+                                        mustDismissCrisisSupportHint
+                                            ? "Dismiss support reminder to continue"
+                                            : isSaving
                                             ? "Saving"
                                             : primaryActionSaves
                                             ? "Save entry"
                                             : "Next step"
                                     }
-                                    accessibilityState={{ disabled: isSaving }}
+                                    accessibilityState={{ disabled: isPrimaryActionDisabled }}
                                     accessibilityHint={
-                                        primaryActionSaves ? BUTTON_HINTS.save : "Proceed to next step"
+                                        mustDismissCrisisSupportHint
+                                            ? "Use the close button on the support reminder before continuing"
+                                            : primaryActionSaves
+                                            ? BUTTON_HINTS.save
+                                            : "Proceed to next step"
                                     }
                                 >
                                     <Text

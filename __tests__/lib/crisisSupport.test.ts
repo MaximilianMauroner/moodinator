@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   CRISIS_SUPPORT_MESSAGE,
   CRISIS_SUPPORT_TITLE,
+  requiresCrisisSupportAcknowledgement,
   shouldShowCrisisSupportHint,
 } from "../../src/lib/crisisSupport";
 
@@ -25,9 +26,18 @@ describe("crisis support", () => {
     expect(CRISIS_SUPPORT_MESSAGE).not.toMatch(/https?:|988|call us|text us/i);
   });
 
+  it("requires the rating 9 or 10 reminder to be dismissed before continuing", () => {
+    expect(requiresCrisisSupportAcknowledgement(8, false)).toBe(false);
+    expect(requiresCrisisSupportAcknowledgement(9, false)).toBe(true);
+    expect(requiresCrisisSupportAcknowledgement(10, false)).toBe(true);
+    expect(requiresCrisisSupportAcknowledgement(9, true)).toBe(false);
+  });
+
   it("renders the guidance inline without post-save alert behavior", () => {
-    expect(moodEntryModal).toContain("shouldShowCrisisSupportHint(mood)");
+    expect(moodEntryModal).toContain("requiresCrisisSupportAcknowledgement(");
     expect(moodEntryModal).toContain("CRISIS_SUPPORT_MESSAGE");
+    expect(moodEntryModal).toContain("Dismiss support reminder");
+    expect(moodEntryModal).toContain("disabled={isPrimaryActionDisabled}");
     expect(moodEntryModal).not.toContain("showCrisisSupportAlert");
     expect(moodEntryModal).not.toContain("setTimeout(showCrisisSupport");
   });

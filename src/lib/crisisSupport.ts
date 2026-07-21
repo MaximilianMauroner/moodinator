@@ -11,3 +11,10 @@ export function shouldShowCrisisSupportHint(mood: number): boolean {
     mood <= CRISIS_SUPPORT_MAX_RATING
   );
 }
+
+export function requiresCrisisSupportAcknowledgement(
+  mood: number,
+  hasDismissedHint: boolean
+): boolean {
+  return shouldShowCrisisSupportHint(mood) && !hasDismissedHint;
+}
