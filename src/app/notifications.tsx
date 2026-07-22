@@ -6,6 +6,7 @@ import {
   ScrollView,
   Switch,
   ActivityIndicator,
+  AppState,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Link, useRouter, useFocusEffect } from "expo-router";
@@ -13,6 +14,7 @@ import {
   getAllNotifications,
   deleteNotification,
   updateNotification,
+  ensureMoodReminderScheduled,
   NotificationConfig,
 } from "@/hooks/useNotifications";
 import { IconSymbol } from "@/components/ui/IconSymbol";
@@ -26,16 +28,20 @@ import {
   getReminderScheduleResultWarning,
   getReminderScheduleWarning,
 } from "@/lib/reminderSchedulePresentation";
+import { formatReminderTime } from "@/lib/reminderTimePresentation";
+import { useCalendars, useLocales } from "expo-localization";
 
 const NotificationsErrorFallback = createScreenErrorFallback("Notifications");
 
 function NotificationsScreenContent() {
   const router = useRouter();
   const { isDark, get } = useThemeColors();
+  const [{ languageTag }] = useLocales();
+  const [{ uses24hourClock }] = useCalendars();
   const [notifications, setNotifications] = useState<NotificationConfig[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const loadNotifications = async () => {
+  const loadNotifications = React.useCallback(async () => {
     try {
       setLoading(true);
       const all = await getAllNotifications();
@@ -46,13 +52,26 @@ function NotificationsScreenContent() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useFocusEffect(
     React.useCallback(() => {
-      loadNotifications();
-    }, [])
+      void loadNotifications();
+    }, [loadNotifications])
   );
+
+  React.useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        void ensureMoodReminderScheduled()
+          .then(() => loadNotifications())
+          .catch((error) => {
+            console.error("Failed to refresh notification status:", error);
+          });
+      }
+    });
+    return () => subscription.remove();
+  }, [loadNotifications]);
 
   const handleToggleEnabled = async (id: string, enabled: boolean) => {
     if (enabled) {
@@ -87,8 +106,12 @@ function NotificationsScreenContent() {
 
     try {
       haptics.selection();
-      await updateNotification(id, { enabled });
+      const result = await updateNotification(id, { enabled });
       await loadNotifications();
+      const warning = getReminderScheduleResultWarning(result);
+      if (warning) {
+        Alert.alert(warning.title, warning.message);
+      }
     } catch (error) {
       console.error("Failed to update notification:", error);
       Alert.alert("Error", "Failed to update notification");
@@ -110,8 +133,12 @@ function NotificationsScreenContent() {
           style: "destructive",
           onPress: async () => {
             try {
-              await deleteNotification(id);
+              const result = await deleteNotification(id);
               await loadNotifications();
+              const warning = getReminderScheduleResultWarning(result);
+              if (warning) {
+                Alert.alert(warning.title, warning.message);
+              }
             } catch (error) {
               console.error("Failed to delete notification:", error);
               Alert.alert("Error", "Failed to delete notification");
@@ -120,17 +147,6 @@ function NotificationsScreenContent() {
         },
       ]
     );
-  };
-
-  const formatTime = (hour: number, minute: number) => {
-    const date = new Date();
-    date.setHours(hour);
-    date.setMinutes(minute);
-    return date.toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    });
   };
 
   if (loading) {
@@ -286,7 +302,12 @@ function NotificationsScreenContent() {
                           color: notification.enabled ? get("primary") : get("textMuted"),
                         }}
                       >
-                        {formatTime(notification.hour, notification.minute)}
+                        {formatReminderTime(
+                          notification.hour,
+                          notification.minute,
+                          languageTag,
+                          uses24hourClock
+                        )}
                       </Text>
                     </View>
                     <Switch
