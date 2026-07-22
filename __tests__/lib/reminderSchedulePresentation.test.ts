@@ -36,6 +36,20 @@ describe("reminderSchedulePresentation", () => {
     });
   });
 
+  it("shows cleanup failures for paused reminders with a pending action", () => {
+    expect(
+      getReminderScheduleWarning({
+        enabled: false,
+        pendingAction: "delete",
+        scheduleStatus: "failed",
+        unscheduledReason: "Could not confirm cancellation.",
+      })
+    ).toEqual({
+      title: "Reminder Not Scheduled",
+      message: "Could not confirm cancellation.",
+    });
+  });
+
   it("shows result warnings after failed schedule attempts", () => {
     expect(
       getReminderScheduleResultWarning({
