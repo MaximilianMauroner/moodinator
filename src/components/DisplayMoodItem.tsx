@@ -180,8 +180,6 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
 
         if (direction === "left") {
           haptics.swipeThreshold();
-        } else {
-          haptics.destructive();
         }
 
         setTimeout(() => {
@@ -196,7 +194,6 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
       if (swipeActionPendingRef.current) return;
       swipeActionPendingRef.current = true;
 
-      haptics.destructive();
       isDeleting.value = true;
 
       // Slide the card the rest of the way off-screen and fade it out, then
