@@ -629,10 +629,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                     return (
                         <HapticTab
                             key={item.value}
-                            onPress={() => {
-                                setMood(item.value);
-                                haptics.light();
-                            }}
+                            onPress={() => setMood(item.value)}
                             className="rounded-xl px-3 py-2.5 items-center"
                             style={{
                                 width: "30%",
