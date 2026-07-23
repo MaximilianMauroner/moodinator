@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { View, Text, AppState, AppStateStatus, ActivityIndicator, Pressable } from "react-native";
-import { Stack } from "expo-router";
+import { Stack, useNavigationContainerRef, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { registerBackgroundBackupTask } from "@db/backgroundBackup";
@@ -10,7 +10,10 @@ import { AppToaster } from "@/components/ui/AppToaster";
 import { AppAlertProvider } from "@/components/ui/AppAlert";
 import { useSettingsStore } from "@/shared/state/settingsStore";
 import { runAppBootstrap, type AppBootstrapStatus } from "@/services/bootstrapService";
-import { useNotifications } from "@/hooks/useNotifications";
+import {
+  startPendingReminderNavigation,
+  useNotifications,
+} from "@/hooks/useNotifications";
 
 import "./global.css";
 
@@ -59,8 +62,12 @@ function AppLockRecovery({ retry }: { retry: () => void }) {
 }
 
 export default function Layout() {
+  const router = useRouter();
+  const navigationRef = useNavigationContainerRef();
   const [bootstrapStatus, setBootstrapStatus] =
     useState<AppBootstrapStatus>("running");
+  const [hasPendingReminderNavigation, setHasPendingReminderNavigation] =
+    useState(false);
   const {
     hydrated: lockHydrated,
     hydrationError: lockHydrationError,
@@ -71,7 +78,10 @@ export default function Layout() {
   } = useAppLockStore();
   const { hydrated: onboardingHydrated, hydrate: hydrateOnboarding, hasCompletedOnboarding } = useOnboardingStore();
   const { hydrated: settingsHydrated, hydrate: hydrateSettings } = useSettingsStore();
-  useNotifications();
+  const handleMoodReminderResponse = useCallback(() => {
+    setHasPendingReminderNavigation(true);
+  }, []);
+  useNotifications(handleMoodReminderResponse);
 
   // Hydrate all stores on mount before any screen renders.
   // AppBootSplash is shown until all three resolve.
@@ -87,6 +97,27 @@ export default function Layout() {
     hydrated && !lockHydrationError && hasCompletedOnboarding && isEnabled && isLocked;
   const shouldMountNavigator = hydrated && !lockHydrationError && hasCompletedOnboarding;
   const blocksNavigator = !hydrated || Boolean(lockHydrationError) || !hasCompletedOnboarding || showLockScreen;
+
+  useEffect(() => {
+    if (!hasPendingReminderNavigation || !shouldMountNavigator || blocksNavigator) {
+      return;
+    }
+
+    return startPendingReminderNavigation({
+      isReady: () => navigationRef.isReady(),
+      subscribeToState: (listener) => navigationRef.addListener("state", listener),
+      navigate: () => {
+        router.replace("/");
+        setHasPendingReminderNavigation(false);
+      },
+    });
+  }, [
+    blocksNavigator,
+    hasPendingReminderNavigation,
+    navigationRef,
+    router,
+    shouldMountNavigator,
+  ]);
 
   // Lock app when it goes to background
   useEffect(() => {

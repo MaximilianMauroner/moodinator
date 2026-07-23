@@ -86,6 +86,7 @@ export const colors = {
     "#E08B5A", // 7 - Struggling (soft coral)
     "#E06B55", // 8 - Overwhelmed (coral-500)
     "#C75441", // 9 - Crisis (coral-600)
+    "#9D3D30", // 10 - Emergency (coral-700)
   ],
 
   /**

@@ -146,13 +146,14 @@ function MoodButton({
   }));
 
   return (
-    <Animated.View style={containerStyle}>
+    <Animated.View
+      style={[containerStyle, { backgroundColor: mood.backgroundHex }]}
+    >
       <HapticTab
         style={{
           flex: 1,
           alignItems: "center",
           justifyContent: "center",
-          backgroundColor: mood.backgroundHex,
         }}
         onPress={() => onMoodPress(mood.value)}
         onLongPress={() => onLongPress(mood.value)}
@@ -167,6 +168,8 @@ function MoodButton({
               color: mood.colorHex,
               fontWeight: "700",
               fontVariant: ["tabular-nums"],
+              alignSelf: "stretch",
+              textAlign: "center",
             },
             numberStyle,
           ]}
