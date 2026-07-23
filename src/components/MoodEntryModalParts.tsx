@@ -272,15 +272,15 @@ const ContextTagChip: React.FC<{
     textColor: string;
     onPress: () => void;
 }> = ({ label, isSelected, bgColor, borderColor, textColor, onPress }) => {
-    const scale = useSharedValue(isSelected ? 1.04 : 1);
+    const scale = useSharedValue(1);
 
     useEffect(() => {
-        scale.value = withSpring(isSelected ? 1.04 : 1, {
+        scale.value = withSpring(1, {
             damping: 20,
             stiffness: 380,
             overshootClamping: true,
         });
-    }, [isSelected, scale]);
+    }, [scale]);
 
     const chipAnimatedStyle = useAnimatedStyle(() => ({
         transform: [{ scale: scale.value }],
@@ -294,25 +294,35 @@ const ContextTagChip: React.FC<{
                     scale.value = withSpring(0.94, { damping: 20, stiffness: 500 });
                 }}
                 onPressOut={() => {
-                    scale.value = withSpring(isSelected ? 1.04 : 1, { damping: 18, stiffness: 380 });
+                    scale.value = withSpring(1, { damping: 18, stiffness: 380 });
                 }}
-                className="flex-row items-center px-3 py-2 rounded-xl gap-1.5"
+                className="px-3 py-2 rounded-xl"
                 style={{
                     backgroundColor: bgColor,
                     borderWidth: 1,
                     borderColor: borderColor,
+                    shadowColor: isSelected ? textColor : "transparent",
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: isSelected ? 0.22 : 0,
+                    shadowRadius: isSelected ? 6 : 0,
+                    elevation: isSelected ? 2 : 0,
                 }}
                 accessibilityRole="button"
                 accessibilityLabel={`Context: ${label}, ${isSelected ? "selected" : "not selected"}`}
                 accessibilityState={{ selected: isSelected }}
             >
-                {isSelected && (
-                    <Ionicons
-                        name="checkmark-circle"
-                        size={13}
-                        color={textColor}
-                    />
-                )}
+                <Ionicons
+                    name="checkmark-circle"
+                    size={13}
+                    color={textColor}
+                    accessible={false}
+                    style={{
+                        position: "absolute",
+                        right: -4,
+                        top: -4,
+                        opacity: isSelected ? 1 : 0,
+                    }}
+                />
                 <Text className="text-sm font-medium" style={{ color: textColor }}>
                     {label}
                 </Text>

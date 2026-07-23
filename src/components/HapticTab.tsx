@@ -1,4 +1,4 @@
-import { BottomTabBarButtonProps } from "@react-navigation/bottom-tabs";
+import type { BottomTabBarButtonProps } from "@react-navigation/bottom-tabs";
 import { PlatformPressable } from "@react-navigation/elements";
 import { haptics } from "@/lib/haptics";
 
@@ -25,9 +25,9 @@ export function HapticTab({ hapticStyle = "selection", ...props }: HapticTabProp
   return (
     <PlatformPressable
       {...props}
-      onPressIn={(ev) => {
+      onPressIn={(event) => {
         triggerHaptic();
-        props.onPressIn?.(ev);
+        props.onPressIn?.(event);
       }}
     />
   );

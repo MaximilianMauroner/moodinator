@@ -1,50 +1,14 @@
 /**
- * Centralized haptic feedback utilities
- * Uses react-native-haptic-feedback for crisp, low-latency haptics.
+ * Centralized, semantic haptic feedback.
+ *
+ * Keep feedback short and native: one system-defined event per interaction.
+ * Callers intentionally receive a synchronous, fire-and-forget API.
  */
 
-import { Platform, Vibration } from "react-native";
-
-// Lazy-load the native haptic module so the app works in Expo Go
-// (which doesn't bundle RNHapticFeedback in its binary).
-type HapticOptions = {
-  enableVibrateFallback: boolean;
-  ignoreAndroidSystemSettings: boolean;
-};
-
-type HapticModule = {
-  default: { trigger: (type: string, options: HapticOptions) => void } | null;
-  HapticFeedbackTypes: Record<string, string>;
-};
-
-let _haptic: HapticModule | null = null;
-function getHapticModule() {
-  if (!_haptic) {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      _haptic = require("react-native-haptic-feedback");
-    } catch {
-      _haptic = { default: null, HapticFeedbackTypes: {} };
-    }
-  }
-  return _haptic!;
-}
-
-// Stable reference for type-safe usage throughout the file.
-const HapticFeedbackTypes = new Proxy({} as Record<string, string>, {
-  get(_t, key: string) {
-    return getHapticModule().HapticFeedbackTypes?.[key] ?? key;
-  },
-});
-
-const isHapticsSupported = Platform.OS !== "web";
+import * as Haptics from "expo-haptics";
+import { Platform } from "react-native";
 
 let hapticsEnabled = true;
-
-const options: HapticOptions = {
-  enableVibrateFallback: true,
-  ignoreAndroidSystemSettings: true,
-};
 
 export function setHapticsEnabled(enabled: boolean): void {
   hapticsEnabled = enabled;
@@ -54,125 +18,188 @@ export function getHapticsEnabled(): boolean {
   return hapticsEnabled;
 }
 
-// Vibration durations for Android fallback (in ms)
-const vibrationDurations: Record<string, number> = {
-  [HapticFeedbackTypes.selection]: 10,
-  [HapticFeedbackTypes.impactLight]: 20,
-  [HapticFeedbackTypes.impactMedium]: 40,
-  [HapticFeedbackTypes.impactHeavy]: 60,
-  [HapticFeedbackTypes.rigid]: 30,
-  [HapticFeedbackTypes.soft]: 15,
-  [HapticFeedbackTypes.notificationSuccess]: 50,
-  [HapticFeedbackTypes.notificationWarning]: 50,
-  [HapticFeedbackTypes.notificationError]: 80,
+type NativeFeedback = {
+  android: AndroidFeedback;
+  ios: () => Promise<void>;
 };
 
-/**
- * Custom haptic patterns for contextual feedback
- * Each pattern is an array of [duration, pause, duration, pause, ...]
- * Durations are in milliseconds
- */
-const patterns = {
-  // Celebration pattern for mood logged - ascending intensity
-  moodLogged: [20, 40, 20, 40, 30, 40, 40],
-  // Warning pattern for destructive actions
-  destructive: [60, 100, 60],
-  // Subtle feedback when swipe threshold is reached
-  swipeThreshold: [40, 30, 20],
-  // Long press activation feedback - building intensity
-  longPressActivate: [10, 30, 50],
-  // Calendar month navigation
-  monthChange: [15, 30, 15],
-  // PIN keypad digit press
-  pinDigit: [8],
-  // Wrong PIN error - urgent, repetitive
-  pinError: [80, 60, 80, 60, 80],
-  // Successful unlock - satisfying crescendo
-  unlockSuccess: [15, 50, 25, 50, 35],
-  // Onboarding page change
-  pageChange: [12],
-} as const;
+type AndroidFeedback =
+  | Haptics.AndroidHaptics
+  | {
+      fallback: Haptics.AndroidHaptics;
+      minimumApiLevel: number;
+      preferred: Haptics.AndroidHaptics;
+    };
 
-type PatternName = keyof typeof patterns;
+function getAndroidFeedback(feedback: AndroidFeedback): {
+  fallback: Haptics.AndroidHaptics;
+  type: Haptics.AndroidHaptics;
+} {
+  if (typeof feedback === "string") {
+    return { fallback: feedback, type: feedback };
+  }
 
-/**
- * Play a custom haptic pattern
- * On iOS: Uses multiple haptic triggers with delays
- * On Android: Uses vibration pattern
- */
-function playPattern(patternName: PatternName): void {
-  if (!isHapticsSupported || !hapticsEnabled) return;
+  const apiLevel =
+    typeof Platform.Version === "number"
+      ? Platform.Version
+      : Number.parseInt(String(Platform.Version), 10);
+  const supportsPreferred =
+    Number.isFinite(apiLevel) && apiLevel >= feedback.minimumApiLevel;
 
-  const pattern = patterns[patternName];
+  return {
+    fallback: feedback.fallback,
+    type: supportsPreferred ? feedback.preferred : feedback.fallback,
+  };
+}
 
-  if (Platform.OS === "android") {
-    // Android Vibration.vibrate expects [pause, vibrate, pause, vibrate, ...]
-    // Our patterns are [vibrate, pause, vibrate, pause, ...]
-    // Prepend 0 to start immediately
-    Vibration.vibrate([0, ...pattern]);
-  } else {
-    // iOS: Trigger haptics with delays to create pattern
-    let delay = 0;
-    for (let i = 0; i < pattern.length; i++) {
-      const duration = pattern[i];
-      // Even indices are vibration durations, odd are pauses
-      if (i % 2 === 0) {
-        setTimeout(() => {
-          if (hapticsEnabled) {
-            const mod = getHapticModule().default;
-            if (!mod) return;
-            // Map duration to haptic type
-            if (duration <= 15) {
-              mod.trigger(HapticFeedbackTypes.soft, options);
-            } else if (duration <= 30) {
-              mod.trigger(HapticFeedbackTypes.impactLight, options);
-            } else if (duration <= 50) {
-              mod.trigger(HapticFeedbackTypes.impactMedium, options);
-            } else {
-              mod.trigger(HapticFeedbackTypes.impactHeavy, options);
-            }
-          }
-        }, delay);
-      }
-      delay += duration;
-    }
+function performAndroid(feedback: AndroidFeedback): Promise<void> {
+  const { fallback, type } = getAndroidFeedback(feedback);
+
+  return Haptics.performAndroidHapticsAsync(type).catch(() => {
+    if (type === fallback) return;
+    return Haptics.performAndroidHapticsAsync(fallback).catch(() => {
+      // Haptics are an enhancement and should never interrupt an interaction.
+    });
+  });
+}
+
+function perform({ android, ios }: NativeFeedback): void {
+  if (!hapticsEnabled) return;
+
+  try {
+    const feedback =
+      Platform.OS === "android"
+        ? performAndroid(android)
+        : Platform.OS === "ios"
+          ? ios()
+          : null;
+
+    void feedback?.catch(() => {
+      // Haptics are an enhancement and should never interrupt an interaction.
+    });
+  } catch {
+    // Gracefully handle devices or runtimes without a haptic engine.
   }
 }
 
-function trigger(type: string): void {
-  if (isHapticsSupported && hapticsEnabled) {
-    if (Platform.OS === "android") {
-      // Use native Vibration API on Android as it's more reliable
-      const duration = vibrationDurations[type] || 20;
-      Vibration.vibrate(duration);
-    } else {
-      getHapticModule().default?.trigger(type, options);
-    }
-  }
+function selection(): void {
+  perform({
+    android: {
+      preferred: Haptics.AndroidHaptics.Segment_Tick,
+      minimumApiLevel: 34,
+      fallback: Haptics.AndroidHaptics.Clock_Tick,
+    },
+    ios: Haptics.selectionAsync,
+  });
 }
+
+function impact(
+  iosStyle: Haptics.ImpactFeedbackStyle,
+  androidType: AndroidFeedback
+): void {
+  perform({
+    android: androidType,
+    ios: () => Haptics.impactAsync(iosStyle),
+  });
+}
+
+function notification(
+  iosType: Haptics.NotificationFeedbackType,
+  androidType: AndroidFeedback
+): void {
+  perform({
+    android: androidType,
+    ios: () => Haptics.notificationAsync(iosType),
+  });
+}
+
+const light = () =>
+  impact(
+    Haptics.ImpactFeedbackStyle.Light,
+    Haptics.AndroidHaptics.Virtual_Key
+  );
+const medium = () =>
+  impact(
+    Haptics.ImpactFeedbackStyle.Medium,
+    Haptics.AndroidHaptics.Context_Click
+  );
+const heavy = () =>
+  impact(
+    Haptics.ImpactFeedbackStyle.Heavy,
+    Haptics.AndroidHaptics.Long_Press
+  );
+const rigid = () =>
+  impact(
+    Haptics.ImpactFeedbackStyle.Rigid,
+    Haptics.AndroidHaptics.Context_Click
+  );
+const soft = () =>
+  impact(
+    Haptics.ImpactFeedbackStyle.Soft,
+    {
+      preferred: Haptics.AndroidHaptics.Segment_Tick,
+      minimumApiLevel: 34,
+      fallback: Haptics.AndroidHaptics.Clock_Tick,
+    }
+  );
+const success = () =>
+  notification(
+    Haptics.NotificationFeedbackType.Success,
+    {
+      preferred: Haptics.AndroidHaptics.Confirm,
+      minimumApiLevel: 30,
+      fallback: Haptics.AndroidHaptics.Context_Click,
+    }
+  );
+const warning = () =>
+  notification(
+    Haptics.NotificationFeedbackType.Warning,
+    {
+      preferred: Haptics.AndroidHaptics.Reject,
+      minimumApiLevel: 30,
+      fallback: Haptics.AndroidHaptics.Long_Press,
+    }
+  );
+const error = () =>
+  notification(
+    Haptics.NotificationFeedbackType.Error,
+    {
+      preferred: Haptics.AndroidHaptics.Reject,
+      minimumApiLevel: 30,
+      fallback: Haptics.AndroidHaptics.Long_Press,
+    }
+  );
 
 export const haptics = {
-  // Basic haptics
-  selection: () => trigger(HapticFeedbackTypes.selection),
-  light: () => trigger(HapticFeedbackTypes.impactLight),
-  medium: () => trigger(HapticFeedbackTypes.impactMedium),
-  heavy: () => trigger(HapticFeedbackTypes.impactHeavy),
-  rigid: () => trigger(HapticFeedbackTypes.rigid),
-  soft: () => trigger(HapticFeedbackTypes.soft),
-  success: () => trigger(HapticFeedbackTypes.notificationSuccess),
-  warning: () => trigger(HapticFeedbackTypes.notificationWarning),
-  error: () => trigger(HapticFeedbackTypes.notificationError),
+  // Low-level primitives retained for existing interaction call sites.
+  selection,
+  light,
+  medium,
+  heavy,
+  rigid,
+  soft,
+  success,
+  warning,
+  error,
 
-  // Contextual haptic patterns
-  moodLogged: () => playPattern("moodLogged"),
-  destructive: () => playPattern("destructive"),
-  swipeThreshold: () => playPattern("swipeThreshold"),
-  longPressActivate: () => playPattern("longPressActivate"),
-  monthChange: () => playPattern("monthChange"),
-  pinDigit: () => playPattern("pinDigit"),
-  pinError: () => playPattern("pinError"),
-  unlockSuccess: () => playPattern("unlockSuccess"),
-  pageChange: () => playPattern("pageChange"),
+  // Semantic events. Each resolves to one restrained native event.
+  moodLogged: success,
+  destructive: rigid,
+  swipeThreshold: soft,
+  longPressActivate: () =>
+    impact(
+      Haptics.ImpactFeedbackStyle.Rigid,
+      Haptics.AndroidHaptics.Long_Press
+    ),
+  monthChange: selection,
+  pinDigit: () =>
+    impact(
+      Haptics.ImpactFeedbackStyle.Soft,
+      Haptics.AndroidHaptics.Keyboard_Tap
+    ),
+  pinError: error,
+  unlockSuccess: success,
+  pageChange: selection,
 };
 
 export default haptics;

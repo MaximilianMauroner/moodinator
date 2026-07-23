@@ -28,11 +28,15 @@ import {
   getReminderScheduleResultWarning,
   getReminderScheduleWarning,
 } from "@/lib/reminderSchedulePresentation";
+import { formatReminderTime } from "@/lib/reminderTimePresentation";
+import { useCalendars, useLocales } from "expo-localization";
 
 export default function NotificationDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { isDark, get } = useThemeColors();
+  const [{ languageTag }] = useLocales();
+  const [{ uses24hourClock }] = useCalendars();
   const isNew = id === "new";
 
   const [title, setTitle] = useState("");
@@ -121,7 +125,7 @@ export default function NotificationDetailScreen() {
         scheduleWarning = getReminderScheduleResultWarning(result);
       }
 
-      if (enabled && scheduleWarning) {
+      if (scheduleWarning) {
         Alert.alert(scheduleWarning.title, scheduleWarning.message, [
           { text: "OK", onPress: () => router.back() },
         ]);
@@ -137,14 +141,7 @@ export default function NotificationDetailScreen() {
   };
 
   const formatTime = () => {
-    const date = new Date();
-    date.setHours(hour);
-    date.setMinutes(minute);
-    return date.toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    });
+    return formatReminderTime(hour, minute, languageTag, uses24hourClock);
   };
 
   const getTimeOfDayIcon = (): keyof typeof Ionicons.glyphMap => {
@@ -373,6 +370,7 @@ export default function NotificationDetailScreen() {
                     display={Platform.OS === "ios" ? "spinner" : "default"}
                     onChange={handleTimeChange}
                     textColor={get("text")}
+                    is24Hour={uses24hourClock ?? undefined}
                   />
                   {Platform.OS === "ios" && (
                     <Pressable
@@ -395,6 +393,11 @@ export default function NotificationDetailScreen() {
                     </Pressable>
                   )}
                 </View>
+              )}
+              {Platform.OS === "android" && (
+                <Text className="text-xs leading-4 mt-2" style={{ color: get("textMuted") }}>
+                  Android may deliver reminders a little later to preserve battery.
+                </Text>
               )}
             </View>
 

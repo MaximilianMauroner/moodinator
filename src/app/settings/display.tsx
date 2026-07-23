@@ -242,7 +242,7 @@ export default function DisplaySettingsScreen() {
         <SettingsSection title="Feedback">
           <ToggleRow
             title="Haptic Feedback"
-            description="Vibration feedback when interacting with buttons and controls"
+            description="Subtle tactile feedback for selections and confirmations"
             value={hapticsEnabled}
             onChange={setHapticsEnabled}
             icon="hand-left-outline"

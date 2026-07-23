@@ -1,8 +1,11 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { AccessibilityInfo, BackHandler, View, Text, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Animated from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
+import PagerView, {
+  type PagerViewOnPageSelectedEvent,
+} from "react-native-pager-view";
 import { useThemeColors } from "@/constants/colors";
 import { haptics } from "@/lib/haptics";
 import { useOnboardingStore } from "../store/onboardingStore";
@@ -12,6 +15,7 @@ import { onboardingPages } from "../content";
 
 export function OnboardingScreen() {
   const { isDark, get } = useThemeColors();
+  const pagerRef = useRef<PagerView>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [reduceMotion, setReduceMotion] = useState(false);
   const { complete } = useOnboardingStore();
@@ -20,26 +24,49 @@ export function OnboardingScreen() {
   const isLastPage = currentIndex === onboardingPages.length - 1;
   const currentPage = onboardingPages[currentIndex];
 
+  const goToPage = useCallback(
+    (index: number) => {
+      const pager = pagerRef.current;
+
+      if (!pager) {
+        setCurrentIndex(index);
+        return;
+      }
+
+      if (reduceMotion) {
+        pager.setPageWithoutAnimation(index);
+      } else {
+        pager.setPage(index);
+      }
+    },
+    [reduceMotion]
+  );
+
   const handleNext = useCallback(() => {
     if (isLastPage) {
       haptics.success();
       void complete();
     } else {
-      const nextIndex = currentIndex + 1;
-
-      haptics.light();
-      setCurrentIndex(nextIndex);
+      goToPage(currentIndex + 1);
     }
-  }, [currentIndex, isLastPage, complete]);
+  }, [complete, currentIndex, goToPage, isLastPage]);
 
   const handleBack = useCallback(() => {
     if (isFirstPage) return;
 
-    const previousIndex = currentIndex - 1;
+    goToPage(currentIndex - 1);
+  }, [currentIndex, goToPage, isFirstPage]);
 
-    haptics.light();
-    setCurrentIndex(previousIndex);
-  }, [currentIndex, isFirstPage]);
+  const handlePageSelected = useCallback(
+    (event: PagerViewOnPageSelectedEvent) => {
+      const nextIndex = event.nativeEvent.position;
+      if (nextIndex === currentIndex) return;
+
+      haptics.pageChange();
+      setCurrentIndex(nextIndex);
+    },
+    [currentIndex]
+  );
 
   const handleSkip = useCallback(() => {
     haptics.light();
@@ -127,13 +154,24 @@ export function OnboardingScreen() {
         )}
       </View>
 
-      {/* Page */}
-      <OnboardingPage
-        key={currentPage.id}
-        page={currentPage}
-        isActive
-        reduceMotion={reduceMotion}
-      />
+      {/* Pages */}
+      <PagerView
+        ref={pagerRef}
+        style={{ flex: 1 }}
+        initialPage={0}
+        onPageSelected={handlePageSelected}
+        offscreenPageLimit={1}
+        overdrag
+      >
+        {onboardingPages.map((page, index) => (
+          <OnboardingPage
+            key={page.id}
+            page={page}
+            isActive={index === currentIndex}
+            reduceMotion={reduceMotion}
+          />
+        ))}
+      </PagerView>
 
       {/* Bottom section */}
       <View className="px-6 pb-6">

@@ -2,7 +2,6 @@ import { Tabs } from "expo-router";
 import React from "react";
 import { Platform } from "react-native";
 import type { BottomTabBarButtonProps } from "@react-navigation/bottom-tabs";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { HapticTab } from "@/components/HapticTab";
 import { IconSymbol } from "@/components/ui/IconSymbol";
@@ -38,7 +37,6 @@ function HomeTabButton(props: BottomTabBarButtonProps) {
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
-  const insets = useSafeAreaInsets();
 
   // Soft Organic palette: tab chrome follows the same botanical night tokens
   // as the screens so dark mode keeps the warm field-journal feel.
@@ -48,9 +46,6 @@ export default function TabLayout() {
     background: isDark ? "#08150F" : "#FAF8F4",
     border: isDark ? "#233D2D" : "#E5D9BF",
   };
-  const compactTabBarHeight = 50;
-  const compactBottomPadding = Math.max(insets.bottom - 4, 6);
-  const compactTopPadding = 6;
 
   return (
     <Tabs
@@ -67,27 +62,16 @@ export default function TabLayout() {
           ios: {
             position: "absolute",
             backgroundColor: "transparent",
-            height: compactTabBarHeight + insets.bottom,
-            paddingTop: compactTopPadding,
-            paddingBottom: compactBottomPadding,
           },
           default: {
             backgroundColor: colors.background,
             borderTopColor: colors.border,
             borderTopWidth: 1,
             elevation: 0,
-            height: compactTabBarHeight + insets.bottom,
-            paddingTop: compactTopPadding,
-            paddingBottom: Math.max(insets.bottom, 8),
           },
         }),
-        tabBarItemStyle: {
-          paddingVertical: 0,
-        },
         tabBarLabelStyle: {
           fontWeight: "600",
-          fontSize: 12,
-          marginTop: -1,
         },
       }}
     >
@@ -96,8 +80,8 @@ export default function TabLayout() {
         options={{
           title: "Home",
           tabBarButton: HomeTabButton,
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={24} name="house.fill" color={color} />
+          tabBarIcon: ({ color, size }) => (
+            <IconSymbol size={size} name="house.fill" color={color} />
           ),
           tabBarAccessibilityLabel: TAB_ACCESSIBILITY_LABELS.home,
         }}
@@ -106,8 +90,8 @@ export default function TabLayout() {
         name="charts"
         options={{
           title: "Insights",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={24} name="chart.bar" color={color} />
+          tabBarIcon: ({ color, size }) => (
+            <IconSymbol size={size} name="chart.bar" color={color} />
           ),
           tabBarAccessibilityLabel: TAB_ACCESSIBILITY_LABELS.insights,
         }}
@@ -116,8 +100,8 @@ export default function TabLayout() {
         name="settings"
         options={{
           title: "Settings",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={24} name="gear" color={color} />
+          tabBarIcon: ({ color, size }) => (
+            <IconSymbol size={size} name="gear" color={color} />
           ),
           tabBarAccessibilityLabel: TAB_ACCESSIBILITY_LABELS.settings,
         }}

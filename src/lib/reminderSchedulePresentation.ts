@@ -33,10 +33,13 @@ function isUnscheduledStatus(
 export function getReminderScheduleWarning(
   notification: Pick<
     NotificationConfig,
-    "enabled" | "scheduleStatus" | "unscheduledReason"
+    "enabled" | "scheduleStatus" | "unscheduledReason" | "pendingAction"
   >
 ): ReminderScheduleWarning | null {
-  if (!notification.enabled || !isUnscheduledStatus(notification.scheduleStatus)) {
+  if (
+    (!notification.enabled && !notification.pendingAction)
+    || !isUnscheduledStatus(notification.scheduleStatus)
+  ) {
     return null;
   }
 
