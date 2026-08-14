@@ -22,7 +22,7 @@ This information is processed and stored locally. Moodinator has no developer-op
 
 Mood data is stored in the app's local SQLite database inside the operating system's app sandbox. On Android, Moodinator does **not** apply database-level encryption to that SQLite database. The app sandbox, device encryption, screen lock, and other platform protections may reduce access, but app lock is not database encryption.
 
-If you set an app-lock PIN, Moodinator stores a salted hash—not the plaintext PIN—in the operating system's secure storage. Biometric enrollment and biometric matching are handled by the operating system; Moodinator does not receive or store your fingerprint, face, iris, or biometric template.
+If you set an app-lock PIN, Moodinator stores a salted hash, not the plaintext PIN, in the operating system's secure storage. Biometric enrollment and biometric matching are handled by the operating system; Moodinator does not receive or store your fingerprint, face, iris, or biometric template.
 
 No security measure can guarantee absolute protection. Use a device passcode, keep the operating system updated, and protect access to unlocked devices and exported files.
 
