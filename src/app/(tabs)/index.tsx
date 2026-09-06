@@ -53,7 +53,6 @@ import { useMoodModals } from "@/hooks/useMoodModals";
 import { useMoodItemActions } from "@/hooks/useMoodItemActions";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
-import { haptics } from "@/lib/haptics";
 import { getHomeHeaderSnapTarget } from "@/lib/homeHeaderSnap";
 import { addHomeTabDoublePressListener } from "@/lib/homeTabEvents";
 
@@ -351,11 +350,7 @@ function HomeScreenContent() {
   );
 
   const scrollHomeListToTop = useCallback(
-    (options?: { refresh?: boolean; haptic?: boolean }) => {
-      if (options?.haptic !== false) {
-        haptics.selection();
-      }
-
+    (options?: { refresh?: boolean }) => {
       clearPendingTopResets();
       forceHomeListToTop(true);
 
@@ -375,17 +370,16 @@ function HomeScreenContent() {
       energy: values.energy,
     });
 
-    scrollHomeListToTop({ haptic: false });
+    scrollHomeListToTop();
     schedulePostSaveTopResets();
   }, [createMood, schedulePostSaveTopResets, scrollHomeListToTop]);
 
   const handleJumpToTopPress = useCallback(() => {
-    // HapticTab fires its own press feedback, so skip the duplicate buzz here.
-    scrollHomeListToTop({ haptic: false });
+    scrollHomeListToTop();
   }, [scrollHomeListToTop]);
 
   const handleHomeTabDoublePress = useCallback(() => {
-    scrollHomeListToTop({ haptic: false, refresh: true });
+    scrollHomeListToTop({ refresh: true });
   }, [scrollHomeListToTop]);
 
   useEffect(() => {
