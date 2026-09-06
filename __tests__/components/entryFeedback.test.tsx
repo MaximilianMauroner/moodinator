@@ -4,22 +4,43 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Emotion } from "@db/types";
 import { EmotionPicker } from "@/components/entry/EmotionPicker";
 import { EnergySlider } from "@/components/entry/EnergySlider";
+import { QuickMoodEntryModal } from "@/components/MoodEntryModal";
 import { setHapticsEnabled } from "@/lib/haptics";
 
-const nativeFeedback = vi.hoisted(() => ({ selectionAsync: vi.fn(async () => {}) }));
+const nativePlatform = vi.hoisted(() => ({ OS: "ios", Version: 18 }));
+const nativeFeedback = vi.hoisted(() => ({
+  selectionAsync: vi.fn(async () => {}),
+  performAndroidHapticsAsync: vi.fn(async () => {}),
+  impactAsync: vi.fn(async () => {}),
+}));
 
 vi.mock("expo-haptics", () => ({
   ...nativeFeedback,
+  ImpactFeedbackStyle: { Light: "light" },
   AndroidHaptics: { Gesture_End: "gesture-end", Context_Click: "context-click" },
 }));
 vi.mock("react-native", () => ({
+  Modal: "Modal",
+  KeyboardAvoidingView: "KeyboardAvoidingView",
+  TextInput: "TextInput",
+  Keyboard: { addListener: () => ({ remove: () => {} }), dismiss: vi.fn() },
+  useWindowDimensions: () => ({ width: 390, height: 844 }),
   View: "View",
   Text: "Text",
   Pressable: "Pressable",
   ScrollView: "ScrollView",
-  Platform: { OS: "ios", Version: 18 },
+  Platform: {
+    get OS() { return nativePlatform.OS; },
+    get Version() { return nativePlatform.Version; },
+    select: (values: Record<string, unknown>) => values[nativePlatform.OS] ?? values.default,
+  },
   useColorScheme: () => "dark",
 }));
+vi.mock("react-native-pager-view", () => ({ default: "PagerView" }));
+vi.mock("@react-navigation/elements", () => ({ PlatformPressable: "Pressable" }));
+vi.mock("@/components/entry", () => ({ SameAsYesterdayButton: () => null }));
+vi.mock("@/components/ui/AppAlert", () => ({ Alert: { alert: vi.fn() } }));
+vi.mock("@/lib/showCrisisSupportAlert", () => ({ showCrisisSupportAlert: vi.fn() }));
 vi.mock("@expo/vector-icons", () => ({ Ionicons: "Ionicons" }));
 vi.mock("react-native-reanimated", async () => {
   const { useRef } = await import("react");
@@ -29,6 +50,7 @@ vi.mock("react-native-reanimated", async () => {
     useSharedValue: (value: number) => useRef({ value }).current,
     useAnimatedStyle: (style: () => unknown) => style(),
     withSpring: (value: number) => value,
+    withTiming: (value: number) => value,
     FadeIn: transition,
     FadeOut: transition,
   };
@@ -71,15 +93,21 @@ async function press(testID: string) {
 
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => { callback(0); return 0; });
   setHapticsEnabled(true);
 });
 
 afterEach(async () => {
   if (renderer) await act(async () => renderer.unmount());
+  vi.unstubAllGlobals();
   setHapticsEnabled(true);
 });
 
-describe("entry field feedback", () => {
+describe.each(["android", "ios"])("entry field feedback on %s", (platform) => {
+  beforeEach(() => {
+    nativePlatform.OS = platform;
+    nativePlatform.Version = platform === "android" ? 35 : 18;
+  });
   it("selects, deselects, and removes emotions with one feedback event per change", async () => {
     await render(<EmotionForm />);
     await press("emotion-option-Happy");
@@ -130,5 +158,66 @@ describe("entry field feedback", () => {
     expect(button("emotion-option-Happy").props.accessibilityState.selected).toBe(false);
     expect(button("energy-level-5").props.accessibilityState.selected).toBe(false);
     expect(nativeFeedback.selectionAsync).not.toHaveBeenCalled();
+  });
+});
+
+function EntryModal() {
+  return (
+    <QuickMoodEntryModal
+      visible
+      initialMood={4}
+      emotionOptions={options}
+      contextOptions={["Work", "Family"]}
+      fieldConfig={{ emotions: true, context: true, energy: false, notes: false }}
+      onClose={() => {}}
+      onSubmit={() => {}}
+      onCreateEmotion={() => null}
+    />
+  );
+}
+
+function labeledButton(accessibilityLabel: string) {
+  return renderer.root.findByProps({ accessibilityLabel });
+}
+
+async function pressLabel(accessibilityLabel: string) {
+  await act(async () => { labeledButton(accessibilityLabel).props.onPress(); });
+}
+
+describe.each(["android", "ios"])("entry modal feedback on %s", (platform) => {
+  beforeEach(() => {
+    nativePlatform.OS = platform;
+    nativePlatform.Version = platform === "android" ? 35 : 18;
+  });
+
+  it.each([true, false])("toggles context through the modal with haptics enabled=%s", async (enabled) => {
+    setHapticsEnabled(enabled);
+    // Strict Mode replays state updaters, so feedback must belong to the press handler.
+    await render(<React.StrictMode><EntryModal /></React.StrictMode>);
+    expect(nativeFeedback.selectionAsync).not.toHaveBeenCalled();
+    await pressLabel("Context: Work, not selected");
+    expect(labeledButton("Context: Work, selected").props.accessibilityState.selected).toBe(true);
+    expect(nativeFeedback.selectionAsync).toHaveBeenCalledTimes(enabled ? 1 : 0);
+    await pressLabel("Context: Work, selected");
+    expect(labeledButton("Context: Work, not selected").props.accessibilityState.selected).toBe(false);
+    expect(nativeFeedback.selectionAsync).toHaveBeenCalledTimes(enabled ? 2 : 0);
+    expect(nativeFeedback.performAndroidHapticsAsync).not.toHaveBeenCalled();
+    expect(nativeFeedback.impactAsync).not.toHaveBeenCalled();
+  });
+
+  it("only gives category feedback when the category changes", async () => {
+    await render(<EntryModal />);
+    await pressLabel("Add new emotion");
+    await pressLabel("Positive emotion category");
+    expect(nativeFeedback.selectionAsync).not.toHaveBeenCalled();
+    await pressLabel("Negative emotion category");
+    expect(labeledButton("Negative emotion category").props.accessibilityState.selected).toBe(true);
+    expect(nativeFeedback.selectionAsync).toHaveBeenCalledTimes(1);
+    await pressLabel("Negative emotion category");
+    expect(nativeFeedback.selectionAsync).toHaveBeenCalledTimes(1);
+    setHapticsEnabled(false);
+    await pressLabel("Neutral emotion category");
+    expect(labeledButton("Neutral emotion category").props.accessibilityState.selected).toBe(true);
+    expect(nativeFeedback.selectionAsync).toHaveBeenCalledTimes(1);
   });
 });

@@ -12,7 +12,6 @@ vi.mock("expo-haptics", () => ({
     Clock_Tick: "clock-tick",
     Confirm: "confirm",
     Context_Click: "context-click",
-    Gesture_End: "gesture-end",
     Gesture_Start: "gesture-start",
     Keyboard_Tap: "keyboard-tap",
     Long_Press: "long-press",
@@ -53,10 +52,9 @@ afterEach(() => {
 });
 
 describe("haptics", () => {
-  test("uses Android's semantic haptic engine", async () => {
+  test("uses Android's semantic haptic engine for non-selection events", async () => {
     const { haptics } = await loadHaptics("android", 35);
 
-    haptics.selection();
     haptics.light();
     haptics.medium();
     haptics.swipeThreshold();
@@ -64,7 +62,6 @@ describe("haptics", () => {
     haptics.pinDigit();
 
     expect(hapticMocks.performAndroidHapticsAsync.mock.calls).toEqual([
-      ["gesture-end"],
       ["context-click"],
       ["confirm"],
       ["gesture-start"],
@@ -76,17 +73,26 @@ describe("haptics", () => {
     expect(hapticMocks.selectionAsync).not.toHaveBeenCalled();
   });
 
+  test.each([29, 35])("selection avoids Android's activity view on API %i", async (version) => {
+    const { haptics } = await loadHaptics("android", version);
+
+    haptics.selection();
+
+    expect(hapticMocks.selectionAsync).toHaveBeenCalledTimes(1);
+    expect(hapticMocks.performAndroidHapticsAsync).not.toHaveBeenCalled();
+    expect(hapticMocks.impactAsync).not.toHaveBeenCalled();
+    expect(hapticMocks.notificationAsync).not.toHaveBeenCalled();
+  });
+
   test("falls back to universally available Android feedback", async () => {
     const { haptics } = await loadHaptics("android", 29);
 
-    haptics.selection();
     haptics.medium();
     haptics.moodLogged();
     haptics.swipeThreshold();
     haptics.error();
 
     expect(hapticMocks.performAndroidHapticsAsync.mock.calls).toEqual([
-      ["context-click"],
       ["long-press"],
       ["context-click"],
       ["context-click"],
@@ -100,12 +106,12 @@ describe("haptics", () => {
     );
     const { haptics } = await loadHaptics("android", 35);
 
-    haptics.selection();
+    haptics.moodLogged();
     await Promise.resolve();
     await Promise.resolve();
 
     expect(hapticMocks.performAndroidHapticsAsync.mock.calls).toEqual([
-      ["gesture-end"],
+      ["confirm"],
       ["context-click"],
     ]);
   });
@@ -123,9 +129,9 @@ describe("haptics", () => {
     expect(hapticMocks.performAndroidHapticsAsync).not.toHaveBeenCalled();
   });
 
-  test("honors the in-app preference", async () => {
+  test.each(["android", "ios"] as const)("honors the in-app preference on %s", async (platform) => {
     const { getHapticsEnabled, haptics, setHapticsEnabled } =
-      await loadHaptics("ios");
+      await loadHaptics(platform, 35);
 
     setHapticsEnabled(false);
     haptics.selection();
@@ -134,12 +140,30 @@ describe("haptics", () => {
     expect(getHapticsEnabled()).toBe(false);
     expect(hapticMocks.selectionAsync).not.toHaveBeenCalled();
     expect(hapticMocks.notificationAsync).not.toHaveBeenCalled();
+    expect(hapticMocks.performAndroidHapticsAsync).not.toHaveBeenCalled();
 
     setHapticsEnabled(true);
     haptics.selection();
 
     expect(getHapticsEnabled()).toBe(true);
     expect(hapticMocks.selectionAsync).toHaveBeenCalledTimes(1);
+  });
+
+  test.each(["android", "ios"] as const)("isolates native selection failures on %s without a second event", async (platform) => {
+    const { haptics } = await loadHaptics(platform, 35);
+    hapticMocks.selectionAsync.mockImplementationOnce(() => {
+      throw new Error("native module unavailable");
+    });
+    expect(() => haptics.selection()).not.toThrow();
+
+    hapticMocks.selectionAsync.mockRejectedValueOnce(new Error("native request failed"));
+    haptics.selection();
+    await Promise.resolve();
+
+    expect(hapticMocks.selectionAsync).toHaveBeenCalledTimes(2);
+    expect(hapticMocks.performAndroidHapticsAsync).not.toHaveBeenCalled();
+    expect(hapticMocks.impactAsync).not.toHaveBeenCalled();
+    expect(hapticMocks.notificationAsync).not.toHaveBeenCalled();
   });
 
   test("does nothing on unsupported platforms", async () => {
