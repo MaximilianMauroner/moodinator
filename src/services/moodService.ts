@@ -25,6 +25,7 @@ import {
   type PaginationOptions,
   type PaginatedResult,
 } from "@db/db";
+import { getLatestMood } from "@db/moods/repository";
 import type { MoodDateRange, MoodRangePreset } from "@db/moods/range";
 export {
   createMoodEntryWorkflow,
@@ -187,8 +188,7 @@ export const moodService: MoodServiceInterface = {
    * Get the most recent mood entry (for "same as last entry" feature)
    */
   async getLastEntry(): Promise<MoodEntry | null> {
-    const moods = await getAllMoods();
-    return moods.length > 0 ? moods[0] : null;
+    return getLatestMood();
   },
 
   /**

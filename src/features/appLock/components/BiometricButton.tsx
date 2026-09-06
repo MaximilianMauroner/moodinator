@@ -1,15 +1,6 @@
 import React from "react";
 import { Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import Animated, {
-  useAnimatedStyle,
-  withRepeat,
-  withSequence,
-  withTiming,
-  useSharedValue,
-  withDelay,
-  useReducedMotion,
-} from "react-native-reanimated";
 import { useThemeColors } from "@/constants/colors";
 import { haptics } from "@/lib/haptics";
 
@@ -22,38 +13,13 @@ type BiometricButtonProps = {
 
 export function BiometricButton({ onPress, label, icon, disabled }: BiometricButtonProps) {
   const { isDark, get } = useThemeColors();
-  const scale = useSharedValue(1);
-  const reduceMotion = useReducedMotion();
-
-  React.useEffect(() => {
-    if (reduceMotion) {
-      scale.value = 1;
-      return;
-    }
-    scale.value = withDelay(
-      500,
-      withRepeat(
-        withSequence(
-          withTiming(1.05, { duration: 1000 }),
-          withTiming(1, { duration: 1000 })
-        ),
-        -1,
-        true
-      )
-    );
-  }, [reduceMotion, scale]);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
   const handlePress = () => {
     haptics.light();
     onPress();
   };
 
   return (
-    <Animated.View style={animatedStyle}>
+    <View>
       <Pressable
         onPress={handlePress}
         disabled={disabled}
@@ -89,6 +55,6 @@ export function BiometricButton({ onPress, label, icon, disabled }: BiometricBut
           {label}
         </Text>
       </Pressable>
-    </Animated.View>
+    </View>
   );
 }

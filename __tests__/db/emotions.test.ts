@@ -6,13 +6,6 @@ import { vi } from "vitest";
 
 import { createMockDb } from "./mockClient";
 
-// Mock the database client module
-const mockDb = createMockDb();
-
-vi.mock("../../db/client", () => ({
-  getDb: vi.fn(() => Promise.resolve(mockDb)),
-}));
-
 // Import after mocking
 import {
   getAllEmotions,
@@ -23,6 +16,13 @@ import {
   linkEmotionsToMood,
 } from "../../db/moods/emotions";
 import type { Emotion } from "../../db/types";
+
+// Mock the database client module
+const mockDb = createMockDb();
+
+vi.mock("../../db/client", () => ({
+  getDb: vi.fn(() => Promise.resolve(mockDb)),
+}));
 
 describe("Emotions", () => {
   beforeEach(() => {
@@ -164,11 +164,12 @@ describe("Emotions", () => {
 describe("linkEmotionsToMood", () => {
   beforeEach(() => {
     mockDb.__reset();
+    mockDb.__addMood({});
     vi.clearAllMocks();
   });
 
   it("clears existing links before adding new ones", async () => {
-    await linkEmotionsToMood(mockDb as any, 1, [
+    await linkEmotionsToMood(mockDb.database, 1, [
       { name: "Happy", category: "positive" },
     ]);
 
@@ -180,7 +181,7 @@ describe("linkEmotionsToMood", () => {
   });
 
   it("creates emotion entries and links them", async () => {
-    await linkEmotionsToMood(mockDb as any, 1, [
+    await linkEmotionsToMood(mockDb.database, 1, [
       { name: "Happy", category: "positive" },
       { name: "Excited", category: "positive" },
     ]);
@@ -193,7 +194,7 @@ describe("linkEmotionsToMood", () => {
   });
 
   it("handles empty emotions array", async () => {
-    await linkEmotionsToMood(mockDb as any, 1, []);
+    await linkEmotionsToMood(mockDb.database, 1, []);
 
     // Should still clear existing links
     expect(mockDb.runAsync).toHaveBeenCalledWith(

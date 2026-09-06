@@ -226,6 +226,14 @@ export async function getAllMoods(): Promise<MoodEntry[]> {
   return rows.map(toMoodEntry);
 }
 
+export async function getLatestMood(): Promise<MoodEntry | null> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<MoodRow>(
+    "SELECT * FROM moods ORDER BY timestamp DESC, id DESC LIMIT 1;"
+  );
+  return row ? toMoodEntry(row) : null;
+}
+
 export type PaginationOptions = {
   limit: number;
   offset: number;

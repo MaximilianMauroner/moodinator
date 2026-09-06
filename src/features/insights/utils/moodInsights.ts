@@ -11,14 +11,13 @@ import {
 import type { MoodEntry } from "@db/types";
 import type { TimePeriod } from "../components/TimePeriodSelector";
 import { calculatePeriodStats, type PeriodStats } from "./periodStats";
-import { calculateStreak, detectPatterns, type Pattern } from "./patternDetection";
+import { detectPatterns, type Pattern } from "./patternDetection";
 
 export type MoodInsightsResult = {
   periodMoods: MoodEntry[];
   previousPeriodMoods: MoodEntry[];
   stats: PeriodStats;
   patterns: Pattern[];
-  streak: { current: number; longest: number };
 };
 
 export function getMoodsInPeriod(
@@ -88,6 +87,5 @@ export function buildMoodInsights(
     previousPeriodMoods,
     stats: calculatePeriodStats(periodMoods, previousPeriodMoods),
     patterns: period === "week" ? [] : detectPatterns(moodsForPatterns),
-    streak: calculateStreak(allMoods),
   };
 }

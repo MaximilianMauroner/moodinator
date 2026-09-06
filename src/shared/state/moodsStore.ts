@@ -46,8 +46,7 @@ export type MoodsStore = {
  */
 function computeLastTracked(moods: MoodEntry[]): Date | null {
   if (moods.length === 0) return null;
-  const sorted = [...moods].sort((a, b) => b.timestamp - a.timestamp);
-  return new Date(sorted[0].timestamp);
+  return new Date(moods.reduce((latest, mood) => Math.max(latest, mood.timestamp), -Infinity));
 }
 
 const DEFAULT_PAGE_SIZE = 50;
@@ -65,6 +64,8 @@ function applyCollectionState(moods: MoodEntry[]) {
 let activeHydrationPromise: Promise<void> | null = null;
 
 export const useMoodsStore = create<MoodsStore>((set, get) => {
+  let collectionRevision = 0;
+
   const hydrateAll = (
     nextStatus: Extract<LoadStatus, "loading" | "refreshing">,
     options?: { clearError?: boolean }
@@ -80,7 +81,24 @@ export const useMoodsStore = create<MoodsStore>((set, get) => {
 
     activeHydrationPromise = (async () => {
       try {
-        const moods = await moodService.getAll();
+        let moods: MoodEntry[];
+        while (true) {
+          const revision = collectionRevision;
+          try {
+            moods = await moodService.getAll();
+          } catch (error) {
+            if (revision === collectionRevision) throw error;
+            if (get().isStale) continue;
+            set({ status: "idle" });
+            return;
+          }
+          if (revision === collectionRevision) break;
+          // A confirmed write or invalidation made this snapshot obsolete.
+          if (!get().isStale) {
+            set({ status: "idle" });
+            return;
+          }
+        }
         set({
           status: "idle",
           error: null,
@@ -114,15 +132,15 @@ export const useMoodsStore = create<MoodsStore>((set, get) => {
 
   const workflow = createMoodEntryWorkflow(moodService, {
     getMoods: () => get().moods,
-    applyMutation: (moods) =>
-      set({
+    applyMutation: (moods) => {
+      collectionRevision += 1;
+      set((state) => ({
         ...applyCollectionState(moods),
-        isStale: true,
-      }),
-    refreshAfterMutation: () => {
-      queueMicrotask(() => {
+        isStale: state.isStale || activeHydrationPromise !== null,
+      }));
+      if (get().isStale && !activeHydrationPromise) {
         void get().ensureFresh();
-      });
+      }
     },
   });
 
@@ -137,13 +155,15 @@ export const useMoodsStore = create<MoodsStore>((set, get) => {
     hasMore: false,
     currentOffset: 0,
 
-    setLocal: (moods) =>
+    setLocal: (moods) => {
+      collectionRevision += 1;
       set({
         status: "idle",
         error: null,
         isStale: false,
         ...applyCollectionState(moods),
-      }),
+      });
+    },
 
     loadAll: () => hydrateAll("loading", { clearError: true }),
 
@@ -176,7 +196,10 @@ export const useMoodsStore = create<MoodsStore>((set, get) => {
 
     refreshMoods: () => hydrateAll("refreshing"),
 
-    invalidate: () => set({ isStale: true }),
+    invalidate: () => {
+      collectionRevision += 1;
+      set({ isStale: true });
+    },
 
     ensureFresh: async () => {
       const { isStale, status, lastLoadedAt, moods, loadAll, refreshMoods } = get();

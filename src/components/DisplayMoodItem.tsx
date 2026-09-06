@@ -362,6 +362,7 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
                 onLongPress?.(mood);
               }}
               accessibilityRole="button"
+              testID={`mood-entry-${mood.id}`}
               accessibilityLabel={accessibilityLabel}
               accessibilityHint={getMoodItemHint()}
               accessibilityActions={[
@@ -447,6 +448,7 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
                         }}
                         className="h-11 w-11 items-center justify-center rounded-full"
                         accessibilityRole="button"
+                        testID={`mood-entry-actions-${mood.id}`}
                         accessibilityLabel={`Actions for ${moodData.label} entry`}
                         accessibilityHint="Edit, change date and time, or delete this entry"
                       >
@@ -489,6 +491,7 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
                           }}
                           className="ml-1 h-11 w-11 items-center justify-center rounded-full"
                           accessibilityRole="button"
+                          testID={`mood-entry-actions-${mood.id}`}
                           accessibilityLabel={`Actions for ${moodData.label} entry`}
                           accessibilityHint="Edit, change date and time, or delete this entry"
                         >

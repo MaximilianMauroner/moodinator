@@ -29,7 +29,6 @@ describe("createMoodEntryWorkflow", () => {
   let moods: MoodEntry[];
   let repository: MoodEntryWorkflowRepository;
   let applyMutation: ReturnType<typeof vi.fn>;
-  let refreshAfterMutation: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     moods = [];
@@ -42,18 +41,16 @@ describe("createMoodEntryWorkflow", () => {
     applyMutation = vi.fn((nextMoods: MoodEntry[]) => {
       moods = nextMoods;
     });
-    refreshAfterMutation = vi.fn();
   });
 
   function workflow() {
     return createMoodEntryWorkflow(repository, {
       getMoods: () => moods,
       applyMutation,
-      refreshAfterMutation,
     });
   }
 
-  it("creates a Mood Entry and refreshes the store adapter", async () => {
+  it("creates a Mood Entry and updates the store adapter", async () => {
     const created = makeMood(1, 100);
     vi.mocked(repository.create).mockResolvedValue(created);
 
@@ -61,7 +58,24 @@ describe("createMoodEntryWorkflow", () => {
 
     expect(moods).toEqual([created]);
     expect(applyMutation).toHaveBeenCalledWith([created]);
-    expect(refreshAfterMutation).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["create", "restore", "undoDelete"] as const)("keeps a backdated %s in timestamp order", async (action) => {
+    const newer = makeMood(1, 200);
+    const backdated = makeMood(2, 100);
+    moods = [newer];
+    vi.mocked(repository.create).mockResolvedValue(backdated);
+    await workflow()[action]({ mood: 4, timestamp: 100 });
+    expect(moods).toEqual([newer, backdated]);
+  });
+
+  it("reorders a timestamp changed through the general update action", async () => {
+    const newer = makeMood(1, 200);
+    const moved = makeMood(2, 300);
+    moods = [newer, makeMood(2, 100)];
+    vi.mocked(repository.update).mockResolvedValue(moved);
+    await workflow().update(2, { timestamp: 300 });
+    expect(moods).toEqual([moved, newer]);
   });
 
   it("edits a Mood Entry in place", async () => {
@@ -73,7 +87,6 @@ describe("createMoodEntryWorkflow", () => {
     await expect(workflow().update(1, { note: "Updated" })).resolves.toEqual(updated);
 
     expect(moods).toEqual([updated]);
-    expect(refreshAfterMutation).toHaveBeenCalledTimes(1);
   });
 
   it("reschedules a Mood Entry and sorts newest first", async () => {
@@ -86,7 +99,6 @@ describe("createMoodEntryWorkflow", () => {
     await expect(workflow().reschedule(1, 300)).resolves.toEqual(moved);
 
     expect(moods).toEqual([moved, newer]);
-    expect(refreshAfterMutation).toHaveBeenCalledTimes(1);
   });
 
   it("deletes a Mood Entry and returns the removed snapshot for undo", async () => {
@@ -97,7 +109,6 @@ describe("createMoodEntryWorkflow", () => {
     await expect(workflow().delete(1)).resolves.toEqual(existing);
 
     expect(moods).toEqual([]);
-    expect(refreshAfterMutation).toHaveBeenCalledTimes(1);
   });
 
   it("restores a Mood Entry through the create path", async () => {
@@ -109,7 +120,6 @@ describe("createMoodEntryWorkflow", () => {
     ).resolves.toEqual(restored);
 
     expect(moods).toEqual([restored]);
-    expect(refreshAfterMutation).toHaveBeenCalledTimes(1);
   });
 
   it("undoes delete through the restore workflow", async () => {
@@ -121,6 +131,5 @@ describe("createMoodEntryWorkflow", () => {
     ).resolves.toEqual(restored);
 
     expect(moods).toEqual([restored]);
-    expect(refreshAfterMutation).toHaveBeenCalledTimes(1);
   });
 });
