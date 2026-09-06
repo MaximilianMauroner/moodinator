@@ -6,6 +6,15 @@ import { vi } from "vitest";
 
 import { createMockDb } from "./mockClient";
 
+// Import after mocking
+import {
+  exportMoods,
+  importMoods,
+  importOldBackup,
+  previewImportMoods,
+} from "../../db/moods/importExport";
+import { linkEmotionsToMood } from "../../db/moods/emotions";
+
 // Mock the database client module
 const mockDb = createMockDb();
 const higherIsBetterScale = {
@@ -19,19 +28,15 @@ vi.mock("../../db/client", () => ({
   getDb: vi.fn(() => Promise.resolve(mockDb)),
 }));
 
-// Mock emotions functions
-vi.mock("../../db/moods/emotions", () => ({
-  linkEmotionsToMood: vi.fn(),
-}));
-
-// Import after mocking
-import {
-  exportMoods,
-  importMoods,
-  importOldBackup,
-  previewImportMoods,
-} from "../../db/moods/importExport";
-import { linkEmotionsToMood } from "../../db/moods/emotions";
+// Keep real emotion SQL, with spies for orchestration assertions and failures.
+vi.mock("../../db/moods/emotions", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../db/moods/emotions")>();
+  return {
+    ...actual,
+    linkEmotionsToMood: vi.fn(actual.linkEmotionsToMood),
+    upsertEmotionCategory: vi.fn(actual.upsertEmotionCategory),
+  };
+});
 
 describe("Import/Export", () => {
   beforeEach(() => {
@@ -471,5 +476,30 @@ describe("Import/Export", () => {
       expect(result.imported).toBe(0);
       expect(result.skipped).toBe(0);
     });
+  });
+});
+
+describe("replacement import rollback with SQLite", () => {
+  beforeEach(() => mockDb.__reset());
+
+  it("restores original moods, emotions, and links after a partial replacement fails", async () => {
+    const original = mockDb.__addMood({ mood: 2, note: "keep me" });
+    const emotion = mockDb.__addEmotion({ name: "Calm", category: "positive" });
+    mockDb.__addMoodEmotion(original.id, emotion.id);
+    const before = {
+      moods: mockDb.__getMoods(), emotions: mockDb.__getEmotions(), links: mockDb.__getMoodEmotions(),
+    };
+    await mockDb.execAsync(`CREATE TEMP TRIGGER reject_second_mood BEFORE INSERT ON moods WHEN NEW.note = 'fail' BEGIN SELECT RAISE(ABORT, 'injected import failure'); END;`);
+    try {
+      await expect(importMoods(JSON.stringify([
+        { mood: 6, note: "inserted first", emotions: [{ name: "New", category: "neutral" }] },
+        { mood: 7, note: "fail" },
+      ]))).rejects.toThrow("injected import failure");
+      expect(mockDb.__getMoods()).toEqual(before.moods);
+      expect(mockDb.__getEmotions()).toEqual(before.emotions);
+      expect(mockDb.__getMoodEmotions()).toEqual(before.links);
+    } finally {
+      await mockDb.execAsync("DROP TRIGGER reject_second_mood;");
+    }
   });
 });

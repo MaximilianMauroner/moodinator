@@ -32,7 +32,7 @@ A privacy-focused mood tracking app built with React Native. Track your emotiona
 
 ## Tech Stack
 
-- **React Native** with **Expo** (SDK 53)
+- **React Native** with **Expo** (SDK 55)
 - **TypeScript** for type safety
 - **SQLite** via expo-sqlite for local persistence
 - **NativeWind** (TailwindCSS) for styling
@@ -43,32 +43,33 @@ A privacy-focused mood tracking app built with React Native. Track your emotiona
 ## Getting Started
 
 ### Prerequisites
-- Node.js 18+
-- npm or yarn
-- Expo Go app (for device testing) or iOS Simulator / Android Emulator
+
+- Node.js 24 LTS, version 24.13.1 or newer within major 24 (`.node-version`)
+- Bun 1.3.14 (`packageManager` in `package.json`)
+- Android Studio and an emulator, or Xcode on macOS for iOS
+
+The test suite uses Node's built-in SQLite. Expo Go cannot verify custom native
+configuration such as SQLCipher; use a native build for that coverage.
 
 ### Installation
 
 ```bash
-# Clone the repository
 git clone https://github.com/MaximilianMauroner/moodinator.git
 cd moodinator
-
-# Install dependencies
-npm install
-
-# Start the development server
-npm start
+bun install --frozen-lockfile
+bun start
 ```
 
-### Running the App
+### Running the app
 
 ```bash
-npm run ios      # Run on iOS simulator
-npm run android  # Run on Android emulator
+bun run android
+bun run ios
 ```
 
-Or scan the QR code with Expo Go on your physical device.
+These commands build the normal app identifier. For disposable test data and
+automation, use the separate QA app described in [Native QA](docs/native-qa.md).
+Do not open a browser for normal app verification.
 
 ## Project Structure
 
@@ -87,16 +88,53 @@ Or scan the QR code with Expo Go on your physical device.
 ## Development
 
 ```bash
-npm test         # Run tests in watch mode
-npm run lint     # Run ESLint
-npx tsc --noEmit # Type check
+bun run verify   # Lint, typecheck, tests, Expo Doctor, Android release config
+bun run test     # Watch tests while editing
+bun run test:run # Run tests once
 ```
+
+The suite includes real in-memory SQLite queries, migrations and rollback,
+store/date regressions, and rendered emotion/energy interactions. Native hosts
+and haptic APIs are mocked in component tests. Physical feedback, native layout,
+SQLCipher and the Expo bridge require a device build.
+
+Expo Doctor needs network access to check SDK compatibility. It is installed
+locally so the command does not download a different checker on each run.
+
+### Isolated native verification
+
+```bash
+bun run qa:prepare
+# In the printed temporary workspace:
+bun install --frozen-lockfile
+MOODINATOR_VARIANT=qa bunx expo run:android --variant release --device
+bun run qa:smoke -- emulator-5554
+```
+
+`qa:prepare` copies current tracked files and relevant new source/test files,
+including uncommitted edits, into a temporary directory. It excludes native
+build folders, dependencies, credentials and personal scratch files. It does
+not install or launch anything. Use one disposable emulator per concurrent run.
+The release QA build embeds its bundle and does not need a shared Metro port.
+After collecting evidence, remove that temporary workspace and disposable AVD.
+
+The QA app uses `com.lab4code.moodinator.qa` and separate local storage. The smoke
+runner accepts an explicit emulator serial and checks that package before
+running a flow which clears QA data. See [Native QA](docs/native-qa.md) for
+coverage, fixture generation, manual checks and performance captures.
+
+### Versions and builds
+
+`bun run version:bump` explicitly increments the minor version in `app.json`
+and `package.json`. Build commands do not invoke it automatically. Run it only
+when preparing an intended version change. Native generation uses
+`bunx expo prebuild` in an isolated workspace.
 
 ## Known Issues
 
 ### NativeWind shadows + Expo Router
 
-On Expo SDK 53 with `expo-router` 5, toggling NativeWind `shadow-*` utilities during state updates can trigger a React Navigation context warning. Workaround: use inline `style` with iOS shadow props + Android `elevation` instead of `shadow-*` classes in dynamic components.
+In older Expo builds, toggling NativeWind `shadow-*` utilities during state updates can trigger a React Navigation context warning. Workaround: use inline `style` with iOS shadow props + Android `elevation` instead of `shadow-*` classes in dynamic components.
 
 ## Roadmap
 

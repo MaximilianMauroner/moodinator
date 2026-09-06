@@ -7,6 +7,7 @@ import Animated, {
     FadeIn,
     FadeOut,
 } from "react-native-reanimated";
+import { haptics } from "@/lib/haptics";
 import { useThemeColors } from "@/constants/colors";
 
 interface EnergySliderProps {
@@ -56,42 +57,48 @@ const EnergySegment: React.FC<{
     }));
 
     return (
-        <Animated.View
-            style={[
-                {
-                    flex: 1,
-                    height: 32,
-                    borderRadius: 4,
-                    backgroundColor: isFilled
-                        ? fillColor
-                        : isDark
-                        ? emptyColorDark
-                        : emptyColorLight,
-                    borderWidth: isSelected ? 2 : 0,
-                    borderColor: isSelected ? fillColor : "transparent",
-                    shadowColor: isSelected ? fillColor : "transparent",
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: isDark ? 0.4 : 0.3,
-                    shadowRadius: 4,
-                    elevation: isSelected ? 3 : 0,
-                },
-                segmentAnimatedStyle,
-            ]}
+        <Pressable
+            onPress={onPress}
+            onPressIn={() => {
+                scaleY.value = withSpring(0.9, { damping: 18, stiffness: 500 });
+            }}
+            onPressOut={() => {
+                scaleY.value = withSpring(isSelected ? 1.15 : 1, { damping: 14, stiffness: 380 });
+            }}
+            testID={`energy-level-${index}`}
+            style={{ minWidth: 48, minHeight: 48, flexGrow: 1, justifyContent: "center" }}
+            accessibilityRole="button"
+            accessibilityLabel={`Energy level ${index}: ${ENERGY_LABELS[index]}`}
+            accessibilityState={{ selected: isSelected }}
         >
-            <Pressable
-                onPress={onPress}
-                onPressIn={() => {
-                    scaleY.value = withSpring(0.9, { damping: 18, stiffness: 500 });
-                }}
-                onPressOut={() => {
-                    scaleY.value = withSpring(isSelected ? 1.15 : 1, { damping: 14, stiffness: 380 });
-                }}
-                style={{ flex: 1 }}
-                accessibilityRole="button"
-                accessibilityLabel={`Energy level ${index}: ${ENERGY_LABELS[index]}`}
-                accessibilityState={{ selected: isSelected }}
-            />
-        </Animated.View>
+            <Animated.View
+                style={[
+                    {
+                        height: 36,
+                        borderRadius: 4,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        backgroundColor: isFilled
+                            ? fillColor
+                            : isDark
+                            ? emptyColorDark
+                            : emptyColorLight,
+                        borderWidth: isSelected ? 2 : 0,
+                        borderColor: isSelected ? fillColor : "transparent",
+                        shadowColor: isSelected ? fillColor : "transparent",
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: isDark ? 0.4 : 0.3,
+                        shadowRadius: 4,
+                        elevation: isSelected ? 3 : 0,
+                    },
+                    segmentAnimatedStyle,
+                ]}
+            >
+                <Text style={{ color: isDark && (!isFilled || index < 7) ? "#FFFFFF" : "#171410", fontWeight: isSelected ? "700" : "500" }}>
+                    {index}
+                </Text>
+            </Animated.View>
+        </Pressable>
     );
 };
 
@@ -104,7 +111,7 @@ export const EnergySlider: React.FC<EnergySliderProps> = ({ value, onChange }) =
     return (
         <View>
             {/* Segmented bar */}
-            <View className="flex-row gap-1 mb-2">
+            <View className="flex-row flex-wrap gap-1 mb-2">
                 {Array.from({ length: 11 }, (_, i) => (
                     <EnergySegment
                         key={i}
@@ -114,7 +121,10 @@ export const EnergySlider: React.FC<EnergySliderProps> = ({ value, onChange }) =
                         emptyColorDark="rgba(61, 53, 42, 0.25)"
                         emptyColorLight="rgba(229, 217, 191, 0.25)"
                         isDark={isDark}
-                        onPress={() => onChange(value === i ? null : i)}
+                        onPress={() => {
+                            haptics.selection();
+                            onChange(value === i ? null : i);
+                        }}
                     />
                 ))}
             </View>
@@ -173,8 +183,12 @@ export const EnergySlider: React.FC<EnergySliderProps> = ({ value, onChange }) =
                     exiting={FadeOut.duration(120)}
                 >
                     <Pressable
-                        onPress={() => onChange(null)}
-                        className="self-center px-4 py-1.5 rounded-full"
+                        testID="energy-clear"
+                        onPress={() => {
+                            haptics.selection();
+                            onChange(null);
+                        }}
+                        className="min-h-12 min-w-12 justify-center self-center px-4 py-1.5 rounded-full"
                         style={{
                             backgroundColor: isDark
                                 ? "rgba(42, 37, 32, 0.6)"

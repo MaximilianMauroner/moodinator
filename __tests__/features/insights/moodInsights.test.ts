@@ -1,3 +1,4 @@
+import { calculateStreak } from "../../../src/features/insights/utils/patternDetection";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createMockMoodEntry } from "../../db/mockClient";
@@ -125,16 +126,34 @@ describe("moodInsights", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2024-03-13T12:00:00"));
 
-    const insights = buildMoodInsights(
+    const streak = calculateStreak(
       [
         mood(1, 2, "2024-03-13T12:00:00"),
         mood(2, 3, "2024-03-12T12:00:00"),
         mood(3, 4, "2024-03-10T12:00:00"),
       ],
-      "week",
       new Date("2024-03-13T12:00:00")
     );
 
-    expect(insights.streak).toEqual({ current: 2, longest: 2 });
+    expect(streak).toEqual({ current: 2, longest: 2 });
+  });
+});
+
+describe("streak calendar days across DST", () => {
+  it.each([
+    ["2026-03-09T00:30:00", "2026-03-08T12:00:00"],
+    ["2026-11-01T23:30:00", "2026-10-31T12:00:00"],
+  ])("counts the previous local day at %s", (today, yesterday) => {
+    const previousTZ = process.env.TZ;
+    process.env.TZ = "America/New_York";
+    try {
+      expect(calculateStreak([mood(1, 4, yesterday)], new Date(today))).toEqual({
+        current: 1,
+        longest: 1,
+      });
+    } finally {
+      if (previousTZ === undefined) delete process.env.TZ;
+      else process.env.TZ = previousTZ;
+    }
   });
 });

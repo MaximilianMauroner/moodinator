@@ -12,6 +12,8 @@ vi.mock("expo-haptics", () => ({
     Clock_Tick: "clock-tick",
     Confirm: "confirm",
     Context_Click: "context-click",
+    Gesture_End: "gesture-end",
+    Gesture_Start: "gesture-start",
     Keyboard_Tap: "keyboard-tap",
     Long_Press: "long-press",
     Reject: "reject",
@@ -55,11 +57,17 @@ describe("haptics", () => {
     const { haptics } = await loadHaptics("android", 35);
 
     haptics.selection();
+    haptics.light();
+    haptics.medium();
+    haptics.swipeThreshold();
     haptics.moodLogged();
     haptics.pinDigit();
 
     expect(hapticMocks.performAndroidHapticsAsync.mock.calls).toEqual([
-      ["segment-tick"],
+      ["gesture-end"],
+      ["context-click"],
+      ["confirm"],
+      ["gesture-start"],
       ["confirm"],
       ["keyboard-tap"],
     ]);
@@ -72,14 +80,16 @@ describe("haptics", () => {
     const { haptics } = await loadHaptics("android", 29);
 
     haptics.selection();
+    haptics.medium();
     haptics.moodLogged();
     haptics.swipeThreshold();
     haptics.error();
 
     expect(hapticMocks.performAndroidHapticsAsync.mock.calls).toEqual([
-      ["clock-tick"],
       ["context-click"],
-      ["clock-tick"],
+      ["long-press"],
+      ["context-click"],
+      ["context-click"],
       ["long-press"],
     ]);
   });
@@ -95,8 +105,8 @@ describe("haptics", () => {
     await Promise.resolve();
 
     expect(hapticMocks.performAndroidHapticsAsync.mock.calls).toEqual([
-      ["segment-tick"],
-      ["clock-tick"],
+      ["gesture-end"],
+      ["context-click"],
     ]);
   });
 
