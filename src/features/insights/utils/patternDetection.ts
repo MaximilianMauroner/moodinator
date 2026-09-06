@@ -1,5 +1,5 @@
 import type { MoodEntry } from "@db/types";
-import { format, getHours, getDay, isWeekend } from "date-fns";
+import { format, getHours, getDay, isWeekend, subDays } from "date-fns";
 import {
   getInterpretedMoodRating,
   isBetterMoodRating,
@@ -304,15 +304,12 @@ export function detectPatterns(moods: MoodEntry[], maxPatterns = 3): Pattern[] {
 /**
  * Calculate current streak (consecutive days with entries)
  */
-export function calculateStreak(moods: MoodEntry[]): { current: number; longest: number } {
+export function calculateStreak(moods: MoodEntry[], todayDate = new Date()): { current: number; longest: number } {
   if (moods.length === 0) return { current: 0, longest: 0 };
-
-  // Sort by timestamp descending
-  const sortedMoods = [...moods].sort((a, b) => b.timestamp - a.timestamp);
 
   // Group by date
   const dateSet = new Set<string>();
-  sortedMoods.forEach((mood) => {
+  moods.forEach((mood) => {
     const dateKey = format(new Date(mood.timestamp), "yyyy-MM-dd");
     dateSet.add(dateKey);
   });
@@ -323,8 +320,8 @@ export function calculateStreak(moods: MoodEntry[]): { current: number; longest:
 
   // Calculate current streak
   let currentStreak = 0;
-  const today = format(new Date(), "yyyy-MM-dd");
-  const yesterday = format(new Date(Date.now() - 86400000), "yyyy-MM-dd");
+  const today = format(todayDate, "yyyy-MM-dd");
+  const yesterday = format(subDays(todayDate, 1), "yyyy-MM-dd");
 
   // Current streak must include today or yesterday
   if (dates[0] === today || dates[0] === yesterday) {

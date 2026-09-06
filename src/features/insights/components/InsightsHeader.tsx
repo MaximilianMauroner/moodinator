@@ -6,7 +6,6 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withDelay,
-  withRepeat,
   withTiming,
 } from "react-native-reanimated";
 import { useColorScheme } from "@/hooks/useColorScheme";
@@ -29,19 +28,13 @@ interface InsightsHeaderProps {
 interface RhythmDotProps {
   color: string;
   isData: boolean;
-  isLatest: boolean;
   index: number;
   visibleCount: number;
 }
 
-/**
- * One dot in the rhythm strip. Data dots ease in from the right on mount or
- * whenever the dot identity changes (data refresh). The newest data dot also
- * carries a slow continuous breath so the page never sits perfectly still.
- */
-function RhythmDot({ color, isData, isLatest, index, visibleCount }: RhythmDotProps) {
+/** Recent data dots enter once when the data changes. */
+function RhythmDot({ color, isData, index, visibleCount }: RhythmDotProps) {
   const entry = useSharedValue(0);
-  const pulse = useSharedValue(0);
 
   useEffect(() => {
     if (!isData) {
@@ -61,34 +54,10 @@ function RhythmDot({ color, isData, isLatest, index, visibleCount }: RhythmDotPr
     );
   }, [color, isData, visibleCount, index, entry]);
 
-  useEffect(() => {
-    if (!isLatest || !isData) {
-      pulse.value = 0;
-      return;
-    }
-    pulse.value = withRepeat(
-      withTiming(1, {
-        duration: 1800,
-        easing: Easing.inOut(Easing.quad),
-      }),
-      -1,
-      true
-    );
-  }, [isLatest, isData, pulse]);
-
-  const animatedStyle = useAnimatedStyle(() => {
-    const entryOpacity = isData ? entry.value : 0.55;
-    // Pulse modulates a soft glow scale on the newest dot.
-    const pulseScale = isLatest ? 1 + pulse.value * 0.18 : 1;
-    const pulseGlow = isLatest ? 0.55 + pulse.value * 0.45 : 1;
-    return {
-      opacity: isData ? entryOpacity * pulseGlow : 0.55,
-      transform: [
-        { translateX: isData ? (1 - entry.value) * 8 : 0 },
-        { scale: pulseScale },
-      ],
-    };
-  });
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: isData ? entry.value : 0.55,
+    transform: [{ translateX: isData ? (1 - entry.value) * 8 : 0 }],
+  }));
 
   return (
     <Animated.View
@@ -134,18 +103,15 @@ export function InsightsHeader({ moods, totalEntries, onRefresh }: InsightsHeade
       key: string;
       color: string;
       isData: boolean;
-      isLatest: boolean;
     }[] = [];
     for (let i = 0; i < empty; i++) {
-      items.push({ key: `e${i}`, color: emptyDot, isData: false, isLatest: false });
+      items.push({ key: `e${i}`, color: emptyDot, isData: false });
     }
     recent.forEach((entry, i) => {
-      const isLatest = i === recent.length - 1;
       items.push({
         key: `m${entry.id ?? i}`,
         color: getMoodHex(entry.mood, isDark, entry.moodScale),
         isData: true,
-        isLatest,
       });
     });
     return items;
@@ -159,7 +125,6 @@ export function InsightsHeader({ moods, totalEntries, onRefresh }: InsightsHeade
             key={slot.key}
             color={slot.color}
             isData={slot.isData}
-            isLatest={slot.isLatest}
             index={index}
             visibleCount={slots.length}
           />
@@ -191,7 +156,6 @@ export function InsightsHeader({ moods, totalEntries, onRefresh }: InsightsHeade
           ]}
           accessibilityRole="button"
           accessibilityLabel="Refresh insights"
-          hitSlop={8}
         >
           <Ionicons name="refresh" size={16} color={sage.fg} />
         </Pressable>
@@ -225,8 +189,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   refresh: {
-    width: 36,
-    height: 36,
+    width: 48,
+    height: 48,
     borderRadius: 12,
     borderWidth: 1,
     alignItems: "center",

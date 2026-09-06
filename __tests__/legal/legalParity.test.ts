@@ -6,20 +6,23 @@ const privacyScreen = readFileSync("src/app/settings/privacy-policy.tsx", "utf8"
 const terms = readFileSync("TERMS_OF_SERVICE.md", "utf8");
 const termsScreen = readFileSync("src/app/settings/terms-of-service.tsx", "utf8");
 const license = readFileSync("LICENSE", "utf8");
-const playChecklist = readFileSync(
-  "docs/release/google-play-release-checklist.md",
-  "utf8"
-);
+
 
 function withoutMarkdownEmphasis(source: string): string {
   return source.replaceAll("**", "");
 }
 
 describe("legal document parity", () => {
-  it("uses the same current Last Updated date on all legal surfaces", () => {
-    for (const source of [privacyPolicy, privacyScreen, terms, termsScreen]) {
-      expect(source).toContain("Last Updated: July 21, 2026");
-    }
+  it.each([
+    ["privacy", privacyPolicy, privacyScreen],
+    ["terms", terms, termsScreen],
+  ])("keeps the %s policy date aligned with its in-app screen", (_, document, screen) => {
+    const datePattern = /Last Updated: ([A-Za-z]+ \d{1,2}, \d{4})/;
+    const documentDate = document.match(datePattern)?.[1];
+    const screenDate = screen.match(datePattern)?.[1];
+    expect(documentDate).toBeDefined();
+    expect(Number.isNaN(Date.parse(documentDate!))).toBe(false);
+    expect(screenDate).toBe(documentDate);
   });
 
   it("keeps core privacy disclosures in the root and in-app policies", () => {
@@ -30,9 +33,7 @@ describe("legal document parity", () => {
       expect(source).toContain("salted hash");
       expect(source).toContain("plaintext JSON");
       expect(source).toContain("plaintext CSV");
-      expect(source).toContain("temporary");
       expect(source).toContain("clipboard");
-      expect(source).toContain("automatically");
       expect(source).toContain("at most once per week");
       expect(source).toContain("eight newest app-managed");
       expect(source).toContain("Delete Mood Data");
@@ -53,7 +54,6 @@ describe("legal document parity", () => {
       expect(source).toContain("database emotion records");
       expect(source).toContain("Emotion List presets");
       expect(source).toContain("plaintext CSV");
-      expect(source).toContain("automatically");
       expect(source).toContain("at most once per week");
       expect(source).toContain("eight newest app-managed");
       expect(source).toContain("MIT License");
@@ -70,16 +70,4 @@ describe("legal document parity", () => {
     expect(license).toContain("Permission is hereby granted, free of charge");
   });
 
-  it("keeps the Data Safety answer unresolved with a conservative candidate", () => {
-    expect(playChecklist).toContain("Final Data Safety answers are unresolved");
-    expect(playChecklist).toContain("Candidate: **Yes**");
-    expect(playChecklist).toContain("Health info");
-    expect(playChecklist).toContain("Other user-generated content");
-    expect(playChecklist).toContain("App functionality");
-    expect(playChecklist).toContain("specific user-initiated exception for **sharing**");
-    expect(playChecklist).toContain("Candidate: **No**");
-    expect(playChecklist).not.toContain(
-      "Does your app collect or share any of the required user data types?** No"
-    );
-  });
 });

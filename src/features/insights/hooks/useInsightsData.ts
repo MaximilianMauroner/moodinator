@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { isAfter, isBefore, startOfDay } from "date-fns";
+import { addDays, endOfMonth, endOfWeek, startOfDay, startOfMonth, startOfWeek } from "date-fns";
+import { AppState } from "react-native";
+import { calculateStreak } from "../utils/patternDetection";
 import { useFocusEffect } from "expo-router";
 import type { MoodEntry, MoodScaleSnapshot } from "@db/types";
 import type { TimePeriod } from "../components/TimePeriodSelector";
@@ -51,6 +53,21 @@ export function useInsightsData(): InsightsData {
   const { isDark } = useThemeColors();
   const [period, setPeriod] = useState<TimePeriod>("week");
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [localDay, setLocalDay] = useState(() => startOfDay(new Date()).getTime());
+  const updateLocalDay = useCallback(() => {
+    setLocalDay(startOfDay(new Date()).getTime());
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(updateLocalDay, addDays(new Date(localDay), 1).getTime() - Date.now());
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") updateLocalDay();
+    });
+    return () => {
+      clearTimeout(timer);
+      subscription.remove();
+    };
+  }, [localDay, updateLocalDay]);
   const allMoods = useMoodsStore((state) => state.moods);
   const status = useMoodsStore((state) => state.status);
   const error = useMoodsStore((state) => state.error);
@@ -60,7 +77,7 @@ export function useInsightsData(): InsightsData {
   const loading =
     status === "loading" ||
     (status === "refreshing" && allMoods.length === 0) ||
-    (allMoods.length === 0 && isStale);
+    (allMoods.length === 0 && isStale && status === "idle" && error === null);
 
   const loadMoods = useCallback(async () => {
     try {
@@ -76,15 +93,20 @@ export function useInsightsData(): InsightsData {
 
   useFocusEffect(
     useCallback(() => {
+      updateLocalDay();
       void ensureFresh();
-    }, [ensureFresh])
+    }, [ensureFresh, updateLocalDay])
   );
 
   const insights = useMemo(
     () => buildMoodInsights(allMoods, period, currentDate),
     [allMoods, period, currentDate]
   );
-  const { periodMoods, stats, patterns, streak } = insights;
+  const { periodMoods, stats, patterns } = insights;
+  const streak = useMemo(
+    () => calculateStreak(allMoods, new Date(localDay)),
+    [allMoods, localDay]
+  );
 
   // Navigation
   const goToPrevious = useCallback(() => {
@@ -107,19 +129,24 @@ export function useInsightsData(): InsightsData {
   const canGoNext = useMemo(() => {
     if (period === "all") return false;
     const nextDate = getNextPeriodDate(period, currentDate);
-    return !isAfter(startOfDay(nextDate), startOfDay(new Date()));
-  }, [period, currentDate]);
+    const nextStart = period === "week"
+      ? startOfWeek(nextDate, { weekStartsOn: 1 })
+      : startOfMonth(nextDate);
+    return nextStart.getTime() <= localDay;
+  }, [period, currentDate, localDay]);
 
   const canGoPrevious = useMemo(() => {
     if (period === "all") return false;
     if (allMoods.length === 0) return false;
 
     // Can go back as long as there's data
-    const oldestMood = allMoods[allMoods.length - 1];
-    const oldestDate = new Date(oldestMood.timestamp);
+    const oldestTimestamp = allMoods.reduce((oldest, mood) => Math.min(oldest, mood.timestamp), Infinity);
     const prevDate = getPreviousPeriodDate(period, currentDate);
 
-    return !isBefore(prevDate, startOfDay(oldestDate));
+    const previousEnd = period === "week"
+      ? endOfWeek(prevDate, { weekStartsOn: 1 })
+      : endOfMonth(prevDate);
+    return previousEnd.getTime() >= oldestTimestamp;
   }, [period, currentDate, allMoods]);
 
   // Helpers

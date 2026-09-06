@@ -16,7 +16,6 @@ export interface MoodEntryWorkflowRepository {
 export interface MoodEntryWorkflowStoreAdapter {
   getMoods: () => MoodEntry[];
   applyMutation: (moods: MoodEntry[]) => void;
-  refreshAfterMutation: () => void;
 }
 
 function withoutExistingEntry(moods: MoodEntry[], id: number): MoodEntry[] {
@@ -31,8 +30,7 @@ function commitMutation(
   store: MoodEntryWorkflowStoreAdapter,
   moods: MoodEntry[]
 ) {
-  store.applyMutation(moods);
-  store.refreshAfterMutation();
+  store.applyMutation(sortNewestFirst(moods));
 }
 
 export function createMoodEntryWorkflow(
@@ -70,9 +68,7 @@ export function createMoodEntryWorkflow(
 
       commitMutation(
         store,
-        sortNewestFirst(
-          store.getMoods().map((mood) => (mood.id === id ? updated : mood))
-        )
+        store.getMoods().map((mood) => (mood.id === id ? updated : mood))
       );
       return updated;
     },

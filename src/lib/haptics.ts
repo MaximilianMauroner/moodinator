@@ -85,9 +85,9 @@ function perform({ android, ios }: NativeFeedback): void {
 function selection(): void {
   perform({
     android: {
-      preferred: Haptics.AndroidHaptics.Segment_Tick,
-      minimumApiLevel: 34,
-      fallback: Haptics.AndroidHaptics.Clock_Tick,
+      preferred: Haptics.AndroidHaptics.Gesture_End,
+      minimumApiLevel: 30,
+      fallback: Haptics.AndroidHaptics.Context_Click,
     },
     ios: Haptics.selectionAsync,
   });
@@ -116,12 +116,16 @@ function notification(
 const light = () =>
   impact(
     Haptics.ImpactFeedbackStyle.Light,
-    Haptics.AndroidHaptics.Virtual_Key
+    Haptics.AndroidHaptics.Context_Click
   );
 const medium = () =>
   impact(
     Haptics.ImpactFeedbackStyle.Medium,
-    Haptics.AndroidHaptics.Context_Click
+    {
+      preferred: Haptics.AndroidHaptics.Confirm,
+      minimumApiLevel: 30,
+      fallback: Haptics.AndroidHaptics.Long_Press,
+    }
   );
 const heavy = () =>
   impact(
@@ -136,11 +140,7 @@ const rigid = () =>
 const soft = () =>
   impact(
     Haptics.ImpactFeedbackStyle.Soft,
-    {
-      preferred: Haptics.AndroidHaptics.Segment_Tick,
-      minimumApiLevel: 34,
-      fallback: Haptics.AndroidHaptics.Clock_Tick,
-    }
+    Haptics.AndroidHaptics.Context_Click
   );
 const success = () =>
   notification(
@@ -185,7 +185,15 @@ export const haptics = {
   // Semantic events. Each resolves to one restrained native event.
   moodLogged: success,
   destructive: rigid,
-  swipeThreshold: soft,
+  swipeThreshold: () =>
+    impact(
+      Haptics.ImpactFeedbackStyle.Soft,
+      {
+        preferred: Haptics.AndroidHaptics.Gesture_Start,
+        minimumApiLevel: 30,
+        fallback: Haptics.AndroidHaptics.Context_Click,
+      }
+    ),
   longPressActivate: () =>
     impact(
       Haptics.ImpactFeedbackStyle.Rigid,

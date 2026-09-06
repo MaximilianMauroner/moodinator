@@ -12,7 +12,7 @@ export default defineConfig({
   test: {
     environment: "node",
     globals: true,
-    include: ["__tests__/**/*.test.ts"],
+    include: ["__tests__/**/*.test.{ts,tsx}"],
     setupFiles: ["./__tests__/setup.ts"],
     pool: "forks",
   },

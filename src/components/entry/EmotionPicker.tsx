@@ -8,6 +8,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
 import { useThemeColors } from "@/constants/colors";
+import { haptics } from "@/lib/haptics";
 import type { Emotion } from "@db/types";
 
 interface EmotionPickerProps {
@@ -77,7 +78,8 @@ const EmotionChip: React.FC<EmotionChipProps> = ({
                     scale.value = withSpring(1, { damping: 18, stiffness: 380 });
                 }}
                 disabled={disabled}
-                className="px-3 py-2 rounded-xl"
+                testID={`emotion-option-${emotion.name}`}
+                className="min-h-12 min-w-12 justify-center px-3 py-2 rounded-xl"
                 style={{
                     backgroundColor: bgColor,
                     // Keep layout stable: borderWidth must NOT change on select.
@@ -142,7 +144,8 @@ const SelectedChip: React.FC<{
         <Animated.View style={selectedChipAnimatedStyle}>
             <Pressable
                 onPress={onRemove}
-                className="flex-row items-center px-2.5 py-1.5 rounded-full gap-1"
+                testID={`emotion-remove-${emotion.name}`}
+                className="min-h-12 min-w-12 flex-row items-center justify-center px-2.5 py-1.5 rounded-full gap-1"
                 style={{ backgroundColor: bgColor }}
                 accessibilityRole="button"
                 accessibilityLabel={`Remove ${emotion.name}`}
@@ -200,8 +203,10 @@ export const EmotionPicker: React.FC<EmotionPickerProps> = ({
         (emotion: Emotion) => {
             const isSelected = selectedNames.has(emotion.name);
             if (isSelected) {
+                haptics.selection();
                 onChange(selected.filter((e) => e.name !== emotion.name));
             } else if (!atLimit) {
+                haptics.selection();
                 onChange([...selected, emotion]);
             }
         },
@@ -251,7 +256,7 @@ export const EmotionPicker: React.FC<EmotionPickerProps> = ({
                     style={
                         reserveSummarySpace
                             ? {
-                                  minHeight: 54,
+                                  minHeight: 82,
                                   paddingTop: 2,
                                   paddingBottom: 2,
                               }
@@ -305,24 +310,7 @@ export const EmotionPicker: React.FC<EmotionPickerProps> = ({
                         </Animated.View>
                     )}
 
-                    {/* Hint is overlayed in the full picker so it never changes layout. */}
-                    {atLimit && reserveSummarySpace && (
-                        <Animated.Text
-                            entering={FadeIn.duration(160)}
-                            style={{
-                                position: "absolute",
-                                bottom: 0,
-                                left: 0,
-                                right: 0,
-                                fontSize: 12,
-                                color: isDark ? "#9EB894" : "#7A6B55",
-                                fontStyle: "italic",
-                            }}
-                        >
-                            Tap any chip above to swap it out
-                        </Animated.Text>
-                    )}
-                    {atLimit && !reserveSummarySpace && (
+                    {atLimit && (
                         <Animated.Text
                             entering={FadeIn.duration(160)}
                             style={{
@@ -332,7 +320,7 @@ export const EmotionPicker: React.FC<EmotionPickerProps> = ({
                                 marginTop: 2,
                             }}
                         >
-                            Tap a selected chip to swap it out
+                            Tap a selected emotion to remove it
                         </Animated.Text>
                     )}
                 </View>

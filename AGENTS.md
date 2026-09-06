@@ -11,7 +11,7 @@ are not obvious from a quick code search.
 * Use the task tracker as the source of truth for non-trivial issues, roadmap tracking,
   milestones, dependencies, estimates, owners, and task status.
 * No tracked task = user request + repo docs.
-* Read first: `README.md`, `ISSUES.md`, nearby code, tests, and scripts.
+* Read first: `README.md`, nearby code, tests, and scripts.
 * Keep repo docs for durable product context and sequencing guardrails, not as
   the live issue tracker or milestone board.
 

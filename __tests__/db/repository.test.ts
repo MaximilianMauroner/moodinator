@@ -2,24 +2,10 @@ import { vi } from "vitest";
 
 /**
  * Tests for database repository functions.
- * These tests use a mock SQLite client to verify CRUD operations.
+ * These tests run production SQL against an in-memory SQLite database.
  */
 
 import { createMockDb } from "./mockClient";
-
-// Mock the database client module
-const mockDb = createMockDb();
-
-vi.mock("../../db/client", () => ({
-  getDb: vi.fn(() => Promise.resolve(mockDb)),
-}));
-
-// Mock emotions functions to avoid circular dependencies
-vi.mock("../../db/moods/emotions", () => ({
-  linkEmotionsToMood: vi.fn(),
-  deleteEmotion: vi.fn(),
-  upsertEmotionCategory: vi.fn(),
-}));
 
 // Import after mocking
 import {
@@ -38,6 +24,23 @@ import {
 } from "../../db/moods/repository";
 import { linkEmotionsToMood } from "../../db/moods/emotions";
 import { toMoodEntry } from "../../db/moods/serialization";
+
+// Mock the database client module
+const mockDb = createMockDb();
+
+vi.mock("../../db/client", () => ({
+  getDb: vi.fn(() => Promise.resolve(mockDb)),
+}));
+
+// Keep real emotion SQL, with spies for orchestration assertions and failures.
+vi.mock("../../db/moods/emotions", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../db/moods/emotions")>();
+  return {
+    ...actual,
+    linkEmotionsToMood: vi.fn(actual.linkEmotionsToMood),
+    upsertEmotionCategory: vi.fn(actual.upsertEmotionCategory),
+  };
+});
 
 describe("Repository", () => {
   beforeEach(() => {
@@ -409,5 +412,88 @@ describe("Repository", () => {
       const result = await hasMoodBeenLoggedToday();
       expect(result).toBe(true);
     });
+  });
+});
+
+describe("SQLite query and transaction behavior", () => {
+  beforeEach(() => mockDb.__reset());
+
+  it("returns no latest entry for an empty database", async () => {
+    const { getLatestMood } = await import("../../db/moods/repository");
+    expect(await getLatestMood()).toBeNull();
+  });
+
+  it("returns the newest entry and breaks timestamp ties by ID with one bounded query", async () => {
+    const { getLatestMood } = await import("../../db/moods/repository");
+    mockDb.__addMood({ timestamp: 300 });
+    const newest = mockDb.__addMood({ timestamp: 300, mood: 2 });
+    mockDb.__addMood({ timestamp: 100 });
+    mockDb.getFirstAsync.mockClear();
+    mockDb.getAllAsync.mockClear();
+    expect(await getLatestMood()).toMatchObject({ id: newest.id, mood: 2, timestamp: 300 });
+    expect(mockDb.getFirstAsync).toHaveBeenCalledExactlyOnceWith(
+      "SELECT * FROM moods ORDER BY timestamp DESC, id DESC LIMIT 1;"
+    );
+    expect(mockDb.getAllAsync).not.toHaveBeenCalled();
+  });
+
+  it("returns ascending entries within each calendar day and excludes the next month", async () => {
+    const { getMoodsByMonth } = await import("../../db/moods/repository");
+    const late = mockDb.__addMood({ timestamp: new Date(2024, 0, 3, 18).getTime() });
+    const early = mockDb.__addMood({ timestamp: new Date(2024, 0, 3, 8).getTime() });
+    mockDb.__addMood({ timestamp: new Date(2024, 1, 1).getTime() });
+    const result = await getMoodsByMonth(2024, 0);
+    expect([...result.keys()]).toEqual([3]);
+    expect(result.get(3)?.map((entry) => entry.id)).toEqual([early.id, late.id]);
+  });
+
+  it("applies pagination in SQLite and reports the final page", async () => {
+    const { getMoodsPaginated } = await import("../../db/moods/repository");
+    for (const timestamp of [100, 300, 200]) mockDb.__addMood({ timestamp });
+    const result = await getMoodsPaginated({ limit: 2, offset: 1 });
+    expect(result.data.map((entry) => entry.timestamp)).toEqual([200, 100]);
+    expect(result.total).toBe(3);
+    expect(result.hasMore).toBe(false);
+  });
+
+  it("rolls back a mood and its emotion writes after a link constraint failure", async () => {
+    await mockDb.execAsync(`CREATE TEMP TRIGGER reject_link BEFORE INSERT ON mood_emotions BEGIN SELECT RAISE(ABORT, 'injected link failure'); END;`);
+    try {
+      await expect(insertMoodEntry({ mood: 4, emotions: [{ name: "Hopeful", category: "positive" }] })).rejects.toThrow("injected link failure");
+      expect(mockDb.__getMoods()).toEqual([]);
+      expect(mockDb.__getEmotions()).toEqual([]);
+      expect(mockDb.__getMoodEmotions()).toEqual([]);
+    } finally {
+      await mockDb.execAsync("DROP TRIGGER reject_link;");
+    }
+  });
+
+  it("restores mood fields and old emotion links when an update fails", async () => {
+    const original = await insertMoodEntry({ mood: 2, emotions: [{ name: "Calm", category: "positive" }] });
+    const before = { moods: mockDb.__getMoods(), emotions: mockDb.__getEmotions(), links: mockDb.__getMoodEmotions() };
+    await mockDb.execAsync(`CREATE TEMP TRIGGER reject_update_link BEFORE INSERT ON mood_emotions BEGIN SELECT RAISE(ABORT, 'injected update failure'); END;`);
+    try {
+      await expect(updateMoodEntry(original.id, { mood: 8, emotions: [{ name: "Sad", category: "negative" }] })).rejects.toThrow("injected update failure");
+      expect(mockDb.__getMoods()).toEqual(before.moods);
+      expect(mockDb.__getEmotions()).toEqual(before.emotions);
+      expect(mockDb.__getMoodEmotions()).toEqual(before.links);
+    } finally {
+      await mockDb.execAsync("DROP TRIGGER reject_update_link;");
+    }
+  });
+
+  it("enforces declared foreign keys and cascades when foreign keys are enabled", async () => {
+    await mockDb.execAsync("PRAGMA foreign_keys = ON;");
+    try {
+      const mood = mockDb.__addMood({});
+      const emotion = mockDb.__addEmotion({ name: "Calm", category: "positive" });
+      mockDb.__addMoodEmotion(mood.id, emotion.id);
+      await expect(mockDb.runAsync("INSERT INTO mood_emotions VALUES (?, ?)", mood.id + 1, emotion.id)).rejects.toThrow(/FOREIGN KEY/);
+      await deleteMood(mood.id);
+      expect(mockDb.__getMoodEmotions()).toEqual([]);
+      expect(mockDb.__getEmotions()).toHaveLength(1);
+    } finally {
+      await mockDb.execAsync("PRAGMA foreign_keys = OFF;");
+    }
   });
 });
