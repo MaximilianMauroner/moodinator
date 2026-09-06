@@ -1136,6 +1136,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                 }}
                                 cursorColor={get("primary")}
                                 selectionColor={isDark ? "rgba(166, 227, 155, 0.32)" : "rgba(91, 138, 91, 0.24)"}
+                                testID="entry-notes"
                                 accessibilityLabel="Notes input"
                                 accessibilityHint={notesPlaceholder}
                             />

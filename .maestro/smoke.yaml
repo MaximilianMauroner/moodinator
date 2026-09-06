@@ -1,0 +1,88 @@
+appId: com.lab4code.moodinator.qa
+name: Isolated Android entry lifecycle
+---
+# Destructive only to the separately installed QA app. Use bun run qa:smoke.
+- launchApp:
+    clearState: true
+- runFlow: flows/onboarding.yaml
+- longPressOn: "Mood Rating 5 of 10, Neutral. Lower numbers are better."
+- assertVisible: "What emotions are present?"
+- scrollUntilVisible:
+    element:
+      id: "emotion-option-Happy"
+    direction: DOWN
+- tapOn:
+    id: "emotion-option-Happy"
+- tapOn: "Next step"
+- assertVisible: "Any more context?"
+- scrollUntilVisible:
+    element:
+      id: "energy-level-5"
+    direction: DOWN
+- tapOn:
+    id: "energy-level-5"
+- scrollUntilVisible:
+    element:
+      id: "entry-notes"
+    direction: DOWN
+- tapOn:
+    id: "entry-notes"
+- inputText: "QA smoke original note"
+- hideKeyboard
+- tapOn: "Save entry"
+- assertVisible:
+    id: "mood-entry-actions-.*"
+- stopApp
+- launchApp:
+    clearState: false
+# Reopen the stored record. These checks verify fields after process restart.
+- tapOn:
+    id: "mood-entry-actions-.*"
+- tapOn: "Edit entry"
+- assertVisible: "How are you feeling?"
+- tapOn: "Next step"
+- assertVisible:
+    id: "emotion-remove-Happy"
+- tapOn: "Next step"
+- scrollUntilVisible:
+    element:
+      text: "Moderate · 5/10"
+    direction: DOWN
+- scrollUntilVisible:
+    element:
+      id: "entry-notes"
+    direction: DOWN
+- assertVisible:
+    id: "entry-notes"
+    text: "QA smoke original note"
+- tapOn:
+    id: "entry-notes"
+- eraseText
+- inputText: "QA smoke edited note"
+- hideKeyboard
+- tapOn: "Save entry"
+- tapOn:
+    id: "mood-entry-actions-.*"
+- tapOn: "Edit entry"
+- tapOn: "Next step"
+- tapOn: "Next step"
+- scrollUntilVisible:
+    element:
+      id: "entry-notes"
+    direction: DOWN
+- assertVisible:
+    id: "entry-notes"
+    text: "QA smoke edited note"
+- tapOn: "Save entry"
+- tapOn:
+    id: "mood-entry-actions-.*"
+- tapOn: "Delete entry"
+- assertNotVisible:
+    id: "mood-entry-actions-.*"
+- tapOn: "Undo delete"
+- assertVisible:
+    id: "mood-entry-actions-.*"
+- tapOn: "Insights tab, view mood charts and analytics"
+- assertVisible: "Patterns across 1 entry"
+- tapOn: "Refresh insights"
+- assertVisible: "Patterns across 1 entry"

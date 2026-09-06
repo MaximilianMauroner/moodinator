@@ -1,105 +1,51 @@
 import { vi } from "vitest";
+import { createMockDb } from "./mockClient";
 
-vi.mock("../../db/client", () => ({
-  getDb: vi.fn(),
-}));
-
+import { createMoodTable } from "../../db/moods/schema";
 import { backfillMoodScaleJson } from "../../db/moods/migrations";
-import {
-  CURRENT_MOOD_SCALE_SNAPSHOT,
-  serializeMoodScale,
-} from "../../db/moods/serialization";
+import { CURRENT_MOOD_SCALE_SNAPSHOT, serializeMoodScale } from "../../db/moods/serialization";
 
-type FixtureRow = {
-  id: number;
-  mood_scale_json: string | null;
-};
+const fixture = createMockDb();
+vi.mock("../../db/client", () => ({ getDb: vi.fn(() => Promise.resolve(fixture)) }));
 
-function createFixtureDb(initial: FixtureRow[]) {
-  const rows: FixtureRow[] = initial.map((r) => ({ ...r }));
-  const runAsync = vi.fn(async (sql: string, ...params: unknown[]) => {
-    if (
-      sql.includes("UPDATE moods SET mood_scale_json") &&
-      sql.includes("IS NULL OR mood_scale_json = ''")
-    ) {
-      const value = params[0] as string;
-      let changes = 0;
-      for (const row of rows) {
-        if (row.mood_scale_json === null || row.mood_scale_json === "") {
-          row.mood_scale_json = value;
-          changes++;
-        }
-      }
-      return { changes, lastInsertRowId: 0 };
-    }
-    return { changes: 0, lastInsertRowId: 0 };
-  });
+describe("backfillMoodScaleJson with SQLite", () => {
+  beforeEach(() => fixture.__reset());
 
-  return {
-    runAsync,
-    rows,
-  };
-}
+  it("backfills NULL and empty scales, preserves saved scales, and is idempotent", async () => {
+    const preset = JSON.stringify({ version: 1, min: 0, max: 5, lowerIsBetter: false });
+    fixture.__addMood({ mood_scale_json: null });
+    fixture.__addMood({ mood_scale_json: "" });
+    fixture.__addMood({ mood_scale_json: preset });
 
-describe("backfillMoodScaleJson", () => {
-  it("sets the current scale on rows with NULL mood_scale_json", async () => {
-    const fixture = createFixtureDb([
-      { id: 1, mood_scale_json: null },
-      { id: 2, mood_scale_json: null },
-    ]);
-
-    const result = await backfillMoodScaleJson(fixture as never);
-
+    expect(await backfillMoodScaleJson(fixture.database)).toEqual({ backfilled: 2 });
     const expected = serializeMoodScale(CURRENT_MOOD_SCALE_SNAPSHOT);
-    expect(result.backfilled).toBe(2);
-    expect(fixture.rows.map((r) => r.mood_scale_json)).toEqual([
-      expected,
-      expected,
-    ]);
+    expect(fixture.__getMoods().map((row) => row.mood_scale_json)).toEqual([expected, expected, preset]);
+    expect(await backfillMoodScaleJson(fixture.database)).toEqual({ backfilled: 0 });
   });
+});
 
-  it("leaves already-set rows untouched", async () => {
-    const preset = JSON.stringify({
-      version: 1,
-      min: 0,
-      max: 5,
-      lowerIsBetter: false,
-    });
-    const fixture = createFixtureDb([
-      { id: 1, mood_scale_json: preset },
-      { id: 2, mood_scale_json: null },
-    ]);
-
-    const result = await backfillMoodScaleJson(fixture as never);
-
-    expect(result.backfilled).toBe(1);
-    expect(fixture.rows[0].mood_scale_json).toBe(preset);
-    expect(fixture.rows[1].mood_scale_json).toBe(
-      serializeMoodScale(CURRENT_MOOD_SCALE_SNAPSHOT)
-    );
-  });
-
-  it("is a no-op when every row already has a scale", async () => {
-    const preset = serializeMoodScale(CURRENT_MOOD_SCALE_SNAPSHOT);
-    const fixture = createFixtureDb([
-      { id: 1, mood_scale_json: preset },
-      { id: 2, mood_scale_json: preset },
-    ]);
-
-    const result = await backfillMoodScaleJson(fixture as never);
-
-    expect(result.backfilled).toBe(0);
-    expect(fixture.rows.every((r) => r.mood_scale_json === preset)).toBe(true);
-  });
-
-  it("treats empty-string mood_scale_json the same as NULL", async () => {
-    const fixture = createFixtureDb([{ id: 1, mood_scale_json: "" }]);
-
-    const result = await backfillMoodScaleJson(fixture as never);
-
-    expect(result.backfilled).toBe(1);
-    expect(fixture.rows[0].mood_scale_json).toBe(
-      serializeMoodScale(CURRENT_MOOD_SCALE_SNAPSHOT)
-    );
+describe("schema upgrade with SQLite", () => {
+  it("upgrades an old mood table without losing entries and can run twice", async () => {
+    await fixture.execAsync(`
+      DROP TABLE mood_emotions;
+      DROP TABLE emotions;
+      DROP TABLE moods;
+      CREATE TABLE moods (id INTEGER PRIMARY KEY AUTOINCREMENT, mood INTEGER NOT NULL, note TEXT, timestamp DATETIME);
+      INSERT INTO moods (mood, note, timestamp) VALUES (3, 'legacy entry', 1000);
+    `);
+    await createMoodTable(fixture.database);
+    await createMoodTable(fixture.database);
+    await backfillMoodScaleJson(fixture.database);
+    expect(fixture.__getMoods()).toEqual([expect.objectContaining({
+      id: 1, mood: 3, note: "legacy entry", timestamp: 1000,
+      emotions: "[]", context_tags: "[]", energy: null,
+      mood_scale_json: serializeMoodScale(CURRENT_MOOD_SCALE_SNAPSHOT),
+      photos_json: "[]", location_json: null, voice_memos_json: "[]", based_on_entry_id: null,
+    })]);
+    const indexes = await fixture.getAllAsync("SELECT name FROM sqlite_master WHERE type = 'index';");
+    expect(indexes.map((index) => index.name)).toEqual(expect.arrayContaining([
+      "idx_moods_timestamp", "idx_mood_emotions_mood_id", "idx_emotions_name", "idx_mood_emotions_emotion_id",
+    ]));
+    expect(await fixture.getAllAsync("PRAGMA foreign_key_check;")).toEqual([]);
   });
 });

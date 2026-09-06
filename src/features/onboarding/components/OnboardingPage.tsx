@@ -3,11 +3,7 @@ import { ScrollView, View, Text, useWindowDimensions } from "react-native";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
-  withRepeat,
-  withSequence,
   withTiming,
-  withDelay,
-  Easing,
 } from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
 import { useThemeColors } from "@/constants/colors";
@@ -25,40 +21,16 @@ export function OnboardingPage({ page, isActive, reduceMotion = false }: Onboard
   const compact = height < 700;
   const accentColor = isDark ? page.accentColorDark : page.accentColor;
 
-  // Float animation for the icon
-  const translateY = useSharedValue(0);
   const scale = useSharedValue(1);
 
   useEffect(() => {
-    if (reduceMotion) {
-      translateY.value = 0;
-      scale.value = 1;
-    } else if (isActive) {
-      translateY.value = withDelay(
-        300,
-        withRepeat(
-          withSequence(
-            withTiming(-10, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
-            withTiming(0, { duration: 2000, easing: Easing.inOut(Easing.ease) })
-          ),
-          -1,
-          true
-        )
-      );
-      scale.value = withDelay(
-        300,
-        withTiming(1, { duration: 500 })
-      );
-    } else {
-      scale.value = withTiming(0.9, { duration: 200 });
-    }
-  }, [isActive, reduceMotion, translateY, scale]);
+    scale.value = reduceMotion
+      ? 1
+      : withTiming(isActive ? 1 : 0.9, { duration: 200 });
+  }, [isActive, reduceMotion, scale]);
 
   const iconAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateY: translateY.value },
-      { scale: scale.value },
-    ],
+    transform: [{ scale: scale.value }],
   }));
 
   return (

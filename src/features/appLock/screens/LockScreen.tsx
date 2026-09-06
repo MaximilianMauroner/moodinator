@@ -9,13 +9,6 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withRepeat,
-  withSequence,
-  withTiming,
-} from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useThemeColors } from "@/constants/colors";
@@ -38,7 +31,6 @@ export function LockScreen() {
   const [showPinPad, setShowPinPad] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [isSubmittingPin, setIsSubmittingPin] = useState(false);
-  const [reduceMotion, setReduceMotion] = useState(false);
   const [lockoutNow, setLockoutNow] = useState(() => Date.now());
   const isAuthenticatingRef = useRef(false);
   const hasAutoPromptedRef = useRef(false);
@@ -80,27 +72,6 @@ export function LockScreen() {
     const interval = setInterval(() => setLockoutNow(Date.now()), 1000);
     return () => clearInterval(interval);
   }, [isPinLockedOut]);
-
-  const iconScale = useSharedValue(1);
-  useEffect(() => {
-    void AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion);
-    const subscription = AccessibilityInfo.addEventListener("reduceMotionChanged", setReduceMotion);
-    return () => subscription.remove();
-  }, []);
-
-  useEffect(() => {
-    iconScale.value = reduceMotion
-      ? 1
-      : withRepeat(
-          withSequence(withTiming(1.02, { duration: 2000 }), withTiming(1, { duration: 2000 })),
-          -1,
-          true
-        );
-  }, [iconScale, reduceMotion]);
-
-  const iconAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: iconScale.value }],
-  }));
 
   const finalizeSuccessfulAuth = useCallback(() => {
     unlock();
@@ -224,7 +195,7 @@ export function LockScreen() {
         >
           {!showPinPad ? (
             <View className="items-center">
-              <Animated.View style={iconAnimatedStyle}>
+              <View>
                 <View
                   className="w-24 h-24 rounded-3xl items-center justify-center mb-6"
                   style={{
@@ -238,7 +209,7 @@ export function LockScreen() {
                 >
                   <Ionicons name="leaf-outline" size={48} color={isDark ? "#A8C5A8" : "#5B8A5B"} />
                 </View>
-              </Animated.View>
+              </View>
               <Text accessibilityRole="header" className="text-2xl font-bold mb-2" style={{ color: get("text") }}>
                 Moodinator is locked
               </Text>
