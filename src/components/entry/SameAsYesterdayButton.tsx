@@ -88,7 +88,6 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
   };
 
   const handlePress = async () => {
-    haptics.light();
     setLoading(true);
     setNoEntry(false);
 
@@ -96,8 +95,8 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
       const lastEntry = await fetchLastEntry();
 
       if (lastEntry) {
-        haptics.success();
         onCopy(lastEntry);
+        haptics.success();
       } else {
         setNoEntry(true);
         haptics.warning();

@@ -411,6 +411,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     );
 
     const toggleContext = useCallback((value: string) => {
+        haptics.selection();
         setContextTags((prev) =>
             prev.includes(value)
                 ? prev.filter((item) => item !== value)
@@ -713,6 +714,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                     <Pressable
                         key={category}
                         onPress={() => {
+                            if (category === newEmotionCategory) return;
                             setNewEmotionCategory(category);
                             haptics.selection();
                         }}

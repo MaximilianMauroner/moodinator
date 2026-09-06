@@ -18,11 +18,6 @@ export function getHapticsEnabled(): boolean {
   return hapticsEnabled;
 }
 
-type NativeFeedback = {
-  android: AndroidFeedback;
-  ios: () => Promise<void>;
-};
-
 type AndroidFeedback =
   | Haptics.AndroidHaptics
   | {
@@ -63,18 +58,11 @@ function performAndroid(feedback: AndroidFeedback): Promise<void> {
   });
 }
 
-function perform({ android, ios }: NativeFeedback): void {
-  if (!hapticsEnabled) return;
+function perform(feedback: () => Promise<void>): void {
+  if (!hapticsEnabled || (Platform.OS !== "android" && Platform.OS !== "ios")) return;
 
   try {
-    const feedback =
-      Platform.OS === "android"
-        ? performAndroid(android)
-        : Platform.OS === "ios"
-          ? ios()
-          : null;
-
-    void feedback?.catch(() => {
+    void feedback().catch(() => {
       // Haptics are an enhancement and should never interrupt an interaction.
     });
   } catch {
@@ -83,34 +71,27 @@ function perform({ android, ios }: NativeFeedback): void {
 }
 
 function selection(): void {
-  perform({
-    android: {
-      preferred: Haptics.AndroidHaptics.Gesture_End,
-      minimumApiLevel: 30,
-      fallback: Haptics.AndroidHaptics.Context_Click,
-    },
-    ios: Haptics.selectionAsync,
-  });
+  // Android's view-based feedback targets the activity behind a native Modal.
+  // Expo selection uses the vibrator directly without depending on that view.
+  perform(Haptics.selectionAsync);
 }
 
 function impact(
   iosStyle: Haptics.ImpactFeedbackStyle,
   androidType: AndroidFeedback
 ): void {
-  perform({
-    android: androidType,
-    ios: () => Haptics.impactAsync(iosStyle),
-  });
+  perform(() => Platform.OS === "android"
+    ? performAndroid(androidType)
+    : Haptics.impactAsync(iosStyle));
 }
 
 function notification(
   iosType: Haptics.NotificationFeedbackType,
   androidType: AndroidFeedback
 ): void {
-  perform({
-    android: androidType,
-    ios: () => Haptics.notificationAsync(iosType),
-  });
+  perform(() => Platform.OS === "android"
+    ? performAndroid(androidType)
+    : Haptics.notificationAsync(iosType));
 }
 
 const light = () =>
@@ -127,19 +108,9 @@ const medium = () =>
       fallback: Haptics.AndroidHaptics.Long_Press,
     }
   );
-const heavy = () =>
-  impact(
-    Haptics.ImpactFeedbackStyle.Heavy,
-    Haptics.AndroidHaptics.Long_Press
-  );
 const rigid = () =>
   impact(
     Haptics.ImpactFeedbackStyle.Rigid,
-    Haptics.AndroidHaptics.Context_Click
-  );
-const soft = () =>
-  impact(
-    Haptics.ImpactFeedbackStyle.Soft,
     Haptics.AndroidHaptics.Context_Click
   );
 const success = () =>
@@ -175,9 +146,6 @@ export const haptics = {
   selection,
   light,
   medium,
-  heavy,
-  rigid,
-  soft,
   success,
   warning,
   error,

@@ -44,8 +44,11 @@ failures. Use fabricated data only.
 | Area | Check | Expected result |
 | --- | --- | --- |
 | Emotion feedback | Select three emotions, try a fourth, remove one from the summary, then select another. | One short event per valid change. No event or state change for the blocked fourth selection. |
+| Context feedback | In Quick, Detailed, and Edit Entry with context enabled, select and deselect a context tag. Cancel a press by dragging off the chip. | One short event per accepted change. No event for a canceled press. |
 | Energy feedback | Select 0, select 10, tap the selected level, then set and clear energy. | Zero is retained as a value. Tapping the selected level and Clear both remove it. One short event per change. |
-| Preference | Turn haptics off in Settings. Repeat emotion, energy, save, and navigation actions. Restart and repeat. | Fields still work. App feedback remains silent after restart. |
+| Preference | Turn haptics off in Settings. Repeat emotion, context, energy, save, and navigation actions. Restart and repeat. | Fields still work. App feedback remains silent after restart. |
+| Android modal feedback | Record the device, API level, build revision, and app/system vibration settings. Compare selection feedback on Home and in each entry modal. Toggle the system touch-feedback setting and repeat. | Selection remains brief in modals. Record system-setting behavior: Expo selection uses the vibrator service, so it is not equivalent to Android view feedback. The in-app off setting must always silence it. |
+| Restrained feedback | Select the current emotion category again, then change it. Copy the previous entry once. | No event for an unchanged category. One result event after copying, without an initial buzz. |
 | Device feedback | Repeat on a real Android device and, when available, an iPhone. | Feedback is brief and consistent. Emulator silence is not evidence of physical feedback quality. |
 | Touch | Use a narrow screen and large system text. Tap the edges of emotion chips, summary chips, each energy level, Clear, and Refresh. | Controls remain separate and reachable. Labels do not overlap. Energy wraps in numeric order. |
 | Keyboard | Open detailed entry, focus notes, type several lines, hide the keyboard, move back, then save. | Notes and footer remain reachable. The first Back action dismisses the keyboard where applicable. |

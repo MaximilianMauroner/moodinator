@@ -189,6 +189,7 @@ function EmotionModal({
                   <Pressable
                     key={cat}
                     onPress={() => {
+                      if (isSelected) return;
                       haptics.light();
                       setCategory(cat);
                     }}
