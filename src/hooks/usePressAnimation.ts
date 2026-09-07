@@ -20,23 +20,29 @@ const DEFAULT_PRESSED_SCALE = 0.97;
 export function usePressAnimation(pressedScale: number = DEFAULT_PRESSED_SCALE) {
   const reducedMotion = useReducedMotion();
   const scale = useSharedValue(1);
+  const opacity = useSharedValue(1);
 
   const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
     transform: [{ scale: scale.value }],
   }));
 
   const onPressIn = useCallback(() => {
-    if (reducedMotion) return;
+    if (reducedMotion) {
+      opacity.value = 0.72;
+      return;
+    }
     scale.value = withSpring(pressedScale, springs.snap);
-  }, [pressedScale, reducedMotion, scale]);
+  }, [opacity, pressedScale, reducedMotion, scale]);
 
   const onPressOut = useCallback(() => {
     if (reducedMotion) {
+      opacity.value = 1;
       scale.value = 1;
       return;
     }
     scale.value = withSpring(1, springs.snap);
-  }, [reducedMotion, scale]);
+  }, [opacity, reducedMotion, scale]);
 
   return { animatedStyle, onPressIn, onPressOut };
 }
