@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { AccessibilityInfo } from "react-native";
+import { useReducedMotion as useSystemReducedMotion } from "react-native-reanimated";
 
 /**
  * Tracks the platform "reduce motion" accessibility setting.
@@ -9,7 +10,11 @@ import { AccessibilityInfo } from "react-native";
  * not gated on this: they are a separate preference, held in the settings store.
  */
 export function useReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(false);
+  // Reanimated exposes the native value captured during app startup, which
+  // avoids an accessibility-violating motion-enabled first render while the
+  // asynchronous React Native query is still pending.
+  const systemReduced = useSystemReducedMotion();
+  const [reduced, setReduced] = useState(systemReduced);
 
   useEffect(() => {
     let active = true;

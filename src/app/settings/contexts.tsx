@@ -169,8 +169,8 @@ export default function ContextsSettingsScreen() {
       }
       if (!result.ok) return;
 
-      haptics.commit();
       await setContexts(result.values);
+      haptics.commit();
       setIsAddModalVisible(false);
     },
     [presetModel, setContexts]

@@ -25,9 +25,18 @@ export function useCountUp(value: number, decimals: number = 0): number {
   const reducedMotion = useReducedMotion();
   const [animated, setAnimated] = useState(0);
   const frameRef = useRef<number | null>(null);
+  const inputRef = useRef({ decimals, value });
+  const inputChanged =
+    inputRef.current.value !== value || inputRef.current.decimals !== decimals;
+
+  if (inputChanged) {
+    inputRef.current = { decimals, value };
+  }
 
   useEffect(() => {
     if (reducedMotion) return;
+
+    setAnimated(0);
 
     const factor = 10 ** decimals;
     let startedAt: number | null = null;
@@ -58,7 +67,7 @@ export function useCountUp(value: number, decimals: number = 0): number {
     };
   }, [decimals, reducedMotion, value]);
 
-  return reducedMotion ? value : animated;
+  return reducedMotion ? value : inputChanged ? 0 : animated;
 }
 
 export default useCountUp;

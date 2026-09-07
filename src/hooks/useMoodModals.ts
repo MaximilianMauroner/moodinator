@@ -1,13 +1,12 @@
 import { useState, useCallback, useMemo } from "react";
 import type { MoodEntry } from "@db/types";
-import { haptics } from "@/lib/haptics";
 
 /**
  * Hook for managing modal visibility and related state.
  * Handles quick entry, detailed entry, editing, and date picker modals.
  *
- * Opening feedback lives here rather than in each selector, so the compact,
- * detailed and collapsed grids all fire exactly one event per press.
+ * Mood selectors own their press feedback, so opening a modal does not add a
+ * second haptic for the same gesture.
  */
 export function useMoodModals() {
   const [showDateModal, setShowDateModal] = useState(false);
@@ -18,13 +17,11 @@ export function useMoodModals() {
   const [editingEntry, setEditingEntry] = useState<MoodEntry | null>(null);
 
   const handleMoodPress = useCallback((mood: number) => {
-    haptics.tap();
     setPendingMood(mood);
     setQuickEntryVisible(true);
   }, []);
 
   const handleLongPress = useCallback((mood: number) => {
-    haptics.tap();
     setPendingMood(mood);
     setDetailedEntryVisible(true);
   }, []);
