@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { View, Text, Pressable } from "react-native";
+import { View, Text, Pressable, ScrollView } from "react-native";
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
@@ -66,7 +66,7 @@ const EnergySegment: React.FC<{
                 scaleY.value = withSpring(isSelected ? 1.15 : 1, { damping: 14, stiffness: 380 });
             }}
             testID={`energy-level-${index}`}
-            style={{ minHeight: 48, flex: 1, justifyContent: "center" }}
+            style={{ width: 48, minHeight: 48, justifyContent: "center" }}
             accessibilityRole="button"
             accessibilityLabel={`Energy level ${index}: ${ENERGY_LABELS[index]}`}
             accessibilityState={{ selected: isSelected }}
@@ -111,7 +111,12 @@ export const EnergySlider: React.FC<EnergySliderProps> = ({ value, onChange }) =
     return (
         <View>
             {/* Segmented bar */}
-            <View className="flex-row gap-1 mb-2">
+            <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerClassName="flex-row gap-1"
+                className="mb-2"
+            >
                 {Array.from({ length: 11 }, (_, i) => (
                     <EnergySegment
                         key={i}
@@ -127,7 +132,7 @@ export const EnergySlider: React.FC<EnergySliderProps> = ({ value, onChange }) =
                         }}
                     />
                 ))}
-            </View>
+            </ScrollView>
 
             {/* Scale labels + current value */}
             <View className="flex-row items-center justify-between px-0.5 mb-2">

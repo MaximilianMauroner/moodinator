@@ -9,12 +9,13 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { getMoodRatingDisplay } from "@/constants/moodScaleInterpretation";
 import { useThemeColors, colors } from "@/constants/colors";
 import { haptics } from "@/lib/haptics";
+import { Alert } from "@/components/ui/AppAlert";
 
 interface Props {
   visible: boolean;
   mood: MoodEntry | null;
   onClose: () => void;
-  onSave: (moodId: number, newTimestamp: number) => void;
+  onSave: (moodId: number, newTimestamp: number) => Promise<void> | void;
   onEdit?: (mood: MoodEntry) => void;
 }
 
@@ -74,12 +75,17 @@ export const DateTimePickerModal: React.FC<Props> = ({
     }
   };
 
-  const handleSave = () => {
-    haptics.commit();
-    if (mood) {
-      onSave(mood.id, selectedDate.getTime());
+  const handleSave = async () => {
+    if (!mood) return;
+
+    try {
+      await onSave(mood.id, selectedDate.getTime());
+      haptics.commit();
+      onClose();
+    } catch {
+      haptics.reject();
+      Alert.alert("Error", "Could not update this entry's date and time.");
     }
-    onClose();
   };
 
   const handleCancel = () => {

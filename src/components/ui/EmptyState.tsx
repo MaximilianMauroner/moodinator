@@ -122,6 +122,7 @@ export function EmptyState({
 
           {actionLabel && onAction && (
             <Pressable
+              className="mt-6"
               onPress={onAction}
               onPressIn={press.onPressIn}
               onPressOut={press.onPressOut}
@@ -129,7 +130,7 @@ export function EmptyState({
               accessibilityLabel={actionLabel}
             >
               <Animated.View
-                className="mt-6 px-6 rounded-2xl items-center justify-center"
+                className="px-6 rounded-2xl items-center justify-center"
                 style={[
                   {
                     backgroundColor: get("primary"),

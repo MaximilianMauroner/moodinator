@@ -13,6 +13,7 @@ export const ToggleRow = memo(function ToggleRow({
   onChange,
   isLast,
   icon,
+  feedback = "tick",
 }: {
   title: string;
   description?: string;
@@ -20,6 +21,7 @@ export const ToggleRow = memo(function ToggleRow({
   onChange: (v: boolean) => void;
   isLast?: boolean;
   icon?: keyof typeof Ionicons.glyphMap;
+  feedback?: "tap" | "tick";
 }) {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === "dark";
@@ -28,9 +30,9 @@ export const ToggleRow = memo(function ToggleRow({
   const handleValueChange = useCallback(
     (next: boolean) => {
       onChange(next);
-      haptics.tick();
+      haptics[feedback]();
     },
-    [onChange]
+    [feedback, onChange]
   );
 
   return (
