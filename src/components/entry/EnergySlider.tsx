@@ -122,7 +122,7 @@ export const EnergySlider: React.FC<EnergySliderProps> = ({ value, onChange }) =
                         emptyColorLight="rgba(229, 217, 191, 0.25)"
                         isDark={isDark}
                         onPress={() => {
-                            haptics.selection();
+                            haptics.tick();
                             onChange(value === i ? null : i);
                         }}
                     />
@@ -185,7 +185,7 @@ export const EnergySlider: React.FC<EnergySliderProps> = ({ value, onChange }) =
                     <Pressable
                         testID="energy-clear"
                         onPress={() => {
-                            haptics.selection();
+                            haptics.tick();
                             onChange(null);
                         }}
                         className="min-h-12 min-w-12 justify-center self-center px-4 py-1.5 rounded-full"

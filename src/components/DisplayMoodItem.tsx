@@ -179,7 +179,7 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
         swipeActionPendingRef.current = true;
 
         if (direction === "left") {
-          haptics.swipeThreshold();
+          haptics.tap();
         }
 
         setTimeout(() => {
@@ -358,7 +358,7 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
                 pressScale.value = withSpring(1, springs.gentle);
               }}
               onLongPress={() => {
-                haptics.swipeThreshold();
+                haptics.tap();
                 onLongPress?.(mood);
               }}
               accessibilityRole="button"

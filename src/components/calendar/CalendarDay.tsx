@@ -23,13 +23,13 @@ export function CalendarDay({
   const { isDark, get } = useThemeColors();
 
   const handlePress = () => {
-    haptics.selection();
+    haptics.tick();
     onPress(day, data);
   };
 
   const handleLongPress = () => {
     if (!onLongPress) return;
-    haptics.longPressActivate();
+    haptics.tap();
     onLongPress(day);
   };
 

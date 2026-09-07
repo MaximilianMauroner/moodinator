@@ -75,7 +75,7 @@ export default function ContextsSettingsScreen() {
 
   const handleToggleDefaultContext = useCallback(
     async (name: string) => {
-      haptics.light();
+      haptics.tick();
       const defaultContext = DEFAULT_CONTEXTS.find(
         (context) => normalizePresetKey(context) === normalizePresetKey(name)
       );
@@ -87,22 +87,22 @@ export default function ContextsSettingsScreen() {
   );
 
   const handleSelectAllDefaults = useCallback(async () => {
-    haptics.light();
+    haptics.tick();
     await setContexts(presetModel.selectAllDefaults());
   }, [presetModel, setContexts]);
 
   const handleClearAllDefaults = useCallback(async () => {
-    haptics.light();
+    haptics.tick();
     await setContexts(presetModel.clearDefaults());
   }, [presetModel, setContexts]);
 
   const handleOpenAddModal = useCallback(() => {
-    haptics.light();
+    haptics.tap();
     setIsAddModalVisible(true);
   }, []);
 
   const handleAddFromHistory = useCallback(async () => {
-    haptics.light();
+    haptics.tap();
 
     try {
       setHistorySyncLoading(true);
@@ -129,7 +129,7 @@ export default function ContextsSettingsScreen() {
                 setHistorySyncLoading(true);
                 const result =
                   await presetSyncService.addMissingFromHistory("contexts");
-                haptics.success();
+                haptics.commit();
                 Alert.alert(
                   "Added from History",
                   result.addedContexts.length > 0
@@ -137,7 +137,7 @@ export default function ContextsSettingsScreen() {
                     : "No new context tags were found."
                 );
               } catch {
-                haptics.error();
+                haptics.reject();
                 Alert.alert("Error", "Could not add context tags from history.");
               } finally {
                 setHistorySyncLoading(false);
@@ -147,7 +147,7 @@ export default function ContextsSettingsScreen() {
         ]
       );
     } catch {
-      haptics.error();
+      haptics.reject();
       setHistorySyncLoading(false);
       Alert.alert("Error", "Could not check your Mood Entry history.");
     }
@@ -169,7 +169,7 @@ export default function ContextsSettingsScreen() {
       }
       if (!result.ok) return;
 
-      haptics.medium();
+      haptics.commit();
       await setContexts(result.values);
       setIsAddModalVisible(false);
     },
@@ -177,7 +177,7 @@ export default function ContextsSettingsScreen() {
   );
 
   const handleRemoveContext = useCallback((name: string) => {
-    haptics.light();
+    haptics.tap();
     setContextPendingRemoval(name);
   }, []);
 
@@ -188,7 +188,7 @@ export default function ContextsSettingsScreen() {
   const handleConfirmRemoveContext = useCallback(async () => {
     if (!contextPendingRemoval) return;
 
-    haptics.destructive();
+    haptics.reject();
     await setContexts(presetModel.removeByLabel(contextPendingRemoval));
     setContextPendingRemoval(null);
   }, [contextPendingRemoval, presetModel, setContexts]);

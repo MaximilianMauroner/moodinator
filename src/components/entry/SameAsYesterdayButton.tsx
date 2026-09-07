@@ -96,21 +96,21 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
 
       if (lastEntry) {
         onCopy(lastEntry);
-        haptics.success();
+        haptics.commit();
       } else {
         setNoEntry(true);
-        haptics.warning();
+        haptics.reject();
         setTimeout(() => setNoEntry(false), 3000);
       }
     } catch {
-      haptics.error();
+      haptics.reject();
     } finally {
       setLoading(false);
     }
   };
 
   const handleLongPress = async () => {
-    haptics.light();
+    haptics.tap();
     setLoading(true);
 
     try {
@@ -124,11 +124,11 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
         cardOpacity.value = withTiming(1, { duration: 220, easing: Easing.out(Easing.cubic) });
       } else {
         setNoEntry(true);
-        haptics.warning();
+        haptics.reject();
         setTimeout(() => setNoEntry(false), 3000);
       }
     } catch {
-      haptics.error();
+      haptics.reject();
     } finally {
       setLoading(false);
     }
@@ -148,7 +148,7 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
 
   const handleUseEntry = () => {
     if (previewEntry) {
-      haptics.success();
+      haptics.commit();
       onCopy(previewEntry);
       handleClosePreview();
     }

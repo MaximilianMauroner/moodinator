@@ -1,8 +1,17 @@
 /**
  * Centralized, semantic haptic feedback.
  *
- * Keep feedback short and native: one system-defined event per interaction.
- * Callers intentionally receive a synchronous, fire-and-forget API.
+ * There are four levels and no more. Intensity carries meaning, so a saved
+ * entry never feels like an opened settings page:
+ *
+ *   tick   — a value moved (selection, toggle, detent, month change)
+ *   tap    — a target accepted the press (navigation, sheet open, threshold)
+ *   commit — data was written (entry saved, undo restored, import finished)
+ *   reject — the action failed or needs care (delete, wrong PIN, crisis entry)
+ *
+ * Callers intentionally receive a synchronous, fire-and-forget API. No screen
+ * should fire more than one event per user action; compound feedback is what
+ * makes an app feel noisy.
  */
 
 import * as Haptics from "expo-haptics";
@@ -70,12 +79,6 @@ function perform(feedback: () => Promise<void>): void {
   }
 }
 
-function selection(): void {
-  // Android's view-based feedback targets the activity behind a native Modal.
-  // Expo selection uses the vibrator directly without depending on that view.
-  perform(Haptics.selectionAsync);
-}
-
 function impact(
   iosStyle: Haptics.ImpactFeedbackStyle,
   androidType: AndroidFeedback
@@ -94,88 +97,41 @@ function notification(
     : Haptics.notificationAsync(iosType));
 }
 
-const light = () =>
-  impact(
-    Haptics.ImpactFeedbackStyle.Light,
-    Haptics.AndroidHaptics.Context_Click
-  );
-const medium = () =>
-  impact(
-    Haptics.ImpactFeedbackStyle.Medium,
-    {
-      preferred: Haptics.AndroidHaptics.Confirm,
-      minimumApiLevel: 30,
-      fallback: Haptics.AndroidHaptics.Long_Press,
-    }
-  );
-const rigid = () =>
-  impact(
-    Haptics.ImpactFeedbackStyle.Rigid,
-    Haptics.AndroidHaptics.Context_Click
-  );
-const success = () =>
-  notification(
-    Haptics.NotificationFeedbackType.Success,
-    {
-      preferred: Haptics.AndroidHaptics.Confirm,
-      minimumApiLevel: 30,
-      fallback: Haptics.AndroidHaptics.Context_Click,
-    }
-  );
-const warning = () =>
-  notification(
-    Haptics.NotificationFeedbackType.Warning,
-    {
-      preferred: Haptics.AndroidHaptics.Reject,
-      minimumApiLevel: 30,
-      fallback: Haptics.AndroidHaptics.Long_Press,
-    }
-  );
-const error = () =>
-  notification(
-    Haptics.NotificationFeedbackType.Error,
-    {
-      preferred: Haptics.AndroidHaptics.Reject,
-      minimumApiLevel: 30,
-      fallback: Haptics.AndroidHaptics.Long_Press,
-    }
-  );
+/**
+ * A value moved: selection change, switch toggle, slider detent, month change.
+ *
+ * Android's view-based feedback targets the activity behind a native Modal.
+ * Expo selection uses the vibrator directly without depending on that view.
+ */
+function tick(): void {
+  perform(Haptics.selectionAsync);
+}
 
-export const haptics = {
-  // Low-level primitives retained for existing interaction call sites.
-  selection,
-  light,
-  medium,
-  success,
-  warning,
-  error,
+/** A target accepted the press: navigation, sheet open, swipe threshold. */
+function tap(): void {
+  impact(Haptics.ImpactFeedbackStyle.Light, Haptics.AndroidHaptics.Context_Click);
+}
 
-  // Semantic events. Each resolves to one restrained native event.
-  moodLogged: success,
-  destructive: rigid,
-  swipeThreshold: () =>
-    impact(
-      Haptics.ImpactFeedbackStyle.Soft,
-      {
-        preferred: Haptics.AndroidHaptics.Gesture_Start,
-        minimumApiLevel: 30,
-        fallback: Haptics.AndroidHaptics.Context_Click,
-      }
-    ),
-  longPressActivate: () =>
-    impact(
-      Haptics.ImpactFeedbackStyle.Rigid,
-      Haptics.AndroidHaptics.Long_Press
-    ),
-  monthChange: selection,
-  pinDigit: () =>
-    impact(
-      Haptics.ImpactFeedbackStyle.Soft,
-      Haptics.AndroidHaptics.Keyboard_Tap
-    ),
-  pinError: error,
-  unlockSuccess: success,
-  pageChange: selection,
-};
+/** Data was written: entry saved, undo restored, import finished. */
+function commit(): void {
+  notification(Haptics.NotificationFeedbackType.Success, {
+    preferred: Haptics.AndroidHaptics.Confirm,
+    minimumApiLevel: 30,
+    fallback: Haptics.AndroidHaptics.Context_Click,
+  });
+}
+
+/** The action failed or needs care: delete, save failure, wrong PIN, crisis entry. */
+function reject(): void {
+  notification(Haptics.NotificationFeedbackType.Warning, {
+    preferred: Haptics.AndroidHaptics.Reject,
+    minimumApiLevel: 30,
+    fallback: Haptics.AndroidHaptics.Long_Press,
+  });
+}
+
+export const haptics = { tick, tap, commit, reject };
+
+export type HapticLevel = keyof typeof haptics;
 
 export default haptics;

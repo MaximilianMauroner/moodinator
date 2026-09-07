@@ -35,9 +35,10 @@ import { IconBadge } from "@/components/ui/IconBadge";
 import { ScreenBackgroundAccent } from "@/components/layout/ScreenBackgroundAccent";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { typography } from "@/constants/typography";
-import { motion } from "@/constants/motion";
+import { motion, staggerDelay } from "@/constants/motion";
 import { haptics } from "@/lib/haptics";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 import type { MoodEntry } from "@db/types";
 import { getInterpretedMoodRating } from "@/constants/moodScaleInterpretation";
 
@@ -51,6 +52,7 @@ const viewModes: { id: ViewMode; label: string; icon: keyof typeof Ionicons.glyp
 export function InsightsScreen() {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === "dark";
+  const reducedMotion = useReducedMotion();
   const [selectedEntry, setSelectedEntry] = useState<MoodEntry | null>(null);
   const [showAllEntries, setShowAllEntries] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("calendar");
@@ -83,7 +85,7 @@ export function InsightsScreen() {
   }, [period, currentDate]);
 
   const handleViewModeChange = useCallback((mode: ViewMode) => {
-    haptics.selection();
+    haptics.tick();
     setViewMode(mode);
   }, []);
 
@@ -147,7 +149,9 @@ export function InsightsScreen() {
   const hasData = allMoods.length > 0;
   const hasPeriodData = periodMoods.length > 0;
   const reveal = (index: number) =>
-    FadeInUp.duration(motion.duration.normal).delay(index * motion.stagger.tight);
+    reducedMotion
+      ? undefined
+      : FadeInUp.duration(motion.duration.normal).delay(staggerDelay(index));
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -275,7 +279,7 @@ export function InsightsScreen() {
                       title="Average Mood"
                       metric={stats.averageMood.toFixed(1)}
                       metricSuffix="/ 10"
-                      interpretation={getMoodLabel(stats.averageMood)}
+                      interpretation={`${getMoodLabel(stats.averageMood)}. Lower is better.`}
                       trend={
                         stats.moodChange !== 0
                           ? {
@@ -287,7 +291,6 @@ export function InsightsScreen() {
                       metricColor={getMoodColor(stats.averageMood)}
                       variant="accent"
                     />
-                    <Text className="mt-2 text-center" style={[typography.bodySm, { color: isDark ? "#9FB39A" : "#7A6545" }]}>Mood Rating: 0 is best, 10 is worst.</Text>
                   </Animated.View>
 
                   {/* Supporting metrics */}
@@ -391,9 +394,7 @@ export function InsightsScreen() {
                       {(showAllEntries ? periodMoods : periodMoods.slice(0, 5)).map((mood, index, arr) => (
                         <Animated.View
                           key={mood.id}
-                          entering={FadeInUp.duration(motion.duration.normal).delay(
-                            Math.min(index, 6) * motion.stagger.tight
-                          )}
+                          entering={reveal(index)}
                           layout={LinearTransition.duration(motion.duration.normal)}
                         >
                           <Pressable

@@ -86,7 +86,7 @@ export function LockScreen() {
     setIsAuthenticating(true);
     try {
       if (await authenticate()) {
-        haptics.unlockSuccess();
+        haptics.commit();
         finalizeSuccessfulAuth();
       }
     } finally {
@@ -105,7 +105,7 @@ export function LockScreen() {
   useEffect(() => {
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
       if (showPinPad && canUseBiometrics && !isBusy) {
-        haptics.light();
+        haptics.tap();
         setShowPinPad(false);
         setPin("");
         setFeedback(null);
@@ -123,11 +123,11 @@ export function LockScreen() {
       try {
         const result = await attemptPin(enteredPin);
         if (result.status === "success") {
-          haptics.unlockSuccess();
+          haptics.commit();
           unlock();
           return;
         }
-        haptics.pinError();
+        haptics.reject();
         setPin("");
         if (result.status === "invalid") {
           const message = "Incorrect PIN. Try again.";
@@ -224,7 +224,7 @@ export function LockScreen() {
               />
               <Pressable
                 onPress={() => {
-                  haptics.light();
+                  haptics.tap();
                   setShowPinPad(true);
                 }}
                 disabled={isAuthenticating}
@@ -279,7 +279,7 @@ export function LockScreen() {
               {canUseBiometrics ? (
                 <Pressable
                   onPress={() => {
-                    haptics.light();
+                    haptics.tap();
                     setPin("");
                     setFeedback(null);
                     void handleBiometricAuth();

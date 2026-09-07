@@ -85,7 +85,7 @@ function NotificationsScreenContent() {
             onPress: () => {
               void (async () => {
                 try {
-                  haptics.selection();
+                  haptics.tick();
                   const result = await updateNotification(id, { enabled: true });
                   await loadNotifications();
                   const warning = getReminderScheduleResultWarning(result);
@@ -105,7 +105,7 @@ function NotificationsScreenContent() {
     }
 
     try {
-      haptics.selection();
+      haptics.tick();
       const result = await updateNotification(id, { enabled });
       await loadNotifications();
       const warning = getReminderScheduleResultWarning(result);
@@ -119,7 +119,7 @@ function NotificationsScreenContent() {
   };
 
   const handleDelete = async (id: string, title: string) => {
-    haptics.warning();
+    haptics.reject();
     Alert.alert(
       "Delete Reminder",
       `Are you sure you want to delete "${title}"?`,
@@ -169,7 +169,7 @@ function NotificationsScreenContent() {
         >
           <Pressable
             onPress={() => {
-              haptics.light();
+              haptics.tap();
               router.back();
             }}
             className="p-2 -ml-2 rounded-xl"
@@ -204,7 +204,7 @@ function NotificationsScreenContent() {
           {/* Add New Button */}
           <Link href="/notifications/new" asChild>
             <Pressable
-              onPress={() => haptics.light()}
+              onPress={() => haptics.tap()}
               className="rounded-2xl py-4 px-5 mb-5 flex-row items-center justify-center"
               style={{
                 backgroundColor: get("primary"),
@@ -388,7 +388,7 @@ function NotificationsScreenContent() {
                       className="flex-1"
                     >
                       <Pressable
-                        onPress={() => haptics.light()}
+                        onPress={() => haptics.tap()}
                         className="flex-1 rounded-xl py-2.5 items-center flex-row justify-center"
                         style={{ backgroundColor: get("primaryBg") }}
                         accessibilityRole="button"
