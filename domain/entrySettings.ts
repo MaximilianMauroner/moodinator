@@ -75,6 +75,88 @@ export const DEFAULT_EMOTIONS: Emotion[] = [
     { name: "Tired",        category: "neutral" },   // fatigue / exhaustion (PANAS-X)
 ];
 
+// ── Energy bands ─────────────────────────────────────────────────────────────
+// The entry picker groups emotions by arousal (how activated the feeling is)
+// instead of by name. Valence stays visible through the existing chip colours,
+// so the two axes of the affect circumplex are readable at the same time.
+//
+// Arousal is a stable property of the word, not of the entry, so it lives here
+// as a static map rather than on the Emotion type. That keeps it out of the
+// database, the settings payload, and import/export.
+export type EmotionEnergyBand = "high" | "steady" | "low";
+
+export const EMOTION_ENERGY_BAND_ORDER: readonly EmotionEnergyBand[] = [
+    "high",
+    "steady",
+    "low",
+] as const;
+
+export const EMOTION_ENERGY_BAND_LABELS: Record<EmotionEnergyBand, string> = {
+    high: "High energy",
+    steady: "Steady",
+    low: "Low energy",
+};
+
+// Arousal ratings follow the circumplex placements in Russell (1980) and the
+// PANAS-X activation subscales. Every DEFAULT_EMOTIONS entry has a value; the
+// `emotionEnergyBands` test asserts that stays true.
+const DEFAULT_EMOTION_AROUSAL: Record<string, EmotionEnergyBand> = {
+    // Positive
+    energetic: "high",
+    excited: "high",
+    inspired: "high",
+    motivated: "high",
+    affectionate: "steady",
+    amused: "steady",
+    awe: "steady",
+    confident: "steady",
+    grateful: "steady",
+    happy: "steady",
+    hopeful: "steady",
+    loved: "steady",
+    proud: "steady",
+    content: "low",
+    relaxed: "low",
+
+    // Negative
+    angry: "high",
+    anxious: "high",
+    embarrassed: "high",
+    fearful: "high",
+    frustrated: "high",
+    overwhelmed: "high",
+    stressed: "high",
+    ashamed: "steady",
+    disgusted: "steady",
+    guilty: "steady",
+    hurt: "steady",
+    insecure: "steady",
+    irritable: "steady",
+    jealous: "steady",
+    disappointed: "low",
+    grieving: "low",
+    hopeless: "low",
+    lonely: "low",
+    numb: "low",
+    sad: "low",
+
+    // Neutral
+    surprised: "high",
+    confused: "steady",
+    curious: "steady",
+    bored: "low",
+    tired: "low",
+};
+
+/**
+ * Returns the energy band for an emotion name, or null when the name has no
+ * rating. Custom emotions are unrated by design: the picker groups them
+ * separately instead of claiming an activation level they were never given.
+ */
+export function getEmotionEnergyBand(name: string): EmotionEnergyBand | null {
+    return DEFAULT_EMOTION_AROUSAL[name.trim().toLowerCase()] ?? null;
+}
+
 export const DEFAULT_CONTEXTS = [
     "Home",
     "Work",
