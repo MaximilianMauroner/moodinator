@@ -26,10 +26,10 @@ export function PinPad({ onDigitPress, onDeletePress, disabled }: PinPadProps) {
     if (disabled) return;
 
     if (value === "delete") {
-      haptics.light();
+      haptics.tick();
       onDeletePress();
     } else if (value) {
-      haptics.pinDigit();
+      haptics.tick();
       onDigitPress(value);
     }
   };

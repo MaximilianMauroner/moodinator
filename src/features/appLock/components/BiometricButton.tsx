@@ -14,7 +14,7 @@ type BiometricButtonProps = {
 export function BiometricButton({ onPress, label, icon, disabled }: BiometricButtonProps) {
   const { isDark, get } = useThemeColors();
   const handlePress = () => {
-    haptics.light();
+    haptics.tap();
     onPress();
   };
 

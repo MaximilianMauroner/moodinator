@@ -21,10 +21,10 @@ export function useMoodItemActions({
 
   const handleDeleteMood = useCallback(
     async (mood: MoodEntry) => {
-      haptics.warning(); // Haptic feedback for delete action
+      haptics.reject();
       await removeMood(mood.id);
       toastService.showDeletedMood(mood, async (deletedMood) => {
-        haptics.success(); // Haptic feedback for undo/restore
+        haptics.commit();
         await restoreMood({
           mood: deletedMood.mood,
           note: deletedMood.note,

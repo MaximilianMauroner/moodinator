@@ -141,7 +141,7 @@ export default function EmotionsSettingsScreen() {
 
   const handleToggleDefault = useCallback(
     async (name: string) => {
-      haptics.light();
+      haptics.tick();
       const def = DEFAULT_EMOTIONS.find(
         (e) => normalizePresetKey(e.name) === normalizePresetKey(name)
       );
@@ -152,7 +152,7 @@ export default function EmotionsSettingsScreen() {
 
   const handleRemoveEmotion = useCallback(
     async (name: string) => {
-      haptics.light();
+      haptics.tap();
       setEmotionPendingRemoval(name);
     },
     []
@@ -165,14 +165,14 @@ export default function EmotionsSettingsScreen() {
   const handleConfirmRemoveEmotion = useCallback(async () => {
     if (!emotionPendingRemoval) return;
 
-    haptics.destructive();
+    haptics.reject();
     await setEmotions(presetModel.removeByLabel(emotionPendingRemoval));
     setEmotionPendingRemoval(null);
   }, [emotionPendingRemoval, presetModel, setEmotions]);
 
   const handleOpenMoveEmotion = useCallback(
     (name: string, category: Emotion["category"]) => {
-      haptics.longPressActivate();
+      haptics.tap();
       setEmotionPendingMove({ name, category });
     },
     []
@@ -228,7 +228,7 @@ export default function EmotionsSettingsScreen() {
 
   const handleSelectAll = useCallback(
     async (category: Emotion["category"]) => {
-      haptics.light();
+      haptics.tick();
       const defs = DEFAULT_EMOTIONS.filter((e) => e.category === category);
       await setEmotions(presetModel.selectAllDefaults(defs));
     },
@@ -237,7 +237,7 @@ export default function EmotionsSettingsScreen() {
 
   const handleClearAll = useCallback(
     async (category: Emotion["category"]) => {
-      haptics.light();
+      haptics.tick();
       const defaultsInCategory = DEFAULT_EMOTIONS.filter(
         (e) => e.category === category
       );
@@ -248,7 +248,7 @@ export default function EmotionsSettingsScreen() {
 
   const handleOpenAddModal = useCallback(
     (category: Emotion["category"] = "positive") => {
-      haptics.light();
+      haptics.tap();
       setEditingEmotion({ name: "", category, isNew: true });
       setIsModalVisible(true);
     },
@@ -256,7 +256,7 @@ export default function EmotionsSettingsScreen() {
   );
 
   const handleAddFromHistory = useCallback(async () => {
-    haptics.light();
+    haptics.tap();
 
     try {
       setHistorySyncLoading(true);
@@ -283,7 +283,7 @@ export default function EmotionsSettingsScreen() {
                 setHistorySyncLoading(true);
                 const result =
                   await presetSyncService.addMissingFromHistory("emotions");
-                haptics.success();
+                haptics.commit();
                 Alert.alert(
                   "Added from History",
                   result.addedEmotions.length > 0
@@ -291,7 +291,7 @@ export default function EmotionsSettingsScreen() {
                     : "No new emotions were found."
                 );
               } catch {
-                haptics.error();
+                haptics.reject();
                 Alert.alert("Error", "Could not add emotions from history.");
               } finally {
                 setHistorySyncLoading(false);
@@ -301,7 +301,7 @@ export default function EmotionsSettingsScreen() {
         ]
       );
     } catch {
-      haptics.error();
+      haptics.reject();
       setHistorySyncLoading(false);
       Alert.alert("Error", "Could not check your Mood Entry history.");
     }
@@ -309,7 +309,7 @@ export default function EmotionsSettingsScreen() {
 
   const handleEditEmotion = useCallback(
     (name: string, category: Emotion["category"]) => {
-      haptics.light();
+      haptics.tap();
       setEditingEmotion({ name, category, isNew: false });
       setIsModalVisible(true);
     },
@@ -332,8 +332,6 @@ export default function EmotionsSettingsScreen() {
         Alert.alert("Duplicate", "This emotion already exists.");
         return;
       }
-
-      haptics.medium();
 
       if (originalName && normalizedOld) {
         const originalEmotion = emotions.find(
@@ -401,6 +399,7 @@ export default function EmotionsSettingsScreen() {
         await setEmotions(result.values);
       }
 
+      haptics.commit();
       setIsModalVisible(false);
       setEditingEmotion(null);
     },

@@ -44,7 +44,7 @@ export function OnboardingScreen() {
 
   const handleNext = useCallback(() => {
     if (isLastPage) {
-      haptics.success();
+      haptics.commit();
       void complete();
     } else {
       goToPage(currentIndex + 1);
@@ -62,14 +62,14 @@ export function OnboardingScreen() {
       const nextIndex = event.nativeEvent.position;
       if (nextIndex === currentIndex) return;
 
-      haptics.pageChange();
+      haptics.tick();
       setCurrentIndex(nextIndex);
     },
     [currentIndex]
   );
 
   const handleSkip = useCallback(() => {
-    haptics.light();
+    haptics.tap();
     void complete();
   }, [complete]);
 

@@ -11,6 +11,10 @@ import Animated, {
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { IconBadge } from "@/components/ui/IconBadge";
 import { typography } from "@/constants/typography";
+import { motion } from "@/constants/motion";
+import { semanticToneColors } from "@/constants/colors";
+import { useCountUp } from "@/hooks/useCountUp";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 
 type StreakBadgeSharedProps = {
   current: number;
@@ -24,51 +28,42 @@ type StreakBadgeBaseProps = StreakBadgeSharedProps & {
 function StreakBadgeBase({ current, longest, compact }: StreakBadgeBaseProps) {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === "dark";
+  const reducedMotion = useReducedMotion();
+  const mode = isDark ? "dark" : "light";
 
   const isOnStreak = current > 0;
   const isNewRecord = current > 0 && current === longest;
   const progressPercent = longest > 0 ? Math.min((current / longest) * 100, 100) : 0;
 
+  const countedCurrent = useCountUp(current);
   const progressWidth = useSharedValue(progressPercent);
 
   useEffect(() => {
-    progressWidth.value = withTiming(progressPercent, {
-      duration: 520,
-      easing: Easing.out(Easing.cubic),
-    });
-  }, [progressPercent, progressWidth]);
+    progressWidth.value = reducedMotion
+      ? progressPercent
+      : withTiming(progressPercent, {
+          duration: motion.duration.reveal,
+          easing: Easing.out(Easing.cubic),
+        });
+  }, [progressPercent, progressWidth, reducedMotion]);
 
   const progressAnimatedStyle = useAnimatedStyle(() => ({
     width: `${progressWidth.value}%`,
   }));
 
-  // Flame colors for active streak
-  const flameColors = {
-    primary: isDark ? "#FCD34D" : "#F59E0B",
-    secondary: isDark ? "#FB923C" : "#EA580C",
-    glow: isDark ? "rgba(252, 211, 77, 0.3)" : "rgba(245, 158, 11, 0.2)",
-  };
-
-  // Muted colors for inactive
-  const inactiveColors = {
-    primary: isDark ? "#8AAE98" : "#9D8660",
-    secondary: isDark ? "#4A4035" : "#BDA77D",
-  };
+  // A streak is a warm, sand-family idea. An idle streak stays neutral rather
+  // than reading as a failure, so a missed day never renders as an alarm.
+  const sand = semanticToneColors.sand[mode];
+  const sage = semanticToneColors.sage[mode];
+  const neutral = semanticToneColors.neutral[mode];
+  const tone = isOnStreak ? sand : neutral;
 
   if (compact) {
     return (
       <SurfaceCard
         tone={isOnStreak ? "sand" : "neutral"}
         padding={12}
-        style={{
-          backgroundColor: isOnStreak
-            ? isDark
-              ? "rgba(245, 158, 11, 0.15)"
-              : "#FEF3C7"
-            : isDark
-            ? "#364C44"
-            : "#F5F1E8",
-        }}
+        style={{ backgroundColor: tone.bg }}
       >
         <View className="flex-row items-center">
           <IconBadge
@@ -77,13 +72,7 @@ function StreakBadgeBase({ current, longest, compact }: StreakBadgeBaseProps) {
             size="sm"
             style={{ marginRight: 8 }}
           />
-          <Text
-            style={{
-              ...typography.bodyMd,
-              fontWeight: "700",
-              color: isOnStreak ? flameColors.primary : inactiveColors.primary,
-            }}
-          >
+          <Text style={{ ...typography.bodyMd, fontWeight: "700", color: tone.fg }}>
             {current} {current === 1 ? "day" : "days"}
           </Text>
         </View>
@@ -92,27 +81,14 @@ function StreakBadgeBase({ current, longest, compact }: StreakBadgeBaseProps) {
   }
 
   return (
-    <SurfaceCard
-      tone="sand"
-      accentColor={isOnStreak ? flameColors.primary : inactiveColors.secondary}
-      accentHeight={4}
-    >
+    <SurfaceCard tone="sand" accentColor={tone.fg} accentHeight={4}>
       <View>
         {/* Main streak display */}
         <View className="flex-row items-start justify-between">
           <View className="flex-row items-center">
-            {/* Animated flame container */}
             <View
               className="w-14 h-14 rounded-2xl items-center justify-center mr-4"
-              style={{
-                backgroundColor: isOnStreak
-                  ? isDark
-                    ? "rgba(245, 158, 11, 0.2)"
-                    : "#FEF3C7"
-                  : isDark
-                  ? "#364C44"
-                  : "#F5F1E8",
-              }}
+              style={{ backgroundColor: tone.bg }}
             >
               {isOnStreak && (
                 <View
@@ -121,30 +97,28 @@ function StreakBadgeBase({ current, longest, compact }: StreakBadgeBaseProps) {
                     width: 40,
                     height: 40,
                     borderRadius: 20,
-                    backgroundColor: flameColors.glow,
+                    backgroundColor: sand.ring,
                   }}
                 />
               )}
               <Ionicons
                 name={isOnStreak ? "flame" : "moon-outline"}
                 size={28}
-                color={isOnStreak ? flameColors.secondary : inactiveColors.primary}
+                color={tone.fg}
               />
             </View>
 
-            <View>
+            <View
+              accessible
+              accessibilityRole="text"
+              accessibilityLabel={`Current streak: ${current} ${current === 1 ? "day" : "days"}`}
+            >
               <Text className="text-paper-700 dark:text-sand-400 mb-1" style={typography.eyebrow}>
                 Current Streak
               </Text>
               <View className="flex-row items-baseline">
-                <Text
-                  className="text-paper-800 dark:text-paper-100"
-                  style={{
-                    ...typography.metricLg,
-                    color: isOnStreak ? flameColors.primary : inactiveColors.primary,
-                  }}
-                >
-                  {current}
+                <Text style={{ ...typography.metricLg, color: tone.fg }}>
+                  {countedCurrent}
                 </Text>
                 <Text className="ml-2 text-paper-700 dark:text-sand-400" style={typography.bodyMd}>
                   {current === 1 ? "day" : "days"}
@@ -158,14 +132,14 @@ function StreakBadgeBase({ current, longest, compact }: StreakBadgeBaseProps) {
             <View
               className="px-3 py-1.5 rounded-full"
               style={{
-                backgroundColor: isDark ? "rgba(34, 197, 94, 0.2)" : "#DCFCE7",
+                backgroundColor: sage.bg,
                 borderWidth: 1,
-                borderColor: isDark ? "rgba(134, 239, 172, 0.3)" : "#BBF7D0",
+                borderColor: sage.border,
               }}
             >
               <Text
                 className="text-xs font-bold uppercase tracking-wide"
-                style={{ color: isDark ? "#86EFAC" : "#16A34A" }}
+                style={{ color: sage.fg }}
               >
                 Record!
               </Text>
@@ -186,16 +160,11 @@ function StreakBadgeBase({ current, longest, compact }: StreakBadgeBaseProps) {
             </View>
             <View
               className="h-3 rounded-full overflow-hidden"
-              style={{ backgroundColor: isDark ? "#3D352A" : "#E5D9BF" }}
+              style={{ backgroundColor: sand.border }}
             >
               <Animated.View
                 className="h-full rounded-full"
-                style={[
-                  {
-                    backgroundColor: isOnStreak ? flameColors.primary : inactiveColors.primary,
-                  },
-                  progressAnimatedStyle,
-                ]}
+                style={[{ backgroundColor: tone.fg }, progressAnimatedStyle]}
               />
             </View>
           </View>
@@ -204,10 +173,7 @@ function StreakBadgeBase({ current, longest, compact }: StreakBadgeBaseProps) {
         {/* Stats row */}
         <View
           className="flex-row mt-5 pt-4"
-          style={{
-            borderTopWidth: 1,
-            borderTopColor: isDark ? "#3D352A" : "#E5D9BF",
-          }}
+          style={{ borderTopWidth: 1, borderTopColor: sand.border }}
         >
           <View className="flex-1 items-center">
             <IconBadge icon="trophy-outline" tone="sand" size="sm" style={{ marginBottom: 8 }} />
@@ -219,15 +185,12 @@ function StreakBadgeBase({ current, longest, compact }: StreakBadgeBaseProps) {
             </Text>
           </View>
 
-          <View
-            className="w-px mx-4"
-            style={{ backgroundColor: isDark ? "#3D352A" : "#E5D9BF" }}
-          />
+          <View className="w-px mx-4" style={{ backgroundColor: sand.border }} />
 
           <View className="flex-1 items-center">
             <IconBadge
-              icon={isOnStreak ? "checkmark" : "remove"}
-              tone={isOnStreak ? "sage" : "coral"}
+              icon={isOnStreak ? "checkmark" : "moon-outline"}
+              tone={isOnStreak ? "sage" : "neutral"}
               size="sm"
               style={{ marginBottom: 8 }}
             />
@@ -236,17 +199,9 @@ function StreakBadgeBase({ current, longest, compact }: StreakBadgeBaseProps) {
             </Text>
             <Text
               className="text-lg font-bold"
-              style={{
-                color: isOnStreak
-                  ? isDark
-                    ? "#86EFAC"
-                    : "#16A34A"
-                  : isDark
-                  ? "#FCA5A5"
-                  : "#DC2626",
-              }}
+              style={{ color: isOnStreak ? sage.fg : neutral.fg }}
             >
-              {isOnStreak ? "Active" : "Inactive"}
+              {isOnStreak ? "Active" : "Paused"}
             </Text>
           </View>
         </View>

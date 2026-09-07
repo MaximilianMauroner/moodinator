@@ -52,31 +52,54 @@ afterEach(() => {
 });
 
 describe("haptics", () => {
-  test("uses Android's semantic haptic engine for non-selection events", async () => {
+  test("exposes exactly four levels", async () => {
+    const { haptics } = await loadHaptics("ios");
+
+    expect(Object.keys(haptics).sort()).toEqual([
+      "commit",
+      "reject",
+      "tap",
+      "tick",
+    ]);
+  });
+
+  test("maps each level to one native iOS event", async () => {
+    const { haptics } = await loadHaptics("ios");
+
+    haptics.tick();
+    haptics.tap();
+    haptics.commit();
+    haptics.reject();
+
+    expect(hapticMocks.selectionAsync).toHaveBeenCalledTimes(1);
+    expect(hapticMocks.impactAsync.mock.calls).toEqual([["light"]]);
+    expect(hapticMocks.notificationAsync.mock.calls).toEqual([
+      ["success"],
+      ["warning"],
+    ]);
+    expect(hapticMocks.performAndroidHapticsAsync).not.toHaveBeenCalled();
+  });
+
+  test("maps each level to Android's semantic haptic engine", async () => {
     const { haptics } = await loadHaptics("android", 35);
 
-    haptics.light();
-    haptics.medium();
-    haptics.swipeThreshold();
-    haptics.moodLogged();
-    haptics.pinDigit();
+    haptics.tap();
+    haptics.commit();
+    haptics.reject();
 
     expect(hapticMocks.performAndroidHapticsAsync.mock.calls).toEqual([
       ["context-click"],
       ["confirm"],
-      ["gesture-start"],
-      ["confirm"],
-      ["keyboard-tap"],
+      ["reject"],
     ]);
     expect(hapticMocks.impactAsync).not.toHaveBeenCalled();
     expect(hapticMocks.notificationAsync).not.toHaveBeenCalled();
-    expect(hapticMocks.selectionAsync).not.toHaveBeenCalled();
   });
 
-  test.each([29, 35])("selection avoids Android's activity view on API %i", async (version) => {
+  test.each([29, 35])("tick avoids Android's activity view on API %i", async (version) => {
     const { haptics } = await loadHaptics("android", version);
 
-    haptics.selection();
+    haptics.tick();
 
     expect(hapticMocks.selectionAsync).toHaveBeenCalledTimes(1);
     expect(hapticMocks.performAndroidHapticsAsync).not.toHaveBeenCalled();
@@ -84,16 +107,14 @@ describe("haptics", () => {
     expect(hapticMocks.notificationAsync).not.toHaveBeenCalled();
   });
 
-  test("falls back to universally available Android feedback", async () => {
+  test("falls back to universally available Android feedback below API 30", async () => {
     const { haptics } = await loadHaptics("android", 29);
 
-    haptics.medium();
-    haptics.moodLogged();
-    haptics.swipeThreshold();
-    haptics.error();
+    haptics.tap();
+    haptics.commit();
+    haptics.reject();
 
     expect(hapticMocks.performAndroidHapticsAsync.mock.calls).toEqual([
-      ["long-press"],
       ["context-click"],
       ["context-click"],
       ["long-press"],
@@ -106,7 +127,7 @@ describe("haptics", () => {
     );
     const { haptics } = await loadHaptics("android", 35);
 
-    haptics.moodLogged();
+    haptics.commit();
     await Promise.resolve();
     await Promise.resolve();
 
@@ -116,26 +137,13 @@ describe("haptics", () => {
     ]);
   });
 
-  test("uses one native iOS event for each semantic interaction", async () => {
-    const { haptics } = await loadHaptics("ios");
-
-    haptics.selection();
-    haptics.moodLogged();
-    haptics.longPressActivate();
-
-    expect(hapticMocks.selectionAsync).toHaveBeenCalledTimes(1);
-    expect(hapticMocks.notificationAsync).toHaveBeenCalledWith("success");
-    expect(hapticMocks.impactAsync).toHaveBeenCalledWith("rigid");
-    expect(hapticMocks.performAndroidHapticsAsync).not.toHaveBeenCalled();
-  });
-
   test.each(["android", "ios"] as const)("honors the in-app preference on %s", async (platform) => {
     const { getHapticsEnabled, haptics, setHapticsEnabled } =
       await loadHaptics(platform, 35);
 
     setHapticsEnabled(false);
-    haptics.selection();
-    haptics.error();
+    haptics.tick();
+    haptics.reject();
 
     expect(getHapticsEnabled()).toBe(false);
     expect(hapticMocks.selectionAsync).not.toHaveBeenCalled();
@@ -143,21 +151,21 @@ describe("haptics", () => {
     expect(hapticMocks.performAndroidHapticsAsync).not.toHaveBeenCalled();
 
     setHapticsEnabled(true);
-    haptics.selection();
+    haptics.tick();
 
     expect(getHapticsEnabled()).toBe(true);
     expect(hapticMocks.selectionAsync).toHaveBeenCalledTimes(1);
   });
 
-  test.each(["android", "ios"] as const)("isolates native selection failures on %s without a second event", async (platform) => {
+  test.each(["android", "ios"] as const)("isolates native tick failures on %s without a second event", async (platform) => {
     const { haptics } = await loadHaptics(platform, 35);
     hapticMocks.selectionAsync.mockImplementationOnce(() => {
       throw new Error("native module unavailable");
     });
-    expect(() => haptics.selection()).not.toThrow();
+    expect(() => haptics.tick()).not.toThrow();
 
     hapticMocks.selectionAsync.mockRejectedValueOnce(new Error("native request failed"));
-    haptics.selection();
+    haptics.tick();
     await Promise.resolve();
 
     expect(hapticMocks.selectionAsync).toHaveBeenCalledTimes(2);
@@ -169,8 +177,8 @@ describe("haptics", () => {
   test("does nothing on unsupported platforms", async () => {
     const { haptics } = await loadHaptics("web");
 
-    haptics.selection();
-    haptics.success();
+    haptics.tick();
+    haptics.commit();
 
     expect(hapticMocks.performAndroidHapticsAsync).not.toHaveBeenCalled();
     expect(hapticMocks.notificationAsync).not.toHaveBeenCalled();

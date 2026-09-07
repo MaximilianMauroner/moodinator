@@ -9,12 +9,13 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { getMoodRatingDisplay } from "@/constants/moodScaleInterpretation";
 import { useThemeColors, colors } from "@/constants/colors";
 import { haptics } from "@/lib/haptics";
+import { Alert } from "@/components/ui/AppAlert";
 
 interface Props {
   visible: boolean;
   mood: MoodEntry | null;
   onClose: () => void;
-  onSave: (moodId: number, newTimestamp: number) => void;
+  onSave: (moodId: number, newTimestamp: number) => Promise<void> | void;
   onEdit?: (mood: MoodEntry) => void;
 }
 
@@ -29,6 +30,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   React.useEffect(() => {
     if (mood) {
@@ -54,6 +56,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
   }, [mood?.emotions]);
 
   const handleDateChange = (_event: DateTimePickerEvent, date?: Date) => {
+    if (saving) return;
     if (Platform.OS === "android") {
       setShowDatePicker(false);
     }
@@ -63,6 +66,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
   };
 
   const handleTimeChange = (_event: DateTimePickerEvent, time?: Date) => {
+    if (saving) return;
     if (Platform.OS === "android") {
       setShowTimePicker(false);
     }
@@ -74,16 +78,27 @@ export const DateTimePickerModal: React.FC<Props> = ({
     }
   };
 
-  const handleSave = () => {
-    haptics.light();
-    if (mood) {
-      onSave(mood.id, selectedDate.getTime());
+  const handleSave = async () => {
+    if (!mood || saving) return;
+
+    try {
+      setSaving(true);
+      setShowDatePicker(false);
+      setShowTimePicker(false);
+      await onSave(mood.id, selectedDate.getTime());
+      haptics.commit();
+      onClose();
+    } catch {
+      haptics.reject();
+      Alert.alert("Error", "Could not update this entry's date and time.");
+    } finally {
+      setSaving(false);
     }
-    onClose();
   };
 
   const handleCancel = () => {
-    haptics.light();
+    if (saving) return;
+    haptics.tap();
     onClose();
   };
 
@@ -97,7 +112,9 @@ export const DateTimePickerModal: React.FC<Props> = ({
         transparent
         visible={visible}
         animationType="fade"
-        onRequestClose={onClose}
+        onRequestClose={() => {
+          if (!saving) onClose();
+        }}
       >
         <View
           className="flex-1 justify-center items-center px-4"
@@ -128,9 +145,11 @@ export const DateTimePickerModal: React.FC<Props> = ({
                 </Text>
                 <Pressable
                   onPress={handleCancel}
+                  disabled={saving}
                   className="h-11 w-11 items-center justify-center rounded-full"
                   accessibilityRole="button"
                   accessibilityLabel="Close entry details"
+                  accessibilityState={{ disabled: saving }}
                 >
                   <Ionicons
                     name="close-circle"
@@ -322,6 +341,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
                   {/* Date picker button */}
                   <Pressable
                     onPress={() => setShowDatePicker(true)}
+                    disabled={saving}
                     className="flex-1 flex-row items-center p-3 rounded-xl"
                     style={{
                       backgroundColor: get("surfaceAlt"),
@@ -330,6 +350,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
                     }}
                     accessibilityRole="button"
                     accessibilityLabel="Change entry date"
+                    accessibilityState={{ disabled: saving }}
                   >
                     <Ionicons
                       name="calendar-outline"
@@ -356,6 +377,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
                   {/* Time picker button */}
                   <Pressable
                     onPress={() => setShowTimePicker(true)}
+                    disabled={saving}
                     className="flex-row items-center p-3 rounded-xl"
                     style={{
                       backgroundColor: get("surfaceAlt"),
@@ -365,6 +387,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
                     }}
                     accessibilityRole="button"
                     accessibilityLabel="Change entry time"
+                    accessibilityState={{ disabled: saving }}
                   >
                     <Ionicons
                       name="time-outline"
@@ -400,10 +423,12 @@ export const DateTimePickerModal: React.FC<Props> = ({
             >
               <Pressable
                 onPress={handleCancel}
+                disabled={saving}
                 className="flex-1 py-3.5 rounded-xl items-center"
                 style={{ backgroundColor: get("surfaceAlt") }}
                 accessibilityRole="button"
                 accessibilityLabel="Cancel date and time changes"
+                accessibilityState={{ disabled: saving }}
               >
                 <Text
                   className="font-semibold text-sm"
@@ -416,13 +441,16 @@ export const DateTimePickerModal: React.FC<Props> = ({
               {onEdit ? (
                 <Pressable
                   onPress={() => {
+                    if (saving) return;
                     onClose();
                     onEdit(mood);
                   }}
+                  disabled={saving}
                   className="flex-1 py-3.5 rounded-xl items-center"
                   style={{ backgroundColor: get("surfaceAlt") }}
                   accessibilityRole="button"
                   accessibilityLabel="Edit this entry"
+                  accessibilityState={{ disabled: saving }}
                 >
                   <Text className="font-semibold text-sm" style={{ color: isDark ? get("primary") : colors.positive.textDark.light }}>
                     Edit
@@ -432,17 +460,17 @@ export const DateTimePickerModal: React.FC<Props> = ({
 
               <Pressable
                 onPress={handleSave}
-                disabled={!hasChanged}
+                disabled={!hasChanged || saving}
                 className="flex-1 py-3.5 rounded-xl items-center"
                 style={{
                   backgroundColor: hasChanged
                     ? (isDark ? colors.primary.dark : colors.primary.light)
                     : get("surfaceAlt"),
-                  opacity: hasChanged ? 1 : 0.5,
+                  opacity: hasChanged && !saving ? 1 : 0.5,
                 }}
                 accessibilityRole="button"
                 accessibilityLabel="Save date and time changes"
-                accessibilityState={{ disabled: !hasChanged }}
+                accessibilityState={{ disabled: !hasChanged || saving }}
               >
                 <Text
                   className="font-semibold text-sm"
@@ -458,6 +486,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
             {/* Date picker */}
             {showDatePicker && (
               <DateTimePicker
+                disabled={saving}
                 value={selectedDate}
                 mode="date"
                 display={Platform.OS === "ios" ? "spinner" : "default"}
@@ -468,6 +497,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
             {/* Time picker */}
             {showTimePicker && (
               <DateTimePicker
+                disabled={saving}
                 value={selectedDate}
                 mode="time"
                 display={Platform.OS === "ios" ? "spinner" : "default"}

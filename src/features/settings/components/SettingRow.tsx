@@ -26,7 +26,7 @@ export function SettingRow({
 
   const handlePress = () => {
     if (onPress) {
-      haptics.light();
+      haptics.tap();
       onPress();
     }
   };
