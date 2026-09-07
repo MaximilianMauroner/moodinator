@@ -30,6 +30,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   React.useEffect(() => {
     if (mood) {
@@ -76,15 +77,18 @@ export const DateTimePickerModal: React.FC<Props> = ({
   };
 
   const handleSave = async () => {
-    if (!mood) return;
+    if (!mood || saving) return;
 
     try {
+      setSaving(true);
       await onSave(mood.id, selectedDate.getTime());
       haptics.commit();
       onClose();
     } catch {
       haptics.reject();
       Alert.alert("Error", "Could not update this entry's date and time.");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -438,17 +442,17 @@ export const DateTimePickerModal: React.FC<Props> = ({
 
               <Pressable
                 onPress={handleSave}
-                disabled={!hasChanged}
+                disabled={!hasChanged || saving}
                 className="flex-1 py-3.5 rounded-xl items-center"
                 style={{
                   backgroundColor: hasChanged
                     ? (isDark ? colors.primary.dark : colors.primary.light)
                     : get("surfaceAlt"),
-                  opacity: hasChanged ? 1 : 0.5,
+                  opacity: hasChanged && !saving ? 1 : 0.5,
                 }}
                 accessibilityRole="button"
                 accessibilityLabel="Save date and time changes"
-                accessibilityState={{ disabled: !hasChanged }}
+                accessibilityState={{ disabled: !hasChanged || saving }}
               >
                 <Text
                   className="font-semibold text-sm"

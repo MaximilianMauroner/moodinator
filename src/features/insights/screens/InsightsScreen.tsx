@@ -278,6 +278,7 @@ export function InsightsScreen() {
                       icon="analytics"
                       title="Average Mood"
                       metric={stats.averageMood.toFixed(1)}
+                      animateMetric={false}
                       metricSuffix="/ 10"
                       interpretation={`${getMoodLabel(stats.averageMood)}. Lower is better.`}
                       trend={
@@ -343,6 +344,7 @@ export function InsightsScreen() {
                           icon="heart"
                           title="Most Common"
                           metric={stats.mostCommonMood}
+                          animateMetric={false}
                           interpretation={getMoodLabel(stats.mostCommonMood)}
                           metricColor={getMoodColor(stats.mostCommonMood)}
                           variant="accent"
