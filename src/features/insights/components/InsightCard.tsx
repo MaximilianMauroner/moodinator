@@ -37,6 +37,7 @@ type InsightCardSharedProps = {
     value?: number;
   };
   metricColor?: string;
+  animateMetric?: boolean;
   variant?: "default" | "accent" | "warm";
 };
 
@@ -52,6 +53,7 @@ function InsightCardBase({
   interpretation,
   trend,
   metricColor,
+  animateMetric = true,
   compact,
   variant = "default",
 }: InsightCardBaseProps) {
@@ -60,8 +62,11 @@ function InsightCardBase({
   const { get } = useThemeColors();
 
   const countable = parseCountableMetric(metric);
-  const counted = useCountUp(countable?.value ?? 0, countable?.decimals ?? 0);
-  const displayedMetric = countable
+  const counted = useCountUp(
+    animateMetric ? countable?.value ?? 0 : 0,
+    countable?.decimals ?? 0
+  );
+  const displayedMetric = countable && animateMetric
     ? counted.toFixed(countable.decimals)
     : metric;
 
