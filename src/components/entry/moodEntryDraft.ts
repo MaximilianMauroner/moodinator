@@ -20,6 +20,8 @@ export type MoodEntryFlow = "quick" | "detailed";
 
 export type MoodEntryStepId = "mood" | "emotions" | "details";
 
+export const DEFAULT_MOOD_ENTRY_ENERGY = 5;
+
 export type MoodEntryBackAction =
   | "ignore"
   | "dismissKeyboard"
@@ -77,9 +79,11 @@ export function createMoodEntryFormValues(
     emotions: initialValues?.emotions ?? [],
     contextTags: initialValues?.contextTags ?? [],
     energy:
-      initialValues && typeof initialValues.energy === "number"
+      initialValues?.energy === null
+        ? null
+        : typeof initialValues?.energy === "number"
         ? initialValues.energy
-        : null,
+        : DEFAULT_MOOD_ENTRY_ENERGY,
     note: initialValues?.note ?? "",
     basedOnEntryId: initialValues?.basedOnEntryId ?? null,
   };

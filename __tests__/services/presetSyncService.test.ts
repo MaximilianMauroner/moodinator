@@ -64,7 +64,7 @@ describe("presetSyncService", () => {
     });
 
     expect(diff).toEqual({
-      emotions: [{ name: "Calm", category: "positive" }],
+      emotions: [{ name: "Calm", category: "positive", energy: "neutral" }],
       contexts: ["Uni", "Doctor"],
     });
   });
@@ -97,12 +97,12 @@ describe("presetSyncService", () => {
     const result = await presetSyncService.addMissingFromHistory("all");
 
     expect(result).toEqual({
-      addedEmotions: [{ name: "Calm", category: "positive" }],
+      addedEmotions: [{ name: "Calm", category: "positive", energy: "neutral" }],
       addedContexts: ["Work"],
     });
     expect(useSettingsStore.getState().emotions).toEqual([
       { name: "Happy", category: "negative" },
-      { name: "Calm", category: "positive" },
+      { name: "Calm", category: "positive", energy: "neutral" },
     ]);
     expect(useSettingsStore.getState().contexts).toEqual(["Home", "Work"]);
   });

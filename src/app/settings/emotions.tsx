@@ -10,7 +10,11 @@ import Animated, {
   FadeInUp,
 } from "react-native-reanimated";
 import { useSettingsStore } from "@/shared/state/settingsStore";
-import { DEFAULT_EMOTIONS } from "@/lib/entrySettings";
+import {
+  DEFAULT_EMOTIONS,
+  resolveEmotionEnergyBand,
+  type EmotionEnergyBand,
+} from "@/lib/entrySettings";
 import type { Emotion } from "@db/types";
 import { SettingsPageHeader } from "@/features/settings/components/SettingsPageHeader";
 import {
@@ -74,6 +78,7 @@ export default function EmotionsSettingsScreen() {
   const [editingEmotion, setEditingEmotion] = useState<{
     name: string;
     category: Emotion["category"];
+    energy: EmotionEnergyBand;
     isNew: boolean;
   } | null>(null);
   const [emotionPendingMove, setEmotionPendingMove] = useState<{
@@ -118,24 +123,44 @@ export default function EmotionsSettingsScreen() {
   const chipsByCategory = useMemo(() => {
     const result = {} as Record<
       Emotion["category"],
-      { name: string; isActive: boolean; isCustom: boolean }[]
+      {
+        name: string;
+        category: Emotion["category"];
+        energy: EmotionEnergyBand;
+        isActive: boolean;
+        isCustom: boolean;
+      }[]
     >;
+    const configuredByName = new Map(
+      emotions.map((emotion) => [normalizePresetKey(emotion.name), emotion])
+    );
+
     CATEGORIES.forEach((cat) => {
       result[cat] = [
-        ...presetModel.defaultItems.filter((item) => item.value.category === cat).map((item) => ({
-          name: item.label,
-          isActive: item.isActive,
-          isCustom: false,
-        })),
+        ...presetModel.defaultItems
+          .map((item) => {
+            const configured = configuredByName.get(item.key);
+            const value = configured ?? item.value;
+            return {
+              name: item.label,
+              category: value.category,
+              energy: resolveEmotionEnergyBand(value),
+              isActive: item.isActive,
+              isCustom: false,
+            };
+          })
+          .filter((item) => item.category === cat),
         ...presetModel.customItems.filter((item) => item.value.category === cat).map((item) => ({
           name: item.label,
+          category: item.value.category,
+          energy: resolveEmotionEnergyBand(item.value),
           isActive: true,
           isCustom: true,
         })),
       ];
     });
     return result;
-  }, [presetModel]);
+  }, [emotions, presetModel]);
 
   // ─── Handlers ──────────────────────────────────────────────────────────────
 
@@ -249,7 +274,7 @@ export default function EmotionsSettingsScreen() {
   const handleOpenAddModal = useCallback(
     (category: Emotion["category"] = "positive") => {
       haptics.tap();
-      setEditingEmotion({ name: "", category, isNew: true });
+      setEditingEmotion({ name: "", category, energy: "neutral", isNew: true });
       setIsModalVisible(true);
     },
     []
@@ -308,16 +333,25 @@ export default function EmotionsSettingsScreen() {
   }, []);
 
   const handleEditEmotion = useCallback(
-    (name: string, category: Emotion["category"]) => {
+    (emotion: {
+      name: string;
+      category: Emotion["category"];
+      energy: EmotionEnergyBand;
+    }) => {
       haptics.tap();
-      setEditingEmotion({ name, category, isNew: false });
+      setEditingEmotion({ ...emotion, isNew: false });
       setIsModalVisible(true);
     },
     []
   );
 
   const handleSaveEmotion = useCallback(
-    async (name: string, category: Emotion["category"], originalName?: string) => {
+    async (
+      name: string,
+      category: Emotion["category"],
+      energy: EmotionEnergyBand,
+      originalName?: string
+    ) => {
       const trimmed = name.trim();
       if (!trimmed) return;
 
@@ -344,7 +378,7 @@ export default function EmotionsSettingsScreen() {
         await setEmotions(
           emotions.map((e) =>
             normalizePresetKey(e.name) === normalizedOld
-              ? { name: trimmed, category }
+              ? { name: trimmed, category, energy }
               : e
           )
         );
@@ -394,7 +428,7 @@ export default function EmotionsSettingsScreen() {
         }
       } else {
         // Adding new emotion
-        const result = presetModel.addCustom({ name: trimmed, category });
+        const result = presetModel.addCustom({ name: trimmed, category, energy });
         if (!result.ok) return;
         await setEmotions(result.values);
       }
@@ -466,7 +500,7 @@ export default function EmotionsSettingsScreen() {
         >
           <PresetTipCard isDark={isDark}>
             Long-press custom emotions to move them between categories. Tap the
-            edit icon to rename.
+            edit icon to rename or change energy. New emotions start neutral.
           </PresetTipCard>
         </Animated.View>
 

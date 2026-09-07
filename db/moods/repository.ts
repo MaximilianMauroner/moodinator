@@ -14,6 +14,7 @@ import {
   upsertEmotionCategory,
 } from "./emotions";
 import { parseEmotionItem } from "./emotionUtils";
+import { isEmotionEnergyBand } from "../../domain/entrySettings";
 
 export async function insertMood(
   mood: number,
@@ -356,7 +357,9 @@ function toHistoryEmotion(item: unknown): Emotion | null {
       ? raw.category
       : "neutral";
 
-  return { name, category };
+  return isEmotionEnergyBand(raw.energy)
+    ? { name, category, energy: raw.energy }
+    : { name, category };
 }
 
 function parseHistoryEmotions(value: unknown): Emotion[] {
