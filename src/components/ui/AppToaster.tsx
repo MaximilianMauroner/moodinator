@@ -6,6 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { colors } from "@/constants/colors";
 import { fontFamilies, typography } from "@/constants/typography";
+import { useToastOffset } from "@/hooks/useToastOffset";
 import { useColorScheme } from "@/hooks/useColorScheme";
 
 function ToasterSafeAreaOverlay({
@@ -15,7 +16,7 @@ function ToasterSafeAreaOverlay({
 }) {
   return (
     <SafeAreaView
-      edges={["top", "left", "right"]}
+      edges={["left", "right"]}
       style={styles.overlaySafeArea}
       pointerEvents="box-none"
     >
@@ -28,23 +29,26 @@ function ToasterSafeAreaOverlay({
 
 export function AppToaster() {
   const colorScheme = useColorScheme();
+  const offset = useToastOffset();
   const isDark = colorScheme === "dark";
 
   return (
     <Toaster
       ToasterOverlayWrapper={ToasterSafeAreaOverlay}
       theme={isDark ? "dark" : "light"}
-      position="top-center"
-      offset={8}
+      position="bottom-center"
+      offset={offset}
       gap={8}
       visibleToasts={3}
       enableStacking
       swipeToDismissDirection="up"
       toastOptions={{
         style: {
-          borderRadius: 18,
+          borderRadius: 12,
+          padding: 12,
+          marginHorizontal: 0,
           borderWidth: 1,
-          backgroundColor: isDark ? colors.surface.dark : colors.surface.light,
+          backgroundColor: isDark ? colors.surfaceElevated.dark : colors.surfaceElevated.light,
           borderColor: isDark ? colors.border.dark : colors.border.light,
           shadowColor: isDark ? colors.background.dark : "#9D8660",
           shadowOffset: { width: 0, height: 3 },
@@ -55,6 +59,9 @@ export function AppToaster() {
         toastContainerStyle: {
           width: "100%",
           paddingHorizontal: 16,
+        },
+        toastContentStyle: {
+          gap: 12,
         },
         textContainerStyle: {
           rowGap: 2,
@@ -74,11 +81,11 @@ export function AppToaster() {
           gap: 6,
         },
         actionButtonStyle: {
-          backgroundColor: isDark ? colors.primaryBg.dark : colors.primaryBg.light,
+          backgroundColor: isDark ? colors.primaryBgHover.dark : colors.primaryBgHover.light,
           borderWidth: 1,
           borderColor: isDark ? "#4A6653" : "#D1DFD1",
-          borderRadius: 14,
-          minHeight: 36,
+          borderRadius: 10,
+          minHeight: 48,
           paddingHorizontal: 12,
           paddingVertical: 6,
         },
@@ -92,8 +99,8 @@ export function AppToaster() {
           backgroundColor: isDark ? colors.surfaceAlt.dark : colors.surfaceAlt.light,
           borderWidth: 1,
           borderColor: isDark ? colors.border.dark : colors.border.light,
-          borderRadius: 14,
-          minHeight: 36,
+          borderRadius: 10,
+          minHeight: 48,
           paddingHorizontal: 12,
           paddingVertical: 6,
         },
