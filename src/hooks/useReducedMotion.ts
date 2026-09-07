@@ -18,19 +18,27 @@ export function useReducedMotion(): boolean {
 
   useEffect(() => {
     let active = true;
+    let receivedChangeEvent = false;
+
+    const handleChange = (enabled: boolean) => {
+      receivedChangeEvent = true;
+      setReduced(enabled);
+    };
+
+    // Subscribe before querying so a newer event cannot be overwritten by the
+    // older snapshot returned from the asynchronous call.
+    const subscription = AccessibilityInfo.addEventListener(
+      "reduceMotionChanged",
+      handleChange
+    );
 
     AccessibilityInfo.isReduceMotionEnabled()
       .then((enabled) => {
-        if (active) setReduced(enabled);
+        if (active && !receivedChangeEvent) setReduced(enabled);
       })
       .catch(() => {
         // Platforms without the query keep motion enabled.
       });
-
-    const subscription = AccessibilityInfo.addEventListener(
-      "reduceMotionChanged",
-      setReduced
-    );
 
     return () => {
       active = false;

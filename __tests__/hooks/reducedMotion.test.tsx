@@ -115,6 +115,24 @@ describe("useReducedMotion", () => {
     expect(readText("probe")).toBe("false");
   });
 
+  it("does not let an older query overwrite a newer change event", async () => {
+    let resolveQuery!: (enabled: boolean) => void;
+    accessibility.isReduceMotionEnabled.mockReturnValue(
+      new Promise<boolean>((resolve) => {
+        resolveQuery = resolve;
+      })
+    );
+    await render(<Probe />);
+
+    await act(async () => {
+      accessibility.listeners.forEach((handler) => handler(true));
+    });
+    expect(readText("probe")).toBe("true");
+
+    await act(async () => resolveQuery(false));
+    expect(readText("probe")).toBe("true");
+  });
+
   it("removes its subscription on unmount", async () => {
     await render(<Probe />);
     expect(accessibility.listeners.size).toBe(1);
