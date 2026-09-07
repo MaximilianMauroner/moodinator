@@ -19,9 +19,9 @@
       "extends": "preview",
       "env": {
         "CMAKE_BUILD_PARALLEL_LEVEL": "2",
-        "GRADLE_OPTS": "-Dorg.gradle.workers.max=2 -Dorg.gradle.parallel=false",
+        "GRADLE_OPTS": "-Dorg.gradle.workers.max=2 -Dorg.gradle.parallel=false -Dorg.gradle.jvmargs=-Xmx1536m -Dkotlin.daemon.jvm.options=-Xmx768m",
         "NODE_ENV": "production",
-        "NODE_OPTIONS": "--max-old-space-size=2048",
+        "NODE_OPTIONS": "--max-old-space-size=1536",
         "ORG_GRADLE_PROJECT_reactNativeArchitectures": "arm64-v8a"
       }
     },
