@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { View, Text, Pressable, ScrollView } from "react-native";
 import Animated, {
     useSharedValue,
@@ -104,16 +104,33 @@ const EnergySegment: React.FC<{
 
 export const EnergySlider: React.FC<EnergySliderProps> = ({ value, onChange }) => {
     const { isDark, get, colors } = useThemeColors();
+    const scrollRef = useRef<ScrollView>(null);
     const fillColors = isDark
         ? colors.energySegmentColors.dark
         : colors.energySegmentColors.light;
+
+    useEffect(() => {
+        if (value === null) return;
+        scrollRef.current?.scrollTo({
+            x: Math.max(0, value * 52 - 96),
+            animated: false,
+        });
+    }, [value]);
 
     return (
         <View>
             {/* Segmented bar */}
             <ScrollView
+                ref={scrollRef}
                 horizontal
-                showsHorizontalScrollIndicator={false}
+                onContentSizeChange={() => {
+                    if (value !== null) {
+                        scrollRef.current?.scrollTo({
+                            x: Math.max(0, value * 52 - 96),
+                            animated: false,
+                        });
+                    }
+                }}
                 contentContainerClassName="flex-row gap-1"
                 className="mb-2"
             >
