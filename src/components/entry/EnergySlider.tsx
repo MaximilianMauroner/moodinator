@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from "react";
-import { View, Text, Pressable, ScrollView } from "react-native";
+import React, { useEffect } from "react";
+import { View, Text, Pressable } from "react-native";
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
@@ -21,7 +21,7 @@ const ENERGY_LABELS: Record<number, string> = {
     2: "Low",
     3: "Below avg",
     4: "A bit low",
-    5: "Moderate",
+    5: "Neutral",
     6: "Average",
     7: "Above avg",
     8: "High",
@@ -66,7 +66,7 @@ const EnergySegment: React.FC<{
                 scaleY.value = withSpring(isSelected ? 1.15 : 1, { damping: 14, stiffness: 380 });
             }}
             testID={`energy-level-${index}`}
-            style={{ width: 48, minHeight: 48, justifyContent: "center" }}
+            style={{ flex: 1, minWidth: 0, minHeight: 48, justifyContent: "center" }}
             accessibilityRole="button"
             accessibilityLabel={`Energy level ${index}: ${ENERGY_LABELS[index]}`}
             accessibilityState={{ selected: isSelected }}
@@ -104,52 +104,47 @@ const EnergySegment: React.FC<{
 
 export const EnergySlider: React.FC<EnergySliderProps> = ({ value, onChange }) => {
     const { isDark, get, colors } = useThemeColors();
-    const scrollRef = useRef<ScrollView>(null);
     const fillColors = isDark
         ? colors.energySegmentColors.dark
         : colors.energySegmentColors.light;
 
-    useEffect(() => {
-        if (value === null) return;
-        scrollRef.current?.scrollTo({
-            x: Math.max(0, value * 52 - 96),
-            animated: false,
-        });
-    }, [value]);
+    const rows = [
+        Array.from({ length: 5 }, (_, i) => i),
+        Array.from({ length: 5 }, (_, i) => i + 5),
+        [10],
+    ];
 
     return (
         <View>
-            {/* Segmented bar */}
-            <ScrollView
-                ref={scrollRef}
-                horizontal
-                onContentSizeChange={() => {
-                    if (value !== null) {
-                        scrollRef.current?.scrollTo({
-                            x: Math.max(0, value * 52 - 96),
-                            animated: false,
-                        });
-                    }
-                }}
-                contentContainerClassName="flex-row gap-1"
-                className="mb-2"
-            >
-                {Array.from({ length: 11 }, (_, i) => (
-                    <EnergySegment
-                        key={i}
-                        index={i}
-                        value={value}
-                        fillColor={fillColors[i]}
-                        emptyColorDark="rgba(61, 53, 42, 0.25)"
-                        emptyColorLight="rgba(229, 217, 191, 0.25)"
-                        isDark={isDark}
-                        onPress={() => {
-                            haptics.tick();
-                            onChange(value === i ? null : i);
-                        }}
-                    />
+            {/* Compact rows keep every level visible without horizontal scrolling. */}
+            <View className="mb-2 gap-2">
+                {rows.map((row) => (
+                    <View key={row[0]} className="flex-row gap-1.5">
+                        {Array.from({ length: 5 }, (_, column) => {
+                            const index = row[column];
+                            if (index === undefined) {
+                                return <View key={`empty-${column}`} className="flex-1" />;
+                            }
+
+                            return (
+                                <EnergySegment
+                                    key={index}
+                                    index={index}
+                                    value={value}
+                                    fillColor={fillColors[index]}
+                                    emptyColorDark="rgba(61, 53, 42, 0.25)"
+                                    emptyColorLight="rgba(229, 217, 191, 0.25)"
+                                    isDark={isDark}
+                                    onPress={() => {
+                                        haptics.tick();
+                                        onChange(value === index ? null : index);
+                                    }}
+                                />
+                            );
+                        })}
+                    </View>
                 ))}
-            </ScrollView>
+            </View>
 
             {/* Scale labels + current value */}
             <View className="flex-row items-center justify-between px-0.5 mb-2">

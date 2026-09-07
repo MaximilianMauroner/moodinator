@@ -12,7 +12,7 @@ import { haptics } from "@/lib/haptics";
 import {
     EMOTION_ENERGY_BAND_LABELS,
     EMOTION_ENERGY_BAND_ORDER,
-    getEmotionEnergyBand,
+    resolveEmotionEnergyBand,
     type EmotionEnergyBand,
 } from "@/lib/entrySettings";
 import type { Emotion } from "@db/types";
@@ -31,28 +31,20 @@ const CHIP_HEIGHT = 36;
 const CHIP_HIT_SLOP = { top: 6, bottom: 6, left: 3, right: 3 };
 const DISABLED_OPACITY = 0.28;
 
-// Emotions without an arousal rating (every custom emotion) keep their own group
-// at the end rather than being filed under an activation level nobody chose.
-const UNRATED = "unrated" as const;
-type EmotionGroup = EmotionEnergyBand | typeof UNRATED;
+type EmotionGroup = EmotionEnergyBand;
 
 const GROUP_LABELS: Record<EmotionGroup, string> = {
     ...EMOTION_ENERGY_BAND_LABELS,
-    [UNRATED]: "Your own",
 };
 
 // Bar heights for the small activation meter beside each band label.
 const GROUP_BARS: Record<EmotionGroup, number> = {
     high: 3,
-    steady: 2,
+    neutral: 2,
     low: 1,
-    [UNRATED]: 0,
 };
 
-const GROUP_ORDER: readonly EmotionGroup[] = [
-    ...EMOTION_ENERGY_BAND_ORDER,
-    UNRATED,
-];
+const GROUP_ORDER: readonly EmotionGroup[] = EMOTION_ENERGY_BAND_ORDER;
 
 // ─── Activation meter ───────────────────────────────────────────────────────
 const BandMeter: React.FC<{ filled: number; color: string; dimColor: string }> = ({
@@ -230,12 +222,11 @@ export const EmotionPicker: React.FC<EmotionPickerProps> = ({
     const grouped = useMemo(() => {
         const map: Record<EmotionGroup, Emotion[]> = {
             high: [],
-            steady: [],
+            neutral: [],
             low: [],
-            [UNRATED]: [],
         };
         for (const emotion of options) {
-            map[getEmotionEnergyBand(emotion.name) ?? UNRATED].push(emotion);
+            map[resolveEmotionEnergyBand(emotion)].push(emotion);
         }
         for (const group of GROUP_ORDER) {
             map[group].sort((a, b) => a.name.localeCompare(b.name));
@@ -340,13 +331,11 @@ export const EmotionPicker: React.FC<EmotionPickerProps> = ({
                 return (
                     <View key={group} className="mb-3.5">
                         <View className="flex-row items-center mb-2 gap-2">
-                            {group !== UNRATED && (
-                                <BandMeter
-                                    filled={GROUP_BARS[group]}
-                                    color={labelColor}
-                                    dimColor={meterDimColor}
-                                />
-                            )}
+                            <BandMeter
+                                filled={GROUP_BARS[group]}
+                                color={labelColor}
+                                dimColor={meterDimColor}
+                            />
                             <Text
                                 style={{
                                     fontSize: 11.5,

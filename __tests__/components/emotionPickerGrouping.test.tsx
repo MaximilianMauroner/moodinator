@@ -34,10 +34,10 @@ vi.mock("react-native-reanimated", async () => {
 const options: Emotion[] = [
   { name: "Excited", category: "positive" },   // high
   { name: "Angry", category: "negative" },     // high
-  { name: "Happy", category: "positive" },     // steady
+  { name: "Happy", category: "positive" },     // neutral
   { name: "Sad", category: "negative" },       // low
   { name: "Tired", category: "neutral" },      // low
-  { name: "Dissatisfied", category: "negative" }, // custom, unrated
+  { name: "Dissatisfied", category: "negative" }, // custom, defaults neutral
 ];
 
 let renderer: ReactTestRenderer;
@@ -73,13 +73,13 @@ describe("EmotionPicker energy bands", () => {
     const at = (label: string) => rendered.indexOf(label);
 
     expect(at("High energy")).toBeGreaterThanOrEqual(0);
-    expect(at("Steady")).toBeGreaterThan(at("High energy"));
-    expect(at("Low energy")).toBeGreaterThan(at("Steady"));
+    expect(at("Neutral")).toBeGreaterThan(at("High energy"));
+    expect(at("Low energy")).toBeGreaterThan(at("Neutral"));
 
     // Each emotion sits inside its own band.
     expect(at("Angry")).toBeGreaterThan(at("High energy"));
-    expect(at("Angry")).toBeLessThan(at("Steady"));
-    expect(at("Happy")).toBeGreaterThan(at("Steady"));
+    expect(at("Angry")).toBeLessThan(at("Neutral"));
+    expect(at("Happy")).toBeGreaterThan(at("Neutral"));
     expect(at("Happy")).toBeLessThan(at("Low energy"));
     expect(at("Tired")).toBeGreaterThan(at("Low energy"));
   });
@@ -90,21 +90,21 @@ describe("EmotionPicker energy bands", () => {
     );
     const rendered = texts();
     const high = rendered.indexOf("High energy");
-    const steady = rendered.indexOf("Steady");
-    const inHighBand = rendered.slice(high, steady);
+    const neutral = rendered.indexOf("Neutral");
+    const inHighBand = rendered.slice(high, neutral);
 
     expect(inHighBand).toContain("Excited"); // positive
     expect(inHighBand).toContain("Angry");   // negative
   });
 
-  it("keeps unrated custom emotions in their own group at the end", async () => {
+  it("defaults custom emotions without an energy band to neutral", async () => {
     await render(
       <EmotionPicker options={options} selected={[]} onChange={() => {}} />
     );
     const rendered = texts();
 
-    expect(rendered.indexOf("Your own")).toBeGreaterThan(rendered.indexOf("Low energy"));
-    expect(rendered.indexOf("Dissatisfied")).toBeGreaterThan(rendered.indexOf("Your own"));
+    expect(rendered.indexOf("Dissatisfied")).toBeGreaterThan(rendered.indexOf("Neutral"));
+    expect(rendered.indexOf("Dissatisfied")).toBeLessThan(rendered.indexOf("Low energy"));
   });
 
   it("omits a band that has no emotions", async () => {
@@ -119,8 +119,7 @@ describe("EmotionPicker energy bands", () => {
 
     expect(rendered).toContain("Low energy");
     expect(rendered).not.toContain("High energy");
-    expect(rendered).not.toContain("Steady");
-    expect(rendered).not.toContain("Your own");
+    expect(rendered).not.toContain("Neutral");
   });
 
   it("still exposes every option as a selectable control", async () => {

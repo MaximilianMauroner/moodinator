@@ -4,6 +4,13 @@ import {
   CURRENT_MOOD_SCALE_SNAPSHOT,
   getSupportedMoodScaleSnapshot,
 } from "../../domain/moodScale";
+import { isEmotionEnergyBand } from "../../domain/entrySettings";
+
+type SerializedEmotion = {
+  name: string;
+  category: "positive" | "negative" | "neutral";
+  energy?: import("../../domain/entrySettings").EmotionEnergyBand;
+};
 
 export { CURRENT_MOOD_SCALE_SNAPSHOT } from "../../domain/moodScale";
 
@@ -45,16 +52,24 @@ function deserializeArray(value: unknown): string[] {
 
 function isValidEmotionObject(
   item: unknown
-): item is { name: string; category: "positive" | "negative" | "neutral" } {
+): item is SerializedEmotion {
+  const candidate = item as Record<string, unknown>;
   return (
     typeof item === "object" &&
     item !== null &&
-    typeof (item as Record<string, unknown>).name === "string" &&
-    ((item as Record<string, unknown>).name as string).trim().length > 0 &&
-    ((item as Record<string, unknown>).category === "positive" ||
-      (item as Record<string, unknown>).category === "negative" ||
-      (item as Record<string, unknown>).category === "neutral")
+    typeof candidate.name === "string" &&
+    candidate.name.trim().length > 0 &&
+    (candidate.category === "positive" ||
+      candidate.category === "negative" ||
+      candidate.category === "neutral") &&
+    (candidate.energy === undefined || isEmotionEnergyBand(candidate.energy))
   );
+}
+
+function toEmotion(item: SerializedEmotion): Emotion {
+  return item.energy === undefined
+    ? { name: item.name.trim(), category: item.category }
+    : { name: item.name.trim(), category: item.category, energy: item.energy };
 }
 
 function deserializeEmotions(value: unknown): Emotion[] {
@@ -72,10 +87,7 @@ function deserializeEmotions(value: unknown): Emotion[] {
           return { name: item.trim(), category: "neutral" };
         }
         if (isValidEmotionObject(item)) {
-          return {
-            name: item.name.trim(),
-            category: item.category,
-          };
+          return toEmotion(item);
         }
         return null;
       })
@@ -172,10 +184,7 @@ export function sanitizeImportedEmotions(value: unknown): Emotion[] {
         return { name: item.trim(), category: "neutral" };
       }
       if (isValidEmotionObject(item)) {
-        return {
-          name: item.name.trim(),
-          category: item.category,
-        };
+        return toEmotion(item);
       }
       return null;
     })

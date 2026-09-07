@@ -61,11 +61,14 @@ export interface RunResult {
 /**
  * Raw emotion item that could be a string or object (for migration)
  */
+import type { EmotionEnergyBand } from "../../domain/entrySettings";
+
 export type RawEmotionItem =
   | string
   | {
       name: string;
       category?: "positive" | "negative" | "neutral";
+      energy?: EmotionEnergyBand;
     };
 
 /**

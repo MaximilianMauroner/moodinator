@@ -344,6 +344,37 @@ export const styles = StyleSheet.create({
   modalCategoryText: {
     fontSize: 14,
   },
+  modalEnergySection: {
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  modalEnergyTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  modalEnergyHint: {
+    fontSize: 12,
+    lineHeight: 17,
+    marginBottom: 12,
+  },
+  modalEnergyRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  modalEnergyPill: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 44,
+    paddingHorizontal: 8,
+    borderRadius: 14,
+    borderWidth: 1.5,
+  },
+  modalEnergyText: {
+    fontSize: 12,
+    textAlign: "center",
+  },
   modalInputRow: {
     paddingHorizontal: 20,
     marginBottom: 24,

@@ -4,6 +4,7 @@ import {
   EMOTION_ENERGY_BAND_LABELS,
   EMOTION_ENERGY_BAND_ORDER,
   getEmotionEnergyBand,
+  resolveEmotionEnergyBand,
 } from "../../src/lib/entrySettings";
 
 describe("getEmotionEnergyBand", () => {
@@ -38,7 +39,7 @@ describe("getEmotionEnergyBand", () => {
     expect(getEmotionEnergyBand("Angry")).toBe("high");
     expect(getEmotionEnergyBand("Relaxed")).toBe("low");
     expect(getEmotionEnergyBand("Sad")).toBe("low");
-    expect(getEmotionEnergyBand("Happy")).toBe("steady");
+    expect(getEmotionEnergyBand("Happy")).toBe("neutral");
   });
 
   test("ignores case and surrounding space", () => {
@@ -48,6 +49,19 @@ describe("getEmotionEnergyBand", () => {
   test("returns null for custom emotions rather than guessing", () => {
     expect(getEmotionEnergyBand("Dissatisfied")).toBeNull();
     expect(getEmotionEnergyBand("")).toBeNull();
+  });
+
+  test("resolves configured and missing custom energy values", () => {
+    expect(
+      resolveEmotionEnergyBand({ name: "Dissatisfied", category: "neutral" })
+    ).toBe("neutral");
+    expect(
+      resolveEmotionEnergyBand({
+        name: "Dissatisfied",
+        category: "neutral",
+        energy: "high",
+      })
+    ).toBe("high");
   });
 
   test("labels every band in render order", () => {

@@ -60,6 +60,7 @@ function canonicalizeHistoryEmotion(emotion: Emotion): Emotion | null {
   return {
     name,
     category: resolveEmotionCategory(emotion.category),
+    energy: emotion.energy ?? "neutral",
   };
 }
 
