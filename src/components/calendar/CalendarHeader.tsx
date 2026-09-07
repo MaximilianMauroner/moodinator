@@ -26,20 +26,20 @@ export function CalendarHeader({
   const { isDark, get } = useThemeColors();
 
   const handlePrevious = () => {
-    haptics.monthChange();
+    haptics.tick();
     onPrevious();
   };
 
   const handleNext = () => {
     if (canGoNext) {
-      haptics.monthChange();
+      haptics.tick();
       onNext();
     }
   };
 
   const handleToday = () => {
     if (!isCurrentMonth) {
-      haptics.light();
+      haptics.tick();
       onToday();
     }
   };

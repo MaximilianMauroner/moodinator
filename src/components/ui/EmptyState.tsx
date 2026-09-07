@@ -1,8 +1,12 @@
 import React from "react";
 import { View, Text, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import Animated, { FadeInUp, ZoomIn } from "react-native-reanimated";
 import { useThemeColors } from "@/constants/colors";
 import { typography } from "@/constants/typography";
+import { motion, springs } from "@/constants/motion";
+import { usePressAnimation } from "@/hooks/usePressAnimation";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { SurfaceCard } from "./SurfaceCard";
 import { IconBadge } from "./IconBadge";
 
@@ -32,7 +36,22 @@ export function EmptyState({
   tone = "sage",
 }: EmptyStateProps) {
   const { get, isDark } = useThemeColors();
+  const reducedMotion = useReducedMotion();
+  const press = usePressAnimation();
   const resolvedIcon = icon ?? "document-text-outline";
+
+  // The icon settles once, then the words arrive behind it. One shot, no loop.
+  const iconEntering = reducedMotion
+    ? undefined
+    : ZoomIn.springify()
+        .damping(springs.bouncy.damping)
+        .stiffness(springs.bouncy.stiffness);
+  const textEntering = (index: number) =>
+    reducedMotion
+      ? undefined
+      : FadeInUp.duration(motion.duration.normal).delay(
+          motion.stagger.tight * (index + 2)
+        );
   const haloSize = 96;
   const contentWidth = 272;
   const accent = {
@@ -56,7 +75,10 @@ export function EmptyState({
         contentStyle={{ alignItems: "center", paddingHorizontal: 24, paddingVertical: 28 }}
       >
         <View className="items-center w-full">
-          <View className="items-center justify-center mb-4">
+          <Animated.View
+            entering={iconEntering}
+            className="items-center justify-center mb-4"
+          >
             <View
               pointerEvents="none"
               className="absolute"
@@ -78,45 +100,52 @@ export function EmptyState({
             ) : (
               <IconBadge icon={resolvedIcon} tone={tone} size="lg" />
             )}
-          </View>
+          </Animated.View>
 
-          <Text
+          <Animated.Text
+            entering={textEntering(0)}
             className="text-center text-paper-800 dark:text-paper-200"
             style={[typography.titleMd, { maxWidth: contentWidth, marginBottom: 8 }]}
           >
             {title}
-          </Text>
+          </Animated.Text>
 
           {description && (
-            <Text
+            <Animated.Text
+              entering={textEntering(1)}
               className="text-center"
               style={[typography.bodyMd, { color: get("textMuted"), maxWidth: contentWidth }]}
             >
               {description}
-            </Text>
+            </Animated.Text>
           )}
 
           {actionLabel && onAction && (
             <Pressable
               onPress={onAction}
-              className="mt-6 px-6 rounded-2xl items-center justify-center"
-              style={({ pressed }) => [
-                {
-                  backgroundColor: get("primary"),
-                  minWidth: 132,
-                  minHeight: 44,
-                },
-                pressed ? { opacity: 0.85 } : null,
-              ]}
+              onPressIn={press.onPressIn}
+              onPressOut={press.onPressOut}
               accessibilityRole="button"
               accessibilityLabel={actionLabel}
             >
-              <Text
-                className="font-semibold"
-                style={[typography.bodyMd, { color: get("onPrimary") }]}
+              <Animated.View
+                className="mt-6 px-6 rounded-2xl items-center justify-center"
+                style={[
+                  {
+                    backgroundColor: get("primary"),
+                    minWidth: 132,
+                    minHeight: 44,
+                  },
+                  press.animatedStyle,
+                ]}
               >
-                {actionLabel}
-              </Text>
+                <Text
+                  className="font-semibold"
+                  style={[typography.bodyMd, { color: get("onPrimary") }]}
+                >
+                  {actionLabel}
+                </Text>
+              </Animated.View>
             </Pressable>
           )}
         </View>

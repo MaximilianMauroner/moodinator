@@ -1,13 +1,16 @@
-import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import React, { useCallback } from "react";
+import { View, Text, Pressable, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useColorScheme } from "nativewind";
 import { useRouter } from "expo-router";
+import Animated from "react-native-reanimated";
 import {
   colors as themeColors,
   effectColors,
   semanticToneColors,
 } from "@/constants/colors";
+import { haptics } from "@/lib/haptics";
+import { usePressAnimation } from "@/hooks/usePressAnimation";
 
 const settingsCategoryColors = {
   sage: {
@@ -42,7 +45,7 @@ const settingsCategoryColors = {
 
 type AccentColor = keyof typeof settingsCategoryColors;
 
-interface SettingsCategoryCardProps {
+export interface SettingsCategoryCardProps {
   title: string;
   description: string;
   icon: keyof typeof Ionicons.glyphMap;
@@ -64,6 +67,12 @@ export function SettingsCategoryCard({
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === "dark";
   const router = useRouter();
+  const press = usePressAnimation();
+
+  const handlePress = useCallback(() => {
+    haptics.tap();
+    router.push(href as never);
+  }, [href, router]);
 
   const palette = settingsCategoryColors[accentColor];
   const colors = {
@@ -75,15 +84,16 @@ export function SettingsCategoryCard({
   };
 
   return (
-    <TouchableOpacity
-      onPress={() => router.push(href as never)}
-      activeOpacity={0.7}
+    <Pressable
+      onPress={handlePress}
+      onPressIn={press.onPressIn}
+      onPressOut={press.onPressOut}
       accessibilityRole="button"
       accessibilityLabel={`${title} settings`}
     >
-      <View
+      <Animated.View
         className="rounded-3xl border border-paper-200 bg-paper-50 dark:border-paper-800 dark:bg-paper-800 overflow-hidden"
-        style={isDark ? styles.cardShadowDark : styles.cardShadowLight}
+        style={[isDark ? styles.cardShadowDark : styles.cardShadowLight, press.animatedStyle]}
       >
         {/* Left accent bar */}
         <View className="flex-row">
@@ -158,8 +168,8 @@ export function SettingsCategoryCard({
             </View>
           </View>
         </View>
-      </View>
-    </TouchableOpacity>
+      </Animated.View>
+    </Pressable>
   );
 }
 

@@ -131,11 +131,11 @@ export function MoodCalendar({
       }
 
       if (event.translationX > 0) {
-        haptics.monthChange();
+        haptics.tick();
         setTransitionDirection("previous");
         goToPreviousMonth();
       } else if (event.translationX < -80 && canGoNext) {
-        haptics.monthChange();
+        haptics.tick();
         setTransitionDirection("next");
         goToNextMonth();
       }

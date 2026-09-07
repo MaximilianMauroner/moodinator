@@ -1,9 +1,10 @@
-import React, { memo } from "react";
+import React, { memo, useCallback } from "react";
 import { Switch, Platform } from "react-native";
 import { useColorScheme } from "nativewind";
 import { Ionicons } from "@expo/vector-icons";
 import { SettingRow } from "./SettingRow";
 import { SETTINGS_ACCESSIBILITY } from "@/constants/accessibility";
+import { haptics } from "@/lib/haptics";
 
 export const ToggleRow = memo(function ToggleRow({
   title,
@@ -23,6 +24,15 @@ export const ToggleRow = memo(function ToggleRow({
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === "dark";
 
+  // A switch moves a value, so it fires the same level as any other selection.
+  const handleValueChange = useCallback(
+    (next: boolean) => {
+      haptics.tick();
+      onChange(next);
+    },
+    [onChange]
+  );
+
   return (
     <SettingRow
       label={title}
@@ -32,7 +42,7 @@ export const ToggleRow = memo(function ToggleRow({
       action={
         <Switch
           value={value}
-          onValueChange={onChange}
+          onValueChange={handleValueChange}
           trackColor={{
             false: isDark ? "#3D352A" : "#E5D9BF",
             true: "#5B8A5B",

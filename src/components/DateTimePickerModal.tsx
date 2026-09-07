@@ -75,7 +75,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
   };
 
   const handleSave = () => {
-    haptics.light();
+    haptics.commit();
     if (mood) {
       onSave(mood.id, selectedDate.getTime());
     }
@@ -83,7 +83,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
   };
 
   const handleCancel = () => {
-    haptics.light();
+    haptics.tap();
     onClose();
   };
 

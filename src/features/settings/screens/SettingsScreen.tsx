@@ -2,6 +2,9 @@ import React, { useCallback, useMemo, useState } from "react";
 import { View, Text, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "expo-router";
+import Animated, { FadeInUp } from "react-native-reanimated";
+import { motion, staggerDelay } from "@/constants/motion";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { dataPortabilityService } from "@/services/dataPortabilityService";
 import { useSettingsStore } from "@/shared/state/settingsStore";
 import { useMoodsStore } from "@/shared/state/moodsStore";
@@ -9,14 +12,33 @@ import { useAppLockStore } from "@/features/appLock";
 import { Ionicons } from "@expo/vector-icons";
 
 import { ProfileCard } from "../components/ProfileCard";
-import { SettingsCategoryCard } from "../components/SettingsCategoryCard";
+import {
+  SettingsCategoryCard,
+  type SettingsCategoryCardProps,
+} from "../components/SettingsCategoryCard";
 import { SettingsHeader } from "../components/SettingsHeader";
 import { ScreenBackgroundAccent } from "@/components/layout/ScreenBackgroundAccent";
+
+type SettingsSectionModel = {
+  items: (SettingsCategoryCardProps & { revealIndex: number })[];
+  title: string;
+};
 
 export function SettingsScreen() {
   const [backupCount, setBackupCount] = useState(0);
   const [statsError, setStatsError] = useState(false);
   const appLockEnabled = useAppLockStore((state) => state.isEnabled);
+  const reducedMotion = useReducedMotion();
+
+  // Cards rise in once on mount. The index keeps running across sections so the
+  // whole list reads as one sweep instead of four restarting groups.
+  const reveal = useCallback(
+    (index: number) =>
+      reducedMotion
+        ? undefined
+        : FadeInUp.duration(motion.duration.normal).delay(staggerDelay(index)),
+    [reducedMotion]
+  );
 
   const moods = useMoodsStore((state) => state.moods);
   const ensureFresh = useMoodsStore((state) => state.ensureFresh);
@@ -65,6 +87,119 @@ export function SettingsScreen() {
     quickEntryPrefs.showNotes,
   ].filter(Boolean).length;
 
+  const sections = useMemo<SettingsSectionModel[]>(() => {
+    const groups: { items: SettingsCategoryCardProps[]; title: string }[] = [
+      {
+        title: "Mood Tracking",
+        items: [
+          {
+            title: "Quick Entry",
+            description: "Choose fields shown while logging",
+            icon: "flash-outline",
+            href: "/settings/quick-entry",
+            accentColor: "sand",
+            badge: `${activeQuickEntryFields}/4`,
+          },
+          {
+            title: "Emotions",
+            description: "Manage your emotion presets",
+            icon: "heart-outline",
+            href: "/settings/emotions",
+            accentColor: "coral",
+            badge: emotions.length,
+          },
+          {
+            title: "Context Tags",
+            description: "Places, people, and recurring situations",
+            icon: "pricetag-outline",
+            href: "/settings/contexts",
+            accentColor: "dusk",
+            badge: contexts.length,
+          },
+        ],
+      },
+      {
+        title: "App Experience",
+        items: [
+          {
+            title: "Reminders",
+            description: "Manage check-in reminders",
+            icon: "notifications-outline",
+            href: "/notifications",
+            accentColor: "sage",
+          },
+          {
+            title: "Display",
+            description: "Labels, charts, and history cards",
+            icon: "eye-outline",
+            href: "/settings/display",
+            accentColor: "sage",
+          },
+        ],
+      },
+      {
+        title: "Privacy & Data",
+        items: [
+          {
+            title: "Security",
+            description: "App lock and local privacy controls",
+            icon: "lock-closed-outline",
+            href: "/settings/security",
+            accentColor: "sand",
+          },
+          {
+            title: "Data & Backups",
+            description: "Data export, import, and backups",
+            icon: "folder-outline",
+            href: "/settings/data",
+            accentColor: "sage",
+            preview:
+              backupCount > 0
+                ? `${backupCount} backup${backupCount === 1 ? "" : "s"} saved`
+                : undefined,
+          },
+          {
+            title: "Therapy Export",
+            description: "Create a report for your therapist",
+            icon: "medical-outline",
+            href: "/therapy-export",
+            accentColor: "dusk",
+          },
+        ],
+      },
+      {
+        title: "Support & Advanced",
+        items: [
+          {
+            title: "About",
+            description: "App info, support, and legal",
+            icon: "information-circle-outline",
+            href: "/settings/about",
+            accentColor: "dusk",
+          },
+          ...(__DEV__
+            ? ([
+                {
+                  title: "Developer",
+                  description: "Advanced options and testing",
+                  icon: "code-slash-outline",
+                  href: "/settings/developer",
+                  accentColor: "sand",
+                },
+              ] satisfies SettingsCategoryCardProps[])
+            : []),
+        ],
+      },
+    ];
+
+    // The reveal index runs across sections so the list arrives as one sweep.
+    let index = 0;
+    return groups.map((group) => ({
+      title: group.title,
+      items: group.items.map((item) => ({ ...item, revealIndex: index++ })),
+    }));
+  }, [activeQuickEntryFields, backupCount, contexts.length, emotions.length]);
+
   return (
     <SafeAreaView className="flex-1 bg-paper-100 dark:bg-paper-900" edges={["top"]}>
       <ScreenBackgroundAccent />
@@ -98,116 +233,25 @@ export function SettingsScreen() {
           )}
         </View>
 
-        {/* Categories */}
-        <Text className="text-xs font-semibold uppercase tracking-wider text-paper-700 dark:text-paper-400 mb-3 mt-2 ml-1">
-          Mood Tracking
-        </Text>
+        {sections.map((section, sectionIndex) => (
+          <View key={section.title}>
+            <Text
+              className={`text-xs font-semibold uppercase tracking-wider text-paper-700 dark:text-paper-400 mb-3 ml-1 ${
+                sectionIndex === 0 ? "mt-2" : "mt-6"
+              }`}
+            >
+              {section.title}
+            </Text>
 
-        <View className="gap-3">
-          <SettingsCategoryCard
-            title="Quick Entry"
-            description="Choose fields shown while logging"
-            icon="flash-outline"
-            href="/settings/quick-entry"
-            accentColor="sand"
-            badge={`${activeQuickEntryFields}/4`}
-          />
-
-          <SettingsCategoryCard
-            title="Emotions"
-            description="Manage your emotion presets"
-            icon="heart-outline"
-            href="/settings/emotions"
-            accentColor="coral"
-            badge={emotions.length}
-          />
-
-          <SettingsCategoryCard
-            title="Context Tags"
-            description="Places, people, and recurring situations"
-            icon="pricetag-outline"
-            href="/settings/contexts"
-            accentColor="dusk"
-            badge={contexts.length}
-          />
-        </View>
-
-        <Text className="text-xs font-semibold uppercase tracking-wider text-paper-700 dark:text-paper-400 mb-3 mt-6 ml-1">
-          App Experience
-        </Text>
-
-        <View className="gap-3">
-          <SettingsCategoryCard
-            title="Reminders"
-            description="Manage check-in reminders"
-            icon="notifications-outline"
-            href="/notifications"
-            accentColor="sage"
-          />
-
-          <SettingsCategoryCard
-            title="Display"
-            description="Labels, charts, and history cards"
-            icon="eye-outline"
-            href="/settings/display"
-            accentColor="sage"
-          />
-        </View>
-
-        <Text className="text-xs font-semibold uppercase tracking-wider text-paper-700 dark:text-paper-400 mb-3 mt-6 ml-1">
-          Privacy & Data
-        </Text>
-
-        <View className="gap-3">
-          <SettingsCategoryCard
-            title="Security"
-            description="App lock and local privacy controls"
-            icon="lock-closed-outline"
-            href="/settings/security"
-            accentColor="sand"
-          />
-
-          <SettingsCategoryCard
-            title="Data & Backups"
-            description="Data export, import, and backups"
-            icon="folder-outline"
-            href="/settings/data"
-            accentColor="sage"
-            preview={backupCount > 0 ? `${backupCount} backup${backupCount === 1 ? "" : "s"} saved` : undefined}
-          />
-
-          <SettingsCategoryCard
-            title="Therapy Export"
-            description="Create a report for your therapist"
-            icon="medical-outline"
-            href="/therapy-export"
-            accentColor="dusk"
-          />
-        </View>
-
-        <Text className="text-xs font-semibold uppercase tracking-wider text-paper-700 dark:text-paper-400 mb-3 mt-6 ml-1">
-          Support & Advanced
-        </Text>
-
-        <View className="gap-3">
-          <SettingsCategoryCard
-            title="About"
-            description="App info, support, and legal"
-            icon="information-circle-outline"
-            href="/settings/about"
-            accentColor="dusk"
-          />
-
-          {__DEV__ && (
-            <SettingsCategoryCard
-              title="Developer"
-              description="Advanced options and testing"
-              icon="code-slash-outline"
-              href="/settings/developer"
-              accentColor="sand"
-            />
-          )}
-        </View>
+            <View className="gap-3">
+              {section.items.map(({ revealIndex, ...card }) => (
+                <Animated.View key={card.href} entering={reveal(revealIndex)}>
+                  <SettingsCategoryCard {...card} />
+                </Animated.View>
+              ))}
+            </View>
+          </View>
+        ))}
       </ScrollView>
     </SafeAreaView>
   );

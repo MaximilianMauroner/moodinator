@@ -190,7 +190,7 @@ function EmotionModal({
                     key={cat}
                     onPress={() => {
                       if (isSelected) return;
-                      haptics.light();
+                      haptics.tick();
                       setCategory(cat);
                     }}
                     style={[
@@ -550,7 +550,7 @@ function MoveEmotionDialog({
                 <Pressable
                   key={category}
                   onPress={() => {
-                    haptics.light();
+                    haptics.tick();
                     onSelectCategory(category);
                   }}
                   style={[

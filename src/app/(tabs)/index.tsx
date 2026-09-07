@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
+  Pressable,
   RefreshControl,
   ScrollView as RNScrollView,
   type LayoutChangeEvent,
@@ -32,7 +33,6 @@ import {
   MoodEntryFormValues,
   QuickMoodEntryModal,
 } from "@/components/MoodEntryModal";
-import { HapticTab } from "@/components/HapticTab";
 import { DisplayMoodItem } from "@/components/DisplayMoodItem";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -53,6 +53,7 @@ import { useMoodModals } from "@/hooks/useMoodModals";
 import { useMoodItemActions } from "@/hooks/useMoodItemActions";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { haptics } from "@/lib/haptics";
 import { getHomeHeaderSnapTarget } from "@/lib/homeHeaderSnap";
 import { addHomeTabDoublePressListener } from "@/lib/homeTabEvents";
 
@@ -375,6 +376,7 @@ function HomeScreenContent() {
   }, [createMood, schedulePostSaveTopResets, scrollHomeListToTop]);
 
   const handleJumpToTopPress = useCallback(() => {
+    haptics.tap();
     scrollHomeListToTop();
   }, [scrollHomeListToTop]);
 
@@ -723,7 +725,7 @@ function HomeScreenContent() {
                   zIndex: 20,
                 }}
               >
-                <HapticTab
+                <Pressable
                   accessibilityHint="Scrolls the recent entries list back to the top"
                   accessibilityLabel="Jump to top"
                   accessibilityRole="button"
@@ -735,7 +737,7 @@ function HomeScreenContent() {
                     size={23}
                     color="#08150F"
                   />
-                </HapticTab>
+                </Pressable>
               </View>
             ) : null}
           </View>

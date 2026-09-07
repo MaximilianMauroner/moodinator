@@ -83,7 +83,7 @@ export default function NotificationDetailScreen() {
       setShowTimePicker(false);
     }
     if (selectedDate) {
-      haptics.selection();
+      haptics.tick();
       setHour(selectedDate.getHours());
       setMinute(selectedDate.getMinutes());
     }
@@ -91,19 +91,19 @@ export default function NotificationDetailScreen() {
 
   const handleSave = async () => {
     if (!title.trim()) {
-      haptics.warning();
+      haptics.reject();
       Alert.alert("Missing Title", "Please enter a title for your reminder");
       return;
     }
     if (!body.trim()) {
-      haptics.warning();
+      haptics.reject();
       Alert.alert("Missing Message", "Please enter a message for your reminder");
       return;
     }
 
     try {
       setSaving(true);
-      haptics.success();
+      haptics.commit();
       let scheduleWarning: ReturnType<typeof getReminderScheduleWarning> = null;
       if (isNew) {
         const createdNotification = await addNotification({
@@ -175,7 +175,7 @@ export default function NotificationDetailScreen() {
           >
             <Pressable
               onPress={() => {
-                haptics.light();
+                haptics.tap();
                 router.back();
               }}
               className="p-2 -ml-2 rounded-xl"
@@ -322,7 +322,7 @@ export default function NotificationDetailScreen() {
               </Text>
               <Pressable
                 onPress={() => {
-                  haptics.light();
+                  haptics.tap();
                   setShowTimePicker(true);
                 }}
                 className="rounded-xl px-4 py-4 flex-row items-center justify-between"
@@ -375,7 +375,7 @@ export default function NotificationDetailScreen() {
                   {Platform.OS === "ios" && (
                     <Pressable
                       onPress={() => {
-                        haptics.light();
+                        haptics.tap();
                         setShowTimePicker(false);
                       }}
                       className="py-3 items-center border-t"
@@ -436,7 +436,7 @@ export default function NotificationDetailScreen() {
               <Switch
                 value={enabled}
                 onValueChange={(value) => {
-                  haptics.selection();
+                  haptics.tick();
                   setEnabled(value);
                 }}
                 trackColor={{
