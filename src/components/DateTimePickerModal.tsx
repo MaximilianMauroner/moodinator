@@ -93,6 +93,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
   };
 
   const handleCancel = () => {
+    if (saving) return;
     haptics.tap();
     onClose();
   };
@@ -107,7 +108,9 @@ export const DateTimePickerModal: React.FC<Props> = ({
         transparent
         visible={visible}
         animationType="fade"
-        onRequestClose={onClose}
+        onRequestClose={() => {
+          if (!saving) onClose();
+        }}
       >
         <View
           className="flex-1 justify-center items-center px-4"
@@ -138,9 +141,11 @@ export const DateTimePickerModal: React.FC<Props> = ({
                 </Text>
                 <Pressable
                   onPress={handleCancel}
+                  disabled={saving}
                   className="h-11 w-11 items-center justify-center rounded-full"
                   accessibilityRole="button"
                   accessibilityLabel="Close entry details"
+                  accessibilityState={{ disabled: saving }}
                 >
                   <Ionicons
                     name="close-circle"
@@ -410,10 +415,12 @@ export const DateTimePickerModal: React.FC<Props> = ({
             >
               <Pressable
                 onPress={handleCancel}
+                disabled={saving}
                 className="flex-1 py-3.5 rounded-xl items-center"
                 style={{ backgroundColor: get("surfaceAlt") }}
                 accessibilityRole="button"
                 accessibilityLabel="Cancel date and time changes"
+                accessibilityState={{ disabled: saving }}
               >
                 <Text
                   className="font-semibold text-sm"
@@ -426,13 +433,16 @@ export const DateTimePickerModal: React.FC<Props> = ({
               {onEdit ? (
                 <Pressable
                   onPress={() => {
+                    if (saving) return;
                     onClose();
                     onEdit(mood);
                   }}
+                  disabled={saving}
                   className="flex-1 py-3.5 rounded-xl items-center"
                   style={{ backgroundColor: get("surfaceAlt") }}
                   accessibilityRole="button"
                   accessibilityLabel="Edit this entry"
+                  accessibilityState={{ disabled: saving }}
                 >
                   <Text className="font-semibold text-sm" style={{ color: isDark ? get("primary") : colors.positive.textDark.light }}>
                     Edit
