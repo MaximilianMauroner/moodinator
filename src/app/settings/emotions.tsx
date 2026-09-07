@@ -333,8 +333,6 @@ export default function EmotionsSettingsScreen() {
         return;
       }
 
-      haptics.commit();
-
       if (originalName && normalizedOld) {
         const originalEmotion = emotions.find(
           (emotion) => normalizePresetKey(emotion.name) === normalizedOld
@@ -401,6 +399,7 @@ export default function EmotionsSettingsScreen() {
         await setEmotions(result.values);
       }
 
+      haptics.commit();
       setIsModalVisible(false);
       setEditingEmotion(null);
     },

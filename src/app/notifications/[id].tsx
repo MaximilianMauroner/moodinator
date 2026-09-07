@@ -103,7 +103,6 @@ export default function NotificationDetailScreen() {
 
     try {
       setSaving(true);
-      haptics.commit();
       let scheduleWarning: ReturnType<typeof getReminderScheduleWarning> = null;
       if (isNew) {
         const createdNotification = await addNotification({
@@ -125,6 +124,8 @@ export default function NotificationDetailScreen() {
         scheduleWarning = getReminderScheduleResultWarning(result);
       }
 
+      haptics.commit();
+
       if (scheduleWarning) {
         Alert.alert(scheduleWarning.title, scheduleWarning.message, [
           { text: "OK", onPress: () => router.back() },
@@ -133,6 +134,7 @@ export default function NotificationDetailScreen() {
       }
       router.back();
     } catch (error) {
+      haptics.reject();
       console.error("Failed to save notification:", error);
       Alert.alert("Error", "Failed to save reminder");
     } finally {

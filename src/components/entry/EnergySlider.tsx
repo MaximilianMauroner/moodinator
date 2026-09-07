@@ -66,7 +66,7 @@ const EnergySegment: React.FC<{
                 scaleY.value = withSpring(isSelected ? 1.15 : 1, { damping: 14, stiffness: 380 });
             }}
             testID={`energy-level-${index}`}
-            style={{ minWidth: 48, minHeight: 48, flexGrow: 1, justifyContent: "center" }}
+            style={{ minHeight: 48, flex: 1, justifyContent: "center" }}
             accessibilityRole="button"
             accessibilityLabel={`Energy level ${index}: ${ENERGY_LABELS[index]}`}
             accessibilityState={{ selected: isSelected }}
@@ -111,7 +111,7 @@ export const EnergySlider: React.FC<EnergySliderProps> = ({ value, onChange }) =
     return (
         <View>
             {/* Segmented bar */}
-            <View className="flex-row flex-wrap gap-1 mb-2">
+            <View className="flex-row gap-1 mb-2">
                 {Array.from({ length: 11 }, (_, i) => (
                     <EnergySegment
                         key={i}

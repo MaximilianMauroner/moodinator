@@ -13,6 +13,12 @@ const accessibility = vi.hoisted(() => ({
   remove: vi.fn(),
 }));
 
+const reanimated = vi.hoisted(() => ({ reducedMotion: false }));
+
+vi.mock("react-native-reanimated", () => ({
+  useReducedMotion: () => reanimated.reducedMotion,
+}));
+
 vi.mock("react-native", () => ({
   Text: "Text",
   AccessibilityInfo: {
@@ -79,6 +85,7 @@ beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   accessibility.listeners.clear();
   accessibility.isReduceMotionEnabled.mockResolvedValue(false);
+  reanimated.reducedMotion = false;
   clock = createFrameClock();
 });
 
@@ -89,6 +96,7 @@ afterEach(async () => {
 
 describe("useReducedMotion", () => {
   it("reports the platform setting and follows later changes", async () => {
+    reanimated.reducedMotion = true;
     accessibility.isReduceMotionEnabled.mockResolvedValue(true);
     await render(<Probe />);
 

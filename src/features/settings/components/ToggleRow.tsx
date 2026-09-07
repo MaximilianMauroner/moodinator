@@ -27,8 +27,8 @@ export const ToggleRow = memo(function ToggleRow({
   // A switch moves a value, so it fires the same level as any other selection.
   const handleValueChange = useCallback(
     (next: boolean) => {
-      haptics.tick();
       onChange(next);
+      haptics.tick();
     },
     [onChange]
   );
