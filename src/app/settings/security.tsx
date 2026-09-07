@@ -154,6 +154,7 @@ export default function SecuritySettingsScreen() {
             description={hasPinSet ? "Require PIN or biometrics to open" : "Set up a PIN to enable"}
             value={isEnabled}
             onChange={handleToggleAppLock}
+            feedback="tap"
             icon="lock-closed-outline"
           />
 
@@ -163,6 +164,7 @@ export default function SecuritySettingsScreen() {
               description="Unlock with biometrics instead of PIN"
               value={biometricsEnabled}
               onChange={handleToggleBiometrics}
+              feedback="tap"
               icon="finger-print"
               isLast={!hasPinSet}
             />

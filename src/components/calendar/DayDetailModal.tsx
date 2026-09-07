@@ -27,12 +27,12 @@ export function DayDetailModal({
   const { isDark, get, getCategoryColors } = useThemeColors();
 
   const handleClose = () => {
-    haptics.light();
+    haptics.tap();
     onClose();
   };
 
   const handleEditEntry = (entry: MoodEntry) => {
-    haptics.selection();
+    haptics.tick();
     onEditEntry?.(entry);
   };
 

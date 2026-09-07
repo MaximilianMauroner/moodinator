@@ -4,6 +4,9 @@ import type { MoodEntry } from "@db/types";
 /**
  * Hook for managing modal visibility and related state.
  * Handles quick entry, detailed entry, editing, and date picker modals.
+ *
+ * Mood selectors own their press feedback, so opening a modal does not add a
+ * second haptic for the same gesture.
  */
 export function useMoodModals() {
   const [showDateModal, setShowDateModal] = useState(false);

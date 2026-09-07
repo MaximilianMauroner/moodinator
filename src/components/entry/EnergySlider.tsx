@@ -1,5 +1,5 @@
-import React, { useEffect } from "react";
-import { View, Text, Pressable } from "react-native";
+import React, { useEffect, useRef } from "react";
+import { View, Text, Pressable, ScrollView } from "react-native";
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
@@ -66,7 +66,7 @@ const EnergySegment: React.FC<{
                 scaleY.value = withSpring(isSelected ? 1.15 : 1, { damping: 14, stiffness: 380 });
             }}
             testID={`energy-level-${index}`}
-            style={{ minWidth: 48, minHeight: 48, flexGrow: 1, justifyContent: "center" }}
+            style={{ width: 48, minHeight: 48, justifyContent: "center" }}
             accessibilityRole="button"
             accessibilityLabel={`Energy level ${index}: ${ENERGY_LABELS[index]}`}
             accessibilityState={{ selected: isSelected }}
@@ -104,14 +104,36 @@ const EnergySegment: React.FC<{
 
 export const EnergySlider: React.FC<EnergySliderProps> = ({ value, onChange }) => {
     const { isDark, get, colors } = useThemeColors();
+    const scrollRef = useRef<ScrollView>(null);
     const fillColors = isDark
         ? colors.energySegmentColors.dark
         : colors.energySegmentColors.light;
 
+    useEffect(() => {
+        if (value === null) return;
+        scrollRef.current?.scrollTo({
+            x: Math.max(0, value * 52 - 96),
+            animated: false,
+        });
+    }, [value]);
+
     return (
         <View>
             {/* Segmented bar */}
-            <View className="flex-row flex-wrap gap-1 mb-2">
+            <ScrollView
+                ref={scrollRef}
+                horizontal
+                onContentSizeChange={() => {
+                    if (value !== null) {
+                        scrollRef.current?.scrollTo({
+                            x: Math.max(0, value * 52 - 96),
+                            animated: false,
+                        });
+                    }
+                }}
+                contentContainerClassName="flex-row gap-1"
+                className="mb-2"
+            >
                 {Array.from({ length: 11 }, (_, i) => (
                     <EnergySegment
                         key={i}
@@ -122,12 +144,12 @@ export const EnergySlider: React.FC<EnergySliderProps> = ({ value, onChange }) =
                         emptyColorLight="rgba(229, 217, 191, 0.25)"
                         isDark={isDark}
                         onPress={() => {
-                            haptics.selection();
+                            haptics.tick();
                             onChange(value === i ? null : i);
                         }}
                     />
                 ))}
-            </View>
+            </ScrollView>
 
             {/* Scale labels + current value */}
             <View className="flex-row items-center justify-between px-0.5 mb-2">
@@ -185,7 +207,7 @@ export const EnergySlider: React.FC<EnergySliderProps> = ({ value, onChange }) =
                     <Pressable
                         testID="energy-clear"
                         onPress={() => {
-                            haptics.selection();
+                            haptics.tick();
                             onChange(null);
                         }}
                         className="min-h-12 min-w-12 justify-center self-center px-4 py-1.5 rounded-full"

@@ -86,7 +86,7 @@ export function SetupPinScreen() {
         if (action === "disable") await setEnabled(false);
         if (action === "remove") await clearPin();
         if (action === "biometrics") await setBiometricsEnabled(params.value === "true");
-        haptics.success();
+        haptics.commit();
         router.back();
       } catch (error: unknown) {
         console.error("Failed to update app lock setting:", error);
@@ -107,11 +107,11 @@ export function SetupPinScreen() {
       try {
         const result = await attemptPin(candidate);
         if (result.status === "success") {
-          haptics.success();
+          haptics.commit();
           await finishAction(true);
           return;
         }
-        haptics.pinError();
+        haptics.reject();
         setPin("");
         if (result.status === "invalid") {
           const message = "Incorrect PIN. Try again.";
@@ -144,7 +144,7 @@ export function SetupPinScreen() {
       try {
         await savePin(newPin);
         if (!hasPinSet) await setEnabled(true);
-        haptics.success();
+        haptics.commit();
         Alert.alert(
           hasPinSet ? "PIN changed" : "PIN set",
           hasPinSet
@@ -192,7 +192,7 @@ export function SetupPinScreen() {
       if (candidate === pin) {
         void saveNewPin(pin);
       } else {
-        haptics.pinError();
+        haptics.reject();
         setConfirmPin("");
         const message = "PINs do not match. Try again.";
         setFeedback(message);

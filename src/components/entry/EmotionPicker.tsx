@@ -203,10 +203,10 @@ export const EmotionPicker: React.FC<EmotionPickerProps> = ({
         (emotion: Emotion) => {
             const isSelected = selectedNames.has(emotion.name);
             if (isSelected) {
-                haptics.selection();
+                haptics.tick();
                 onChange(selected.filter((e) => e.name !== emotion.name));
             } else if (!atLimit) {
-                haptics.selection();
+                haptics.tick();
                 onChange([...selected, emotion]);
             }
         },

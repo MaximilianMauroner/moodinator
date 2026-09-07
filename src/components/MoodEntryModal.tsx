@@ -308,14 +308,20 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                     fieldConfig
                 )
             );
-            haptics.moodLogged();
+            // A crisis level entry is still a successful write, but a celebratory
+            // confirmation reads as the wrong response. Pair it with the support
+            // alert instead, so the feedback matches what follows.
+            const offersCrisisSupport = shouldOfferCrisisSupport(mood);
+            if (offersCrisisSupport) haptics.reject();
+            else haptics.commit();
+
             onClose();
-            if (shouldOfferCrisisSupport(mood)) {
+            if (offersCrisisSupport) {
                 setTimeout(showCrisisSupportAlert, 250);
             }
         } catch (error) {
             console.error("Failed to save mood entry:", error);
-            haptics.error();
+            haptics.reject();
             Alert.alert(
                 "Save failed",
                 "Unable to save your entry. Please try again."
@@ -340,7 +346,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
         if (isLastStep) {
             handleSave();
         } else {
-            haptics.light();
+            haptics.tick();
             goToStep(currentStep + 1);
         }
     }, [currentStep, goToStep, handleSave, isLastStep]);
@@ -372,10 +378,10 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
 
     const handleBack = useCallback(() => {
         if (isFirstStep) {
-            haptics.light();
+            haptics.tap();
             closeWithConfirmation();
         } else {
-            haptics.light();
+            haptics.tick();
             goToStep(currentStep - 1);
         }
     }, [closeWithConfirmation, currentStep, goToStep, isFirstStep]);
@@ -385,7 +391,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
             const nextStep = event.nativeEvent.position;
             if (nextStep === currentStep) return;
 
-            haptics.light();
+            haptics.tick();
             setCurrentStep(nextStep);
         },
         [currentStep]
@@ -411,7 +417,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     );
 
     const toggleContext = useCallback((value: string) => {
-        haptics.selection();
+        haptics.tick();
         setContextTags((prev) =>
             prev.includes(value)
                 ? prev.filter((item) => item !== value)
@@ -425,7 +431,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
 
         if (!onCreateEmotion) {
             setNewEmotionError("Emotion list is not available.");
-            haptics.error();
+            haptics.reject();
             return false;
         }
 
@@ -435,7 +441,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
         );
         if (!alreadySelected && emotions.length >= 3) {
             setNewEmotionError("Remove one selected emotion first.");
-            haptics.warning();
+            haptics.reject();
             return false;
         }
 
@@ -459,11 +465,12 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                 return [...current, result.value];
             });
             setNewEmotionName("");
-            haptics[result.created ? "medium" : "light"]();
+            // A new preset is written to storage; an existing one is only selected.
+            haptics[result.created ? "commit" : "tick"]();
             return true;
         } catch {
             setNewEmotionError("Could not add emotion.");
-            haptics.error();
+            haptics.reject();
             return false;
         } finally {
             setIsAddingEmotion(false);
@@ -482,7 +489,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
 
         if (!onCreateContextTag) {
             setNewContextError("Context Tag List is not available.");
-            haptics.error();
+            haptics.reject();
             return false;
         }
 
@@ -505,11 +512,12 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                 return exists ? current : [...current, result.value];
             });
             setNewContextName("");
-            haptics[result.created ? "medium" : "light"]();
+            // A new preset is written to storage; an existing one is only selected.
+            haptics[result.created ? "commit" : "tick"]();
             return true;
         } catch {
             setNewContextError("Could not add context tag.");
-            haptics.error();
+            haptics.reject();
             return false;
         } finally {
             setIsAddingContext(false);
@@ -521,14 +529,14 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
         setNewEmotionCategory(getDefaultEmotionCategory(mood));
         setNewEmotionError(null);
         setCreatePresetModal("emotion");
-        haptics.light();
+        haptics.tap();
     }, [mood]);
 
     const openCreateContextModal = useCallback(() => {
         setNewContextName("");
         setNewContextError(null);
         setCreatePresetModal("context");
-        haptics.light();
+        haptics.tap();
     }, []);
 
     const closeCreatePresetModal = useCallback(() => {
@@ -716,7 +724,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                         onPress={() => {
                             if (category === newEmotionCategory) return;
                             setNewEmotionCategory(category);
-                            haptics.selection();
+                            haptics.tick();
                         }}
                         className="flex-1 items-center rounded-xl px-2 py-2"
                         style={{

@@ -7,6 +7,24 @@ import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { IconBadge } from "@/components/ui/IconBadge";
 import { typography } from "@/constants/typography";
 import { useThemeColors } from "@/constants/colors";
+import { useCountUp } from "@/hooks/useCountUp";
+
+/**
+ * Metrics arrive as numbers ("18") or preformatted strings ("4.2", "2-7").
+ * Only a plain number can count up; a range renders as it is.
+ */
+function parseCountableMetric(
+  metric: string | number
+): { decimals: number; value: number } | null {
+  const text = String(metric);
+  if (!/^-?\d+(\.\d+)?$/.test(text)) return null;
+
+  const value = Number(text);
+  if (!Number.isFinite(value)) return null;
+
+  const [, fraction = ""] = text.split(".");
+  return { decimals: fraction.length, value };
+}
 
 type InsightCardSharedProps = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -19,6 +37,7 @@ type InsightCardSharedProps = {
     value?: number;
   };
   metricColor?: string;
+  animateMetric?: boolean;
   variant?: "default" | "accent" | "warm";
 };
 
@@ -34,12 +53,22 @@ function InsightCardBase({
   interpretation,
   trend,
   metricColor,
+  animateMetric = true,
   compact,
   variant = "default",
 }: InsightCardBaseProps) {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === "dark";
   const { get } = useThemeColors();
+
+  const countable = parseCountableMetric(metric);
+  const counted = useCountUp(
+    animateMetric ? countable?.value ?? 0 : 0,
+    countable?.decimals ?? 0
+  );
+  const displayedMetric = countable && animateMetric
+    ? counted.toFixed(countable.decimals)
+    : metric;
 
   // Variant-based styling for visual hierarchy
   const getVariantStyles = () => {
@@ -104,8 +133,13 @@ function InsightCardBase({
           )}
         </View>
 
-        {/* Large metric display */}
-        <View className="flex-row items-baseline">
+        {/* Large metric display. The label reads the final value, never a frame. */}
+        <View
+          accessible
+          accessibilityRole="text"
+          accessibilityLabel={`${title}: ${metric}${metricSuffix ? ` ${metricSuffix}` : ""}`}
+          className="flex-row items-baseline"
+        >
           <Text
             className="text-paper-800 dark:text-paper-100"
             style={{
@@ -113,7 +147,7 @@ function InsightCardBase({
               color: metricColor || get("text"),
             }}
           >
-            {metric}
+            {displayedMetric}
           </Text>
           {metricSuffix && (
             <Text
