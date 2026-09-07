@@ -56,6 +56,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
   }, [mood?.emotions]);
 
   const handleDateChange = (_event: DateTimePickerEvent, date?: Date) => {
+    if (saving) return;
     if (Platform.OS === "android") {
       setShowDatePicker(false);
     }
@@ -65,6 +66,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
   };
 
   const handleTimeChange = (_event: DateTimePickerEvent, time?: Date) => {
+    if (saving) return;
     if (Platform.OS === "android") {
       setShowTimePicker(false);
     }
@@ -81,6 +83,8 @@ export const DateTimePickerModal: React.FC<Props> = ({
 
     try {
       setSaving(true);
+      setShowDatePicker(false);
+      setShowTimePicker(false);
       await onSave(mood.id, selectedDate.getTime());
       haptics.commit();
       onClose();
@@ -337,6 +341,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
                   {/* Date picker button */}
                   <Pressable
                     onPress={() => setShowDatePicker(true)}
+                    disabled={saving}
                     className="flex-1 flex-row items-center p-3 rounded-xl"
                     style={{
                       backgroundColor: get("surfaceAlt"),
@@ -345,6 +350,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
                     }}
                     accessibilityRole="button"
                     accessibilityLabel="Change entry date"
+                    accessibilityState={{ disabled: saving }}
                   >
                     <Ionicons
                       name="calendar-outline"
@@ -371,6 +377,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
                   {/* Time picker button */}
                   <Pressable
                     onPress={() => setShowTimePicker(true)}
+                    disabled={saving}
                     className="flex-row items-center p-3 rounded-xl"
                     style={{
                       backgroundColor: get("surfaceAlt"),
@@ -380,6 +387,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
                     }}
                     accessibilityRole="button"
                     accessibilityLabel="Change entry time"
+                    accessibilityState={{ disabled: saving }}
                   >
                     <Ionicons
                       name="time-outline"
@@ -478,6 +486,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
             {/* Date picker */}
             {showDatePicker && (
               <DateTimePicker
+                disabled={saving}
                 value={selectedDate}
                 mode="date"
                 display={Platform.OS === "ios" ? "spinner" : "default"}
@@ -488,6 +497,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
             {/* Time picker */}
             {showTimePicker && (
               <DateTimePicker
+                disabled={saving}
                 value={selectedDate}
                 mode="time"
                 display={Platform.OS === "ios" ? "spinner" : "default"}
