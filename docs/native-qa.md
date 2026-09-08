@@ -36,8 +36,9 @@ flow does not dismiss unexpected screens or skip failed steps.
 
 The flow checks all four onboarding pages, creates a detailed neutral mood with
 an emotion, energy, and note, restarts the process, and reads the saved fields in
-the edit form. It then updates the note, reopens the form to check it, deletes
-the entry, restores it with Undo, and opens and refreshes Insights.
+the edit form. It then updates the note, reopens the form to check it, opens
+and refreshes Insights, and deletes the entry. Undo is verified separately
+through the manual gesture journey below.
 
 The flow expects fresh QA data, the default entry fields, and English app text.
 It uses accessibility labels for actions and test IDs for repeated controls.
@@ -133,3 +134,11 @@ The smoke also opens Findings, Charts and Calendar with its one-entry fixture,
 checks the insufficient-sample message and the empty driver comparison, and
 returns to Findings. It does not establish populated chart correctness or
 large-history performance; use the fabricated comparisons above for those.
+
+Maestro 2.3.0 on the shared Android emulator can spend longer obtaining an
+accessibility hierarchy than the five-second Undo toast stays visible. Shorter
+settle waits and disabling system animations did not resolve this. The automated
+smoke checks persistent entry state and deletion; verify Undo separately by
+promptly tapping the visible button and checking the restored record. Do not
+extend the production toast lifetime or use fixed screen coordinates in the
+reusable smoke merely to accommodate this driver limitation.
