@@ -2,123 +2,160 @@ import React from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { HistoryFilterSheet } from "@/features/history/HistoryFilterSheet";
+import { ActiveFilterChips } from "@/features/history/ActiveFilterChips";
+import { datePresetRange } from "@/features/history/filterModel";
 
+const settings = vi.hoisted(() => ({
+  emotionOptions: [{ name: "Calm, connected", category: "positive" }] as {
+    name: string;
+    category: string;
+  }[],
+  contextOptions: ["Work", "Friends, family"],
+}));
 vi.mock("@/hooks/useEntrySettings", () => ({
-  useEntrySettings: () => ({
-    emotionOptions: [{ name: "Calm, connected", category: "positive" }],
-    contextOptions: ["Work", "Friends, family"],
-  }),
+  useEntrySettings: () => settings,
 }));
 
 const state = vi.hoisted(() => ({ filters: {}, setFilters: vi.fn() }));
 vi.mock("@/shared/state/moodsStore", () => ({
   useMoodsStore: (select: (value: typeof state) => unknown) => select(state),
 }));
+vi.mock("@/services/moodService", () => ({
+  moodService: {
+    getEmotionNames: vi.fn(async () => ["Calm, connected", "Retired feeling"]),
+    getContextTags: vi.fn(async () => ["Work", "Old, archived tag"]),
+  },
+}));
+vi.mock("@/lib/haptics", () => ({
+  haptics: { tick: vi.fn(), tap: vi.fn(), commit: vi.fn(), reject: vi.fn() },
+}));
 vi.mock("react-native", () => ({
+  KeyboardAvoidingView: "KeyboardAvoidingView",
   Modal: "Modal",
+  Platform: { OS: "android", select: (options: Record<string, unknown>) => options.default },
   Pressable: "Pressable",
   ScrollView: "ScrollView",
   Text: "Text",
   TextInput: "TextInput",
   View: "View",
+  useColorScheme: () => "dark",
 }));
-vi.mock("react-native-safe-area-context", () => ({
-  SafeAreaView: "SafeAreaView",
-}));
+vi.mock("react-native-safe-area-context", () => ({ SafeAreaView: "SafeAreaView" }));
 vi.mock("@expo/vector-icons", () => ({ Ionicons: "Ionicons" }));
+vi.mock("@react-native-community/datetimepicker", () => ({ default: "DateTimePicker" }));
+
 let renderer: ReactTestRenderer;
-beforeEach(async () => {
-  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
-  state.filters = {};
-  state.setFilters.mockReset();
+
+async function openSheet() {
   await act(async () => {
     renderer = create(<HistoryFilterSheet />);
   });
   await act(async () =>
-    renderer.root
-      .findByProps({ accessibilityLabel: "Filter history" })
-      .props.onPress(),
+    renderer.root.findByProps({ accessibilityLabel: "Filter history" }).props.onPress()
   );
+}
+
+/** The rendered element, skipping the component that passes the label down. */
+function hostByLabel(label: string) {
+  return renderer.root.find(
+    (node) =>
+      typeof node.type === "string" && node.props.accessibilityLabel === label
+  );
+}
+
+async function pressLabel(label: string) {
+  await act(async () => hostByLabel(label).props.onPress());
+}
+
+beforeEach(() => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  state.filters = {};
+  state.setFilters.mockReset();
+  settings.emotionOptions = [{ name: "Calm, connected", category: "positive" }];
+  settings.contextOptions = ["Work", "Friends, family"];
 });
+
 afterEach(async () => {
   await act(async () => renderer.unmount());
 });
-async function enter(label: string, value: string) {
-  await act(async () =>
-    renderer.root
-      .findByProps({ accessibilityLabel: label })
-      .props.onChangeText(value),
-  );
-}
-async function press(text: string) {
-  const node = renderer.root
-    .findAllByProps({ accessibilityRole: "button" })
-    .find((button) =>
-      button
-        .findAllByType("Text")
-        .some((label) => label.props.children === text),
-    );
-  await act(async () => node!.props.onPress());
-}
 
-test("combines Work, mood 7 or worse and this year, then clears filters", async () => {
+test("combines a context, a mood range and a date preset in one pass", async () => {
+  await openSheet();
+  await pressLabel("Contexts: Work");
+  await pressLabel("Mood 7, Struggling");
+  await pressLabel("Mood 10, Emergency");
   await act(async () =>
     renderer.root
-      .findByProps({ accessibilityLabel: "Contexts: Work" })
-      .props.onPress(),
+      .findByProps({ accessibilityLabel: "Note contains" })
+      .props.onChangeText("meeting")
   );
-  await enter("Mood lower bound (0–10)", "7");
-  await enter("Note contains", "meeting");
-  await press("Use this year");
-  await press("Apply filters");
-  const year = new Date().getFullYear();
+  await pressLabel("Last 7 days");
+  await pressLabel("Apply filters");
+
   expect(state.setFilters).toHaveBeenCalledWith({
     contexts: ["Work"],
     minMood: 7,
+    maxMood: 10,
     text: "meeting",
-    startDate: new Date(year, 0, 1).getTime(),
-    endDate: new Date(year, 11, 31, 23, 59, 59, 999).getTime(),
+    ...datePresetRange("7d", new Date()),
   });
   expect(renderer.root.findByType("Modal").props.visible).toBe(false);
-  await press("Clear filters");
-  expect(state.setFilters).toHaveBeenLastCalledWith({});
 });
 
-test("invalid dates and reversed mood bounds keep the sheet open without querying", async () => {
-  await enter("From date (YYYY-MM-DD)", "2026-02-30");
-  await press("Apply filters");
-  expect(state.setFilters).not.toHaveBeenCalled();
-  expect(
-    renderer.root.findByProps({ accessibilityRole: "alert" }).props.children,
-  ).toBe("Enter a valid date.");
-  await enter("From date (YYYY-MM-DD)", "");
-  await enter("Mood lower bound (0–10)", "9");
-  await enter("Mood upper bound (0–10)", "2");
-  await press("Apply filters");
-  expect(state.setFilters).not.toHaveBeenCalled();
-  expect(renderer.root.findByType("Modal").props.visible).toBe(true);
-});
+test("offers names from older entries alongside the current presets", async () => {
+  await openSheet();
+  await pressLabel("Emotions: Retired feeling");
+  await pressLabel("Contexts: Old, archived tag");
+  await pressLabel("Apply filters");
 
-test("preset chips and other names preserve commas as part of a single filter", async () => {
-  await act(async () =>
-    renderer.root
-      .findByProps({ accessibilityLabel: "Emotions: Calm, connected" })
-      .props.onPress(),
-  );
-  await act(async () =>
-    renderer.root
-      .findByProps({ accessibilityLabel: "Contexts: Friends, family" })
-      .props.onPress(),
-  );
-  await enter("Other contexts name", "Old, archived tag");
-  await act(async () =>
-    renderer.root
-      .findByProps({ accessibilityLabel: "Add contexts filter" })
-      .props.onPress(),
-  );
-  await press("Apply filters");
   expect(state.setFilters).toHaveBeenCalledWith({
-    emotions: ["Calm, connected"],
-    contexts: ["Friends, family", "Old, archived tag"],
+    emotions: ["Retired feeling"],
+    contexts: ["Old, archived tag"],
   });
+});
+
+test("reopening keeps the saved filters selected and clear empties them", async () => {
+  state.filters = { minMood: 4, maxMood: 4, contexts: ["Work"] };
+  await openSheet();
+
+  expect(hostByLabel("Contexts: Work").props.accessibilityState.checked).toBe(true);
+  expect(hostByLabel("Mood 4, Okay").props.accessibilityState.selected).toBe(true);
+
+  await pressLabel("Clear filters");
+  await pressLabel("Apply filters");
+  expect(state.setFilters).toHaveBeenCalledWith({});
+});
+
+test("a long emotion list collapses behind a count until expanded", async () => {
+  const many = Array.from({ length: 30 }, (_, index) => ({
+    name: `Feeling ${index}`,
+    category: "positive",
+  }));
+  settings.emotionOptions = many;
+  await openSheet();
+
+  // 30 presets plus the two names the mocked service reports from history.
+  expect(() => hostByLabel("Emotions: Feeling 25")).toThrow();
+  await pressLabel("Show all 32 emotions");
+  expect(hostByLabel("Emotions: Feeling 25")).toBeTruthy();
+
+  await pressLabel("Show fewer emotions");
+  expect(() => hostByLabel("Emotions: Feeling 25")).toThrow();
+});
+
+test("each active chip removes only its own filter", async () => {
+  state.filters = { minMood: 7, maxMood: 10, contexts: ["Work", "Friends"] };
+  await act(async () => {
+    renderer = create(<ActiveFilterChips />);
+  });
+
+  await pressLabel("Remove filter Work");
+  expect(state.setFilters).toHaveBeenCalledWith({
+    minMood: 7,
+    maxMood: 10,
+    contexts: ["Friends"],
+  });
+
+  await pressLabel("Clear all filters");
+  expect(state.setFilters).toHaveBeenLastCalledWith({});
 });

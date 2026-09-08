@@ -1,290 +1,467 @@
-import React, { useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   Text,
   TextInput,
   View,
 } from "react-native";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import type { MoodHistoryFilters } from "@/services/moodService";
+import { typography } from "@/constants/typography";
+import { useColorScheme } from "@/hooks/useColorScheme";
 import { useEntrySettings } from "@/hooks/useEntrySettings";
+import { haptics } from "@/lib/haptics";
+import { moodService, type MoodHistoryFilters } from "@/services/moodService";
 import { useMoodsStore } from "@/shared/state/moodsStore";
+import {
+  DATE_PRESETS,
+  EMPTY_MOOD_DRAFT,
+  datePresetRange,
+  defaultCustomRange,
+  describeFilters,
+  endOfDay,
+  matchDatePreset,
+  mergeFilterChoices,
+  moodRangeSummary,
+  pickMoodValue,
+  startOfDay,
+  type DatePresetId,
+  type MoodRangeDraft,
+} from "./filterModel";
+import {
+  ChoiceChip,
+  CollapsibleChoices,
+  MoodRangeRow,
+  SectionResetButton,
+  SheetSection,
+  filterPalette,
+} from "./HistoryFilterSheetParts";
 
-function dateText(value?: number) {
-  if (value === undefined) return "";
-  const date = new Date(value);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
-
-function parseDate(text: string, end: boolean): number | undefined {
-  if (!text.trim()) return undefined;
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text.trim());
-  if (!match) throw new Error("Use YYYY-MM-DD for dates.");
-  const [, year, month, day] = match.map(Number);
-  const date = new Date(year, month - 1, day);
-  if (
-    date.getFullYear() !== year ||
-    date.getMonth() !== month - 1 ||
-    date.getDate() !== day
-  )
-    throw new Error("Enter a valid date.");
-  if (end) date.setHours(23, 59, 59, 999);
-  return date.getTime();
-}
-
-function FilterChoices({
-  label,
-  options,
-  selected,
-  onChange,
-}: {
-  label: string;
-  options: string[];
-  selected: string[];
-  onChange: (names: string[]) => void;
-}) {
-  const [otherName, setOtherName] = useState("");
-  const choices = [...new Set([...options, ...selected])];
-  const toggle = (name: string) => {
-    onChange(
-      selected.includes(name)
-        ? selected.filter((value) => value !== name)
-        : [...selected, name],
-    );
-  };
-  const add = () => {
-    const name = otherName.trim();
-    if (name && !selected.includes(name)) onChange([...selected, name]);
-    setOtherName("");
-  };
-  return (
-    <View>
-      <Text className="mb-2 text-paper-900 dark:text-paper-100">{label}</Text>
-      <View className="flex-row flex-wrap gap-2">
-        {choices.map((name) => (
-          <Pressable
-            key={name}
-            accessibilityRole="checkbox"
-            accessibilityLabel={`${label}: ${name}`}
-            accessibilityState={{ checked: selected.includes(name) }}
-            onPress={() => toggle(name)}
-            className={
-              selected.includes(name)
-                ? "rounded-full bg-sage-600 px-3 py-2"
-                : "rounded-full border border-paper-300 px-3 py-2"
-            }
-          >
-            <Text
-              className={
-                selected.includes(name)
-                  ? "text-white"
-                  : "text-paper-900 dark:text-paper-100"
-              }
-            >
-              {name}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
-      <Text className="mt-3 mb-1 text-sm text-paper-700 dark:text-paper-300">
-        Missing a name from older entries? Add its exact name.
-      </Text>
-      <TextInput
-        accessibilityLabel={`Other ${label.toLowerCase()} name`}
-        value={otherName}
-        onChangeText={setOtherName}
-        onSubmitEditing={add}
-        autoCapitalize="none"
-        className="rounded-xl border border-paper-300 p-3 text-paper-900 dark:text-paper-100"
-      />
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`Add ${label.toLowerCase()} filter`}
-        onPress={add}
-        className="py-3"
-      >
-        <Text className="text-sage-700 dark:text-sage-300">Add name</Text>
-      </Pressable>
-    </View>
-  );
+function toggleName(names: string[], name: string): string[] {
+  return names.includes(name)
+    ? names.filter((value) => value !== name)
+    : [...names, name];
 }
 
 export function HistoryFilterSheet() {
+  const isDark = useColorScheme() === "dark";
+  const palette = filterPalette(isDark);
   const { emotionOptions, contextOptions } = useEntrySettings();
   const filters = useMoodsStore((state) => state.filters);
   const setFilters = useMoodsStore((state) => state.setFilters);
+
   const [visible, setVisible] = useState(false);
   const [text, setText] = useState("");
-  const [min, setMin] = useState("");
-  const [max, setMax] = useState("");
+  const [mood, setMood] = useState<MoodRangeDraft>(EMPTY_MOOD_DRAFT);
+  const [datePreset, setDatePreset] = useState<DatePresetId>("any");
+  const [customStart, setCustomStart] = useState(new Date());
+  const [customEnd, setCustomEnd] = useState(new Date());
+  const [picking, setPicking] = useState<"start" | "end" | null>(null);
   const [emotions, setEmotions] = useState<string[]>([]);
   const [contexts, setContexts] = useState<string[]>([]);
-  const [start, setStart] = useState("");
-  const [end, setEnd] = useState("");
-  const [error, setError] = useState("");
-  const open = () => {
+  // Names from older entries, so a preset that was renamed or removed stays
+  // filterable.
+  const [pastEmotions, setPastEmotions] = useState<string[]>([]);
+  const [pastContexts, setPastContexts] = useState<string[]>([]);
+
+  // Counts what the chip bar shows, so a date range reads as one filter.
+  const activeCount = useMemo(
+    () => describeFilters(filters, new Date()).length,
+    [filters],
+  );
+
+  const open = useCallback(() => {
+    const now = new Date();
+    const fallback = defaultCustomRange(now);
     setText(filters.text ?? "");
-    setMin(filters.minMood?.toString() ?? "");
-    setMax(filters.maxMood?.toString() ?? "");
+    setMood({
+      range:
+        filters.minMood === undefined && filters.maxMood === undefined
+          ? null
+          : { min: filters.minMood ?? 0, max: filters.maxMood ?? 10 },
+      anchor: null,
+    });
+    setDatePreset(matchDatePreset(filters, now));
+    setCustomStart(
+      filters.startDate === undefined ? fallback.start : new Date(filters.startDate),
+    );
+    setCustomEnd(
+      filters.endDate === undefined ? fallback.end : new Date(filters.endDate),
+    );
     setEmotions(filters.emotions ?? []);
     setContexts(filters.contexts ?? []);
-    setStart(dateText(filters.startDate));
-    setEnd(dateText(filters.endDate));
-    setError("");
+    setPicking(null);
     setVisible(true);
-  };
+    haptics.tap();
+    void Promise.all([
+      moodService.getEmotionNames(),
+      moodService.getContextTags(),
+    ]).then(([emotionNames, contextNames]) => {
+      setPastEmotions(emotionNames);
+      setPastContexts(contextNames);
+    });
+  }, [filters]);
+
+  const emotionChoices = useMemo(
+    () =>
+      mergeFilterChoices(
+        emotionOptions.map((emotion) => emotion.name),
+        pastEmotions,
+        emotions,
+      ),
+    [emotionOptions, pastEmotions, emotions],
+  );
+  const contextChoices = useMemo(
+    () => mergeFilterChoices(contextOptions, pastContexts, contexts),
+    [contextOptions, pastContexts, contexts],
+  );
+
+  const dirty =
+    Boolean(text.trim()) ||
+    mood.range !== null ||
+    datePreset !== "any" ||
+    emotions.length > 0 ||
+    contexts.length > 0;
+
   const apply = () => {
-    try {
-      const minMood = min.trim() ? Number(min) : undefined;
-      const maxMood = max.trim() ? Number(max) : undefined;
-      if (
-        [minMood, maxMood].some(
-          (value) =>
-            value !== undefined &&
-            (!Number.isInteger(value) || value < 0 || value > 10),
-        )
-      )
-        throw new Error("Mood bounds must be whole numbers from 0 to 10.");
-      if (minMood !== undefined && maxMood !== undefined && minMood > maxMood)
-        throw new Error("The lower mood bound must come first.");
-      const startDate = parseDate(start, false);
-      const endDate = parseDate(end, true);
-      if (
-        startDate !== undefined &&
-        endDate !== undefined &&
-        startDate > endDate
-      )
-        throw new Error("The start date must come first.");
-      const next: MoodHistoryFilters = {};
-      if (text.trim()) next.text = text.trim();
-      if (minMood !== undefined) next.minMood = minMood;
-      if (maxMood !== undefined) next.maxMood = maxMood;
-      if (emotions.length) next.emotions = emotions;
-      if (contexts.length) next.contexts = contexts;
-      if (startDate !== undefined) next.startDate = startDate;
-      if (endDate !== undefined) next.endDate = endDate;
-      void setFilters(next);
-      setVisible(false);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Check your filters.");
+    const next: MoodHistoryFilters = {};
+    if (text.trim()) next.text = text.trim();
+    if (mood.range) {
+      next.minMood = mood.range.min;
+      next.maxMood = mood.range.max;
     }
+    if (emotions.length) next.emotions = emotions;
+    if (contexts.length) next.contexts = contexts;
+    const range =
+      datePreset === "custom"
+        ? { startDate: startOfDay(customStart), endDate: endOfDay(customEnd) }
+        : datePresetRange(datePreset, new Date());
+    if (range.startDate !== undefined) next.startDate = range.startDate;
+    if (range.endDate !== undefined) next.endDate = range.endDate;
+    void setFilters(next);
+    setVisible(false);
   };
+
+  const clear = () => {
+    setText("");
+    setMood(EMPTY_MOOD_DRAFT);
+    setDatePreset("any");
+    setEmotions([]);
+    setContexts([]);
+    haptics.tick();
+  };
+
   return (
     <>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Filter history"
         onPress={open}
-        className="flex-row items-center gap-2 px-3 py-2"
+        className="flex-row items-center gap-1.5 rounded-full px-3"
+        style={{
+          backgroundColor: activeCount ? palette.band : palette.chipBg,
+          borderColor: activeCount ? palette.accent : palette.chipBorder,
+          borderWidth: 1,
+          minHeight: 32,
+        }}
       >
-        <Ionicons name="filter" size={20} color="#5B8A5B" />
-        <Text className="text-sage-700 dark:text-sage-300">
-          {Object.keys(filters).length ? "Filters active" : "Filter"}
+        <Ionicons name="filter" size={15} color={palette.accent} />
+        <Text
+          style={[typography.bodySm, { color: palette.accent, fontWeight: "600" }]}
+        >
+          Filter
         </Text>
+        {activeCount ? (
+          <View
+            className="items-center justify-center rounded-full"
+            style={{ backgroundColor: palette.accent, minWidth: 18, height: 18 }}
+          >
+            <Text
+              style={{
+                color: palette.onAccent,
+                fontSize: 11,
+                fontWeight: "700",
+              }}
+            >
+              {activeCount}
+            </Text>
+          </View>
+        ) : null}
       </Pressable>
+
       <Modal
         visible={visible}
         animationType="slide"
         presentationStyle="pageSheet"
         onRequestClose={() => setVisible(false)}
       >
-        <SafeAreaView className="flex-1 bg-paper-100 dark:bg-paper-900">
-          <ScrollView
-            contentContainerStyle={{ padding: 24, gap: 14 }}
-            keyboardShouldPersistTaps="handled"
-          >
-            <Text className="text-xl font-semibold text-paper-900 dark:text-paper-100">
-              Filter history
-            </Text>
-            <Text className="text-paper-700 dark:text-paper-300">
-              Lower mood scores are better. For mood 7 or worse, set the lower
-              bound to 7. All selected filters must match.
-            </Text>
-            {(
-              [
-                ["Note contains", text, setText],
-                ["Mood lower bound (0–10)", min, setMin],
-                ["Mood upper bound (0–10)", max, setMax],
-                ["From date (YYYY-MM-DD)", start, setStart],
-                ["Through date (YYYY-MM-DD)", end, setEnd],
-              ] as const
-            ).map(([label, value, onChangeText]) => (
-              <View key={label}>
-                <Text className="mb-1 text-paper-900 dark:text-paper-100">
-                  {label}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+        >
+          <SafeAreaView style={{ flex: 1, backgroundColor: palette.surface }}>
+            <View
+              className="flex-row items-center justify-between px-5 pb-3 pt-4"
+              style={{ borderBottomColor: palette.divider, borderBottomWidth: 1 }}
+            >
+              <Text style={[typography.titleMd, { color: palette.text }]}>
+                Filter history
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Close filters"
+                onPress={() => setVisible(false)}
+                hitSlop={10}
+                className="items-center justify-center rounded-full"
+                style={{ backgroundColor: palette.chipBg, height: 34, width: 34 }}
+              >
+                <Ionicons name="close" size={19} color={palette.text} />
+              </Pressable>
+            </View>
+
+            <ScrollView
+              contentContainerStyle={{ padding: 18, paddingBottom: 6 }}
+              keyboardShouldPersistTaps="handled"
+            >
+              <SheetSection title="When" palette={palette}>
+                <View className="flex-row flex-wrap gap-1.5">
+                  {DATE_PRESETS.map((preset) => (
+                    <ChoiceChip
+                      key={preset.id}
+                      label={preset.label}
+                      selected={datePreset === preset.id}
+                      accessibilityLabel={preset.label}
+                      palette={palette}
+                      onPress={() => {
+                        haptics.tick();
+                        setDatePreset(preset.id);
+                      }}
+                    />
+                  ))}
+                </View>
+                {datePreset === "custom" ? (
+                  <View className="mt-3 flex-row gap-2">
+                    {(
+                      [
+                        ["Start date", customStart, "start"],
+                        ["End date", customEnd, "end"],
+                      ] as const
+                    ).map(([label, value, which]) => (
+                      <Pressable
+                        key={which}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${label}, currently ${value.toLocaleDateString()}`}
+                        onPress={() => setPicking(which)}
+                        className="flex-1 rounded-2xl px-3 py-2"
+                        style={{
+                          backgroundColor: palette.chipBg,
+                          borderColor: palette.chipBorder,
+                          borderWidth: 1,
+                        }}
+                      >
+                        <Text style={[typography.bodySm, { color: palette.subtle }]}>
+                          {label}
+                        </Text>
+                        <Text
+                          style={[
+                            typography.bodyMd,
+                            { color: palette.text, fontWeight: "600" },
+                          ]}
+                        >
+                          {value.toLocaleDateString()}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                ) : null}
+              </SheetSection>
+
+              <SheetSection
+                title="Mood"
+                palette={palette}
+                action={
+                  mood.range ? (
+                    <SectionResetButton
+                      label="Any mood"
+                      palette={palette}
+                      onPress={() => setMood(EMPTY_MOOD_DRAFT)}
+                    />
+                  ) : undefined
+                }
+              >
+                <MoodRangeRow
+                  range={mood.range}
+                  palette={palette}
+                  onPick={(value) => {
+                    haptics.tick();
+                    setMood((current) => pickMoodValue(current, value));
+                  }}
+                />
+                <Text
+                  accessibilityLabel={`Mood filter: ${moodRangeSummary(mood.range)}`}
+                  className="mt-2"
+                  style={[typography.bodySm, { color: palette.subtle }]}
+                >
+                  {mood.anchor !== null
+                    ? "Tap a second number for a range"
+                    : `${moodRangeSummary(mood.range)} · 0 is best, 10 is worst`}
                 </Text>
-                <TextInput
-                  accessibilityLabel={label}
-                  value={value}
-                  onChangeText={onChangeText}
-                  autoCapitalize="none"
-                  className="rounded-xl border border-paper-300 p-3 text-paper-900 dark:text-paper-100"
+              </SheetSection>
+
+              {emotionChoices.length ? (
+                <SheetSection title="Emotions" palette={palette}>
+                  <CollapsibleChoices
+                    label="Emotions"
+                    choices={emotionChoices}
+                    selected={emotions}
+                    palette={palette}
+                    onToggle={(name) => {
+                      haptics.tick();
+                      setEmotions((current) => toggleName(current, name));
+                    }}
+                  />
+                </SheetSection>
+              ) : null}
+
+              {contextChoices.length ? (
+                <SheetSection title="Context" palette={palette}>
+                  <CollapsibleChoices
+                    label="Contexts"
+                    choices={contextChoices}
+                    selected={contexts}
+                    palette={palette}
+                    onToggle={(name) => {
+                      haptics.tick();
+                      setContexts((current) => toggleName(current, name));
+                    }}
+                  />
+                </SheetSection>
+              ) : null}
+
+              <SheetSection title="Note" palette={palette}>
+                <View
+                  className="flex-row items-center gap-2 rounded-2xl px-3"
+                  style={{
+                    backgroundColor: palette.chipBg,
+                    borderColor: palette.chipBorder,
+                    borderWidth: 1,
+                    minHeight: 42,
+                  }}
+                >
+                  <Ionicons name="search" size={16} color={palette.subtle} />
+                  <TextInput
+                    accessibilityLabel="Note contains"
+                    value={text}
+                    onChangeText={setText}
+                    placeholder="Search note text"
+                    placeholderTextColor={palette.subtle}
+                    autoCapitalize="none"
+                    className="flex-1"
+                    style={[typography.bodyMd, { color: palette.text }]}
+                  />
+                  {text ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Clear note search"
+                      onPress={() => setText("")}
+                      hitSlop={10}
+                    >
+                      <Ionicons name="close-circle" size={17} color={palette.subtle} />
+                    </Pressable>
+                  ) : null}
+                </View>
+              </SheetSection>
+            </ScrollView>
+
+            <View
+              className="flex-row gap-3 px-5 pb-2 pt-3"
+              style={{ borderTopColor: palette.divider, borderTopWidth: 1 }}
+            >
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Clear filters"
+                disabled={!dirty}
+                onPress={clear}
+                className="items-center justify-center rounded-2xl px-5"
+                style={{
+                  backgroundColor: palette.chipBg,
+                  borderColor: palette.chipBorder,
+                  borderWidth: 1,
+                  minHeight: 46,
+                  opacity: dirty ? 1 : 0.45,
+                }}
+              >
+                <Text
+                  style={[typography.bodyMd, { color: palette.text, fontWeight: "600" }]}
+                >
+                  Clear
+                </Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Apply filters"
+                onPress={apply}
+                className="flex-1 items-center justify-center rounded-2xl"
+                style={{ backgroundColor: palette.accent, minHeight: 46 }}
+              >
+                <Text
+                  style={[
+                    typography.bodyMd,
+                    { color: palette.onAccent, fontWeight: "700" },
+                  ]}
+                >
+                  Show results
+                </Text>
+              </Pressable>
+            </View>
+
+            {picking ? (
+              <View
+                style={{
+                  backgroundColor: palette.surface,
+                  borderTopColor: palette.divider,
+                  borderTopWidth: 1,
+                }}
+              >
+                {/* The iOS spinner stays mounted until it is dismissed, so it
+                    needs its own confirm row. Android uses a system dialog. */}
+                {Platform.OS === "ios" ? (
+                  <View className="flex-row items-center justify-between px-5 pt-3">
+                    <Text style={[typography.bodySm, { color: palette.subtle }]}>
+                      {picking === "start" ? "Start date" : "End date"}
+                    </Text>
+                    <SectionResetButton
+                      label="Done"
+                      palette={palette}
+                      onPress={() => setPicking(null)}
+                    />
+                  </View>
+                ) : null}
+                <DateTimePicker
+                  value={picking === "start" ? customStart : customEnd}
+                  mode="date"
+                  display={Platform.OS === "ios" ? "spinner" : "default"}
+                  maximumDate={picking === "start" ? customEnd : new Date()}
+                  minimumDate={picking === "start" ? undefined : customStart}
+                  onChange={(_event, date) => {
+                    if (Platform.OS !== "ios") setPicking(null);
+                    if (!date) return;
+                    if (picking === "start") setCustomStart(date);
+                    else setCustomEnd(date);
+                  }}
                 />
               </View>
-            ))}
-            <FilterChoices
-              label="Emotions"
-              options={emotionOptions.map((emotion) => emotion.name)}
-              selected={emotions}
-              onChange={setEmotions}
-            />
-            <FilterChoices
-              label="Contexts"
-              options={contextOptions}
-              selected={contexts}
-              onChange={setContexts}
-            />
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => {
-                const now = new Date();
-                setStart(`${now.getFullYear()}-01-01`);
-                setEnd(`${now.getFullYear()}-12-31`);
-              }}
-            >
-              <Text className="text-sage-700 dark:text-sage-300">
-                Use this year
-              </Text>
-            </Pressable>
-            {error ? (
-              <Text accessibilityRole="alert" className="text-red-600">
-                {error}
-              </Text>
             ) : null}
-            <Pressable
-              accessibilityRole="button"
-              onPress={apply}
-              className="rounded-xl bg-sage-600 p-4"
-            >
-              <Text className="text-center text-white">Apply filters</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => {
-                void setFilters({});
-                setVisible(false);
-              }}
-              className="p-3"
-            >
-              <Text className="text-center text-paper-900 dark:text-paper-100">
-                Clear filters
-              </Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => setVisible(false)}
-              className="p-3"
-            >
-              <Text className="text-center text-paper-900 dark:text-paper-100">
-                Cancel
-              </Text>
-            </Pressable>
-          </ScrollView>
-        </SafeAreaView>
+          </SafeAreaView>
+        </KeyboardAvoidingView>
       </Modal>
     </>
   );
 }
+
+export default HistoryFilterSheet;
