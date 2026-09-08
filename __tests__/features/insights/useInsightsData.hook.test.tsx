@@ -1,7 +1,7 @@
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createMockMoodEntry } from "../../db/mockClient";
-import * as patterns from "../../../src/features/insights/utils/patternDetection";
+import * as streaks from "../../../src/features/insights/utils/streaks";
 import { useInsightsData, type InsightsData } from "../../../src/features/insights/hooks/useInsightsData";
 import { useMoodsStore } from "../../../src/shared/state/moodsStore";
 
@@ -83,7 +83,7 @@ describe("useInsightsData hook", () => {
     useMoodsStore.getState().setLocal([
       createMockMoodEntry({ timestamp: new Date("2026-09-05T12:00:00").getTime() }),
     ]);
-    const calculate = vi.spyOn(patterns, "calculateStreak");
+    const calculate = vi.spyOn(streaks, "calculateStreak");
     await mount();
     expect(result.streak.current).toBe(1);
     await act(async () => { result.setPeriod("month"); });

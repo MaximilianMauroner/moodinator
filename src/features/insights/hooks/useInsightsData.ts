@@ -1,11 +1,10 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { addDays, endOfMonth, endOfWeek, startOfDay, startOfMonth, startOfWeek } from "date-fns";
 import { AppState } from "react-native";
-import { calculateStreak } from "../utils/patternDetection";
+import { calculateStreak } from "../utils/streaks";
 import { useFocusEffect } from "expo-router";
 import type { MoodEntry, MoodScaleSnapshot } from "@db/types";
 import type { TimePeriod } from "../components/TimePeriodSelector";
-import type { Pattern } from "../utils/patternDetection";
 import {
   buildMoodInsights,
   getNextPeriodDate,
@@ -38,7 +37,6 @@ export interface InsightsData {
 
   // Stats
   stats: PeriodStats;
-  patterns: Pattern[];
   streak: { current: number; longest: number };
 
   // Helpers
@@ -102,7 +100,7 @@ export function useInsightsData(): InsightsData {
     () => buildMoodInsights(allMoods, period, currentDate),
     [allMoods, period, currentDate]
   );
-  const { periodMoods, stats, patterns } = insights;
+  const { periodMoods, stats } = insights;
   const streak = useMemo(
     () => calculateStreak(allMoods, new Date(localDay)),
     [allMoods, localDay]
@@ -174,7 +172,6 @@ export function useInsightsData(): InsightsData {
     canGoNext,
     canGoPrevious,
     stats,
-    patterns,
     streak,
     getMoodLabel,
     getMoodColor,

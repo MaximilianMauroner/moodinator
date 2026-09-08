@@ -7,11 +7,9 @@ import { motion, staggerDelay } from "@/constants/motion";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { dataPortabilityService } from "@/services/dataPortabilityService";
 import { useSettingsStore } from "@/shared/state/settingsStore";
-import { useMoodsStore } from "@/shared/state/moodsStore";
 import { useAppLockStore } from "@/features/appLock";
 import { Ionicons } from "@expo/vector-icons";
 
-import { ProfileCard } from "../components/ProfileCard";
 import {
   SettingsCategoryCard,
   type SettingsCategoryCardProps,
@@ -26,7 +24,7 @@ type SettingsSectionModel = {
 
 export function SettingsScreen() {
   const [backupCount, setBackupCount] = useState(0);
-  const [statsError, setStatsError] = useState(false);
+  const [backupError, setBackupError] = useState(false);
   const appLockEnabled = useAppLockStore((state) => state.isEnabled);
   const reducedMotion = useReducedMotion();
 
@@ -40,44 +38,26 @@ export function SettingsScreen() {
     [reducedMotion]
   );
 
-  const moods = useMoodsStore((state) => state.moods);
-  const ensureFresh = useMoodsStore((state) => state.ensureFresh);
   const emotions = useSettingsStore((state) => state.emotions);
   const contexts = useSettingsStore((state) => state.contexts);
   const quickEntryPrefs = useSettingsStore((state) => state.quickEntryPrefs);
 
-  const loadStats = useCallback(async () => {
-    try {
-      setStatsError(false);
-      await ensureFresh();
-      const backupInfo = await dataPortabilityService.getBackupInfo();
-      setBackupCount(backupInfo.count);
-    } catch (error) {
-      setStatsError(true);
-      console.error("Failed to load stats:", error);
-    }
-  }, [ensureFresh]);
-
-  // Reload stats when screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      void loadStats();
-    }, [loadStats])
+      async function loadBackupInfo() {
+        try {
+          setBackupError(false);
+          const backupInfo = await dataPortabilityService.getBackupInfo();
+          setBackupCount(backupInfo.count);
+        } catch (error) {
+          setBackupError(true);
+          console.error("Failed to load backup info:", error);
+        }
+      }
+
+      void loadBackupInfo();
+    }, [])
   );
-
-  const entryCount = moods.length;
-  const daysTracking = useMemo(() => {
-    if (moods.length === 0) {
-      return 0;
-    }
-
-    return new Set(
-      moods.map((mood) => {
-        const date = new Date(mood.timestamp);
-        return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
-      })
-    ).size;
-  }, [moods]);
 
   // Count active quick entry fields
   const activeQuickEntryFields = [
@@ -130,7 +110,7 @@ export function SettingsScreen() {
           },
           {
             title: "Display",
-            description: "Labels, charts, and history cards",
+            description: "Mood labels, cards, and feedback",
             icon: "eye-outline",
             href: "/settings/display",
             accentColor: "sage",
@@ -210,9 +190,6 @@ export function SettingsScreen() {
         contentContainerStyle={{ paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Profile Card */}
-        <ProfileCard entryCount={entryCount} daysTracking={daysTracking} />
-
         <View className="mb-5 rounded-2xl border border-sage-200 dark:border-sage-700 bg-sage-50 dark:bg-sage-900/20 p-4">
           <View className="flex-row items-center">
             <Ionicons name="lock-closed" size={20} color="#5B8A5B" />
@@ -226,7 +203,7 @@ export function SettingsScreen() {
               </Text>
             </View>
           </View>
-          {statsError && (
+          {backupError && (
             <Text className="text-xs mt-2 text-coral-700 dark:text-coral-300">
               Some local status details could not be refreshed.
             </Text>

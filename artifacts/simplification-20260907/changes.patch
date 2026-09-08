@@ -1,0 +1,2337 @@
+diff --git a/.maestro/flows/onboarding.yaml b/.maestro/flows/onboarding.yaml
+index 70f1665..4e8f924 100644
+--- a/.maestro/flows/onboarding.yaml
++++ b/.maestro/flows/onboarding.yaml
+@@ -4,7 +4,7 @@ appId: com.lab4code.moodinator.qa
+ - tapOn: "Next onboarding page"
+ - assertVisible: "Track Your Mood"
+ - tapOn: "Next onboarding page"
+-- assertVisible: "Discover Patterns"
++- assertVisible: "Look Back"
+ - tapOn: "Next onboarding page"
+ - assertVisible: "Your Data, Your Control"
+ - tapOn: "Get started"
+diff --git a/.maestro/smoke.yaml b/.maestro/smoke.yaml
+index ad10091..be7b4c4 100644
+--- a/.maestro/smoke.yaml
++++ b/.maestro/smoke.yaml
+@@ -82,7 +82,7 @@ name: Isolated Android entry lifecycle
+ - tapOn: "Undo delete"
+ - assertVisible:
+     id: "mood-entry-actions-.*"
+-- tapOn: "Insights tab, view mood charts and analytics"
+-- assertVisible: "Patterns across 1 entry"
++- tapOn: "Insights tab, view mood history and summaries"
++- assertVisible: "Your history · 1 entry"
+ - tapOn: "Refresh insights"
+-- assertVisible: "Patterns across 1 entry"
++- assertVisible: "Your history · 1 entry"
+diff --git a/README.md b/README.md
+index 2d02312..28f6558 100644
+--- a/README.md
++++ b/README.md
+@@ -1,6 +1,6 @@
+ # Moodinator
+ 
+-A privacy-focused mood tracking app built with React Native. Track your emotional wellbeing, identify patterns, and gain insights without a Moodinator account or developer-operated data server.
++A privacy-focused mood tracking app built with React Native. Record how you feel and review your mood history without a Moodinator account or developer-operated data server.
+ 
+ ## Features
+ 
+@@ -9,13 +9,12 @@ A privacy-focused mood tracking app built with React Native. Track your emotiona
+ - **Quick entry** with tap for fast logging
+ - **Detailed entry** with long-press for comprehensive records
+ - Attach **emotions**, **context tags**, **energy**, and **notes**
+-- Add personal notes to each entry
+ 
+ ### Insights & Analytics
+-- **Interactive charts** showing mood trends over time
++- **Color-coded calendar** for browsing mood history
+ - **Weekly and monthly statistics**
+-- Pattern detection across emotions and contexts
+-- Streak tracking and milestones
++- Compare mood averages across periods
++- Streak tracking
+ 
+ ### Privacy First
+ - **Local-first storage**. No accounts, developer cloud sync, analytics, or ads
+diff --git a/TERMS_OF_SERVICE.md b/TERMS_OF_SERVICE.md
+index 4a52c22..f9ff1d8 100644
+--- a/TERMS_OF_SERVICE.md
++++ b/TERMS_OF_SERVICE.md
+@@ -1,6 +1,6 @@
+ # Terms of Service
+ 
+-**Last Updated: July 21, 2026**
++**Last Updated: September 7, 2026**
+ 
+ ## Agreement to Terms
+ 
+@@ -8,7 +8,7 @@ By downloading, installing, or using Moodinator ("the app"), you agree to these
+ 
+ ## Description and Permitted Use
+ 
+-Moodinator is a personal wellness tool that lets you record moods on a 0–10 scale, add notes and tags, configure local reminders, view on-device patterns and insights, and create exports and backups. On this scale, lower ratings are better; 9 is Crisis and 10 is Emergency.
++Moodinator is a personal wellness tool that lets you record moods on a 0–10 scale, add notes and tags, configure local reminders, view mood history and summaries on your device, and create exports and backups. On this scale, lower ratings are better; 9 is Crisis and 10 is Emergency.
+ 
+ You may use the app for lawful personal purposes. Do not use it to violate applicable law, interfere with the app's operation, or misrepresent the app or its source. Rights to use, copy, modify, merge, publish, distribute, sublicense, or sell copies of the open-source software are governed by the MIT License described below.
+ 
+@@ -22,7 +22,7 @@ Export flows may use a temporary app-cache file and the operating-system share s
+ 
+ ## Health and Medical Disclaimer
+ 
+-**Moodinator is a personal wellness journal. It is not a medical device and does not diagnose, treat, cure, or prevent any medical condition.** It does not provide medical advice, diagnosis, or treatment. Mood ratings, patterns, and insights are informational and may be incomplete or inaccurate. Consult a doctor or other qualified healthcare professional for medical advice, diagnosis, or treatment, and do not disregard professional advice because of information in the app.
++**Moodinator is a personal wellness journal. It is not a medical device and does not diagnose, treat, cure, or prevent any medical condition.** It does not provide medical advice, diagnosis, or treatment. Mood ratings and summaries are informational and may be incomplete or inaccurate. Consult a doctor or other qualified healthcare professional for medical advice, diagnosis, or treatment, and do not disregard professional advice because of information in the app.
+ 
+ Moodinator does not monitor entries, provide live crisis support, contact emergency services, or dispatch help. If you or another person may be in immediate danger, call your local emergency number. In the United States, you can call or text 988. Elsewhere, you can use <https://findahelpline.com/> to look for local support. Availability and accuracy of third-party services are outside Moodinator's control.
+ 
+diff --git a/__tests__/features/insights/moodInsights.test.ts b/__tests__/features/insights/moodInsights.test.ts
+index 5e49a64..3b5b145 100644
+--- a/__tests__/features/insights/moodInsights.test.ts
++++ b/__tests__/features/insights/moodInsights.test.ts
+@@ -1,4 +1,4 @@
+-import { calculateStreak } from "../../../src/features/insights/utils/patternDetection";
++import { calculateStreak } from "../../../src/features/insights/utils/streaks";
+ import { afterEach, describe, expect, it, vi } from "vitest";
+ 
+ import { createMockMoodEntry } from "../../db/mockClient";
+@@ -12,24 +12,15 @@ import {
+ function mood(
+   id: number,
+   value: number,
+-  localDateTime: string,
+-  overrides: Partial<ReturnType<typeof createMockMoodEntry>> = {}
++  localDateTime: string
+ ) {
+   return createMockMoodEntry({
+     id,
+     mood: value,
+     timestamp: new Date(localDateTime).getTime(),
+-    ...overrides,
+   });
+ }
+ 
+-const higherIsBetterScale = {
+-  version: 2,
+-  min: 0,
+-  max: 10,
+-  lowerIsBetter: false,
+-};
+-
+ describe("moodInsights", () => {
+   afterEach(() => {
+     vi.useRealTimers();
+@@ -52,7 +43,6 @@ describe("moodInsights", () => {
+     expect(insights.periodMoods.map((entry) => entry.id)).toEqual([2, 3]);
+     expect(insights.previousPeriodMoods.map((entry) => entry.id)).toEqual([1]);
+     expect(insights.stats.entryCount).toBe(2);
+-    expect(insights.patterns).toEqual([]);
+   });
+ 
+   it("calculates period navigation dates from the same module as the hook", () => {
+@@ -76,52 +66,6 @@ describe("moodInsights", () => {
+       .toBe(allMoods);
+   });
+ 
+-  it("runs pattern detection for month and all-time insights", () => {
+-    const allMoods = [
+-      mood(1, 9, "2024-03-01T12:00:00", {
+-        moodScale: higherIsBetterScale,
+-        emotions: [{ name: "Calm", category: "positive" }],
+-      }),
+-      mood(2, 9, "2024-03-02T12:00:00", {
+-        moodScale: higherIsBetterScale,
+-        emotions: [{ name: "Calm", category: "positive" }],
+-      }),
+-      mood(3, 9, "2024-03-03T12:00:00", {
+-        moodScale: higherIsBetterScale,
+-        emotions: [{ name: "Calm", category: "positive" }],
+-      }),
+-      mood(4, 2, "2024-03-04T12:00:00", {
+-        moodScale: higherIsBetterScale,
+-        emotions: [{ name: "Anxious", category: "negative" }],
+-      }),
+-      mood(5, 2, "2024-03-05T12:00:00", {
+-        moodScale: higherIsBetterScale,
+-        emotions: [{ name: "Anxious", category: "negative" }],
+-      }),
+-      mood(6, 2, "2024-03-06T12:00:00", {
+-        moodScale: higherIsBetterScale,
+-        emotions: [{ name: "Anxious", category: "negative" }],
+-      }),
+-      mood(7, 5, "2024-03-07T12:00:00"),
+-    ];
+-
+-    const insights = buildMoodInsights(
+-      allMoods,
+-      "month",
+-      new Date("2024-03-13T12:00:00")
+-    );
+-
+-    expect(insights.patterns).toEqual(
+-      expect.arrayContaining([
+-        expect.objectContaining({
+-          id: "emotion_correlation",
+-          type: "emotion",
+-          description: expect.stringContaining("Calm"),
+-        }),
+-      ])
+-    );
+-  });
+-
+   it("calculates streaks from the full Mood history", () => {
+     vi.useFakeTimers();
+     vi.setSystemTime(new Date("2024-03-13T12:00:00"));
+diff --git a/__tests__/features/insights/useInsightsData.hook.test.tsx b/__tests__/features/insights/useInsightsData.hook.test.tsx
+index 5f8b07a..ac2b2e2 100644
+--- a/__tests__/features/insights/useInsightsData.hook.test.tsx
++++ b/__tests__/features/insights/useInsightsData.hook.test.tsx
+@@ -1,7 +1,7 @@
+ import { act, create, type ReactTestRenderer } from "react-test-renderer";
+ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+ import { createMockMoodEntry } from "../../db/mockClient";
+-import * as patterns from "../../../src/features/insights/utils/patternDetection";
++import * as streaks from "../../../src/features/insights/utils/streaks";
+ import { useInsightsData, type InsightsData } from "../../../src/features/insights/hooks/useInsightsData";
+ import { useMoodsStore } from "../../../src/shared/state/moodsStore";
+ 
+@@ -83,7 +83,7 @@ describe("useInsightsData hook", () => {
+     useMoodsStore.getState().setLocal([
+       createMockMoodEntry({ timestamp: new Date("2026-09-05T12:00:00").getTime() }),
+     ]);
+-    const calculate = vi.spyOn(patterns, "calculateStreak");
++    const calculate = vi.spyOn(streaks, "calculateStreak");
+     await mount();
+     expect(result.streak.current).toBe(1);
+     await act(async () => { result.setPeriod("month"); });
+diff --git a/__tests__/lib/moodChartData.test.ts b/__tests__/lib/moodChartData.test.ts
+deleted file mode 100644
+index 64117c0..0000000
+--- a/__tests__/lib/moodChartData.test.ts
++++ /dev/null
+@@ -1,225 +0,0 @@
+-import { describe, test, expect } from "vitest";
+-import {
+-  processMoodDataForDailyChart,
+-  processWeeklyMoodData,
+-  sampleDataPoints,
+-  getDaysInRange,
+-} from "../../src/lib/moodChartData";
+-import type { MoodEntry } from "../../db/types";
+-
+-// ---------------------------------------------------------------------------
+-// Helpers
+-// ---------------------------------------------------------------------------
+-
+-const defaultScale = {
+-  version: 1 as const,
+-  min: 0 as const,
+-  max: 10 as const,
+-  lowerIsBetter: true as const,
+-};
+-
+-const higherIsBetterScale = {
+-  version: 2,
+-  min: 0,
+-  max: 10,
+-  lowerIsBetter: false,
+-};
+-
+-let nextId = 1;
+-
+-function mood(
+-  value: number,
+-  isoDate: string,
+-  hour = 12,
+-  moodScale: MoodEntry["moodScale"] = defaultScale
+-): MoodEntry {
+-  return {
+-    id: nextId++,
+-    mood: value,
+-    note: null,
+-    timestamp: new Date(`${isoDate}T${String(hour).padStart(2, "0")}:00:00Z`).getTime(),
+-    emotions: [],
+-    contextTags: [],
+-    energy: null,
+-    moodScale,
+-    basedOnEntryId: null,
+-  };
+-}
+-
+-// ---------------------------------------------------------------------------
+-// getDaysInRange
+-// ---------------------------------------------------------------------------
+-
+-describe("getDaysInRange", () => {
+-  // Tracer bullet
+-  test("returns a single day when start equals end", () => {
+-    const d = new Date("2024-01-15T12:00:00Z");
+-    const days = getDaysInRange(d, d);
+-    expect(days).toHaveLength(1);
+-  });
+-
+-  test("includes every day between start and end inclusive", () => {
+-    const start = new Date("2024-01-01T12:00:00Z");
+-    const end = new Date("2024-01-05T12:00:00Z");
+-    const days = getDaysInRange(start, end);
+-    expect(days).toHaveLength(5);
+-  });
+-});
+-
+-// ---------------------------------------------------------------------------
+-// sampleDataPoints
+-// ---------------------------------------------------------------------------
+-
+-describe("sampleDataPoints", () => {
+-  // Tracer bullet
+-  test("returns data unchanged when count is within the limit", () => {
+-    const data = [{ timestamp: 1000 }, { timestamp: 2000 }, { timestamp: 3000 }];
+-    expect(sampleDataPoints(data, 10)).toEqual(data);
+-  });
+-
+-  test("returns exactly maxPoints items when count exceeds the limit", () => {
+-    const data = Array.from({ length: 100 }, (_, i) => ({ timestamp: i * 1000 }));
+-    const sampled = sampleDataPoints(data, 10);
+-    expect(sampled).toHaveLength(10);
+-  });
+-
+-  test("always preserves the first and last data points", () => {
+-    const data = Array.from({ length: 100 }, (_, i) => ({ timestamp: i * 1000 }));
+-    const sampled = sampleDataPoints(data, 10);
+-    expect(sampled[0].timestamp).toBe(0);
+-    expect(sampled[sampled.length - 1].timestamp).toBe(99_000);
+-  });
+-});
+-
+-// ---------------------------------------------------------------------------
+-// processMoodDataForDailyChart
+-// ---------------------------------------------------------------------------
+-
+-describe("processMoodDataForDailyChart", () => {
+-  // Tracer bullet
+-  test("returns empty labels and aggregates for no moods", () => {
+-    const result = processMoodDataForDailyChart([]);
+-    expect(result.labels).toEqual([]);
+-    expect(result.dailyAggregates).toEqual([]);
+-  });
+-
+-  test("returns one aggregate with hasRealData true for a single mood entry", () => {
+-    const { dailyAggregates } = processMoodDataForDailyChart([mood(3, "2024-01-15")]);
+-    expect(dailyAggregates).toHaveLength(1);
+-    expect(dailyAggregates[0].hasRealData).toBe(true);
+-    expect(dailyAggregates[0].isInterpolated).toBe(false);
+-    expect(dailyAggregates[0].finalAvg).toBe(3);
+-  });
+-
+-  test("averages multiple Mood Entries on the same day", () => {
+-    const moods = [
+-      mood(2, "2024-01-15"),
+-      mood(6, "2024-01-15"),
+-    ];
+-    const { dailyAggregates } = processMoodDataForDailyChart(moods);
+-    expect(dailyAggregates).toHaveLength(1);
+-    expect(dailyAggregates[0].finalAvg).toBe(4);
+-    expect(dailyAggregates[0].moods).toEqual([2, 6]);
+-  });
+-
+-  test("normalizes stored scale references before daily aggregation", () => {
+-    const moods = [
+-      mood(9, "2024-01-15", 12, higherIsBetterScale),
+-      mood(3, "2024-01-15"),
+-    ];
+-    const { dailyAggregates } = processMoodDataForDailyChart(moods);
+-
+-    expect(dailyAggregates[0].finalAvg).toBe(2);
+-    expect(dailyAggregates[0].moods).toEqual([1, 3]);
+-  });
+-
+-  test("linearly interpolates a gap day between two real days", () => {
+-    // Jan 1: mood 2, Jan 3: mood 6 → Jan 2 should interpolate to 4
+-    const moods = [mood(2, "2024-01-01"), mood(6, "2024-01-03")];
+-    const { dailyAggregates } = processMoodDataForDailyChart(moods);
+-
+-    expect(dailyAggregates).toHaveLength(3);
+-
+-    const gapDay = dailyAggregates[1];
+-    expect(gapDay.hasRealData).toBe(false);
+-    expect(gapDay.isInterpolated).toBe(true);
+-    expect(gapDay.finalAvg).toBeCloseTo(4, 5);
+-  });
+-
+-  test("excludes Mood Entries older than the numDays window", () => {
+-    const moods = [
+-      mood(8, "2024-01-01"), // 9 days before most recent
+-      mood(3, "2024-01-10"),
+-    ];
+-    // With numDays=5 the cutoff is Jan 6, so Jan 1 is excluded
+-    const { dailyAggregates } = processMoodDataForDailyChart(moods, 5);
+-    expect(dailyAggregates).toHaveLength(1);
+-    expect(dailyAggregates[0].finalAvg).toBe(3);
+-  });
+-
+-  test("labels each aggregate with the day-of-month string", () => {
+-    const moods = [mood(5, "2024-01-07"), mood(5, "2024-01-09")];
+-    const { labels } = processMoodDataForDailyChart(moods);
+-    // Jan 7, gap Jan 8, Jan 9
+-    expect(labels).toEqual(["7", "8", "9"]);
+-  });
+-});
+-
+-// ---------------------------------------------------------------------------
+-// processWeeklyMoodData
+-// ---------------------------------------------------------------------------
+-
+-describe("processWeeklyMoodData", () => {
+-  // Use a fixed reference date so the maxWeeks cutoff is deterministic
+-  const REF = new Date("2024-02-01T12:00:00Z"); // reference "today" for all weekly tests
+-
+-  // Tracer bullet
+-  test("returns empty labels and aggregates for no moods", () => {
+-    const result = processWeeklyMoodData([], 52, REF);
+-    expect(result.labels).toEqual([]);
+-    expect(result.weeklyAggregates).toEqual([]);
+-  });
+-
+-  test("uses the median as finalAvg, not the mean", () => {
+-    // [1, 1, 9]: mean ≈ 3.67, but median = 1
+-    // Jan 1 2024 is a Monday — well within 52 weeks of REF
+-    const moods = [
+-      mood(1, "2024-01-01"),
+-      mood(1, "2024-01-02"),
+-      mood(9, "2024-01-03"),
+-    ];
+-    const { weeklyAggregates } = processWeeklyMoodData(moods, 52, REF);
+-    expect(weeklyAggregates).toHaveLength(1);
+-    expect(weeklyAggregates[0].finalAvg).toBe(1); // median
+-    expect(weeklyAggregates[0].avg).toBeCloseTo(11 / 3, 5); // mean stored separately
+-  });
+-
+-  test("stores the mean avg alongside the median finalAvg", () => {
+-    // [2, 4, 9]: mean = 5, q2 (sorted index 1) = 4
+-    const moods = [mood(2, "2024-01-01"), mood(4, "2024-01-02"), mood(9, "2024-01-03")];
+-    const { weeklyAggregates } = processWeeklyMoodData(moods, 52, REF);
+-    expect(weeklyAggregates[0].avg).toBeCloseTo(5, 5);    // mean
+-    expect(weeklyAggregates[0].finalAvg).toBe(4);          // q2 median, not mean
+-  });
+-
+-  test("normalizes stored scale references before weekly quartiles", () => {
+-    const moods = [
+-      mood(9, "2024-01-01", 12, higherIsBetterScale),
+-      mood(3, "2024-01-02"),
+-      mood(8, "2024-01-03"),
+-    ];
+-    const { weeklyAggregates } = processWeeklyMoodData(moods, 52, REF);
+-
+-    expect(weeklyAggregates[0].moods).toEqual([1, 3, 8]);
+-    expect(weeklyAggregates[0].finalAvg).toBe(3);
+-  });
+-
+-  test("groups Mood Entries from different weeks into separate aggregates", () => {
+-    const moods = [
+-      mood(3, "2024-01-01"), // week starting Dec 25 2023 (Mon)
+-      mood(7, "2024-01-08"), // week starting Jan 8 2024 (Mon)
+-    ];
+-    const { weeklyAggregates } = processWeeklyMoodData(moods, 52, REF);
+-    expect(weeklyAggregates).toHaveLength(2);
+-  });
+-});
+diff --git a/__tests__/lib/moodPresentation.test.ts b/__tests__/lib/moodPresentation.test.ts
+index 40f510c..df9709d 100644
+--- a/__tests__/lib/moodPresentation.test.ts
++++ b/__tests__/lib/moodPresentation.test.ts
+@@ -1,17 +1,7 @@
+ import { describe, test, expect } from "vitest";
+-import {
+-  getMoodHex,
+-  getMoodInterpretation,
+-  getMoodScaleColor,
+-  getMoodScaleBg,
+-  getTrendInterpretation,
+-} from "../../src/lib/moodPresentation";
++import { getMoodHex } from "../../src/lib/moodPresentation";
+ import { moodScale } from "../../src/constants/moodScale";
+ 
+-// ---------------------------------------------------------------------------
+-// getMoodHex
+-// ---------------------------------------------------------------------------
+-
+ describe("getMoodHex", () => {
+   // Tracer bullet — verify it reads from moodScale.textHex, not a stale colorMap
+   test("returns the textHex from the Mood Scale for a known Mood Rating value", () => {
+@@ -39,98 +29,3 @@ describe("getMoodHex", () => {
+     expect(getMoodHex(3.4)).toBe(value3.textHex);
+   });
+ });
+-
+-// ---------------------------------------------------------------------------
+-// getMoodScaleColor / getMoodScaleBg
+-// ---------------------------------------------------------------------------
+-
+-describe("getMoodScaleColor and getMoodScaleBg", () => {
+-  test("returns the Tailwind text class for a known Mood Rating value", () => {
+-    const neutral = moodScale.find((m) => m.value === 5)!;
+-    expect(getMoodScaleColor(5)).toBe(neutral.color);
+-  });
+-
+-  test("returns the Tailwind bg class for a known Mood Rating value", () => {
+-    const neutral = moodScale.find((m) => m.value === 5)!;
+-    expect(getMoodScaleBg(5)).toBe(neutral.bg);
+-  });
+-
+-  test("falls back to slate classes for unknown values", () => {
+-    expect(getMoodScaleColor(99)).toBe("text-slate-500");
+-    expect(getMoodScaleBg(99)).toBe("bg-slate-100");
+-  });
+-});
+-
+-// ---------------------------------------------------------------------------
+-// getMoodInterpretation
+-// ---------------------------------------------------------------------------
+-
+-describe("getMoodInterpretation", () => {
+-  // Tracer bullet
+-  test("returns the Mood Rating Label from the Mood Scale for a known value", () => {
+-    const neutral = moodScale.find((m) => m.value === 5)!;
+-    const result = getMoodInterpretation(5);
+-    expect(result.text).toBe(neutral.label);
+-  });
+-
+-  test("returns the correct Tailwind text and bg classes", () => {
+-    const neutral = moodScale.find((m) => m.value === 5)!;
+-    const result = getMoodInterpretation(5);
+-    expect(result.textClass).toBe(neutral.color);
+-    expect(result.bgClass).toBe(neutral.bg);
+-  });
+-
+-  test("rounds fractional Mood Ratings before looking up the label", () => {
+-    const result = getMoodInterpretation(4.6); // rounds to 5 = Neutral
+-    expect(result.text).toBe("Neutral");
+-  });
+-
+-  test("covers every value on the 0–10 Mood Scale without fallback", () => {
+-    for (let v = 0; v <= 10; v++) {
+-      const result = getMoodInterpretation(v);
+-      const entry = moodScale.find((m) => m.value === v)!;
+-      expect(result.text).toBe(entry.label);
+-    }
+-  });
+-});
+-
+-// ---------------------------------------------------------------------------
+-// getTrendInterpretation
+-// ---------------------------------------------------------------------------
+-
+-describe("getTrendInterpretation", () => {
+-  // Tracer bullet — on the Mood Scale, lower is better, so negative delta = improvement
+-  test("maps a strongly negative delta to Trending Better", () => {
+-    const result = getTrendInterpretation(-1);
+-    expect(result.text).toBe("Trending Better");
+-  });
+-
+-  test("maps a mildly negative delta to Improving", () => {
+-    expect(getTrendInterpretation(-0.2).text).toBe("Improving");
+-  });
+-
+-  test("maps a strongly positive delta to Declining", () => {
+-    expect(getTrendInterpretation(1).text).toBe("Declining");
+-  });
+-
+-  test("maps a mildly positive delta to Slight Dip", () => {
+-    expect(getTrendInterpretation(0.2).text).toBe("Slight Dip");
+-  });
+-
+-  test("maps zero delta to Steady", () => {
+-    expect(getTrendInterpretation(0).text).toBe("Steady");
+-  });
+-
+-  test("returns an iconName on every branch", () => {
+-    const validIcons = [
+-      "trending-up-outline",
+-      "arrow-up-outline",
+-      "trending-down-outline",
+-      "arrow-down-outline",
+-      "remove-outline",
+-    ];
+-    [-1, -0.2, 0, 0.2, 1].forEach((delta) => {
+-      expect(validIcons).toContain(getTrendInterpretation(delta).iconName);
+-    });
+-  });
+-});
+diff --git a/__tests__/shared/state/moodsStore.test.ts b/__tests__/shared/state/moodsStore.test.ts
+index 788ccd8..8726ba9 100644
+--- a/__tests__/shared/state/moodsStore.test.ts
++++ b/__tests__/shared/state/moodsStore.test.ts
+@@ -9,7 +9,6 @@ const moodServiceMock = vi.hoisted(() => ({
+   delete: vi.fn(),
+   updateTimestamp: vi.fn(),
+   getAll: vi.fn(),
+-  getPaginated: vi.fn(),
+ }));
+ 
+ vi.mock("@/services/moodService", async () => {
+@@ -50,10 +49,6 @@ function resetStore() {
+     error: null,
+     lastLoadedAt: null,
+     isStale: true,
+-    lastTracked: null,
+-    totalCount: 0,
+-    hasMore: false,
+-    currentOffset: 0,
+   });
+ }
+ 
+@@ -156,22 +151,6 @@ describe("useMoodsStore", () => {
+     log.mockRestore();
+   });
+ 
+-  test("setLocal recalculates derived collection state", () => {
+-    const older = makeMood(1, 100);
+-    const newer = makeMood(2, 200);
+-
+-    useMoodsStore.getState().setLocal([older, newer]);
+-
+-    expect(useMoodsStore.getState()).toMatchObject({
+-      moods: [older, newer],
+-      isStale: false,
+-      totalCount: 2,
+-      hasMore: false,
+-      currentOffset: 2,
+-      lastTracked: new Date(newer.timestamp),
+-    });
+-  });
+-
+   test("updateTimestamp reorders entries without a refresh", async () => {
+     const older = makeMood(1, 100);
+     const newer = makeMood(2, 200);
+@@ -180,7 +159,6 @@ describe("useMoodsStore", () => {
+     moodServiceMock.updateTimestamp.mockResolvedValue(moved);
+     expect(await useMoodsStore.getState().updateTimestamp(1, 300)).toEqual(moved);
+     expect(useMoodsStore.getState().moods).toEqual([moved, newer]);
+-    expect(useMoodsStore.getState().lastTracked).toEqual(new Date(300));
+     expect(moodServiceMock.getAll).not.toHaveBeenCalled();
+   });
+ 
+@@ -208,8 +186,6 @@ describe("useMoodsStore", () => {
+       moods,
+       status: "idle",
+       isStale: false,
+-      totalCount: 1,
+-      currentOffset: 1,
+     });
+   });
+ });
+diff --git a/src/app/(tabs)/index.tsx b/src/app/(tabs)/index.tsx
+index 28745b6..27c950b 100644
+--- a/src/app/(tabs)/index.tsx
++++ b/src/app/(tabs)/index.tsx
+@@ -9,6 +9,7 @@ import {
+   type NativeScrollEvent,
+ } from "react-native";
+ import { Ionicons } from "@expo/vector-icons";
++import { useFocusEffect } from "expo-router";
+ import { FlashList, type FlashListRef } from "@shopify/flash-list";
+ import { GestureHandlerRootView } from "react-native-gesture-handler";
+ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+@@ -97,6 +98,7 @@ function HomeScreenContent() {
+   const status = useMoodsStore((state) => state.status);
+   const error = useMoodsStore((state) => state.error);
+   const loadAll = useMoodsStore((state) => state.loadAll);
++  const ensureFresh = useMoodsStore((state) => state.ensureFresh);
+   const refreshMoods = useMoodsStore((state) => state.refreshMoods);
+   const createMood = useMoodsStore((state) => state.create);
+   const updateMood = useMoodsStore((state) => state.update);
+@@ -127,9 +129,11 @@ function HomeScreenContent() {
+     setEditingEntry: modals.setEditingEntry,
+   });
+ 
+-  useEffect(() => {
+-    loadAll();
+-  }, [loadAll]);
++  useFocusEffect(
++    useCallback(() => {
++      void ensureFresh();
++    }, [ensureFresh])
++  );
+ 
+   const handleEditEntrySave = useCallback(
+     async (values: MoodEntryFormValues) => {
+diff --git a/src/app/settings/about.tsx b/src/app/settings/about.tsx
+index bf458e5..b52a953 100644
+--- a/src/app/settings/about.tsx
++++ b/src/app/settings/about.tsx
+@@ -99,7 +99,7 @@ export default function AboutSettingsScreen() {
+           </Text>
+ 
+           <Text className="text-center text-paper-700 dark:text-sand-400 px-4" style={typography.bodySm}>
+-            Track your moods, understand your patterns, and gain insights into your emotional wellbeing.
++            Keep a private mood history and reflect on how you feel over time.
+           </Text>
+         </View>
+ 
+diff --git a/src/app/settings/display.tsx b/src/app/settings/display.tsx
+index 3df011c..8bdbbe3 100644
+--- a/src/app/settings/display.tsx
++++ b/src/app/settings/display.tsx
+@@ -228,10 +228,10 @@ export default function DisplaySettingsScreen() {
+           </View>
+         </SettingsSection>
+ 
+-        <SettingsSection title="Charts">
++        <SettingsSection title="Mood Selector">
+           <ToggleRow
+             title="Detailed Labels"
+-            description="Show mood descriptions on chart axes and tooltips"
++            description="Show detailed mood descriptions on Home"
+             value={showDetailedLabels}
+             onChange={setShowDetailedLabels}
+             icon="text-outline"
+diff --git a/src/app/settings/terms-of-service.tsx b/src/app/settings/terms-of-service.tsx
+index 22711c2..4bb7535 100644
+--- a/src/app/settings/terms-of-service.tsx
++++ b/src/app/settings/terms-of-service.tsx
+@@ -19,7 +19,7 @@ export default function TermsOfServiceScreen() {
+         showsVerticalScrollIndicator={false}
+       >
+         <Text className="text-xs text-paper-700 dark:text-sand-400 mb-4">
+-          Last Updated: July 21, 2026
++          Last Updated: September 7, 2026
+         </Text>
+ 
+         <Section title="Agreement to Terms">
+@@ -35,7 +35,7 @@ export default function TermsOfServiceScreen() {
+           <BulletList items={[
+             "Record moods on a 0–10 scale, where lower is better and 9–10 require the most support",
+             "Add notes, emotions, contexts, and energy values",
+-            "Configure local reminders and view on-device patterns",
++            "Configure local reminders and view mood history and summaries on your device",
+             "Create plaintext JSON mood exports/backups and plaintext CSV therapy exports",
+           ]} />
+         </Section>
+@@ -63,7 +63,7 @@ export default function TermsOfServiceScreen() {
+             Medical Disclaimer
+           </Text>
+           <Text className="text-sm text-coral-700 dark:text-coral-400 leading-5 mb-2">
+-            Moodinator is not a medical device and does not diagnose, treat, cure, or prevent any medical condition. It does not provide medical advice, diagnosis, or treatment. Its ratings, patterns, and insights are informational and may be incomplete or inaccurate. Consult a qualified healthcare professional for medical advice, diagnosis, or treatment.
++            Moodinator is not a medical device and does not diagnose, treat, cure, or prevent any medical condition. It does not provide medical advice, diagnosis, or treatment. Its ratings and summaries are informational and may be incomplete or inaccurate. Consult a qualified healthcare professional for medical advice, diagnosis, or treatment.
+           </Text>
+           <Text className="text-sm text-coral-700 dark:text-coral-400 leading-5 font-medium">
+             Moodinator does not monitor entries, provide live crisis support, contact emergency services, or dispatch help. If someone may be in immediate danger, call the local emergency number. In the U.S., call or text 988; elsewhere, findahelpline.com can help locate support.
+diff --git a/src/components/home/HomeHeader.tsx b/src/components/home/HomeHeader.tsx
+index 3f0a3f8..5c74611 100644
+--- a/src/components/home/HomeHeader.tsx
++++ b/src/components/home/HomeHeader.tsx
+@@ -5,7 +5,7 @@ import { useColorScheme } from "@/hooks/useColorScheme";
+ import { typography } from "@/constants/typography";
+ import { colors, semanticToneColors } from "@/constants/colors";
+ import { useMoodsStore } from "@/shared/state/moodsStore";
+-import { calculateStreak } from "@/features/insights/utils/patternDetection";
++import { calculateStreak } from "@/features/insights/utils/streaks";
+ 
+ function getGreeting(date: Date): string {
+ 	const h = date.getHours();
+diff --git a/src/constants/accessibility.ts b/src/constants/accessibility.ts
+index 9abd435..4b73713 100644
+--- a/src/constants/accessibility.ts
++++ b/src/constants/accessibility.ts
+@@ -40,7 +40,7 @@ export function getMoodButtonHint(): string {
+  */
+ export const TAB_ACCESSIBILITY_LABELS = {
+   home: "Home tab, log your mood",
+-  insights: "Insights tab, view mood charts and analytics",
++  insights: "Insights tab, view mood history and summaries",
+   settings: "Settings tab, customize app preferences",
+ } as const;
+ 
+diff --git a/src/features/insights/components/InsightsHeader.tsx b/src/features/insights/components/InsightsHeader.tsx
+index 3184bef..6e91348 100644
+--- a/src/features/insights/components/InsightsHeader.tsx
++++ b/src/features/insights/components/InsightsHeader.tsx
+@@ -92,8 +92,8 @@ export function InsightsHeader({ moods, totalEntries, onRefresh }: InsightsHeade
+ 
+   const subtitle = useMemo(() => {
+     if (totalEntries === 0) return "Tracked moods will gather here";
+-    if (totalEntries === 1) return "Patterns across 1 entry";
+-    return `Patterns across ${totalEntries} entries`;
++    if (totalEntries === 1) return "Your history · 1 entry";
++    return `Your history · ${totalEntries} entries`;
+   }, [totalEntries]);
+ 
+   const slots = useMemo(() => {
+diff --git a/src/features/insights/components/PatternCard.tsx b/src/features/insights/components/PatternCard.tsx
+deleted file mode 100644
+index e724dab..0000000
+--- a/src/features/insights/components/PatternCard.tsx
++++ /dev/null
+@@ -1,165 +0,0 @@
+-import React from "react";
+-import { View, Text } from "react-native";
+-import { Ionicons } from "@expo/vector-icons";
+-import { useColorScheme } from "nativewind";
+-import type { Pattern } from "../utils/patternDetection";
+-import { SurfaceCard } from "@/components/ui/SurfaceCard";
+-import { IconBadge } from "@/components/ui/IconBadge";
+-import { typography } from "@/constants/typography";
+-
+-interface PatternCardProps {
+-  patterns: Pattern[];
+-}
+-
+-function ConfidenceIndicator({ confidence }: { confidence: number }) {
+-  const { colorScheme } = useColorScheme();
+-  const isDark = colorScheme === "dark";
+-
+-  // Show 3 dots to indicate confidence level
+-  const dots = [0.33, 0.66, 1.0];
+-
+-  return (
+-    <View className="flex-row items-center gap-1">
+-      {dots.map((threshold, index) => (
+-        <View
+-          key={index}
+-          className="w-2 h-2 rounded-full"
+-          style={{
+-            backgroundColor:
+-              confidence >= threshold
+-                ? isDark
+-                  ? "#A8C5A8"
+-                  : "#5B8A5B"
+-                : isDark
+-                ? "#3D352A"
+-                : "#E5D9BF",
+-          }}
+-        />
+-      ))}
+-    </View>
+-  );
+-}
+-
+-function PatternItem({ pattern, isLast }: { pattern: Pattern; isLast: boolean }) {
+-  const { colorScheme } = useColorScheme();
+-  const isDark = colorScheme === "dark";
+-
+-  // Different icon backgrounds based on pattern type
+-  const getIconStyle = () => {
+-    switch (pattern.type) {
+-      case "time_of_day":
+-        return {
+-          bg: isDark ? "#2D3D2D" : "#E8EFE8",
+-          color: isDark ? "#A8C5A8" : "#5B8A5B",
+-        };
+-      case "day_of_week":
+-      case "weekend":
+-        return {
+-          bg: isDark ? "#302A22" : "#F9F5ED",
+-          color: isDark ? "#D4C4A0" : "#7A6545",
+-        };
+-      case "emotion":
+-        return {
+-          bg: isDark ? "#3C1A14" : "#FDE8E4",
+-          color: isDark ? "#F5A899" : "#E06B55",
+-        };
+-      case "context":
+-        return {
+-          bg: isDark ? "#2D2A33" : "#EFECF2",
+-          color: isDark ? "#C4BBCF" : "#847596",
+-        };
+-      default:
+-        return {
+-          bg: isDark ? "#2D3D2D" : "#E8EFE8",
+-          color: isDark ? "#A8C5A8" : "#5B8A5B",
+-        };
+-    }
+-  };
+-
+-  const iconStyle = getIconStyle();
+-
+-  return (
+-    <View
+-      className={`flex-row items-start py-4 ${
+-        !isLast ? "border-b border-paper-200 dark:border-paper-800" : ""
+-      }`}
+-    >
+-      {/* Pattern icon */}
+-      <View
+-        className="w-11 h-11 rounded-2xl items-center justify-center mr-4"
+-        style={{ backgroundColor: iconStyle.bg }}
+-      >
+-        <Ionicons
+-          name={pattern.icon as keyof typeof Ionicons.glyphMap}
+-          size={20}
+-          color={iconStyle.color}
+-        />
+-      </View>
+-
+-      {/* Pattern content */}
+-      <View className="flex-1">
+-        <View className="flex-row items-center justify-between mb-1.5">
+-          <Text className="text-sm font-bold text-paper-800 dark:text-paper-200">
+-            {pattern.title}
+-          </Text>
+-          <ConfidenceIndicator confidence={pattern.confidence} />
+-        </View>
+-        <Text className="text-sm text-paper-700 dark:text-sand-400 leading-5">
+-          {pattern.description}
+-        </Text>
+-      </View>
+-    </View>
+-  );
+-}
+-
+-export function PatternCard({ patterns }: PatternCardProps) {
+-  const { colorScheme } = useColorScheme();
+-  const isDark = colorScheme === "dark";
+-
+-  if (patterns.length === 0) {
+-    return null;
+-  }
+-
+-  return (
+-    <SurfaceCard tone="dusk" accentColor={isDark ? "#847596" : "#A396B3"}>
+-      <View>
+-        {/* Header */}
+-        <View className="flex-row items-center mb-2">
+-          <IconBadge icon="bulb-outline" tone="dusk" size="md" style={{ marginRight: 14 }} />
+-          <View className="flex-1">
+-            <Text className="text-paper-800 dark:text-paper-200" style={typography.bodyMd}>
+-              Patterns Detected
+-            </Text>
+-            <Text className="text-paper-700 dark:text-sand-400 mt-0.5" style={typography.bodySm}>
+-              Insights from your mood history
+-            </Text>
+-          </View>
+-          <View
+-            className="px-2.5 py-1 rounded-full"
+-            style={{
+-              backgroundColor: isDark ? "#2D3D2D" : "#E8EFE8",
+-            }}
+-          >
+-            <Text
+-              className="text-xs font-bold"
+-              style={{ color: isDark ? "#A8C5A8" : "#5B8A5B" }}
+-            >
+-              {patterns.length}
+-            </Text>
+-          </View>
+-        </View>
+-
+-        {/* Pattern list */}
+-        <View className="mt-2">
+-          {patterns.map((pattern, index) => (
+-            <PatternItem
+-              key={pattern.id}
+-              pattern={pattern}
+-              isLast={index === patterns.length - 1}
+-            />
+-          ))}
+-        </View>
+-      </View>
+-    </SurfaceCard>
+-  );
+-}
+diff --git a/src/features/insights/hooks/useInsightsData.ts b/src/features/insights/hooks/useInsightsData.ts
+index d0c26d4..8490491 100644
+--- a/src/features/insights/hooks/useInsightsData.ts
++++ b/src/features/insights/hooks/useInsightsData.ts
+@@ -1,11 +1,10 @@
+ import { useState, useEffect, useCallback, useMemo } from "react";
+ import { addDays, endOfMonth, endOfWeek, startOfDay, startOfMonth, startOfWeek } from "date-fns";
+ import { AppState } from "react-native";
+-import { calculateStreak } from "../utils/patternDetection";
++import { calculateStreak } from "../utils/streaks";
+ import { useFocusEffect } from "expo-router";
+ import type { MoodEntry, MoodScaleSnapshot } from "@db/types";
+ import type { TimePeriod } from "../components/TimePeriodSelector";
+-import type { Pattern } from "../utils/patternDetection";
+ import {
+   buildMoodInsights,
+   getNextPeriodDate,
+@@ -38,7 +37,6 @@ export interface InsightsData {
+ 
+   // Stats
+   stats: PeriodStats;
+-  patterns: Pattern[];
+   streak: { current: number; longest: number };
+ 
+   // Helpers
+@@ -102,7 +100,7 @@ export function useInsightsData(): InsightsData {
+     () => buildMoodInsights(allMoods, period, currentDate),
+     [allMoods, period, currentDate]
+   );
+-  const { periodMoods, stats, patterns } = insights;
++  const { periodMoods, stats } = insights;
+   const streak = useMemo(
+     () => calculateStreak(allMoods, new Date(localDay)),
+     [allMoods, localDay]
+@@ -174,7 +172,6 @@ export function useInsightsData(): InsightsData {
+     canGoNext,
+     canGoPrevious,
+     stats,
+-    patterns,
+     streak,
+     getMoodLabel,
+     getMoodColor,
+diff --git a/src/features/insights/index.ts b/src/features/insights/index.ts
+index e4fb19b..aa2b7df 100644
+--- a/src/features/insights/index.ts
++++ b/src/features/insights/index.ts
+@@ -5,7 +5,6 @@ export { InsightsScreen } from "./screens/InsightsScreen";
+ export { InsightCard, CompactInsightCard } from "./components/InsightCard";
+ export { TimePeriodSelector } from "./components/TimePeriodSelector";
+ export { WeekNavigator } from "./components/WeekNavigator";
+-export { PatternCard } from "./components/PatternCard";
+ export { StreakBadge, CompactStreakBadge } from "./components/StreakBadge";
+ export { TrendIndicator, getTrendDirection } from "./components/TrendIndicator";
+ 
+@@ -13,10 +12,9 @@ export { TrendIndicator, getTrendDirection } from "./components/TrendIndicator";
+ export { useInsightsData } from "./hooks/useInsightsData";
+ 
+ // Utils
+-export { detectPatterns, calculateStreak } from "./utils/patternDetection";
++export { calculateStreak } from "./utils/streaks";
+ 
+ // Types
+ export type { TimePeriod } from "./components/TimePeriodSelector";
+ export type { TrendDirection } from "./components/TrendIndicator";
+-export type { Pattern } from "./utils/patternDetection";
+ export type { InsightsData, PeriodStats } from "./hooks/useInsightsData";
+diff --git a/src/features/insights/screens/InsightsScreen.tsx b/src/features/insights/screens/InsightsScreen.tsx
+index 189d595..e78d76b 100644
+--- a/src/features/insights/screens/InsightsScreen.tsx
++++ b/src/features/insights/screens/InsightsScreen.tsx
+@@ -23,7 +23,6 @@ import { useInsightsData } from "../hooks/useInsightsData";
+ import { TimePeriodSelector } from "../components/TimePeriodSelector";
+ import { WeekNavigator } from "../components/WeekNavigator";
+ import { InsightCard, CompactInsightCard } from "../components/InsightCard";
+-import { PatternCard } from "../components/PatternCard";
+ import { StreakBadge } from "../components/StreakBadge";
+ import { EntryDetailModal } from "../components/EntryDetailModal";
+ import { InsightsHeader } from "../components/InsightsHeader";
+@@ -72,7 +71,6 @@ export function InsightsScreen() {
+     canGoNext,
+     canGoPrevious,
+     stats,
+-    patterns,
+     streak,
+     getMoodLabel,
+     getMoodColor,
+@@ -205,7 +203,7 @@ export function InsightsScreen() {
+             icon="bar-chart-outline"
+             tone="sage"
+             title="No Insights Yet"
+-            description="Start tracking your moods to discover patterns and understand your emotional well-being better."
++            description="Log your mood to review your history and see summaries over time."
+           />
+         ) : viewMode === "calendar" ? (
+           <Animated.View
+@@ -360,16 +358,9 @@ export function InsightsScreen() {
+                     </Animated.View>
+                   )}
+ 
+-                  {/* Patterns (only for month/all view with enough data) */}
+-                  {patterns.length > 0 && (
+-                    <Animated.View entering={reveal(4)} className="mb-4">
+-                      <PatternCard patterns={patterns} />
+-                    </Animated.View>
+-                  )}
+-
+                   {/* Entries List */}
+                   {periodMoods.length > 0 && (
+-                    <Animated.View entering={reveal(5)}>
++                    <Animated.View entering={reveal(4)}>
+                     <SurfaceCard tone="sage" style={{ marginBottom: 4 }}>
+                       <View className="flex-row items-center mb-4">
+                         <IconBadge
+diff --git a/src/features/insights/utils/moodInsights.ts b/src/features/insights/utils/moodInsights.ts
+index ae83caa..4c10bed 100644
+--- a/src/features/insights/utils/moodInsights.ts
++++ b/src/features/insights/utils/moodInsights.ts
+@@ -11,13 +11,11 @@ import {
+ import type { MoodEntry } from "@db/types";
+ import type { TimePeriod } from "../components/TimePeriodSelector";
+ import { calculatePeriodStats, type PeriodStats } from "./periodStats";
+-import { detectPatterns, type Pattern } from "./patternDetection";
+ 
+ export type MoodInsightsResult = {
+   periodMoods: MoodEntry[];
+   previousPeriodMoods: MoodEntry[];
+   stats: PeriodStats;
+-  patterns: Pattern[];
+ };
+ 
+ export function getMoodsInPeriod(
+@@ -80,12 +78,10 @@ export function buildMoodInsights(
+           period,
+           getPreviousPeriodDate(period, currentDate)
+         );
+-  const moodsForPatterns = period === "all" ? allMoods : periodMoods;
+ 
+   return {
+     periodMoods,
+     previousPeriodMoods,
+     stats: calculatePeriodStats(periodMoods, previousPeriodMoods),
+-    patterns: period === "week" ? [] : detectPatterns(moodsForPatterns),
+   };
+ }
+diff --git a/src/features/insights/utils/patternDetection.ts b/src/features/insights/utils/patternDetection.ts
+deleted file mode 100644
+index 06364e7..0000000
+--- a/src/features/insights/utils/patternDetection.ts
++++ /dev/null
+@@ -1,361 +0,0 @@
+-import type { MoodEntry } from "@db/types";
+-import { format, getHours, getDay, isWeekend, subDays } from "date-fns";
+-import {
+-  getInterpretedMoodRating,
+-  isBetterMoodRating,
+-  sortMoodRatingsBestFirst,
+-} from "@/constants/moodScaleInterpretation";
+-
+-export interface Pattern {
+-  id: string;
+-  type: "time_of_day" | "day_of_week" | "emotion" | "context" | "weekend";
+-  title: string;
+-  description: string;
+-  confidence: number; // 0-1 scale
+-  icon: string;
+-}
+-
+-interface TimeOfDayStats {
+-  morning: { total: number; count: number }; // 5-11
+-  afternoon: { total: number; count: number }; // 12-16
+-  evening: { total: number; count: number }; // 17-20
+-  night: { total: number; count: number }; // 21-4
+-}
+-
+-interface DayOfWeekStats {
+-  [key: number]: { total: number; count: number };
+-}
+-
+-function getTimeOfDay(hour: number): keyof TimeOfDayStats {
+-  if (hour >= 5 && hour < 12) return "morning";
+-  if (hour >= 12 && hour < 17) return "afternoon";
+-  if (hour >= 17 && hour < 21) return "evening";
+-  return "night";
+-}
+-
+-function getTimeOfDayLabel(key: keyof TimeOfDayStats): string {
+-  const labels = {
+-    morning: "mornings",
+-    afternoon: "afternoons",
+-    evening: "evenings",
+-    night: "nights",
+-  };
+-  return labels[key];
+-}
+-
+-function getDayLabel(dayIndex: number): string {
+-  const days = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"];
+-  return days[dayIndex];
+-}
+-
+-/**
+- * Detect time of day patterns
+- * Returns pattern if there's a significant difference between best and worst times
+- */
+-function detectTimeOfDayPattern(moods: MoodEntry[]): Pattern | null {
+-  if (moods.length < 10) return null;
+-
+-  const stats: TimeOfDayStats = {
+-    morning: { total: 0, count: 0 },
+-    afternoon: { total: 0, count: 0 },
+-    evening: { total: 0, count: 0 },
+-    night: { total: 0, count: 0 },
+-  };
+-
+-  moods.forEach((mood) => {
+-    const hour = getHours(new Date(mood.timestamp));
+-    const period = getTimeOfDay(hour);
+-    stats[period].total += getInterpretedMoodRating(mood);
+-    stats[period].count++;
+-  });
+-
+-  // Calculate averages for each period
+-  const averages = Object.entries(stats)
+-    .filter(([_, data]) => data.count >= 3) // Need at least 3 entries per period
+-    .map(([period, data]) => ({
+-      period: period as keyof TimeOfDayStats,
+-      avg: data.total / data.count,
+-      count: data.count,
+-    }))
+-    .sort((a, b) => sortMoodRatingsBestFirst(a.avg, b.avg));
+-
+-  if (averages.length < 2) return null;
+-
+-  const best = averages[0];
+-  const worst = averages[averages.length - 1];
+-  const difference = Math.abs(worst.avg - best.avg);
+-
+-  // Need at least 0.8 difference to be significant
+-  if (difference < 0.8) return null;
+-
+-  return {
+-    id: "time_of_day",
+-    type: "time_of_day",
+-    title: "Time of Day",
+-    description: `You tend to feel best in the ${getTimeOfDayLabel(best.period)}`,
+-    confidence: Math.min(difference / 2, 1),
+-    icon: best.period === "morning" ? "sunny-outline" :
+-          best.period === "afternoon" ? "partly-sunny-outline" :
+-          best.period === "evening" ? "moon-outline" : "cloudy-night-outline",
+-  };
+-}
+-
+-/**
+- * Detect day of week patterns
+- */
+-function detectDayOfWeekPattern(moods: MoodEntry[]): Pattern | null {
+-  if (moods.length < 14) return null; // Need at least 2 weeks of data
+-
+-  const stats: DayOfWeekStats = {};
+-  for (let i = 0; i < 7; i++) {
+-    stats[i] = { total: 0, count: 0 };
+-  }
+-
+-  moods.forEach((mood) => {
+-    const dayIndex = getDay(new Date(mood.timestamp));
+-    stats[dayIndex].total += getInterpretedMoodRating(mood);
+-    stats[dayIndex].count++;
+-  });
+-
+-  const averages = Object.entries(stats)
+-    .filter(([_, data]) => data.count >= 2)
+-    .map(([day, data]) => ({
+-      day: parseInt(day, 10),
+-      avg: data.total / data.count,
+-      count: data.count,
+-    }))
+-    .sort((a, b) => sortMoodRatingsBestFirst(a.avg, b.avg));
+-
+-  if (averages.length < 3) return null;
+-
+-  const best = averages[0];
+-  const worst = averages[averages.length - 1];
+-  const difference = Math.abs(worst.avg - best.avg);
+-
+-  if (difference < 0.8) return null;
+-
+-  return {
+-    id: "day_of_week",
+-    type: "day_of_week",
+-    title: "Best Day",
+-    description: `${getDayLabel(best.day)} tend to be your best days`,
+-    confidence: Math.min(difference / 2, 1),
+-    icon: "calendar-outline",
+-  };
+-}
+-
+-/**
+- * Detect weekend vs weekday patterns
+- */
+-function detectWeekendPattern(moods: MoodEntry[]): Pattern | null {
+-  if (moods.length < 14) return null;
+-
+-  let weekdayTotal = 0;
+-  let weekdayCount = 0;
+-  let weekendTotal = 0;
+-  let weekendCount = 0;
+-
+-  moods.forEach((mood) => {
+-    const date = new Date(mood.timestamp);
+-    const interpretedMood = getInterpretedMoodRating(mood);
+-    if (isWeekend(date)) {
+-      weekendTotal += interpretedMood;
+-      weekendCount++;
+-    } else {
+-      weekdayTotal += interpretedMood;
+-      weekdayCount++;
+-    }
+-  });
+-
+-  if (weekdayCount < 5 || weekendCount < 2) return null;
+-
+-  const weekdayAvg = weekdayTotal / weekdayCount;
+-  const weekendAvg = weekendTotal / weekendCount;
+-  const difference = Math.abs(weekdayAvg - weekendAvg);
+-
+-  if (difference < 0.5) return null;
+-
+-  const isBetterOnWeekends = isBetterMoodRating(weekendAvg, weekdayAvg);
+-
+-  return {
+-    id: "weekend",
+-    type: "weekend",
+-    title: "Weekend Effect",
+-    description: isBetterOnWeekends
+-      ? "Your mood tends to be better on weekends"
+-      : "Your mood tends to be better on weekdays",
+-    confidence: Math.min(difference / 1.5, 1),
+-    icon: isBetterOnWeekends ? "sunny-outline" : "briefcase-outline",
+-  };
+-}
+-
+-/**
+- * Detect emotion-mood correlations
+- */
+-function detectEmotionPatterns(moods: MoodEntry[]): Pattern | null {
+-  const emotionStats: Record<string, { total: number; count: number }> = {};
+-
+-  moods.forEach((mood) => {
+-    if (mood.emotions && mood.emotions.length > 0) {
+-      mood.emotions.forEach((emotion) => {
+-        const name = emotion.name.toLowerCase();
+-        if (!emotionStats[name]) {
+-          emotionStats[name] = { total: 0, count: 0 };
+-        }
+-        emotionStats[name].total += getInterpretedMoodRating(mood);
+-        emotionStats[name].count++;
+-      });
+-    }
+-  });
+-
+-  const sortedEmotions = Object.entries(emotionStats)
+-    .filter(([_, data]) => data.count >= 3)
+-    .map(([name, data]) => ({
+-      name,
+-      avg: data.total / data.count,
+-      count: data.count,
+-    }))
+-    .sort((a, b) => sortMoodRatingsBestFirst(a.avg, b.avg));
+-
+-  if (sortedEmotions.length < 2) return null;
+-
+-  const best = sortedEmotions[0];
+-  const worst = sortedEmotions[sortedEmotions.length - 1];
+-
+-  // Capitalize first letter
+-  const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+-
+-  return {
+-    id: "emotion_correlation",
+-    type: "emotion",
+-    title: "Emotion Insight",
+-    description: `When feeling "${capitalize(best.name)}", your mood tends to be better`,
+-    confidence: Math.min(Math.abs(worst.avg - best.avg) / 2, 1),
+-    icon: "heart-outline",
+-  };
+-}
+-
+-/**
+- * Detect context patterns
+- */
+-function detectContextPatterns(moods: MoodEntry[]): Pattern | null {
+-  const contextStats: Record<string, { total: number; count: number }> = {};
+-
+-  moods.forEach((mood) => {
+-    if (mood.contextTags && mood.contextTags.length > 0) {
+-      mood.contextTags.forEach((ctx: string) => {
+-        const name = ctx.toLowerCase();
+-        if (!contextStats[name]) {
+-          contextStats[name] = { total: 0, count: 0 };
+-        }
+-        contextStats[name].total += getInterpretedMoodRating(mood);
+-        contextStats[name].count++;
+-      });
+-    }
+-  });
+-
+-  const sortedContexts = Object.entries(contextStats)
+-    .filter(([_, data]) => data.count >= 3)
+-    .map(([name, data]) => ({
+-      name,
+-      avg: data.total / data.count,
+-      count: data.count,
+-    }))
+-    .sort((a, b) => sortMoodRatingsBestFirst(a.avg, b.avg));
+-
+-  if (sortedContexts.length < 2) return null;
+-
+-  const best = sortedContexts[0];
+-  const worst = sortedContexts[sortedContexts.length - 1];
+-
+-  const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+-
+-  return {
+-    id: "context_correlation",
+-    type: "context",
+-    title: "Context Insight",
+-    description: `"${capitalize(best.name)}" activities are associated with better moods`,
+-    confidence: Math.min(Math.abs(worst.avg - best.avg) / 2, 1),
+-    icon: "location-outline",
+-  };
+-}
+-
+-/**
+- * Main function to detect all patterns
+- * Returns up to 3 highest confidence patterns
+- */
+-export function detectPatterns(moods: MoodEntry[], maxPatterns = 3): Pattern[] {
+-  if (moods.length < 7) return [];
+-
+-  const allPatterns: (Pattern | null)[] = [
+-    detectTimeOfDayPattern(moods),
+-    detectDayOfWeekPattern(moods),
+-    detectWeekendPattern(moods),
+-    detectEmotionPatterns(moods),
+-    detectContextPatterns(moods),
+-  ];
+-
+-  return allPatterns
+-    .filter((p): p is Pattern => p !== null && p.confidence >= 0.3)
+-    .sort((a, b) => b.confidence - a.confidence)
+-    .slice(0, maxPatterns);
+-}
+-
+-/**
+- * Calculate current streak (consecutive days with entries)
+- */
+-export function calculateStreak(moods: MoodEntry[], todayDate = new Date()): { current: number; longest: number } {
+-  if (moods.length === 0) return { current: 0, longest: 0 };
+-
+-  // Group by date
+-  const dateSet = new Set<string>();
+-  moods.forEach((mood) => {
+-    const dateKey = format(new Date(mood.timestamp), "yyyy-MM-dd");
+-    dateSet.add(dateKey);
+-  });
+-
+-  const dates = Array.from(dateSet).sort().reverse(); // Most recent first
+-
+-  if (dates.length === 0) return { current: 0, longest: 0 };
+-
+-  // Calculate current streak
+-  let currentStreak = 0;
+-  const today = format(todayDate, "yyyy-MM-dd");
+-  const yesterday = format(subDays(todayDate, 1), "yyyy-MM-dd");
+-
+-  // Current streak must include today or yesterday
+-  if (dates[0] === today || dates[0] === yesterday) {
+-    currentStreak = 1;
+-    for (let i = 1; i < dates.length; i++) {
+-      const prevDate = new Date(dates[i - 1]);
+-      const currDate = new Date(dates[i]);
+-      const diffDays = Math.round((prevDate.getTime() - currDate.getTime()) / 86400000);
+-
+-      if (diffDays === 1) {
+-        currentStreak++;
+-      } else {
+-        break;
+-      }
+-    }
+-  }
+-
+-  // Calculate longest streak
+-  let longestStreak = 1;
+-  let tempStreak = 1;
+-
+-  const sortedDatesAsc = [...dates].reverse(); // Oldest first
+-  for (let i = 1; i < sortedDatesAsc.length; i++) {
+-    const prevDate = new Date(sortedDatesAsc[i - 1]);
+-    const currDate = new Date(sortedDatesAsc[i]);
+-    const diffDays = Math.round((currDate.getTime() - prevDate.getTime()) / 86400000);
+-
+-    if (diffDays === 1) {
+-      tempStreak++;
+-      longestStreak = Math.max(longestStreak, tempStreak);
+-    } else {
+-      tempStreak = 1;
+-    }
+-  }
+-
+-  return { current: currentStreak, longest: longestStreak };
+-}
+diff --git a/src/features/onboarding/content.ts b/src/features/onboarding/content.ts
+index 4d73cc1..0c5edc8 100644
+--- a/src/features/onboarding/content.ts
++++ b/src/features/onboarding/content.ts
+@@ -13,7 +13,7 @@ export const onboardingPages: OnboardingPage[] = [
+     id: "welcome",
+     title: "Welcome to Moodinator",
+     subtitle: "Your personal mood companion",
+-    description: "Track your emotions, discover patterns, and gain insights into your mental well-being. Your journey to better self-awareness starts here.",
++    description: "Keep a private record of how you feel, with emotions, context, and notes to help you reflect over time.",
+     icon: "leaf",
+     accentColor: "#476D47",
+     accentColorDark: "#A6E39B",
+@@ -29,9 +29,9 @@ export const onboardingPages: OnboardingPage[] = [
+   },
+   {
+     id: "discover",
+-    title: "Discover Patterns",
++    title: "Look Back",
+     subtitle: "Insights at a glance",
+-    description: "View your moods on a color-coded calendar, track streaks, and uncover patterns over time. Understanding your emotions helps you grow.",
++    description: "Browse your moods on a color-coded calendar, review weekly and monthly summaries, and revisit the details of any entry.",
+     icon: "calendar",
+     accentColor: "#695C78",
+     accentColorDark: "#D5CCDD",
+diff --git a/src/features/settings/components/ProfileCard.tsx b/src/features/settings/components/ProfileCard.tsx
+deleted file mode 100644
+index 75d01dc..0000000
+--- a/src/features/settings/components/ProfileCard.tsx
++++ /dev/null
+@@ -1,112 +0,0 @@
+-import React from "react";
+-import { View, Text, StyleSheet, Image } from "react-native";
+-import { Ionicons } from "@expo/vector-icons";
+-import { useColorScheme } from "nativewind";
+-import { colors, effectColors } from "@/constants/colors";
+-
+-
+-interface ProfileCardProps {
+-  entryCount: number;
+-  daysTracking: number;
+-}
+-
+-export function ProfileCard({ entryCount, daysTracking }: ProfileCardProps) {
+-  const { colorScheme } = useColorScheme();
+-  const isDark = colorScheme === "dark";
+-
+-  return (
+-    <View
+-      className="mb-6 rounded-3xl border border-paper-200 bg-paper-50 dark:border-paper-800 dark:bg-paper-800 overflow-hidden"
+-      style={isDark ? styles.cardShadowDark : styles.cardShadowLight}
+-    >
+-      {/* Decorative sage accent bar */}
+-      <View className="h-1 bg-sage-400 dark:bg-sage-500" />
+-
+-      <View className="p-5">
+-        {/* App Identity */}
+-        <View className="flex-row items-center mb-5">
+-          {/* App Icon with layered background */}
+-          <View className="relative mr-4">
+-            <View className="w-16 h-16 rounded-2xl items-center justify-center bg-sage-100 dark:bg-sage-600/20 overflow-hidden">
+-              <Image
+-                source={require("../../../../assets/images/app-icons/app-icon.png")}
+-                className="w-14 h-14 rounded-xl"
+-                resizeMode="cover"
+-                accessible
+-                accessibilityLabel="Moodinator app icon"
+-              />
+-            </View>
+-          </View>
+-
+-          {/* App Info */}
+-          <View className="flex-1">
+-            <Text className="text-xl font-bold text-paper-800 dark:text-paper-200 tracking-tight">
+-              Moodinator
+-            </Text>
+-            <Text className="text-sm text-paper-700 dark:text-paper-400 mt-0.5">
+-              Your wellness companion
+-            </Text>
+-          </View>
+-        </View>
+-
+-        {/* Stats Grid */}
+-        <View className="flex-row gap-3">
+-          {/* Entries Stat */}
+-          <View className="flex-1 p-4 rounded-2xl bg-sage-100 dark:bg-sage-600/20">
+-            <View className="flex-row items-center mb-2">
+-              <View className="w-8 h-8 rounded-xl items-center justify-center mr-2 bg-sage-500/15 dark:bg-sage-300/20">
+-                <Ionicons
+-                  name="document-text"
+-                  size={16}
+-                  color={isDark ? colors.positive.text.dark : colors.positive.text.light}
+-                />
+-              </View>
+-              <Text className="text-xs font-medium uppercase tracking-wider text-sage-600 dark:text-sage-300">
+-                Entries
+-              </Text>
+-            </View>
+-            <Text className="text-2xl font-extrabold text-sage-600 dark:text-sage-300 tracking-tighter">
+-              {entryCount.toLocaleString()}
+-            </Text>
+-          </View>
+-
+-          {/* Days Stat */}
+-          <View className="flex-1 p-4 rounded-2xl bg-sand-100 dark:bg-sand-800">
+-            <View className="flex-row items-center mb-2">
+-              <View className="w-8 h-8 rounded-xl items-center justify-center mr-2 bg-sand-600/12 dark:bg-sand-400/20">
+-                <Ionicons
+-                  name="calendar"
+-                  size={16}
+-                  color={isDark ? colors.sand.text.dark : colors.sand.bgSelected.light}
+-                />
+-              </View>
+-              <Text className="text-xs font-medium uppercase tracking-wider text-paper-700 dark:text-paper-400">
+-                Days
+-              </Text>
+-            </View>
+-            <Text className="text-2xl font-extrabold text-paper-700 dark:text-sand-300 tracking-tighter">
+-              {daysTracking.toLocaleString()}
+-            </Text>
+-          </View>
+-        </View>
+-      </View>
+-    </View>
+-  );
+-}
+-
+-const styles = StyleSheet.create({
+-  cardShadowLight: {
+-    elevation: 4,
+-    shadowColor: effectColors.shadow.light,
+-    shadowOpacity: 0.1,
+-    shadowRadius: 16,
+-    shadowOffset: { width: 0, height: 6 },
+-  },
+-  cardShadowDark: {
+-    elevation: 1,
+-    shadowColor: effectColors.shadow.dark,
+-    shadowOpacity: 0.3,
+-    shadowRadius: 16,
+-    shadowOffset: { width: 0, height: 6 },
+-  },
+-});
+diff --git a/src/features/settings/screens/SettingsScreen.tsx b/src/features/settings/screens/SettingsScreen.tsx
+index 1d63138..60d7a4e 100644
+--- a/src/features/settings/screens/SettingsScreen.tsx
++++ b/src/features/settings/screens/SettingsScreen.tsx
+@@ -7,11 +7,9 @@ import { motion, staggerDelay } from "@/constants/motion";
+ import { useReducedMotion } from "@/hooks/useReducedMotion";
+ import { dataPortabilityService } from "@/services/dataPortabilityService";
+ import { useSettingsStore } from "@/shared/state/settingsStore";
+-import { useMoodsStore } from "@/shared/state/moodsStore";
+ import { useAppLockStore } from "@/features/appLock";
+ import { Ionicons } from "@expo/vector-icons";
+ 
+-import { ProfileCard } from "../components/ProfileCard";
+ import {
+   SettingsCategoryCard,
+   type SettingsCategoryCardProps,
+@@ -26,7 +24,7 @@ type SettingsSectionModel = {
+ 
+ export function SettingsScreen() {
+   const [backupCount, setBackupCount] = useState(0);
+-  const [statsError, setStatsError] = useState(false);
++  const [backupError, setBackupError] = useState(false);
+   const appLockEnabled = useAppLockStore((state) => state.isEnabled);
+   const reducedMotion = useReducedMotion();
+ 
+@@ -40,45 +38,27 @@ export function SettingsScreen() {
+     [reducedMotion]
+   );
+ 
+-  const moods = useMoodsStore((state) => state.moods);
+-  const ensureFresh = useMoodsStore((state) => state.ensureFresh);
+   const emotions = useSettingsStore((state) => state.emotions);
+   const contexts = useSettingsStore((state) => state.contexts);
+   const quickEntryPrefs = useSettingsStore((state) => state.quickEntryPrefs);
+ 
+-  const loadStats = useCallback(async () => {
+-    try {
+-      setStatsError(false);
+-      await ensureFresh();
+-      const backupInfo = await dataPortabilityService.getBackupInfo();
+-      setBackupCount(backupInfo.count);
+-    } catch (error) {
+-      setStatsError(true);
+-      console.error("Failed to load stats:", error);
+-    }
+-  }, [ensureFresh]);
+-
+-  // Reload stats when screen comes into focus
+   useFocusEffect(
+     useCallback(() => {
+-      void loadStats();
+-    }, [loadStats])
++      async function loadBackupInfo() {
++        try {
++          setBackupError(false);
++          const backupInfo = await dataPortabilityService.getBackupInfo();
++          setBackupCount(backupInfo.count);
++        } catch (error) {
++          setBackupError(true);
++          console.error("Failed to load backup info:", error);
++        }
++      }
++
++      void loadBackupInfo();
++    }, [])
+   );
+ 
+-  const entryCount = moods.length;
+-  const daysTracking = useMemo(() => {
+-    if (moods.length === 0) {
+-      return 0;
+-    }
+-
+-    return new Set(
+-      moods.map((mood) => {
+-        const date = new Date(mood.timestamp);
+-        return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+-      })
+-    ).size;
+-  }, [moods]);
+-
+   // Count active quick entry fields
+   const activeQuickEntryFields = [
+     quickEntryPrefs.showEmotions,
+@@ -130,7 +110,7 @@ export function SettingsScreen() {
+           },
+           {
+             title: "Display",
+-            description: "Labels, charts, and history cards",
++            description: "Mood labels, cards, and feedback",
+             icon: "eye-outline",
+             href: "/settings/display",
+             accentColor: "sage",
+@@ -210,9 +190,6 @@ export function SettingsScreen() {
+         contentContainerStyle={{ paddingBottom: 120 }}
+         showsVerticalScrollIndicator={false}
+       >
+-        {/* Profile Card */}
+-        <ProfileCard entryCount={entryCount} daysTracking={daysTracking} />
+-
+         <View className="mb-5 rounded-2xl border border-sage-200 dark:border-sage-700 bg-sage-50 dark:bg-sage-900/20 p-4">
+           <View className="flex-row items-center">
+             <Ionicons name="lock-closed" size={20} color="#5B8A5B" />
+@@ -226,7 +203,7 @@ export function SettingsScreen() {
+               </Text>
+             </View>
+           </View>
+-          {statsError && (
++          {backupError && (
+             <Text className="text-xs mt-2 text-coral-700 dark:text-coral-300">
+               Some local status details could not be refreshed.
+             </Text>
+diff --git a/src/lib/moodChartData.ts b/src/lib/moodChartData.ts
+deleted file mode 100644
+index 836a922..0000000
+--- a/src/lib/moodChartData.ts
++++ /dev/null
+@@ -1,306 +0,0 @@
+-/**
+- * Mood chart data processing
+- *
+- * Pure functions that aggregate MoodEntry arrays into the daily and weekly
+- * data-point shapes consumed by charts and the analytics service. No React
+- * imports — every function is testable with plain Vitest.
+- */
+-
+-import {
+-  format,
+-  startOfDay,
+-  addDays,
+-  isBefore,
+-  isEqual,
+-  startOfWeek,
+-  subDays,
+-} from "date-fns";
+-import type { MoodEntry } from "@db/types";
+-import {
+-  getInterpretedMoodRating,
+-  getNeutralMoodRating,
+-} from "@/constants/moodScaleInterpretation";
+-
+-/** Daily aggregate data point for charts */
+-export interface DailyDataPoint {
+-  date: Date;
+-  moods: number[] | null;
+-  avg?: number;
+-  min?: number;
+-  max?: number;
+-  finalAvg: number;
+-  hasRealData: boolean;
+-  isInterpolated: boolean;
+-}
+-
+-/** Weekly aggregate data point for charts */
+-export interface WeeklyDataPoint {
+-  weekStart: Date;
+-  moods: number[];
+-  q1: number;
+-  q2: number; // median
+-  q3: number;
+-  min: number;
+-  max: number;
+-  outliers: number[];
+-  avg: number;
+-  finalAvg: number;
+-  isInterpolated: boolean;
+-}
+-
+-/** Returns every calendar day between start and end (inclusive). */
+-export const getDaysInRange = (start: Date, end: Date): Date[] => {
+-  const days: Date[] = [];
+-  let currentDate = startOfDay(start);
+-  const finalDate = startOfDay(end);
+-
+-  while (isBefore(currentDate, finalDate) || isEqual(currentDate, finalDate)) {
+-    days.push(new Date(currentDate));
+-    currentDate = addDays(currentDate, 1);
+-  }
+-  return days;
+-};
+-
+-/**
+- * Down-samples a timestamped array to at most maxPoints entries, always
+- * preserving the first and last points.
+- */
+-export const sampleDataPoints = <T extends { timestamp: number }>(
+-  data: T[],
+-  maxPoints: number = 200
+-): T[] => {
+-  if (data.length <= maxPoints) {
+-    return data;
+-  }
+-
+-  const sorted = [...data].sort((a, b) => a.timestamp - b.timestamp);
+-  const step = sorted.length / maxPoints;
+-  const sampled: T[] = [sorted[0]];
+-
+-  for (let i = 1; i < maxPoints - 1; i++) {
+-    const index = Math.round(i * step);
+-    if (index < sorted.length) {
+-      sampled.push(sorted[index]);
+-    }
+-  }
+-
+-  if (sorted.length > 1) {
+-    sampled.push(sorted[sorted.length - 1]);
+-  }
+-
+-  return sampled;
+-};
+-
+-/** Computes quartiles and outliers (1.5×IQR rule) for a numeric array. */
+-const getQuartiles = (arr: number[]) => {
+-  const sorted = [...arr].sort((a, b) => a - b);
+-  const q1Idx = Math.floor(sorted.length * 0.25);
+-  const q2Idx = Math.floor(sorted.length * 0.5);
+-  const q3Idx = Math.floor(sorted.length * 0.75);
+-  const iqr = sorted[q3Idx] - sorted[q1Idx];
+-
+-  return {
+-    q1: sorted[q1Idx],
+-    q2: sorted[q2Idx],
+-    q3: sorted[q3Idx],
+-    min: sorted[0],
+-    max: sorted[sorted.length - 1],
+-    outliers: sorted.filter(
+-      (v) => v < sorted[q1Idx] - 1.5 * iqr || v > sorted[q3Idx] + 1.5 * iqr
+-    ),
+-  };
+-};
+-
+-/**
+- * Aggregates Mood Entries into per-day averages over a rolling window, filling
+- * gaps with linear interpolation between neighbouring real days.
+- */
+-export const processMoodDataForDailyChart = (
+-  allMoods: MoodEntry[],
+-  numDays?: number
+-): { labels: string[]; dailyAggregates: DailyDataPoint[] } => {
+-  if (!allMoods || allMoods.length === 0) {
+-    return { labels: [], dailyAggregates: [] };
+-  }
+-
+-  const maxDays = numDays || 90;
+-  const sortedMoods = [...allMoods].sort(
+-    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+-  );
+-
+-  const mostRecentDate = startOfDay(
+-    new Date(sortedMoods[sortedMoods.length - 1].timestamp)
+-  );
+-  const cutoffDate = startOfDay(subDays(mostRecentDate, maxDays - 1));
+-
+-  const filteredMoods = sortedMoods.filter(
+-    (mood) => startOfDay(new Date(mood.timestamp)) >= cutoffDate
+-  );
+-
+-  if (filteredMoods.length === 0) {
+-    return { labels: [], dailyAggregates: [] };
+-  }
+-
+-  const latestDate = startOfDay(
+-    new Date(filteredMoods[filteredMoods.length - 1].timestamp)
+-  );
+-  const earliestDate = startOfDay(new Date(filteredMoods[0].timestamp));
+-
+-  const allDatesInRange = getDaysInRange(earliestDate, latestDate);
+-
+-  const moodsByDay: Record<string, number[]> = {};
+-  filteredMoods.forEach((mood) => {
+-    const dayKey = format(startOfDay(new Date(mood.timestamp)), "yyyy-MM-dd");
+-    if (!moodsByDay[dayKey]) {
+-      moodsByDay[dayKey] = [];
+-    }
+-    moodsByDay[dayKey].push(getInterpretedMoodRating(mood));
+-  });
+-
+-  type WorkingAggregate = {
+-    date: Date;
+-    moods: number[] | null;
+-    avg?: number;
+-    min?: number;
+-    max?: number;
+-  };
+-
+-  const initialAggregates: WorkingAggregate[] = allDatesInRange.map((date) => {
+-    const dateKey = format(date, "yyyy-MM-dd");
+-    const dayMoods = moodsByDay[dateKey] || null;
+-
+-    if (dayMoods && dayMoods.length > 0) {
+-      const avg = dayMoods.reduce((sum, val) => sum + val, 0) / dayMoods.length;
+-      return {
+-        date,
+-        moods: dayMoods,
+-        avg,
+-        min: Math.min(...dayMoods),
+-        max: Math.max(...dayMoods),
+-      };
+-    }
+-    return { date, moods: null };
+-  });
+-
+-  const finalAggregates: DailyDataPoint[] = initialAggregates.map(
+-    (aggregate, index) => {
+-      if (aggregate.avg !== undefined) {
+-        return {
+-          ...aggregate,
+-          finalAvg: aggregate.avg,
+-          hasRealData: true,
+-          isInterpolated: false,
+-        };
+-      }
+-
+-      // Find nearest real neighbours for linear interpolation
+-      let prevIndex = -1;
+-      for (let i = index - 1; i >= 0; i--) {
+-        if (initialAggregates[i].avg !== undefined) {
+-          prevIndex = i;
+-          break;
+-        }
+-      }
+-
+-      let nextIndex = -1;
+-      for (let i = index + 1; i < initialAggregates.length; i++) {
+-        if (initialAggregates[i].avg !== undefined) {
+-          nextIndex = i;
+-          break;
+-        }
+-      }
+-
+-      const prevAgg = prevIndex !== -1 ? initialAggregates[prevIndex] : null;
+-      const nextAgg = nextIndex !== -1 ? initialAggregates[nextIndex] : null;
+-
+-      let interpolatedAvg: number;
+-
+-      if (
+-        prevAgg?.avg !== undefined &&
+-        nextAgg?.avg !== undefined
+-      ) {
+-        const x0 = prevAgg.date.getTime();
+-        const y0 = prevAgg.avg;
+-        const x1 = nextAgg.date.getTime();
+-        const y1 = nextAgg.avg;
+-        const x = aggregate.date.getTime();
+-        interpolatedAvg =
+-          x1 === x0 ? y0 : y0 + ((y1 - y0) * (x - x0)) / (x1 - x0);
+-      } else if (prevAgg?.avg !== undefined) {
+-        interpolatedAvg = prevAgg.avg;
+-      } else if (nextAgg?.avg !== undefined) {
+-        interpolatedAvg = nextAgg.avg;
+-      } else {
+-        interpolatedAvg = getNeutralMoodRating();
+-      }
+-
+-      return {
+-        ...aggregate,
+-        finalAvg: interpolatedAvg,
+-        hasRealData: false,
+-        isInterpolated: true,
+-      };
+-    }
+-  );
+-
+-  const labels = finalAggregates.map((agg) => format(agg.date, "d"));
+-  return { labels, dailyAggregates: finalAggregates };
+-};
+-
+-/**
+- * Aggregates Mood Entries into per-week box-plot statistics (median, IQR,
+- * outliers) over a rolling window of maxWeeks weeks.
+- */
+-export const processWeeklyMoodData = (
+-  allMoods: MoodEntry[],
+-  maxWeeks: number = 52,
+-  referenceDate: Date = new Date()
+-): { labels: string[]; weeklyAggregates: WeeklyDataPoint[] } => {
+-  if (!allMoods || allMoods.length === 0) {
+-    return { labels: [], weeklyAggregates: [] };
+-  }
+-
+-  const sortedMoods = [...allMoods].sort(
+-    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+-  );
+-
+-  const cutoffDate = subDays(referenceDate, maxWeeks * 7);
+-  const filteredMoods = sortedMoods.filter(
+-    (mood) => new Date(mood.timestamp) >= cutoffDate
+-  );
+-
+-  const moodsByWeek: Record<string, number[]> = {};
+-  filteredMoods.forEach((mood) => {
+-    const weekStart = startOfWeek(new Date(mood.timestamp), {
+-      weekStartsOn: 1,
+-    });
+-    const weekKey = format(weekStart, "yyyy-MM-dd");
+-    if (!moodsByWeek[weekKey]) {
+-      moodsByWeek[weekKey] = [];
+-    }
+-    moodsByWeek[weekKey].push(getInterpretedMoodRating(mood));
+-  });
+-
+-  const weekKeys = Object.keys(moodsByWeek).sort().reverse();
+-  const weeklyAggregates: WeeklyDataPoint[] = weekKeys.map((weekKey) => {
+-    const weekMoods = moodsByWeek[weekKey];
+-    const stats = getQuartiles(weekMoods);
+-    const avg = weekMoods.reduce((sum, val) => sum + val, 0) / weekMoods.length;
+-
+-    return {
+-      weekStart: new Date(weekKey),
+-      moods: weekMoods,
+-      ...stats,
+-      avg,
+-      finalAvg: stats.q2, // use median as the representative value
+-      isInterpolated: false,
+-    };
+-  });
+-
+-  return {
+-    labels: weeklyAggregates.map((week) =>
+-      format(week.weekStart, "'W'w MMM")
+-    ),
+-    weeklyAggregates,
+-  };
+-};
+diff --git a/src/lib/moodPresentation.ts b/src/lib/moodPresentation.ts
+index 41e7573..70e8c84 100644
+--- a/src/lib/moodPresentation.ts
++++ b/src/lib/moodPresentation.ts
+@@ -1,16 +1,5 @@
+-/**
+- * Mood presentation helpers
+- *
+- * Pure functions that map numeric Mood Rating values and trend deltas to the
+- * Tailwind class strings and hex colours consumed by UI components. No React
+- * imports — every function is testable with plain Vitest.
+- */
+-
+ import {
+-  getMoodRatingBgClass,
+   getMoodRatingDisplay,
+-  getMoodRatingLabel,
+-  getMoodRatingTextClass,
+   isKnownMoodRating,
+ } from "@/constants/moodScaleInterpretation";
+ import type { MoodScaleSnapshot } from "@db/types";
+@@ -24,106 +13,3 @@ export const getMoodHex = (
+   if (!isKnownMoodRating(value, sourceScale)) return "#64748b";
+   return getMoodRatingDisplay(value, isDark, sourceScale).colorHex;
+ };
+-
+-/** Returns the Tailwind text-colour class for a Mood Rating value. */
+-export const getMoodScaleColor = (
+-  moodValue: number,
+-  sourceScale?: MoodScaleSnapshot
+-): string => {
+-  if (!isKnownMoodRating(moodValue, sourceScale)) return "text-slate-500";
+-  return getMoodRatingTextClass(moodValue, sourceScale);
+-};
+-
+-/** Returns the Tailwind background-colour class for a Mood Rating value. */
+-export const getMoodScaleBg = (
+-  moodValue: number,
+-  sourceScale?: MoodScaleSnapshot
+-): string => {
+-  if (!isKnownMoodRating(moodValue, sourceScale)) return "bg-slate-100";
+-  return getMoodRatingBgClass(moodValue, sourceScale);
+-};
+-
+-export interface MoodInterpretation {
+-  /** Plain colour name extracted from the Tailwind class, e.g. "sage-600" */
+-  color: string;
+-  /** Mood Rating Label text, e.g. "Neutral" */
+-  text: string;
+-  bg: string;
+-  textClass: string;
+-  bgClass: string;
+-}
+-
+-/** Maps an average Mood Rating to a labelled colour interpretation. */
+-export const getMoodInterpretation = (
+-  average: number,
+-  sourceScale?: MoodScaleSnapshot
+-): MoodInterpretation => {
+-  const moodInfo = getMoodRatingDisplay(average, false, sourceScale);
+-  return {
+-    color: moodInfo.color.replace("text-", ""),
+-    text: getMoodRatingLabel(average, sourceScale),
+-    bg: moodInfo.bg,
+-    textClass: moodInfo.color,
+-    bgClass: moodInfo.bg,
+-  };
+-};
+-
+-export interface TrendInterpretation {
+-  color: string;
+-  text: string;
+-  iconName:
+-    | "trending-up-outline"
+-    | "arrow-up-outline"
+-    | "trending-down-outline"
+-    | "arrow-down-outline"
+-    | "remove-outline";
+-  textClass: string;
+-  bgClass: string;
+-}
+-
+-/**
+- * Maps a mood trend delta to a labelled direction.
+- * Note: on the Mood Scale, lower numbers are better, so a negative delta means
+- * improvement.
+- */
+-export const getTrendInterpretation = (trend: number): TrendInterpretation => {
+-  if (trend < -0.5)
+-    return {
+-      color: "green",
+-      text: "Trending Better",
+-      iconName: "trending-up-outline",
+-      textClass: "text-emerald-600",
+-      bgClass: "bg-emerald-100 dark:bg-emerald-900/30",
+-    };
+-  if (trend < 0)
+-    return {
+-      color: "blue",
+-      text: "Improving",
+-      iconName: "arrow-up-outline",
+-      textClass: "text-blue-600",
+-      bgClass: "bg-blue-100 dark:bg-blue-900/30",
+-    };
+-  if (trend > 0.5)
+-    return {
+-      color: "red",
+-      text: "Declining",
+-      iconName: "trending-down-outline",
+-      textClass: "text-red-600",
+-      bgClass: "bg-red-100 dark:bg-red-900/30",
+-    };
+-  if (trend > 0)
+-    return {
+-      color: "orange",
+-      text: "Slight Dip",
+-      iconName: "arrow-down-outline",
+-      textClass: "text-amber-600",
+-      bgClass: "bg-amber-100 dark:bg-amber-900/30",
+-    };
+-  return {
+-    color: "gray",
+-    text: "Steady",
+-    iconName: "remove-outline",
+-    textClass: "text-slate-600",
+-    bgClass: "bg-slate-100 dark:bg-slate-800",
+-  };
+-};
+diff --git a/src/shared/state/moodsStore.ts b/src/shared/state/moodsStore.ts
+index 3b4efb1..52a3dd8 100644
+--- a/src/shared/state/moodsStore.ts
++++ b/src/shared/state/moodsStore.ts
+@@ -13,16 +13,9 @@ export type MoodsStore = {
+   error: string | null;
+   lastLoadedAt: number | null;
+   isStale: boolean;
+-  lastTracked: Date | null;
+-
+-  // Pagination state
+-  totalCount: number;
+-  hasMore: boolean;
+-  currentOffset: number;
+ 
+   // Actions
+   loadAll: () => Promise<void>;
+-  loadMore: (pageSize?: number) => Promise<void>;
+   refreshMoods: () => Promise<void>;
+   invalidate: () => void;
+   ensureFresh: () => Promise<void>;
+@@ -35,32 +28,8 @@ export type MoodsStore = {
+   restore: (entry: MoodEntryInput) => Promise<MoodEntry>;
+   updateTimestamp: (id: number, timestamp: number) => Promise<MoodEntry | null>;
+   setLocal: (moods: MoodEntry[]) => void;
+-
+-  // Selectors
+-  getMoodById: (id: number) => MoodEntry | undefined;
+-  getMoodCount: () => number;
+ };
+ 
+-/**
+- * Compute lastTracked date from moods
+- */
+-function computeLastTracked(moods: MoodEntry[]): Date | null {
+-  if (moods.length === 0) return null;
+-  return new Date(moods.reduce((latest, mood) => Math.max(latest, mood.timestamp), -Infinity));
+-}
+-
+-const DEFAULT_PAGE_SIZE = 50;
+-
+-function applyCollectionState(moods: MoodEntry[]) {
+-  return {
+-    moods,
+-    lastTracked: computeLastTracked(moods),
+-    totalCount: moods.length,
+-    hasMore: false,
+-    currentOffset: moods.length,
+-  };
+-}
+-
+ let activeHydrationPromise: Promise<void> | null = null;
+ 
+ export const useMoodsStore = create<MoodsStore>((set, get) => {
+@@ -104,7 +73,7 @@ export const useMoodsStore = create<MoodsStore>((set, get) => {
+           error: null,
+           lastLoadedAt: Date.now(),
+           isStale: false,
+-          ...applyCollectionState(moods),
++          moods,
+         });
+       } catch (error) {
+         if (nextStatus === "loading") {
+@@ -135,7 +104,7 @@ export const useMoodsStore = create<MoodsStore>((set, get) => {
+     applyMutation: (moods) => {
+       collectionRevision += 1;
+       set((state) => ({
+-        ...applyCollectionState(moods),
++        moods,
+         isStale: state.isStale || activeHydrationPromise !== null,
+       }));
+       if (get().isStale && !activeHydrationPromise) {
+@@ -150,10 +119,6 @@ export const useMoodsStore = create<MoodsStore>((set, get) => {
+     error: null,
+     lastLoadedAt: null,
+     isStale: true,
+-    lastTracked: null,
+-    totalCount: 0,
+-    hasMore: false,
+-    currentOffset: 0,
+ 
+     setLocal: (moods) => {
+       collectionRevision += 1;
+@@ -161,39 +126,12 @@ export const useMoodsStore = create<MoodsStore>((set, get) => {
+         status: "idle",
+         error: null,
+         isStale: false,
+-        ...applyCollectionState(moods),
++        moods,
+       });
+     },
+ 
+     loadAll: () => hydrateAll("loading", { clearError: true }),
+ 
+-    loadMore: async (pageSize = DEFAULT_PAGE_SIZE) => {
+-      const { status, currentOffset, hasMore } = get();
+-      if (status === "loading" || !hasMore) return;
+-
+-      set({ status: "loading" });
+-      try {
+-        const result = await moodService.getPaginated({
+-          limit: pageSize,
+-          offset: currentOffset,
+-        });
+-        set((state) => ({
+-          moods: [...state.moods, ...result.data],
+-          status: "idle",
+-          error: null,
+-          totalCount: result.total,
+-          hasMore: result.hasMore,
+-          currentOffset: state.currentOffset + result.data.length,
+-        }));
+-      } catch (error) {
+-        console.error("[moodsStore] Failed to load more moods:", error);
+-        set({
+-          status: "idle",
+-          error: error instanceof Error ? error.message : "Failed to load more moods",
+-        });
+-      }
+-    },
+-
+     refreshMoods: () => hydrateAll("refreshing"),
+ 
+     invalidate: () => {
+@@ -234,9 +172,5 @@ export const useMoodsStore = create<MoodsStore>((set, get) => {
+     restore: async (entry) => {
+       return workflow.restore(entry);
+     },
+-
+-    // Selectors
+-    getMoodById: (id) => get().moods.find((m) => m.id === id),
+-    getMoodCount: () => get().moods.length,
+   };
+ });
+diff --git a/src/features/insights/utils/streaks.ts b/src/features/insights/utils/streaks.ts
+new file mode 100644
+index 0000000..93d0c7e
+--- /dev/null
++++ b/src/features/insights/utils/streaks.ts
+@@ -0,0 +1,61 @@
++import type { MoodEntry } from "@db/types";
++import { format, subDays } from "date-fns";
++
++/**
++ * Calculate current streak (consecutive days with entries)
++ */
++export function calculateStreak(moods: MoodEntry[], todayDate = new Date()): { current: number; longest: number } {
++  if (moods.length === 0) return { current: 0, longest: 0 };
++
++  // Group by date
++  const dateSet = new Set<string>();
++  moods.forEach((mood) => {
++    const dateKey = format(new Date(mood.timestamp), "yyyy-MM-dd");
++    dateSet.add(dateKey);
++  });
++
++  const dates = Array.from(dateSet).sort().reverse(); // Most recent first
++
++  if (dates.length === 0) return { current: 0, longest: 0 };
++
++  // Calculate current streak
++  let currentStreak = 0;
++  const today = format(todayDate, "yyyy-MM-dd");
++  const yesterday = format(subDays(todayDate, 1), "yyyy-MM-dd");
++
++  // Current streak must include today or yesterday
++  if (dates[0] === today || dates[0] === yesterday) {
++    currentStreak = 1;
++    for (let i = 1; i < dates.length; i++) {
++      const prevDate = new Date(dates[i - 1]);
++      const currDate = new Date(dates[i]);
++      const diffDays = Math.round((prevDate.getTime() - currDate.getTime()) / 86400000);
++
++      if (diffDays === 1) {
++        currentStreak++;
++      } else {
++        break;
++      }
++    }
++  }
++
++  // Calculate longest streak
++  let longestStreak = 1;
++  let tempStreak = 1;
++
++  const sortedDatesAsc = [...dates].reverse(); // Oldest first
++  for (let i = 1; i < sortedDatesAsc.length; i++) {
++    const prevDate = new Date(sortedDatesAsc[i - 1]);
++    const currDate = new Date(sortedDatesAsc[i]);
++    const diffDays = Math.round((currDate.getTime() - prevDate.getTime()) / 86400000);
++
++    if (diffDays === 1) {
++      tempStreak++;
++      longestStreak = Math.max(longestStreak, tempStreak);
++    } else {
++      tempStreak = 1;
++    }
++  }
++
++  return { current: currentStreak, longest: longestStreak };
++}

@@ -228,10 +228,10 @@ export default function DisplaySettingsScreen() {
           </View>
         </SettingsSection>
 
-        <SettingsSection title="Charts">
+        <SettingsSection title="Mood Selector">
           <ToggleRow
             title="Detailed Labels"
-            description="Show mood descriptions on chart axes and tooltips"
+            description="Show detailed mood descriptions on Home"
             value={showDetailedLabels}
             onChange={setShowDetailedLabels}
             icon="text-outline"
