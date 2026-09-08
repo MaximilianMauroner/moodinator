@@ -20,6 +20,7 @@ import {
   hasMoodBeenLoggedToday,
   updateEmotionCategoryInMoods,
   getEmotionNamesFromMoods,
+  getContextTagsFromMoods,
   clearMoodData,
   seedMoods,
   type PaginationOptions,
@@ -74,6 +75,7 @@ export interface MoodServiceInterface {
     category: Emotion["category"]
   ) => Promise<{ updated: number }>;
   getEmotionNames: () => Promise<string[]>;
+  getContextTags: () => Promise<string[]>;
 }
 
 /**
@@ -259,6 +261,13 @@ export const moodService: MoodServiceInterface = {
    */
   async getEmotionNames(): Promise<string[]> {
     return getEmotionNamesFromMoods();
+  },
+
+  /**
+   * Get all unique context tags used in moods
+   */
+  async getContextTags(): Promise<string[]> {
+    return getContextTagsFromMoods();
   },
 };
 

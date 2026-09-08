@@ -10,13 +10,16 @@ interface HistoryListHeaderProps {
 /**
  * Header for the mood history list section.
  * Shows "Recent entries" title with count badge.
+ *
+ * Carries no bottom margin: it shares a centred row with the filter button, and
+ * a margin here would push the title off that row's centre line.
  */
 export function HistoryListHeader({ moodCount }: HistoryListHeaderProps) {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
 
   return (
-    <View className="flex-row justify-between items-center mb-3 px-1">
+    <View className="flex-row justify-between items-center px-1">
       <Text
         className="font-semibold text-base"
         style={{ color: isDark ? colors.text.dark : colors.text.light }}

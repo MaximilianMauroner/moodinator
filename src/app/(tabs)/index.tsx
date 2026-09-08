@@ -48,6 +48,7 @@ import {
   UNIFIED_COMPACT_EXPANDED_HEIGHT,
 } from "@/components/home";
 
+import { ActiveFilterChips } from "@/features/history/ActiveFilterChips";
 import { HistoryFilterSheet } from "@/features/history/HistoryFilterSheet";
 import { useMoodsStore } from "@/shared/state/moodsStore";
 import { useEntrySettings } from "@/hooks/useEntrySettings";
@@ -724,10 +725,11 @@ function HomeScreenContent() {
                 onLayout={handleHistoryChromeLayout}
                 style={{ paddingTop: HEADER_SECTION_GAP }}
               >
-                <View className="flex-row items-center justify-between">
+                <View className="mb-3 flex-row items-center justify-between gap-2">
                   <View className="flex-1"><HistoryListHeader moodCount={total} /></View>
                   <HistoryFilterSheet />
                 </View>
+                <ActiveFilterChips />
               </View>
             </Animated.View>
 
