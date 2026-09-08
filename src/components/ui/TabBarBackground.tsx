@@ -1,2 +1,4 @@
-// This is a shim for web and Android where the tab bar is generally opaque.
-export default undefined;
+// Android and web use the opaque tab bar surface from the navigator.
+export default function TabBarBackground() {
+  return null;
+}

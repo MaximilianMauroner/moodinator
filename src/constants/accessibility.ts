@@ -40,7 +40,7 @@ export function getMoodButtonHint(): string {
  */
 export const TAB_ACCESSIBILITY_LABELS = {
   home: "Home tab, log your mood",
-  insights: "Insights tab, view mood charts and analytics",
+  insights: "Insights tab, view mood history and summaries",
   settings: "Settings tab, customize app preferences",
 } as const;
 

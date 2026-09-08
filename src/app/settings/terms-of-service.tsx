@@ -19,7 +19,7 @@ export default function TermsOfServiceScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Text className="text-xs text-paper-700 dark:text-sand-400 mb-4">
-          Last Updated: July 21, 2026
+          Last Updated: September 7, 2026
         </Text>
 
         <Section title="Agreement to Terms">
@@ -35,7 +35,7 @@ export default function TermsOfServiceScreen() {
           <BulletList items={[
             "Record moods on a 0–10 scale, where lower is better and 9–10 require the most support",
             "Add notes, emotions, contexts, and energy values",
-            "Configure local reminders and view on-device patterns",
+            "Configure local reminders and view mood history and summaries on your device",
             "Create plaintext JSON mood exports/backups and plaintext CSV therapy exports",
           ]} />
         </Section>
@@ -63,7 +63,7 @@ export default function TermsOfServiceScreen() {
             Medical Disclaimer
           </Text>
           <Text className="text-sm text-coral-700 dark:text-coral-400 leading-5 mb-2">
-            Moodinator is not a medical device and does not diagnose, treat, cure, or prevent any medical condition. It does not provide medical advice, diagnosis, or treatment. Its ratings, patterns, and insights are informational and may be incomplete or inaccurate. Consult a qualified healthcare professional for medical advice, diagnosis, or treatment.
+            Moodinator is not a medical device and does not diagnose, treat, cure, or prevent any medical condition. It does not provide medical advice, diagnosis, or treatment. Its ratings and summaries are informational and may be incomplete or inaccurate. Consult a qualified healthcare professional for medical advice, diagnosis, or treatment.
           </Text>
           <Text className="text-sm text-coral-700 dark:text-coral-400 leading-5 font-medium">
             Moodinator does not monitor entries, provide live crisis support, contact emergency services, or dispatch help. If someone may be in immediate danger, call the local emergency number. In the U.S., call or text 988; elsewhere, findahelpline.com can help locate support.

@@ -81,6 +81,17 @@ function assert(condition, message) {
   }
 }
 
+function readGradleVersionCode(gradle) {
+  const literalVersionCode = gradle.match(/\bversionCode\s+(\d+)/)?.[1];
+  if (literalVersionCode) return Number(literalVersionCode);
+
+  const defaultVersionCode = gradle.match(
+    /moodinatorVersionCode\s*=\s*\(findProperty\(['"]moodinatorVersionCode['"]\)\s*\?:\s*['"](\d+)['"]\)/
+  )?.[1];
+
+  return Number(defaultVersionCode);
+}
+
 const pkg = readJson("package.json");
 const app = readJson("app.json");
 const eas = readJson("eas.json");
@@ -116,7 +127,7 @@ assert(
 
 if (gradle) {
   const gradleVersionName = gradle.match(/versionName\s+"([^"]+)"/)?.[1];
-  const gradleVersionCode = Number(gradle.match(/versionCode\s+(\d+)/)?.[1]);
+  const gradleVersionCode = readGradleVersionCode(gradle);
 
   assert(
     gradleVersionName === app.expo.version,

@@ -4,7 +4,7 @@ appId: com.lab4code.moodinator.qa
 - tapOn: "Next onboarding page"
 - assertVisible: "Track Your Mood"
 - tapOn: "Next onboarding page"
-- assertVisible: "Discover Patterns"
+- assertVisible: "Look Back"
 - tapOn: "Next onboarding page"
 - assertVisible: "Your Data, Your Control"
 - tapOn: "Get started"

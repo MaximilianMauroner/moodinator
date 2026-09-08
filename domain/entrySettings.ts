@@ -12,9 +12,16 @@
 
 export type EmotionCategory = "positive" | "negative" | "neutral";
 
+export type EmotionEnergyBand = "high" | "neutral" | "low";
+
 export type Emotion = {
     name: string;
     category: EmotionCategory;
+    /**
+     * Optional for compatibility with old settings and mood snapshots.
+     * Missing values resolve to the neutral band at the read boundary.
+     */
+    energy?: EmotionEnergyBand;
 };
 
 // Emotion list informed by:
@@ -74,6 +81,105 @@ export const DEFAULT_EMOTIONS: Emotion[] = [
     { name: "Surprised",    category: "neutral" },   // Ekman core; valence depends on context
     { name: "Tired",        category: "neutral" },   // fatigue / exhaustion (PANAS-X)
 ];
+
+// ── Energy bands ─────────────────────────────────────────────────────────────
+// The entry picker groups emotions by arousal (how activated the feeling is)
+// instead of by name. Valence stays visible through the existing chip colours,
+// so the two axes of the affect circumplex are readable at the same time.
+//
+// The map supplies the initial band for built-in names. Explicit settings can
+// override it, while legacy/custom values without a band resolve to neutral.
+export const EMOTION_ENERGY_BAND_ORDER: readonly EmotionEnergyBand[] = [
+    "high",
+    "neutral",
+    "low",
+] as const;
+
+export const EMOTION_ENERGY_BAND_LABELS: Record<EmotionEnergyBand, string> = {
+    high: "High energy",
+    neutral: "Neutral",
+    low: "Low energy",
+};
+
+// Arousal ratings follow the circumplex placements in Russell (1980) and the
+// PANAS-X activation subscales. Every DEFAULT_EMOTIONS entry has a value; the
+// `emotionEnergyBands` test asserts that stays true.
+const DEFAULT_EMOTION_AROUSAL: Record<string, EmotionEnergyBand> = {
+    // Positive
+    energetic: "high",
+    excited: "high",
+    inspired: "high",
+    motivated: "high",
+    affectionate: "neutral",
+    amused: "neutral",
+    awe: "neutral",
+    confident: "neutral",
+    grateful: "neutral",
+    happy: "neutral",
+    hopeful: "neutral",
+    loved: "neutral",
+    proud: "neutral",
+    content: "low",
+    relaxed: "low",
+
+    // Negative
+    angry: "high",
+    anxious: "high",
+    embarrassed: "high",
+    fearful: "high",
+    frustrated: "high",
+    overwhelmed: "high",
+    stressed: "high",
+    ashamed: "neutral",
+    disgusted: "neutral",
+    guilty: "neutral",
+    hurt: "neutral",
+    insecure: "neutral",
+    irritable: "neutral",
+    jealous: "neutral",
+    disappointed: "low",
+    grieving: "low",
+    hopeless: "low",
+    lonely: "low",
+    numb: "low",
+    sad: "low",
+
+    // Neutral
+    surprised: "high",
+    confused: "neutral",
+    curious: "neutral",
+    bored: "low",
+    tired: "low",
+};
+
+/**
+ * Returns the built-in energy band for an emotion name, or null when the name
+ * has no built-in rating. Use resolveEmotionEnergyBand at a UI/data boundary
+ * when a missing value should fall back to neutral.
+ */
+export function getEmotionEnergyBand(name: string): EmotionEnergyBand | null {
+    return DEFAULT_EMOTION_AROUSAL[name.trim().toLowerCase()] ?? null;
+}
+
+export function isEmotionEnergyBand(value: unknown): value is EmotionEnergyBand {
+    return value === "high" || value === "neutral" || value === "low";
+}
+
+/**
+ * Resolve an emotion's configured band. Legacy and newly created emotions
+ * without an explicit band are intentionally neutral until the user changes
+ * them in the emotion settings.
+ */
+export function resolveEmotionEnergyBand(
+    emotion: Pick<Emotion, "name" | "energy"> | string
+): EmotionEnergyBand {
+    if (typeof emotion !== "string" && isEmotionEnergyBand(emotion.energy)) {
+        return emotion.energy;
+    }
+
+    const name = typeof emotion === "string" ? emotion : emotion.name;
+    return getEmotionEnergyBand(name) ?? "neutral";
+}
 
 export const DEFAULT_CONTEXTS = [
     "Home",
@@ -147,7 +253,11 @@ export function parseEmotionList(data: unknown): Emotion[] {
         .map((item): Emotion | null => {
             if (typeof item === "string" && item.trim().length > 0) {
                 const name = item.trim();
-                return { name, category: resolveEmotionCategory(name) };
+                return {
+                    name,
+                    category: resolveEmotionCategory(name),
+                    energy: resolveEmotionEnergyBand(name),
+                };
             }
             if (
                 typeof item === "object" &&
@@ -161,7 +271,14 @@ export function parseEmotionList(data: unknown): Emotion[] {
                     category === "positive" || category === "negative" || category === "neutral"
                         ? category
                         : resolveEmotionCategory(name);
-                return { name, category: validCategory };
+                const energy = (item as Record<string, unknown>).energy;
+                return {
+                    name,
+                    category: validCategory,
+                    energy: isEmotionEnergyBand(energy)
+                        ? energy
+                        : resolveEmotionEnergyBand(name),
+                };
             }
             return null;
         })

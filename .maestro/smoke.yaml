@@ -82,7 +82,7 @@ name: Isolated Android entry lifecycle
 - tapOn: "Undo delete"
 - assertVisible:
     id: "mood-entry-actions-.*"
-- tapOn: "Insights tab, view mood charts and analytics"
-- assertVisible: "Patterns across 1 entry"
+- tapOn: "Insights tab, view mood history and summaries"
+- assertVisible: "Your history · 1 entry"
 - tapOn: "Refresh insights"
-- assertVisible: "Patterns across 1 entry"
+- assertVisible: "Your history · 1 entry"

@@ -23,7 +23,6 @@ import { useInsightsData } from "../hooks/useInsightsData";
 import { TimePeriodSelector } from "../components/TimePeriodSelector";
 import { WeekNavigator } from "../components/WeekNavigator";
 import { InsightCard, CompactInsightCard } from "../components/InsightCard";
-import { PatternCard } from "../components/PatternCard";
 import { StreakBadge } from "../components/StreakBadge";
 import { EntryDetailModal } from "../components/EntryDetailModal";
 import { InsightsHeader } from "../components/InsightsHeader";
@@ -72,7 +71,6 @@ export function InsightsScreen() {
     canGoNext,
     canGoPrevious,
     stats,
-    patterns,
     streak,
     getMoodLabel,
     getMoodColor,
@@ -205,7 +203,7 @@ export function InsightsScreen() {
             icon="bar-chart-outline"
             tone="sage"
             title="No Insights Yet"
-            description="Start tracking your moods to discover patterns and understand your emotional well-being better."
+            description="Log your mood to review your history and see summaries over time."
           />
         ) : viewMode === "calendar" ? (
           <Animated.View
@@ -360,16 +358,9 @@ export function InsightsScreen() {
                     </Animated.View>
                   )}
 
-                  {/* Patterns (only for month/all view with enough data) */}
-                  {patterns.length > 0 && (
-                    <Animated.View entering={reveal(4)} className="mb-4">
-                      <PatternCard patterns={patterns} />
-                    </Animated.View>
-                  )}
-
                   {/* Entries List */}
                   {periodMoods.length > 0 && (
-                    <Animated.View entering={reveal(5)}>
+                    <Animated.View entering={reveal(4)}>
                     <SurfaceCard tone="sage" style={{ marginBottom: 4 }}>
                       <View className="flex-row items-center mb-4">
                         <IconBadge

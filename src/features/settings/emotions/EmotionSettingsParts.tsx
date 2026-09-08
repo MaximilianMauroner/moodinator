@@ -1,5 +1,6 @@
 import React from "react";
 import type { Emotion } from "@db/types";
+import type { EmotionEnergyBand } from "@/lib/entrySettings";
 import { CATEGORY_CONFIG } from "./emotionSettingsConfig";
 import {
   PresetAddChip,
@@ -76,11 +77,21 @@ function HeroStats({
 
 interface CategorySectionProps {
   category: Emotion["category"];
-  chips: { name: string; isActive: boolean; isCustom: boolean }[];
+  chips: {
+    name: string;
+    category: Emotion["category"];
+    energy: EmotionEnergyBand;
+    isActive: boolean;
+    isCustom: boolean;
+  }[];
   isDark: boolean;
   onToggle: (name: string) => void;
   onRemove: (name: string) => void;
-  onEdit: (name: string, category: Emotion["category"]) => void;
+  onEdit: (emotion: {
+    name: string;
+    category: Emotion["category"];
+    energy: EmotionEnergyBand;
+  }) => void;
   onOpenMoveDialog: (name: string, category: Emotion["category"]) => void;
   onSelectAll: () => void;
   onClearAll: () => void;
@@ -130,7 +141,16 @@ function CategorySection({
             onLongPress={
               chip.isCustom ? () => onOpenMoveDialog(chip.name, category) : undefined
             }
-            onEdit={chip.isCustom ? () => onEdit(chip.name, category) : undefined}
+            onEdit={
+              chip.isActive || chip.isCustom
+                ? () =>
+                    onEdit({
+                      name: chip.name,
+                      category: chip.category,
+                      energy: chip.energy,
+                    })
+                : undefined
+            }
           />
         ))}
         <PresetAddChip

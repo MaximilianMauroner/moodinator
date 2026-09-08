@@ -1,6 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+  AccessibilityInfo,
+  findNodeHandle,
   Modal,
+  ScrollView,
+  useWindowDimensions,
   Pressable,
   StyleSheet,
   Text,
@@ -9,10 +13,11 @@ import {
   type AlertStatic,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
 
 import { colors, effectColors, useThemeColors } from "@/constants/colors";
-import { typography } from "@/constants/typography";
+import { fontFamilies, typography } from "@/constants/typography";
+
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 
 type AlertRequest = {
   title: string;
@@ -64,22 +69,22 @@ function buttonColor(button: AlertButton, isDark: boolean) {
   if (button.style === "cancel") {
     return isDark ? colors.textMuted.dark : colors.textMuted.light;
   }
-  return isDark ? colors.primaryMuted.dark : colors.primary.light;
+  return isDark ? colors.primaryMuted.dark : colors.positive.text.light;
 }
 
 export function AppAlertProvider() {
   const { isDark, get } = useThemeColors();
-  const [request, setRequest] = useState<AlertRequest | null>(null);
-  const queueRef = useRef<AlertRequest[]>([]);
+  const { width, fontScale } = useWindowDimensions();
+  const reducedMotion = useReducedMotion();
+  const titleRef = useRef<Text>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  const modalShown = useRef(false);
+  const [requests, setRequests] = useState<AlertRequest[]>([]);
+  const request = requests[0] ?? null;
+  const handledRequest = useRef<AlertRequest | null>(null);
 
   const show = useCallback((next: AlertRequest) => {
-    setRequest((current) => {
-      if (current) {
-        queueRef.current.push(next);
-        return current;
-      }
-      return next;
-    });
+    setRequests((current) => [...current, next]);
   }, []);
 
   useEffect(() => {
@@ -95,37 +100,57 @@ export function AppAlertProvider() {
     };
   }, [show]);
 
-  useEffect(() => {
-    if (!request && queueRef.current.length) {
-      setRequest(queueRef.current.shift() ?? null);
-    }
-  }, [request]);
-
   const dismiss = useCallback(() => {
-    if (!request) return;
-    setRequest(null);
+    if (!request || handledRequest.current === request) return;
+    handledRequest.current = request;
+    setRequests((current) => current.slice(1));
     request.options?.onDismiss?.();
   }, [request]);
 
-  const pressButton = useCallback(
-    (button: AlertButton) => {
-      setRequest(null);
-      button.onPress?.();
-    },
-    []
-  );
+  const pressButton = useCallback((button: AlertButton) => {
+    if (!request || handledRequest.current === request) return;
+    handledRequest.current = request;
+    setRequests((current) => current.slice(1));
+    button.onPress?.();
+  }, [request]);
+
+  const focusTitle = useCallback(() => {
+    const titleTag = findNodeHandle(titleRef.current);
+    if (titleTag !== null) AccessibilityInfo.setAccessibilityFocus(titleTag);
+  }, []);
+
+  useEffect(() => {
+    if (!request) {
+      modalShown.current = false;
+      return;
+    }
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+    // Queued alerts reuse the native Modal, so onShow does not run again.
+    if (modalShown.current) {
+      const frame = requestAnimationFrame(focusTitle);
+      return () => cancelAnimationFrame(frame);
+    }
+  }, [request, focusTitle]);
 
   if (!request) return null;
 
   const cancelable = request.options?.cancelable === true;
 
+  const horizontalActions = request.buttons.length === 2
+    && width >= 360 && fontScale <= 1.2
+    && request.buttons.every((button) => (button.text ?? "OK").length <= 14);
+
   return (
     <Modal
       visible
       transparent
-      animationType="fade"
+      animationType={reducedMotion ? "none" : "fade"}
       statusBarTranslucent
       navigationBarTranslucent
+      onShow={() => {
+        modalShown.current = true;
+        focusTitle();
+      }}
       onRequestClose={() => {
         if (cancelable) dismiss();
       }}
@@ -139,9 +164,8 @@ export function AppAlertProvider() {
             onPress={dismiss}
           />
         ) : null}
-        <SafeAreaView edges={["left", "right"]} style={styles.safeArea}>
+        <SafeAreaView style={styles.safeArea} pointerEvents="box-none">
           <View
-            accessibilityRole="alert"
             accessibilityViewIsModal
             style={[
               styles.dialog,
@@ -152,69 +176,51 @@ export function AppAlertProvider() {
               },
             ]}
           >
-            <View
-              style={[
-                styles.iconWrap,
-                { backgroundColor: isDark ? colors.primaryBg.dark : colors.primaryBg.light },
-              ]}
+            <ScrollView
+              ref={scrollRef}
+              style={styles.scroll}
+              contentContainerStyle={styles.content}
+              bounces={false}
+              keyboardShouldPersistTaps="handled"
             >
-              <Ionicons
-                name="leaf-outline"
-                size={21}
-                color={isDark ? colors.primaryMuted.dark : colors.primary.light}
-              />
-            </View>
-            <Text style={[typography.titleMd, { color: get("text") }]}>{request.title}</Text>
-            {request.message ? (
-              <Text style={[styles.message, { color: get("textMuted") }]}>{request.message}</Text>
-            ) : null}
-            <View style={styles.buttons}>
-              {request.buttons.map((button, index) => (
-                <Pressable
-                  key={`${button.text ?? "button"}-${index}`}
-                  accessibilityRole="button"
-                  accessibilityLabel={button.text ?? "Button"}
-                  onPress={() => pressButton(button)}
-                  style={({ pressed }) => [
-                    styles.button,
-                    {
-                      backgroundColor:
-                        button.style === "cancel"
-                          ? isDark
-                            ? colors.surfaceAlt.dark
-                            : colors.surfaceAlt.light
-                          : button.style === "destructive"
-                            ? isDark
-                              ? colors.negative.bg.dark
-                              : colors.negative.bg.light
-                            : isDark
-                              ? colors.primaryBg.dark
-                              : colors.primaryBg.light,
-                      borderColor:
-                        button.style === "cancel"
-                          ? get("border")
-                          : button.style === "destructive"
-                            ? isDark
-                              ? colors.negative.border.dark
-                              : colors.negative.border.light
-                            : isDark
-                              ? colors.primaryBgHover.dark
-                              : colors.primaryBgHover.light,
-                      opacity: pressed ? 0.72 : 1,
-                    },
-                  ]}
-                >
-                  <Text
+              <Text
+                ref={titleRef}
+                accessibilityRole="header"
+                style={[styles.title, { color: get("text") }]}
+              >
+                {request.title}
+              </Text>
+              {request.message ? (
+                <Text style={[styles.message, { color: get("textMuted") }]}>{request.message}</Text>
+              ) : null}
+              <View style={[styles.buttons, horizontalActions && styles.buttonRow]}>
+                {request.buttons.map((button, index) => (
+                  <Pressable
+                    key={`${button.text ?? "button"}-${index}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={button.text ?? "Button"}
+                    onPress={() => pressButton(button)}
+                    className="active:opacity-70"
                     style={[
-                      styles.buttonText,
-                      { color: buttonColor(button, isDark) },
+                      styles.button,
+                      horizontalActions && styles.rowButton,
+                      {
+                        backgroundColor: button.style === "destructive"
+                          ? colors.negative.bg[isDark ? "dark" : "light"]
+                          : get("surfaceAlt"),
+                        borderColor: button.style === "destructive"
+                          ? colors.negative.border[isDark ? "dark" : "light"]
+                          : get("border"),
+                      },
                     ]}
                   >
-                    {button.text ?? "OK"}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
+                    <Text style={[styles.buttonText, { color: buttonColor(button, isDark) }]}>
+                      {button.text ?? "OK"}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </ScrollView>
           </View>
         </SafeAreaView>
       </View>
@@ -226,53 +232,65 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: colors.overlay,
-    justifyContent: "center",
-    paddingHorizontal: 22,
   },
   safeArea: {
-    width: "100%",
+    flex: 1,
+    padding: 20,
+    justifyContent: "center",
     alignItems: "center",
   },
   dialog: {
     width: "100%",
     maxWidth: 420,
-    borderRadius: 24,
+    maxHeight: "100%",
+    borderRadius: 18,
     borderWidth: 1,
-    paddingHorizontal: 22,
-    paddingTop: 20,
-    paddingBottom: 16,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.16,
-    shadowRadius: 20,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 4,
   },
-  iconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 12,
+  scroll: {
+    flexGrow: 0,
+    borderRadius: 18,
+  },
+  content: {
+    padding: 20,
+  },
+  title: {
+    fontFamily: fontFamilies.bodyMedium,
+    fontSize: 20,
+    lineHeight: 26,
+    fontWeight: "600",
   },
   message: {
     ...typography.bodyMd,
-    marginTop: 8,
-    lineHeight: 21,
+    marginTop: 10,
+    lineHeight: 22,
   },
   buttons: {
     gap: 8,
     marginTop: 20,
   },
+  buttonRow: {
+    flexDirection: "row",
+  },
+  rowButton: {
+    flex: 1,
+  },
   button: {
-    minHeight: 46,
-    borderRadius: 15,
+    minHeight: 48,
+    borderRadius: 10,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
   },
   buttonText: {
     ...typography.bodyMd,
-    fontWeight: "700",
+    fontFamily: fontFamilies.bodyMedium,
+    fontWeight: "600",
+    textAlign: "center",
   },
 });

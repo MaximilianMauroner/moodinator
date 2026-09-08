@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Moodinator — Emotion step redesign</title>
+<style>
+  :root {
+    --page-bg: #0A0F0C;
+    --card-bg: #101A14;
+    --card-border: #1E3226;
+    --ink: #EAF3E4;
+    --ink-dim: #9EB894;
+    --ink-faint: #6E8768;
+    --accent: #A6E39B;
+
+    /* App tokens (src/constants/colors.ts, dark) */
+    --sheet: #0D1A13;
+    --sheet-2: #0B160F;
+    --text-subtle: #9EB894;
+
+    --pos-bg: #122A1A;
+    --pos-bg-sel: #34703D;
+    --pos-border: #2F5A39;
+    --pos-text: #C8F5BE;
+    --pos-text-sel: #FDFCFA;
+
+    --neg-bg: #482721;
+    --neg-bg-sel: #D87561;
+    --neg-border: #693930;
+    --neg-text: #F2B4A6;
+    --neg-text-sel: #08150F;
+
+    --neu-bg: #332D3D;
+    --neu-bg-sel: #8A7AA0;
+    --neu-border: #51485F;
+    --neu-text: #D5CCDD;
+    --neu-text-sel: #08150F;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 40px 28px 80px;
+    background: var(--page-bg);
+    color: var(--ink);
+    font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1 { font-size: 26px; margin: 0 0 8px; letter-spacing: -0.4px; }
+  h2 { font-size: 17px; margin: 44px 0 14px; letter-spacing: -0.2px; }
+  p  { margin: 0 0 10px; color: var(--ink-dim); font-size: 14px; line-height: 1.55; max-width: 78ch; }
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    background: #16241B;
+    border: 1px solid var(--card-border);
+    border-radius: 5px;
+    padding: 1px 5px;
+    color: #C8F5BE;
+  }
+
+  .lede { max-width: 82ch; }
+
+  /* ── Layout ─────────────────────────────────────────────── */
+  .rail {
+    display: flex;
+    gap: 26px;
+    align-items: flex-start;
+    overflow-x: auto;
+    padding: 6px 0 22px;
+  }
+
+  .col { flex: 0 0 auto; width: 411px; }
+
+  .col-head { margin-bottom: 12px; height: 104px; }
+  .col-tag {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 4px 9px;
+    border-radius: 999px;
+    margin-bottom: 8px;
+  }
+  .tag-now  { background: #2A1A17; color: #F2B4A6; border: 1px solid #693930; }
+  .tag-opt  { background: #122A1A; color: #C8F5BE; border: 1px solid #2F5A39; }
+  .col-title { font-size: 16px; font-weight: 650; margin: 0 0 4px; }
+  .col-sub { font-size: 13px; color: var(--ink-faint); line-height: 1.5; margin: 0; }
+
+  /* ── Phone frame (411dp × 820dp = true Pixel-class metrics) ─ */
+  .frame {
+    width: 411px;
+    height: 820px;
+    border-radius: 26px;
+    background: var(--sheet);
+    border: 1px solid #22382A;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    box-shadow: 0 18px 50px rgba(0,0,0,0.55);
+  }
+
+  .sheet-head { flex: 0 0 auto; padding: 14px 20px 0; }
+  .grabber { width: 44px; height: 4px; border-radius: 99px; background: #2C4433; margin: 0 auto 14px; }
+  .sheet-title-row { display: flex; align-items: center; justify-content: space-between; }
+  .sheet-title { font-size: 20px; font-weight: 700; color: #F0F7EA; }
+  .sheet-x { font-size: 22px; color: #B9CFAE; line-height: 1; }
+
+  .mood-row { display: flex; align-items: center; gap: 12px; margin: 14px 0 10px; }
+  .mood-chip {
+    width: 116px; height: 74px; border-radius: 16px;
+    background: #2E2A3E; border: 1px solid #4A4360;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .mood-num { font-size: 27px; font-weight: 700; color: #EDE7F5; line-height: 1.05; }
+  .mood-lab { font-size: 12px; color: #C4BBCF; }
+  .arrow {
+    width: 38px; height: 38px; border-radius: 999px;
+    background: #17261C; border: 1px solid #2A4230;
+    display: flex; align-items: center; justify-content: center;
+    color: #9EB894; font-size: 15px;
+  }
+  .last-entry {
+    margin-left: auto; height: 42px; padding: 0 14px; border-radius: 12px;
+    background: #12251A; border: 1px solid #2F5A39; color: #C8F5BE;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.6px;
+    display: flex; align-items: center; gap: 7px;
+  }
+  .dots { display: flex; gap: 6px; justify-content: center; margin: 8px 0 6px; }
+  .dot { width: 7px; height: 7px; border-radius: 99px; background: #2C4433; }
+  .dot.on { width: 20px; background: var(--accent); }
+  .step-q {
+    text-align: center; font-size: 12.5px; font-weight: 700;
+    letter-spacing: 1.3px; text-transform: uppercase;
+    color: var(--text-subtle); padding-bottom: 12px;
+  }
+
+  .scrollArea {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 0 20px;
+    border-top: 1px solid rgba(47,81,59,0.35);
+    position: relative;
+    scrollbar-width: thin;
+    scrollbar-color: #2C4433 transparent;
+  }
+  .scrollArea::-webkit-scrollbar { width: 5px; }
+  .scrollArea::-webkit-scrollbar-thumb { background: #2C4433; border-radius: 99px; }
+
+  .fold {
+    position: absolute; left: 0; right: 0;
+    border-top: 1px dashed rgba(216,117,97,0.55);
+    pointer-events: none;
+  }
+
+  .sheet-foot {
+    flex: 0 0 auto; height: 76px; padding: 0 20px;
+    display: flex; align-items: center; gap: 12px;
+    border-top: 1px solid rgba(47,81,59,0.35);
+    background: var(--sheet-2);
+  }
+  .btn-ghost {
+    flex: 1; height: 48px; border-radius: 14px;
+    background: #1A2A20; color: #D6E7CC;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; font-weight: 650;
+  }
+  .btn-go {
+    flex: 1.35; height: 48px; border-radius: 14px;
+    background: #BFEDB2; color: #0B1A12;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; font-weight: 750;
+  }
+
+  /* ── Section label row ──────────────────────────────────── */
+  .sec-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 0 0;
+  }
+  .sec-label {
+    font-size: 12px; font-weight: 700; letter-spacing: 1.2px;
+    text-transform: uppercase; color: var(--text-subtle);
+  }
+  .sec-count { margin-left: auto; font-size: 13px; font-weight: 650; color: #E0C993; }
+  .sec-add {
+    width: 40px; height: 40px; border-radius: 12px;
+    background: var(--neg-bg-sel); color: #08150F;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; font-weight: 400;
+  }
+  .sec-add.sm { width: 30px; height: 30px; border-radius: 9px; font-size: 18px; }
+
+  /* ── CURRENT metrics (as shipped) ───────────────────────── */
+  .cur-summary {
+    min-height: 82px; padding: 2px 0; margin-bottom: 16px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .cur-selpill {
+    min-height: 48px; min-width: 48px; border-radius: 999px;
+    padding: 6px 10px; display: flex; align-items: center; gap: 4px;
+    font-size: 12px; font-weight: 650;
+    background: var(--pos-bg-sel); color: var(--pos-text-sel);
+  }
+  .cur-cat { margin-bottom: 16px; }
+  .cur-cat-head {
+    display: flex; align-items: center; gap: 8px;
+    padding-bottom: 5px; margin-bottom: 10px;
+    border-bottom: 1px solid rgba(61,53,42,0.25);
+  }
+  .cur-cat-head span {
+    font-size: 12px; font-weight: 700; letter-spacing: 1.2px;
+    text-transform: uppercase; color: var(--text-subtle);
+  }
+  .cur-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+  .cur-chip {
+    min-height: 48px; min-width: 48px;
+    padding: 8px 12px; border-radius: 12px; border: 1px solid;
+    display: flex; align-items: center;
+    font-size: 14px; font-weight: 500;
+    position: relative;
+  }
+
+  /* ── PROPOSED chips (shared by A/B/C) ───────────────────── */
+  .chip {
+    min-height: 36px;
+    padding: 0 11px;
+    border-radius: 10px;
+    border: 1px solid;
+    display: inline-flex; align-items: center;
+    font-size: 13.5px; font-weight: 550;
+    line-height: 1;
+    position: relative;
+  }
+  .chip.xs { min-height: 32px; padding: 0 10px; font-size: 13px; border-radius: 9px; }
+  .grid { display: flex; flex-wrap: wrap; gap: 8px 7px; }
+  .grid.tight { gap: 7px 6px; }
+
+  .c-pos { background: var(--pos-bg); border-color: var(--pos-border); color: var(--pos-text); }
+  .c-neg { background: var(--neg-bg); border-color: var(--neg-border); color: var(--neg-text); }
+  .c-neu { background: var(--neu-bg); border-color: var(--neu-border); color: var(--neu-text); }
+  .c-pos.sel { background: var(--pos-bg-sel); border-color: #4E9A58; color: var(--pos-text-sel); font-weight: 700; }
+  .c-neg.sel { background: var(--neg-bg-sel); border-color: #E89685; color: var(--neg-text-sel); font-weight: 700; }
+  .c-neu.sel { background: var(--neu-bg-sel); border-color: #A697BA; color: var(--neu-text-sel); font-weight: 700; }
+
+  .tickdot {
+    position: absolute; top: -4px; right: -4px;
+    width: 15px; height: 15px; border-radius: 999px;
+    background: #EAF7E4; color: #143B1C;
+    font-size: 10px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+    border: 1.5px solid var(--sheet);
+  }
+  .c-neg.sel .tickdot { background: #3A1F19; color: #F7D8CF; }
+  .c-neu.sel .tickdot { background: #241F2C; color: #E4DCEC; }
+
+  /* Proposed category header: inline, no divider */
+  .cat { margin-bottom: 14px; }
+  .cat-head {
+    display: flex; align-items: baseline; gap: 8px;
+    height: 22px; margin-bottom: 8px;
+  }
+  .cat-name {
+    font-size: 11.5px; font-weight: 700; letter-spacing: 1.1px;
+    text-transform: uppercase; color: var(--text-subtle);
+  }
+  .cat-n { font-size: 11px; font-weight: 600; color: var(--ink-faint); }
+  .cat-rule { flex: 1; height: 1px; background: rgba(47,81,59,0.30); }
+
+  /* A: compact selection strip */
+  .selstrip {
+    display: flex; align-items: center; gap: 7px;
+    height: 34px; margin: 10px 0 4px;
+  }
+  .selstrip .lbl {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.9px;
+    text-transform: uppercase; color: var(--ink-faint);
+    flex: 0 0 auto;
+  }
+  .selchip {
+    height: 28px; padding: 0 8px 0 10px; border-radius: 9px;
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12.5px; font-weight: 700;
+  }
+  .selchip .x { font-size: 14px; opacity: 0.75; }
+  .selchip.pos { background: var(--pos-bg-sel); color: var(--pos-text-sel); }
+  .selchip.neg { background: var(--neg-bg-sel); color: var(--neg-text-sel); }
+  .selchip.neu { background: var(--neu-bg-sel); color: var(--neu-text-sel); }
+  .selstrip .empty { font-size: 12.5px; font-style: italic; color: var(--ink-faint); }
+
+  /* B: segmented tabs */
+  .segwrap {
+    position: sticky; top: 0; z-index: 5;
+    background: linear-gradient(var(--sheet) 78%, rgba(13,26,19,0));
+    padding: 10px 0 10px;
+  }
+  .seg {
+    display: flex; gap: 5px; padding: 4px;
+    background: #15251B; border: 1px solid #243B2C; border-radius: 12px;
+  }
+  .seg-btn {
+    flex: 1; height: 34px; border-radius: 9px;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    font-size: 13px; font-weight: 650; color: var(--text-subtle);
+  }
+  .seg-btn.on { background: #24422C; color: #DFF5D6; }
+  .seg-badge {
+    min-width: 18px; height: 17px; padding: 0 5px; border-radius: 99px;
+    background: rgba(166,227,155,0.16); color: #C8F5BE;
+    font-size: 10.5px; font-weight: 750;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .seg-btn.on .seg-badge { background: #BFEDB2; color: #0E2415; }
+
+  /* C: selection docked in the footer */
+  .dock {
+    flex: 0 0 auto; padding: 8px 20px 0;
+    background: var(--sheet-2);
+    border-top: 1px solid rgba(47,81,59,0.35);
+    display: flex; align-items: center; gap: 7px; min-height: 44px;
+  }
+  .dock .lbl { font-size: 11px; font-weight: 700; letter-spacing: 0.9px; color: var(--ink-faint); text-transform: uppercase; }
+  .sheet-foot.no-top { border-top: none; }
+
+  /* ── Metrics ────────────────────────────────────────────── */
+  table { border-collapse: collapse; width: 100%; max-width: 1000px; margin: 10px 0 6px; }
+  th, td {
+    text-align: left; font-size: 13.5px;
+    padding: 9px 12px; border-bottom: 1px solid var(--card-border);
+  }
+  th { color: var(--ink-faint); font-weight: 650; font-size: 12px; text-transform: uppercase; letter-spacing: 0.7px; }
+  td.num { font-variant-numeric: tabular-nums; }
+  .good { color: #A6E39B; font-weight: 700; }
+  .bad  { color: #F2B4A6; font-weight: 700; }
+
+  .cards { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 6px; }
+  .card {
+    flex: 1 1 300px; background: var(--card-bg);
+    border: 1px solid var(--card-border); border-radius: 14px; padding: 16px 18px;
+  }
+  .card h3 { margin: 0 0 8px; font-size: 14px; letter-spacing: -0.1px; }
+  .card ul { margin: 0; padding-left: 18px; }
+  .card li { font-size: 13.5px; color: var(--ink-dim); line-height: 1.6; margin-bottom: 5px; }
+
+  .note {
+    border-left: 3px solid var(--accent);
+    background: #101E15; padding: 12px 16px; border-radius: 0 10px 10px 0;
+    margin: 16px 0; max-width: 1000px;
+  }
+  .note p { margin: 0; color: #CFE3C6; }
+
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; margin: 4px 0 18px; font-size: 12.5px; color: var(--ink-faint); }
+  .legend b { color: var(--ink-dim); font-weight: 650; }
+</style>
+</head>
+<body>
+
+<h1>Emotion step — denser chips, fixed selection display</h1>
+<p class="lede">
+  Three directions for the <code>EmotionPicker</code> in the entry sheet. Each frame is a true
+  <b>411 &times; 820 dp</b> phone viewport with the real 40-emotion default list and the real dark tokens from
+  <code>src/constants/colors.ts</code>. The dashed orange line marks the fold: everything above it is visible
+  without scrolling. Counts in the table below are measured from the live DOM, not estimated.
+</p>
+
+<div class="legend">
+  <span><b>Frames scroll.</b> Drag inside one to see the rest of the list.</span>
+  <span><b>Fold line</b> = bottom of the scroll viewport.</span>
+  <span><b>Selected state</b> = filled chip + tick, same as today.</span>
+</div>
+
+<div class="rail" id="rail"></div>
+
+<h2>Measured result</h2>
+<table id="metrics">
+  <thead>
+    <tr>
+      <th>Variant</th>
+      <th>Emotions visible without scrolling</th>
+      <th>Chip height</th>
+      <th>Row pitch</th>
+      <th>Space before the first chip</th>
+      <th>Full list height</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<h2>What is wrong today</h2>
+<div class="cards">
+  <div class="card">
+    <h3>The selected-emotion band is the main offender</h3>
+    <ul>
+      <li><code>reserveSummarySpace</code> holds a fixed <b>82&nbsp;dp</b> band plus a <b>16&nbsp;dp</b> margin, whether or not anything is selected.</li>
+      <li>Its chips use <code>min-h-12 min-w-12</code> (48&nbsp;dp) and <code>rounded-full</code>, so two short words become large floating pills in an otherwise empty strip. That is the part that reads as broken.</li>
+      <li>The information is already duplicated three ways: the <code>2/3 selected</code> badge, the filled grid chip, and the tick.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>Chips are sized for a 14&nbsp;px label but drawn at 48&nbsp;dp</h3>
+    <ul>
+      <li><code>min-h-12</code> forces 48&nbsp;dp for a 17&nbsp;dp line box, so roughly <b>64%</b> of every chip is padding.</li>
+      <li>With an 8&nbsp;dp gap the row pitch is <b>56&nbsp;dp</b>. Four rows of Positive alone cost 224&nbsp;dp.</li>
+      <li>Category headers add a divider, 5&nbsp;dp padding, 10&nbsp;dp margin and a 16&nbsp;dp block margin: <b>~32&nbsp;dp</b> of chrome each, three times over.</li>
+    </ul>
+  </div>
+</div>
+
+<h2>The three directions</h2>
+<div class="cards">
+  <div class="card">
+    <h3>A — Dense grid</h3>
+    <ul>
+      <li>Smallest change. Same browsing model, same components.</li>
+      <li>Chip 36&nbsp;dp, gap 7&nbsp;dp, label 13.5&nbsp;px.</li>
+      <li>Fixed 82&nbsp;dp band replaced by a 34&nbsp;dp single-line strip that keeps its height when empty, so nothing jumps.</li>
+      <li>Selected chips now match the grid chips: 10&nbsp;dp radius, not pills.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>B — Category tabs</h3>
+    <ul>
+      <li>One category at a time, tabs pinned at the top. <b>The tabs work — click them.</b></li>
+      <li>Per-tab badge shows how many of your 3 picks sit in that category, so nothing is hidden.</li>
+      <li id="bTabNote">measuring…</li>
+      <li>Costs one tap to reach another category, and it is the only option that changes how you browse.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>C — Docked selection</h3>
+    <ul>
+      <li>Selection moves out of the scroll area and docks above Cancel / Next, where it is always in view.</li>
+      <li>The scroll area starts straight at the chips: zero space before the first one.</li>
+      <li>Chip 32&nbsp;dp, the tightest of the three.</li>
+      <li>Footer grows by 44&nbsp;dp, which is why it does not beat B outright.</li>
+    </ul>
+  </div>
+</div>
+
+<h2>Implementation spec (whichever you pick)</h2>
+<div class="note">
+  <p>
+    <b>Touch targets stay legal.</b> Dropping <code>min-h-12</code> shrinks the drawn chip, not the tappable one.
+    Add <code>hitSlop={{top: 6, bottom: 6, left: 3, right: 3}}</code> to the chip <code>Pressable</code>: 36 + 12 = 48&nbsp;dp
+    effective height, and the 6&nbsp;dp slop stays inside the 7&nbsp;dp row gap so neighbouring targets never overlap.
+    For the 32&nbsp;dp chip in C use <code>hitSlop</code> of 8 top and bottom with an 8&nbsp;dp row gap.
+  </p>
+</div>
+<div class="cards">
+  <div class="card">
+    <h3>EmotionPicker.tsx</h3>
+    <ul>
+      <li>Chip: <code>min-h-12 min-w-12 px-3 py-2 rounded-xl</code> &rarr; <code>min-h-9 px-[11px] rounded-[10px]</code>, label <code>text-[13.5px]</code>.</li>
+      <li>Grid: <code>gap-2</code> &rarr; <code>gap-x-[7px] gap-y-2</code>.</li>
+      <li>Summary: drop <code>minHeight: 82</code>, use a fixed 34&nbsp;dp row. Keep the reserved height so the empty and filled states do not shift the grid.</li>
+      <li>Selected chip: <code>min-h-12 rounded-full</code> &rarr; <code>h-7 rounded-[9px]</code>, matching the grid chip radius.</li>
+      <li>Category header: drop <code>borderBottomWidth</code>, use a 22&nbsp;dp row with a hairline rule and an item count; block margin <code>mb-4</code> &rarr; <code>mb-3.5</code>.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>Unchanged on purpose</h3>
+    <ul>
+      <li>Colour tokens, selected/disabled semantics, tick badge, and the <code>maxSelections</code> limit behaviour.</li>
+      <li>Press spring, <code>haptics.tick()</code>, and accessibility labels.</li>
+      <li>Light theme uses the same numbers; only the tokens differ, so parity holds.</li>
+      <li>No new animation. Nothing here repaints continuously.</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+const EMOTIONS = {
+  positive: ["Affectionate","Amused","Awe","Confident","Content","Energetic","Excited","Grateful","Happy","Hopeful","Inspired","Loved","Motivated","Proud","Relaxed"],
+  negative: ["Angry","Anxious","Ashamed","Disappointed","Disgusted","Embarrassed","Fearful","Frustrated","Grieving","Guilty","Hopeless","Hurt","Insecure","Irritable","Jealous","Lonely","Numb","Overwhelmed","Sad","Stressed"],
+  neutral:  ["Bored","Confused","Curious","Surprised","Tired"]
+};
+const ORDER = ["positive","negative","neutral"];
+const LABEL = { positive: "Positive", negative: "Negative", neutral: "Neutral" };
+const CLS   = { positive: "c-pos", negative: "c-neg", neutral: "c-neu" };
+const SELCLS= { positive: "pos", negative: "neg", neutral: "neu" };
+const SELECTED = ["Amused", "Awe"]; // matches the reported screenshot
+
+const esc = s => s.replace(/&/g,"&amp;").replace(/</g,"&lt;");
+const catOf = name => ORDER.find(c => EMOTIONS[c].includes(name)) || "neutral";
+
+function sheetHead() {
+  return `
+    <div class="sheet-head">
+      <div class="grabber"></div>
+      <div class="sheet-title-row">
+        <div class="sheet-title">Quick Entry</div>
+        <div class="sheet-x">&times;</div>
+      </div>
+      <div class="mood-row">
+        <div class="arrow">&lsaquo;</div>
+        <div class="mood-chip"><div class="mood-num">4</div><div class="mood-lab">Okay</div></div>
+        <div class="arrow">&rsaquo;</div>
+        <div class="last-entry">&#9634; LAST ENTRY</div>
+      </div>
+      <div class="dots"><div class="dot on"></div><div class="dot"></div></div>
+      <div class="step-q">What emotions are present?</div>
+    </div>`;
+}
+
+function foot(extra = "") {
+  return `${extra}<div class="sheet-foot${extra ? " no-top" : ""}">
+      <div class="btn-ghost">Cancel</div>
+      <div class="btn-go">Next &rsaquo;</div>
+    </div>`;
+}
+
+/* ── Current, at shipped metrics ───────────────────────────── */
+function frameCurrent() {
+  const cats = ORDER.map(cat => `
+    <div class="cur-cat">
+      <div class="cur-cat-head"><span>${LABEL[cat]}</span></div>
+      <div class="cur-grid">
+        ${EMOTIONS[cat].map(n => {
+          const sel = SELECTED.includes(n);
+          return `<div class="cur-chip ${CLS[cat]}${sel ? " sel" : ""}" data-chip="1">
+            ${sel ? '<div class="tickdot">&#10003;</div>' : ""}${esc(n)}</div>`;
+        }).join("")}
+      </div>
+    </div>`).join("");
+
+  return `<div class="frame" data-variant="Current">
+    ${sheetHead()}
+    <div class="scrollArea">
+      <div class="sec-row">
+        <div class="sec-label">Emotions</div>
+        <div class="sec-count">2/3 selected</div>
+        <div class="sec-add">+</div>
+      </div>
+      <div class="cur-summary" data-preamble="1">
+        ${SELECTED.map(n => `<div class="cur-selpill">${esc(n)} <span>&times;</span></div>`).join("")}
+      </div>
+      <div data-firstchip="1"></div>
+      ${cats}
+      <div style="height:16px"></div>
+    </div>
+    ${foot()}
+  </div>`;
+}
+
+/* ── A — Dense grid ────────────────────────────────────────── */
+function frameA() {
+  const cats = ORDER.map(cat => `
+    <div class="cat">
+      <div class="cat-head">
+        <div class="cat-name">${LABEL[cat]}</div>
+        <div class="cat-n">${EMOTIONS[cat].length}</div>
+        <div class="cat-rule"></div>
+      </div>
+      <div class="grid">
+        ${EMOTIONS[cat].map(n => {
+          const sel = SELECTED.includes(n);
+          return `<div class="chip ${CLS[cat]}${sel ? " sel" : ""}" data-chip="1">
+            ${sel ? '<div class="tickdot">&#10003;</div>' : ""}${esc(n)}</div>`;
+        }).join("")}
+      </div>
+    </div>`).join("");
+
+  return `<div class="frame" data-variant="A — Dense grid">
+    ${sheetHead()}
+    <div class="scrollArea">
+      <div class="sec-row">
+        <div class="sec-label">Emotions</div>
+        <div class="sec-count">2/3</div>
+        <div class="sec-add sm">+</div>
+      </div>
+      <div class="selstrip" data-preamble="1">
+        <div class="lbl">Picked</div>
+        ${SELECTED.map(n => `<div class="selchip ${SELCLS[catOf(n)]}">${esc(n)}<span class="x">&times;</span></div>`).join("")}
+      </div>
+      <div data-firstchip="1"></div>
+      ${cats}
+      <div style="height:16px"></div>
+    </div>
+    ${foot()}
+  </div>`;
+}
+
+/* ── B — Category tabs ─────────────────────────────────────── */
+function bTabs(active) {
+  return ORDER.map(cat => {
+    const picks = SELECTED.filter(n => catOf(n) === cat).length;
+    return `<div class="seg-btn${cat === active ? " on" : ""}" data-tab="${cat}">${LABEL[cat]}${
+      picks ? ` <span class="seg-badge">${picks}</span>` : ""}</div>`;
+  }).join("");
+}
+
+function bChips(cat) {
+  return EMOTIONS[cat].map(n => {
+    const sel = SELECTED.includes(n);
+    return `<div class="chip ${CLS[cat]}${sel ? " sel" : ""}" data-chip="1">
+      ${sel ? '<div class="tickdot">&#10003;</div>' : ""}${esc(n)}</div>`;
+  }).join("");
+}
+
+function frameB() {
+  const cat = "positive";
+  return `<div class="frame" data-variant="B — Category tabs">
+    ${sheetHead()}
+    <div class="scrollArea">
+      <div class="segwrap" data-preamble="1">
+        <div class="seg" id="bSeg">${bTabs(cat)}</div>
+      </div>
+      <div data-firstchip="1"></div>
+      <div class="grid" id="bGrid">${bChips(cat)}</div>
+      <div style="height:14px"></div>
+      <div class="selstrip">
+        <div class="lbl">Picked</div>
+        ${SELECTED.map(n => `<div class="selchip ${SELCLS[catOf(n)]}">${esc(n)}<span class="x">&times;</span></div>`).join("")}
+        <div class="sec-add sm" style="margin-left:auto">+</div>
+      </div>
+      <div style="height:16px"></div>
+    </div>
+    ${foot()}
+  </div>`;
+}
+
+/* ── C — Docked selection ──────────────────────────────────── */
+function frameC() {
+  const cats = ORDER.map(cat => `
+    <div class="cat">
+      <div class="cat-head">
+        <div class="cat-name">${LABEL[cat]}</div>
+        <div class="cat-n">${EMOTIONS[cat].length}</div>
+        <div class="cat-rule"></div>
+      </div>
+      <div class="grid tight">
+        ${EMOTIONS[cat].map(n => {
+          const sel = SELECTED.includes(n);
+          return `<div class="chip xs ${CLS[cat]}${sel ? " sel" : ""}" data-chip="1">
+            ${sel ? '<div class="tickdot">&#10003;</div>' : ""}${esc(n)}</div>`;
+        }).join("")}
+      </div>
+    </div>`).join("");
+
+  const dock = `<div class="dock">
+      <div class="lbl">Picked</div>
+      ${SELECTED.map(n => `<div class="selchip pos">${esc(n)}<span class="x">&times;</span></div>`).join("")}
+      <div class="sec-count" style="font-size:12px">2/3</div>
+    </div>`;
+
+  return `<div class="frame" data-variant="C — Docked selection">
+    ${sheetHead()}
+    <div class="scrollArea">
+      <div class="sec-row" style="padding-top:10px">
+        <div class="sec-label">Emotions</div>
+        <div class="sec-add sm" style="margin-left:auto">+</div>
+      </div>
+      <div data-preamble="1" style="height:0"></div>
+      <div data-firstchip="1"></div>
+      ${cats}
+      <div style="height:16px"></div>
+    </div>
+    ${foot(dock)}
+  </div>`;
+}
+
+const COLS = [
+  { tag: "tag-now", tagText: "Now", title: "Current build",
+    sub: "As in your screenshot. 82 dp reserved band, 48 dp chips, divider headers.", html: frameCurrent() },
+  { tag: "tag-opt", tagText: "Option A", title: "Dense grid",
+    sub: "Same structure, shorter chips, selection strip replaces the band.", html: frameA() },
+  { tag: "tag-opt", tagText: "Option B", title: "Category tabs",
+    sub: "One category at a time, pinned tabs with per-tab pick badges.", html: frameB() },
+  { tag: "tag-opt", tagText: "Option C", title: "Docked selection",
+    sub: "Selection lives above the footer, scroll area starts at the chips.", html: frameC() }
+];
+
+document.getElementById("rail").innerHTML = COLS.map(c => `
+  <div class="col">
+    <div class="col-head">
+      <div class="col-tag ${c.tag}">${c.tagText}</div>
+      <div class="col-title">${c.title}</div>
+      <p class="col-sub">${c.sub}</p>
+    </div>
+    ${c.html}
+  </div>`).join("");
+
+/* ── B: measure every tab before wiring interaction ────────── */
+const bSeg  = document.getElementById("bSeg");
+const bGrid = document.getElementById("bGrid");
+const bArea = bGrid.closest(".scrollArea");
+
+function countVisible(area) {
+  const bottom = area.getBoundingClientRect().bottom + 0.5;
+  let n = 0;
+  area.querySelectorAll('[data-chip="1"]').forEach(ch => {
+    if (ch.getBoundingClientRect().bottom <= bottom) n++;
+  });
+  return n;
+}
+
+const bPerTab = ORDER.map(cat => {
+  bGrid.innerHTML = bChips(cat);
+  bSeg.innerHTML = bTabs(cat);
+  return { cat, visible: countVisible(bArea), total: EMOTIONS[cat].length };
+});
+bGrid.innerHTML = bChips("positive");
+bSeg.innerHTML = bTabs("positive");
+
+bSeg.addEventListener("click", e => {
+  const btn = e.target.closest("[data-tab]");
+  if (!btn) return;
+  const cat = btn.dataset.tab;
+  bGrid.innerHTML = bChips(cat);
+  bSeg.innerHTML = bTabs(cat);
+  bArea.scrollTop = 0;
+});
+
+document.getElementById("bTabNote").innerHTML = bPerTab.map(t =>
+  `<b>${LABEL[t.cat]}</b> ${t.visible}/${t.total}${t.visible === t.total ? " — no scroll" : " — scrolls"}`
+).join(" &nbsp;·&nbsp; ");
+
+/* ── Measure the real DOM: what is above the fold ──────────── */
+const rows = [];
+document.querySelectorAll(".frame").forEach(frame => {
+  const area = frame.querySelector(".scrollArea");
+  const areaBox = area.getBoundingClientRect();
+
+  // fold marker at the bottom of the viewport
+  const fold = document.createElement("div");
+  fold.className = "fold";
+  fold.style.top = (area.scrollTop + area.clientHeight - 1) + "px";
+  area.appendChild(fold);
+
+  let visible = 0;
+  const chips = area.querySelectorAll('[data-chip="1"]');
+  chips.forEach(ch => {
+    const b = ch.getBoundingClientRect();
+    if (b.bottom <= areaBox.bottom + 0.5) visible++;
+  });
+
+  const firstChipY = area.querySelector('[data-firstchip="1"]').offsetTop;
+  const chipH = Math.round(chips[0].getBoundingClientRect().height);
+
+  // row pitch = vertical distance between two chips on consecutive rows
+  let pitch = chipH;
+  const firstTop = Math.round(chips[0].getBoundingClientRect().top);
+  for (const ch of chips) {
+    const t = Math.round(ch.getBoundingClientRect().top);
+    if (t > firstTop) { pitch = t - firstTop; break; }
+  }
+
+  rows.push({
+    name: frame.dataset.variant,
+    visible,
+    total: chips.length,
+    chipH,
+    pitch,
+    preamble: Math.round(firstChipY),
+    fullH: Math.round(area.scrollHeight)
+  });
+});
+
+const base = rows[0];
+document.querySelector("#metrics tbody").innerHTML = rows.map((r, i) => {
+  const isTabs = r.name.startsWith("B");
+  const delta = i === 0 || isTabs ? "" :
+    ` <span class="good">(+${r.visible - base.visible}, ${Math.round((r.visible / base.visible - 1) * 100)}% more)</span>`;
+  const seen = isTabs
+    ? `<b>${bPerTab.filter(t => t.visible === t.total).length} of 3</b> categories fit whole` +
+      ` <span class="good">(no scrolling)</span>`
+    : `<b>${r.visible}</b> of ${r.total}${delta}`;
+  const pre = i === 0
+    ? `<span class="bad">${r.preamble} dp</span>`
+    : `${r.preamble} dp <span class="good">(&minus;${base.preamble - r.preamble})</span>`;
+  return `<tr>
+    <td><b>${r.name}</b></td>
+    <td class="num">${seen}</td>
+    <td class="num">${r.chipH} dp</td>
+    <td class="num">${r.pitch} dp</td>
+    <td class="num">${pre}</td>
+    <td class="num">${r.fullH} dp</td>
+  </tr>`;
+}).join("");
+</script>
+
+</body>
+</html>

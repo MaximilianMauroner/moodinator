@@ -58,6 +58,17 @@ describe("serializeEmotions", () => {
     ]);
   });
 
+  it("preserves an explicitly configured emotion energy band", () => {
+    const result = JSON.parse(
+      serializeEmotions([
+        { name: "Alert", category: "neutral", energy: "high" },
+      ])
+    );
+    expect(result).toEqual([
+      { name: "Alert", category: "neutral", energy: "high" },
+    ]);
+  });
+
   it("limits to 50 items", () => {
     const emotions: Emotion[] = Array.from({ length: 60 }, (_, i) => ({
       name: `emotion${i}`,
@@ -514,6 +525,14 @@ describe("sanitizeImportedEmotions", () => {
       { name: "Anxious", category: "negative" },
     ];
     expect(sanitizeImportedEmotions(emotions)).toEqual(emotions);
+  });
+
+  it("preserves a valid imported emotion energy band", () => {
+    expect(
+      sanitizeImportedEmotions([
+        { name: "Alert", category: "neutral", energy: "high" },
+      ])
+    ).toEqual([{ name: "Alert", category: "neutral", energy: "high" }]);
   });
 
   it("trims emotion names", () => {

@@ -9,7 +9,6 @@ const moodServiceMock = vi.hoisted(() => ({
   delete: vi.fn(),
   updateTimestamp: vi.fn(),
   getAll: vi.fn(),
-  getPaginated: vi.fn(),
 }));
 
 vi.mock("@/services/moodService", async () => {
@@ -50,10 +49,6 @@ function resetStore() {
     error: null,
     lastLoadedAt: null,
     isStale: true,
-    lastTracked: null,
-    totalCount: 0,
-    hasMore: false,
-    currentOffset: 0,
   });
 }
 
@@ -156,22 +151,6 @@ describe("useMoodsStore", () => {
     log.mockRestore();
   });
 
-  test("setLocal recalculates derived collection state", () => {
-    const older = makeMood(1, 100);
-    const newer = makeMood(2, 200);
-
-    useMoodsStore.getState().setLocal([older, newer]);
-
-    expect(useMoodsStore.getState()).toMatchObject({
-      moods: [older, newer],
-      isStale: false,
-      totalCount: 2,
-      hasMore: false,
-      currentOffset: 2,
-      lastTracked: new Date(newer.timestamp),
-    });
-  });
-
   test("updateTimestamp reorders entries without a refresh", async () => {
     const older = makeMood(1, 100);
     const newer = makeMood(2, 200);
@@ -180,7 +159,6 @@ describe("useMoodsStore", () => {
     moodServiceMock.updateTimestamp.mockResolvedValue(moved);
     expect(await useMoodsStore.getState().updateTimestamp(1, 300)).toEqual(moved);
     expect(useMoodsStore.getState().moods).toEqual([moved, newer]);
-    expect(useMoodsStore.getState().lastTracked).toEqual(new Date(300));
     expect(moodServiceMock.getAll).not.toHaveBeenCalled();
   });
 
@@ -208,8 +186,6 @@ describe("useMoodsStore", () => {
       moods,
       status: "idle",
       isStale: false,
-      totalCount: 1,
-      currentOffset: 1,
     });
   });
 });
