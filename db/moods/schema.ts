@@ -67,16 +67,8 @@ async function ensureMoodTableColumns(database: SQLite.SQLiteDatabase) {
       sql: "ALTER TABLE moods ADD COLUMN mood_scale_json TEXT;",
     },
     {
-      name: "photos_json",
-      sql: "ALTER TABLE moods ADD COLUMN photos_json TEXT DEFAULT '[]';",
-    },
-    {
-      name: "location_json",
-      sql: "ALTER TABLE moods ADD COLUMN location_json TEXT;",
-    },
-    {
-      name: "voice_memos_json",
-      sql: "ALTER TABLE moods ADD COLUMN voice_memos_json TEXT DEFAULT '[]';",
+      name: "utc_offset_minutes",
+      sql: "ALTER TABLE moods ADD COLUMN utc_offset_minutes INTEGER;",
     },
     {
       name: "based_on_entry_id",

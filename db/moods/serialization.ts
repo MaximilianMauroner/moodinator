@@ -147,6 +147,7 @@ export function toMoodEntry(row: MoodRow): MoodEntry {
         : Number(row.energy),
     moodScale: deserializeMoodScale(row.mood_scale_json),
     basedOnEntryId: row.based_on_entry_id ?? null,
+    utcOffsetMinutes: sanitizeUtcOffset(row.utc_offset_minutes),
   };
 }
 
@@ -161,6 +162,9 @@ export function normalizeInput(entry: MoodEntryInput) {
         : Math.min(10, Math.max(0, Math.round(entry.energy))),
     moodScale: entry.moodScale ?? CURRENT_MOOD_SCALE_SNAPSHOT,
     timestamp: entry.timestamp ?? Date.now(),
+    utcOffsetMinutes: entry.utcOffsetMinutes === undefined
+      ? new Date(entry.timestamp ?? Date.now()).getTimezoneOffset()
+      : sanitizeUtcOffset(entry.utcOffsetMinutes),
     basedOnEntryId: entry.basedOnEntryId ?? null,
   };
 }
@@ -201,4 +205,10 @@ export function sanitizeEnergy(value: unknown): number | null {
 
 export function sanitizeImportedMoodScale(value: unknown): MoodScaleSnapshot {
   return getSupportedMoodScaleSnapshot(value) ?? CURRENT_MOOD_SCALE_SNAPSHOT;
+}
+
+/** Accept only real-world UTC offsets; legacy or invalid imports remain unknown. */
+export function sanitizeUtcOffset(value: unknown): number | null {
+  return typeof value === "number" && Number.isInteger(value) && Math.abs(value) <= 840
+    ? value : null;
 }

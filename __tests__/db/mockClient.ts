@@ -13,9 +13,7 @@ export type MockRow = {
   context_tags: string;
   energy: number | null;
   mood_scale_json: string | null;
-  photos_json: string | null;
-  location_json: string | null;
-  voice_memos_json: string | null;
+  utc_offset_minutes: number | null;
   based_on_entry_id: number | null;
 };
 
@@ -65,9 +63,7 @@ export function createMockDb() {
         context_tags: mood.context_tags ?? "[]",
         energy: mood.energy ?? null,
         mood_scale_json: mood.mood_scale_json ?? null,
-        photos_json: mood.photos_json ?? "[]",
-        location_json: mood.location_json ?? null,
-        voice_memos_json: mood.voice_memos_json ?? "[]",
+        utc_offset_minutes: mood.utc_offset_minutes ?? null,
         based_on_entry_id: mood.based_on_entry_id ?? null,
       };
       const result = sqlite.prepare(`INSERT INTO moods (${Object.keys(row).join(", ")}) VALUES (${Object.keys(row).map(() => "?").join(", ")})`).run(...Object.values(row));

@@ -1,9 +1,11 @@
+import { getEntryLocalDayKey } from "../../src/lib/entryTimezone";
 import type { Emotion, MoodEntry, MoodEntryInput } from "../types";
 import type { MoodRow, CountResult, QueryParam } from "../types/rows";
 import { getDb } from "../client";
 import { resolveDateRange, type MoodDateRange } from "./range";
 import {
   normalizeInput,
+  sanitizeUtcOffset,
   serializeArray,
   serializeEmotions,
   serializeMoodScale,
@@ -31,7 +33,7 @@ export async function insertMood(
   await db.execAsync("BEGIN TRANSACTION;");
   try {
     const result = await db.runAsync(
-      "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy, mood_scale_json, photos_json, location_json, voice_memos_json, based_on_entry_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
+      "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy, mood_scale_json, utc_offset_minutes, based_on_entry_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);",
       mood,
       normalized.note,
       normalized.timestamp,
@@ -39,9 +41,7 @@ export async function insertMood(
       serializeArray(normalized.contextTags),
       normalized.energy,
       serializeMoodScale(normalized.moodScale),
-      "[]",
-      null,
-      "[]",
+      normalized.utcOffsetMinutes,
       normalized.basedOnEntryId
     );
 
@@ -69,7 +69,7 @@ export async function insertMoodEntry(entry: MoodEntryInput): Promise<MoodEntry>
   await db.execAsync("BEGIN TRANSACTION;");
   try {
     const result = await db.runAsync(
-      "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy, mood_scale_json, photos_json, location_json, voice_memos_json, based_on_entry_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
+      "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy, mood_scale_json, utc_offset_minutes, based_on_entry_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);",
       entry.mood,
       normalized.note,
       normalized.timestamp,
@@ -77,9 +77,7 @@ export async function insertMoodEntry(entry: MoodEntryInput): Promise<MoodEntry>
       serializeArray(normalized.contextTags),
       normalized.energy,
       serializeMoodScale(normalized.moodScale),
-      "[]",
-      null,
-      "[]",
+      normalized.utcOffsetMinutes,
       normalized.basedOnEntryId
     );
 
@@ -134,7 +132,7 @@ export async function updateMoodTimestamp(
   timestamp: number
 ): Promise<MoodEntry | undefined> {
   const db = await getDb();
-  await db.runAsync("UPDATE moods SET timestamp = ? WHERE id = ?;", timestamp, id);
+  await db.runAsync("UPDATE moods SET utc_offset_minutes = CASE WHEN timestamp = ? THEN utc_offset_minutes ELSE ? END, timestamp = ? WHERE id = ?;", timestamp, new Date(timestamp).getTimezoneOffset(), timestamp, id);
   const updated = await db.getFirstAsync<MoodRow>(
     "SELECT * FROM moods WHERE id = ?;",
     id
@@ -163,6 +161,13 @@ export async function updateMoodEntry(
   if (updates.timestamp !== undefined) {
     fields.push("timestamp = ?");
     params.push(updates.timestamp);
+    if (updates.utcOffsetMinutes === undefined) {
+      fields.push("utc_offset_minutes = CASE WHEN timestamp = ? THEN utc_offset_minutes ELSE ? END");
+      params.push(updates.timestamp, new Date(updates.timestamp).getTimezoneOffset());
+    } else {
+      fields.push("utc_offset_minutes = ?");
+      params.push(sanitizeUtcOffset(updates.utcOffsetMinutes));
+    }
   }
   if (updates.emotions !== undefined) {
     fields.push("emotions = ?");
@@ -223,7 +228,7 @@ export async function updateMoodEntry(
 
 export async function getAllMoods(): Promise<MoodEntry[]> {
   const db = await getDb();
-  const rows = await db.getAllAsync<MoodRow>("SELECT * FROM moods ORDER BY timestamp DESC;");
+  const rows = await db.getAllAsync<MoodRow>("SELECT * FROM moods ORDER BY timestamp DESC, id DESC;");
   return rows.map(toMoodEntry);
 }
 
@@ -235,7 +240,18 @@ export async function getLatestMood(): Promise<MoodEntry | null> {
   return row ? toMoodEntry(row) : null;
 }
 
+export type MoodHistoryFilters = {
+  text?: string;
+  minMood?: number;
+  maxMood?: number;
+  emotions?: string[];
+  contexts?: string[];
+  startDate?: number;
+  endDate?: number;
+};
+
 export type PaginationOptions = {
+  filters?: MoodHistoryFilters;
   limit: number;
   offset: number;
 };
@@ -250,15 +266,53 @@ export async function getMoodsPaginated(
   options: PaginationOptions
 ): Promise<PaginatedResult<MoodEntry>> {
   const db = await getDb();
-  const { limit, offset } = options;
+  const { limit, offset, filters = {} } = options;
+  if (!Number.isInteger(limit) || limit < 1 || !Number.isInteger(offset) || offset < 0) {
+    throw new Error("Pagination requires a positive limit and nonnegative offset");
+  }
+  const conditions: string[] = [];
+  const params: QueryParam[] = [];
+  if (filters.text) {
+    conditions.push("note LIKE ? ESCAPE '\\' COLLATE NOCASE");
+    params.push(`%${filters.text.replace(/[\\%_]/g, "\\$&")}%`);
+  }
+  // Match supported legacy snapshots only, just as deserialization does.
+  const scale = "CASE WHEN json_valid(mood_scale_json) THEN mood_scale_json ELSE '{}' END";
+  const interpretedMood = `CASE WHEN json_extract(${scale}, '$.version') = 2
+    AND json_extract(${scale}, '$.min') = 0 AND json_extract(${scale}, '$.max') = 10
+    AND json_type(${scale}, '$.lowerIsBetter') = 'false'
+    THEN 10 - min(10, max(0, mood)) ELSE min(10, max(0, mood)) END`;
+  for (const [value, expression] of [
+    [filters.minMood, `${interpretedMood} >= ?`],
+    [filters.maxMood, `${interpretedMood} <= ?`],
+    [filters.startDate, "timestamp >= ?"],
+    [filters.endDate, "timestamp <= ?"],
+  ] as const) {
+    if (value !== undefined) {
+      conditions.push(expression);
+      params.push(value);
+    }
+  }
+  for (const emotion of filters.emotions ?? []) {
+    conditions.push(`EXISTS (SELECT 1 FROM json_each(CASE WHEN json_valid(emotions) THEN emotions ELSE '[]' END) AS item
+      WHERE (CASE WHEN item.type = 'text' THEN item.value ELSE json_extract(item.value, '$.name') END) = ? COLLATE NOCASE)`);
+    params.push(emotion);
+  }
+  for (const context of filters.contexts ?? []) {
+    conditions.push(`EXISTS (SELECT 1 FROM json_each(CASE WHEN json_valid(context_tags) THEN context_tags ELSE '[]' END) AS item
+      WHERE item.type = 'text' AND item.value = ? COLLATE NOCASE)`);
+    params.push(context);
+  }
+  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
 
   const [rows, countResult] = await Promise.all([
     db.getAllAsync<MoodRow>(
-      "SELECT * FROM moods ORDER BY timestamp DESC LIMIT ? OFFSET ?;",
+      `SELECT * FROM moods ${where} ORDER BY timestamp DESC, id DESC LIMIT ? OFFSET ?;`,
+      ...params,
       limit,
       offset
     ),
-    db.getFirstAsync<CountResult>("SELECT COUNT(*) as count FROM moods;"),
+    db.getFirstAsync<CountResult>(`SELECT COUNT(*) as count FROM moods ${where};`, ...params),
   ]);
 
   const total = countResult?.count ?? 0;
@@ -464,7 +518,7 @@ export async function getMoodsWithinRange(
 
   const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
   const rows = await db.getAllAsync<MoodRow>(
-    `SELECT * FROM moods ${whereClause} ORDER BY timestamp DESC;`,
+    `SELECT * FROM moods ${whereClause} ORDER BY timestamp DESC, id DESC;`,
     ...params
   );
   return rows.map(toMoodEntry);
@@ -481,7 +535,7 @@ export async function getMoodsInRange(
 ): Promise<MoodEntry[]> {
   const db = await getDb();
   const rows = await db.getAllAsync<MoodRow>(
-    "SELECT * FROM moods WHERE timestamp >= ? AND timestamp <= ? ORDER BY timestamp DESC;",
+    "SELECT * FROM moods WHERE timestamp >= ? AND timestamp <= ? ORDER BY timestamp DESC, id DESC;",
     startDate,
     endDate
   );
@@ -501,21 +555,23 @@ export async function getMoodsByMonth(
   const db = await getDb();
 
   // Get the first and last day of the month
-  const startOfMonth = new Date(year, month, 1, 0, 0, 0, 0);
-  const endOfMonth = new Date(year, month + 1, 0, 23, 59, 59, 999);
+  const monthKey = `${year}-${String(month + 1).padStart(2, "0")}`;
 
   const rows = await db.getAllAsync<MoodRow>(
     "SELECT * FROM moods WHERE timestamp >= ? AND timestamp <= ? ORDER BY timestamp ASC;",
-    startOfMonth.getTime(),
-    endOfMonth.getTime()
+    Date.UTC(year, month, 1) - 14 * 60 * 60 * 1000,
+    Date.UTC(year, month + 1, 1) + 14 * 60 * 60 * 1000
   );
 
   const moodsByDay = new Map<number, MoodEntry[]>();
 
   for (const row of rows) {
     const entry = toMoodEntry(row);
-    const entryDate = new Date(entry.timestamp);
-    const day = entryDate.getDate();
+    const key = getEntryLocalDayKey(entry);
+    if (!key.startsWith(`${monthKey}-`)) {
+      continue;
+    }
+    const day = Number(key.slice(-2));
 
     const existing = moodsByDay.get(day) || [];
     existing.push(entry);
@@ -523,4 +579,29 @@ export async function getMoodsByMonth(
   }
 
   return moodsByDay;
+}
+
+/** Compact full-history facts without loading notes, tags or every entry. */
+export async function getMoodHistorySummary(): Promise<{
+  totalCount: number;
+  oldestTimestamp: number | null;
+  days: { timestamp: number; utcOffsetMinutes: number | null }[];
+}> {
+  const db = await getDb();
+  const [summary, days] = await Promise.all([
+    db.getFirstAsync<{ count: number; oldest: number | null }>(
+      "SELECT COUNT(*) AS count, MIN(timestamp) AS oldest FROM moods;"
+    ),
+    db.getAllAsync<{ timestamp: number; utcOffsetMinutes: number | null }>(`
+      SELECT timestamp, utc_offset_minutes AS utcOffsetMinutes FROM moods
+      GROUP BY CASE WHEN utc_offset_minutes IS NULL
+        THEN date(timestamp / 1000.0, 'unixepoch', 'localtime')
+        ELSE date(timestamp / 1000.0 - utc_offset_minutes * 60, 'unixepoch') END;
+    `),
+  ]);
+  return {
+    totalCount: summary?.count ?? 0,
+    oldestTimestamp: summary?.oldest ?? null,
+    days,
+  };
 }

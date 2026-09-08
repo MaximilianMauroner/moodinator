@@ -1,16 +1,20 @@
 import type { MoodEntry } from "@db/types";
+import { getEntryLocalDayKey } from "@/lib/entryTimezone";
 import { format, subDays } from "date-fns";
 
 /**
  * Calculate current streak (consecutive days with entries)
  */
-export function calculateStreak(moods: MoodEntry[], todayDate = new Date()): { current: number; longest: number } {
+export function calculateStreak(
+  moods: Pick<MoodEntry, "timestamp" | "utcOffsetMinutes">[],
+  todayDate = new Date(),
+): { current: number; longest: number } {
   if (moods.length === 0) return { current: 0, longest: 0 };
 
   // Group by date
   const dateSet = new Set<string>();
   moods.forEach((mood) => {
-    const dateKey = format(new Date(mood.timestamp), "yyyy-MM-dd");
+    const dateKey = getEntryLocalDayKey(mood);
     dateSet.add(dateKey);
   });
 
@@ -29,7 +33,9 @@ export function calculateStreak(moods: MoodEntry[], todayDate = new Date()): { c
     for (let i = 1; i < dates.length; i++) {
       const prevDate = new Date(dates[i - 1]);
       const currDate = new Date(dates[i]);
-      const diffDays = Math.round((prevDate.getTime() - currDate.getTime()) / 86400000);
+      const diffDays = Math.round(
+        (prevDate.getTime() - currDate.getTime()) / 86400000,
+      );
 
       if (diffDays === 1) {
         currentStreak++;
@@ -47,7 +53,9 @@ export function calculateStreak(moods: MoodEntry[], todayDate = new Date()): { c
   for (let i = 1; i < sortedDatesAsc.length; i++) {
     const prevDate = new Date(sortedDatesAsc[i - 1]);
     const currDate = new Date(sortedDatesAsc[i]);
-    const diffDays = Math.round((currDate.getTime() - prevDate.getTime()) / 86400000);
+    const diffDays = Math.round(
+      (currDate.getTime() - prevDate.getTime()) / 86400000,
+    );
 
     if (diffDays === 1) {
       tempStreak++;

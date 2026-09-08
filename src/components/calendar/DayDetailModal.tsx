@@ -5,6 +5,7 @@ import { format } from "date-fns";
 import { useThemeColors, colors } from "@/constants/colors";
 import { getMoodRatingDisplay } from "@/constants/moodScaleInterpretation";
 import { haptics } from "@/lib/haptics";
+import { getEntryLocalTimeLabel } from "@/lib/entryTimezone";
 import type { MoodEntry, MoodScaleSnapshot } from "@db/types";
 
 type DayDetailModalProps = {
@@ -149,7 +150,7 @@ export function DayDetailModal({
                         elevation: 3,
                       }}
                       accessibilityRole={onEditEntry ? "button" : undefined}
-                      accessibilityLabel={`Mood Rating ${moodData.value} of 10, ${moodData.label}, ${format(new Date(entry.timestamp), "h:mm a")}`}
+                      accessibilityLabel={`Mood Rating ${moodData.value} of 10, ${moodData.label}, ${getEntryLocalTimeLabel(entry)}`}
                     >
                       <View className="flex-row">
                         {/* Left accent bar */}
@@ -184,7 +185,7 @@ export function DayDetailModal({
                               className="text-xs"
                               style={{ color: get("textMuted") }}
                             >
-                              {format(new Date(entry.timestamp), "h:mm a")}
+                              {getEntryLocalTimeLabel(entry)}
                             </Text>
                           </View>
 
