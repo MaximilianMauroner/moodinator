@@ -1,6 +1,6 @@
 # Terms of Service
 
-**Last Updated: September 7, 2026**
+**Last Updated: September 8, 2026**
 
 ## Agreement to Terms
 
@@ -8,7 +8,7 @@ By downloading, installing, or using Moodinator ("the app"), you agree to these 
 
 ## Description and Permitted Use
 
-Moodinator is a personal wellness tool that lets you record moods on a 0–10 scale, add notes and tags, configure local reminders, view mood history and summaries on your device, and create exports and backups. On this scale, lower ratings are better; 9 is Crisis and 10 is Emergency.
+Moodinator is a personal wellness tool that lets you record moods on a 0–10 scale, add notes and tags, configure local reminders, view mood history, descriptive comparisons, and charts on your device, and create exports and backups. On this scale, lower ratings are better; 9 is Crisis and 10 is Emergency.
 
 You may use the app for lawful personal purposes. Do not use it to violate applicable law, interfere with the app's operation, or misrepresent the app or its source. Rights to use, copy, modify, merge, publish, distribute, sublicense, or sell copies of the open-source software are governed by the MIT License described below.
 
@@ -19,6 +19,8 @@ You retain your rights in the mood entries, notes, tags, settings, exports, and 
 The **Delete Mood Data** control deletes mood history, including mood rows, mood–emotion link records, and database emotion records used by that history. It retains the user-visible Emotion List presets, context-tag presets, other settings, reminders, and app-lock configuration. It does not delete exports, backups, clipboard contents, or other copies outside the app.
 
 Export flows may use a temporary app-cache file and the operating-system share sheet, or offer an explicit clipboard copy when sharing is unavailable. An interrupted or failed share can leave a temporary file until the operating system clears the cache. Periodic backups are scheduled by the operating system, are not guaranteed to run, and may run automatically after backup storage is available; the automatic background task limits its successful backups to at most once per week. Manual backups are not subject to that cadence. Android backup requires a selected folder. Moodinator keeps the eight newest app-managed backup files it can identify and removes older identified managed backups; it cannot remove arbitrary exports, renamed copies, or copies held by another app or provider. Uninstalling normally removes app-sandbox data, but external files remain and operating-system secure storage, backup, or device-transfer behavior can vary. We cannot recover lost data or delete external copies.
+
+Entry timestamps may include a recorded UTC offset, which is also included in JSON exports and backups. Comparisons describe your recorded entries and do not establish causes.
 
 ## Health and Medical Disclaimer
 

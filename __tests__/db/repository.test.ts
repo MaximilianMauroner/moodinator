@@ -120,16 +120,16 @@ describe("Repository", () => {
       });
     });
 
-    it("sets legacy media and location columns to empty defaults", async () => {
+    it("does not create speculative media and location columns", async () => {
       const result = await insertMoodEntry({ mood: 6 });
       const [row] = mockDb.__getMoods();
 
       expect(result).not.toHaveProperty("photos");
       expect(result).not.toHaveProperty("location");
       expect(result).not.toHaveProperty("voiceMemos");
-      expect(row.photos_json).toBe("[]");
-      expect(row.location_json).toBeNull();
-      expect(row.voice_memos_json).toBe("[]");
+      expect(row).not.toHaveProperty("photos_json");
+      expect(row).not.toHaveProperty("location_json");
+      expect(row).not.toHaveProperty("voice_memos_json");
     });
 
     it("links emotions when provided", async () => {

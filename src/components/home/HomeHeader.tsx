@@ -1,10 +1,11 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useState } from "react";
 import { Image, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { typography } from "@/constants/typography";
 import { colors, semanticToneColors } from "@/constants/colors";
 import { useMoodsStore } from "@/shared/state/moodsStore";
+import { moodService } from "@/services/moodService";
 import { calculateStreak } from "@/features/insights/utils/streaks";
 
 function getGreeting(date: Date): string {
@@ -28,8 +29,17 @@ const HALO_PAD = 8;
 export function HomeHeader() {
 	const isDark = useColorScheme() === "dark";
 
-	const moods = useMoodsStore((s) => s.moods);
-	const streak = useMemo(() => calculateStreak(moods), [moods]);
+	const revision = useMoodsStore((s) => s.revision);
+	const [streak, setStreak] = useState({ current: 0, longest: 0 });
+	useEffect(() => {
+		let cancelled = false;
+		void moodService.getHistorySummary().then((summary) => {
+			if (!cancelled) setStreak(calculateStreak(summary.days));
+		}).catch(() => {
+			if (!cancelled) setStreak({ current: 0, longest: 0 });
+		});
+		return () => { cancelled = true; };
+	}, [revision]);
 
 	const now = new Date();
 	const greeting = getGreeting(now);

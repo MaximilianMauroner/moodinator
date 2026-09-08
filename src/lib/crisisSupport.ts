@@ -22,6 +22,7 @@ export type CrisisSupportDependencies = {
     buttons?: CrisisSupportAlertButton[]
   ) => void;
   openUrl: (url: string) => Promise<unknown>;
+  getRegion?: () => string | null | undefined;
 };
 
 const LOCAL_EMERGENCY_GUIDANCE =
@@ -47,6 +48,11 @@ export const CRISIS_SUPPORT_ACTIONS: readonly CrisisSupportAction[] = [
     fallbackMessage: `Visit ${FIND_A_HELPLINE_URL} to look for support in your country.`,
   },
 ];
+
+export function getCrisisSupportActions(region?: string | null): readonly CrisisSupportAction[] {
+  if (region?.toUpperCase() === "US") return CRISIS_SUPPORT_ACTIONS;
+  return [CRISIS_SUPPORT_ACTIONS[2], ...CRISIS_SUPPORT_ACTIONS.slice(0, 2)];
+}
 
 export function shouldOfferCrisisSupport(mood: number): boolean {
   return (
@@ -85,11 +91,18 @@ function openSupportAction(
 export function presentCrisisSupportAlert(
   dependencies: CrisisSupportDependencies
 ): void {
+  let region: string | null | undefined;
+  try {
+    region = dependencies.getRegion?.();
+  } catch {
+    // A missing device locale must never prevent access to support.
+    region = null;
+  }
   dependencies.showAlert(
     "Support is available",
     `${LOCAL_EMERGENCY_GUIDANCE} Moodinator does not monitor entries, contact emergency services, or dispatch help.`,
     [
-      ...CRISIS_SUPPORT_ACTIONS.map((action) => ({
+      ...getCrisisSupportActions(region).map((action) => ({
         text: action.label,
         onPress: () => openSupportAction(action, dependencies),
       })),

@@ -19,7 +19,7 @@ export default function PrivacyPolicyScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Text className="text-xs text-paper-700 dark:text-sand-400 mb-4">
-          Last Updated: July 21, 2026
+          Last Updated: September 8, 2026
         </Text>
 
         <Section title="Introduction">
@@ -33,7 +33,7 @@ export default function PrivacyPolicyScreen() {
             Moodinator stores information you choose to enter or configure:
           </Paragraph>
           <BulletList items={[
-            "Mood data: ratings, timestamps, notes, emotions, context tags, energy values, and history",
+            "Mood data: ratings, timestamps, recorded UTC offsets, notes, emotions, context tags, energy values, and history",
             "Settings: entry and display preferences, onboarding state, and other app configuration",
             "Reminders: local notification titles, messages, schedules, permission state, and identifiers",
             "App lock: enabled settings, PIN length, failed-attempt state, and a salted hash of your PIN",
@@ -42,7 +42,7 @@ export default function PrivacyPolicyScreen() {
 
           <Subtitle>Local-First, No Account</Subtitle>
           <Paragraph>
-            Moodinator processes and stores this information locally. It has no developer-operated server, account system, cloud synchronization, advertising, or analytics. We do not receive your mood data or app settings.
+            New entries retain the UTC offset at their recorded time so calendar days remain stable when you travel. Exports and backups include this offset. Older entries without a recorded offset use the current device timezone. Moodinator processes and stores this information locally. It has no developer-operated server, account system, cloud synchronization, advertising, or analytics. We do not receive your mood data or app settings.
           </Paragraph>
         </Section>
 

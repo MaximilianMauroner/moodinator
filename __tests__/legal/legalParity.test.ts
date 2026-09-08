@@ -29,6 +29,7 @@ describe("legal document parity", () => {
     for (const rawSource of [privacyPolicy, privacyScreen]) {
       const source = withoutMarkdownEmphasis(rawSource);
       expect(source).toContain("no developer-operated server");
+      expect(source).toContain("recorded UTC offset");
       expect(source).toContain("does not apply database-level encryption");
       expect(source).toContain("salted hash");
       expect(source).toContain("plaintext JSON");

@@ -6,7 +6,7 @@ name: Isolated Android entry lifecycle
     clearState: true
 - runFlow: flows/onboarding.yaml
 - longPressOn: "Mood Rating 5 of 10, Neutral. Lower numbers are better."
-- assertVisible: "What emotions are present?"
+- assertVisible: "(?i)What emotions are present[?]"
 - scrollUntilVisible:
     element:
       id: "emotion-option-Happy"
@@ -14,13 +14,17 @@ name: Isolated Android entry lifecycle
 - tapOn:
     id: "emotion-option-Happy"
 - tapOn: "Next step"
-- assertVisible: "Any more context?"
+- assertVisible: "(?i)Any more context[?]"
 - scrollUntilVisible:
     element:
-      id: "energy-level-5"
+      id: "energy-level-6"
     direction: DOWN
 - tapOn:
-    id: "energy-level-5"
+    id: "energy-level-6"
+- scrollUntilVisible:
+    element:
+      text: "Average · 6/10"
+    direction: DOWN
 - scrollUntilVisible:
     element:
       id: "entry-notes"
@@ -39,14 +43,14 @@ name: Isolated Android entry lifecycle
 - tapOn:
     id: "mood-entry-actions-.*"
 - tapOn: "Edit entry"
-- assertVisible: "How are you feeling?"
+- assertVisible: "(?i)How are you feeling[?]"
 - tapOn: "Next step"
 - assertVisible:
     id: "emotion-remove-Happy"
 - tapOn: "Next step"
 - scrollUntilVisible:
     element:
-      text: "Moderate · 5/10"
+      text: "Average · 6/10"
     direction: DOWN
 - scrollUntilVisible:
     element:
@@ -74,15 +78,15 @@ name: Isolated Android entry lifecycle
     id: "entry-notes"
     text: "QA smoke edited note"
 - tapOn: "Save entry"
+# Check Insights before deletion; Undo has a separate native timing check.
+- tapOn: "Insights tab, view mood history and summaries"
+- assertVisible: "Your history · 1 entry"
+- tapOn: "Refresh insights"
+- assertVisible: "Your history · 1 entry"
+- runFlow: flows/insights.yaml
+- tapOn: "Home tab, log your mood"
 - tapOn:
     id: "mood-entry-actions-.*"
 - tapOn: "Delete entry"
 - assertNotVisible:
     id: "mood-entry-actions-.*"
-- tapOn: "Undo delete"
-- assertVisible:
-    id: "mood-entry-actions-.*"
-- tapOn: "Insights tab, view mood history and summaries"
-- assertVisible: "Your history · 1 entry"
-- tapOn: "Refresh insights"
-- assertVisible: "Your history · 1 entry"

@@ -25,7 +25,7 @@ import {
   type PaginationOptions,
   type PaginatedResult,
 } from "@db/db";
-import { getLatestMood } from "@db/moods/repository";
+import { getMoodHistorySummary, getLatestMood } from "@db/moods/repository";
 import type { MoodDateRange, MoodRangePreset } from "@db/moods/range";
 export {
   createMoodEntryWorkflow,
@@ -34,6 +34,7 @@ export {
 } from "./moodEntryWorkflow";
 
 export type { PaginationOptions, PaginatedResult };
+export type { MoodHistoryFilters } from "@db/moods/repository";
 export type { MoodDateRange, MoodRangePreset };
 
 export interface MoodServiceInterface {
@@ -44,6 +45,7 @@ export interface MoodServiceInterface {
 
   // Queries
   getAll: () => Promise<MoodEntry[]>;
+  getHistorySummary: () => ReturnType<typeof getMoodHistorySummary>;
   getPaginated: (options: PaginationOptions) => Promise<PaginatedResult<MoodEntry>>;
   getInRange: (range?: MoodDateRange) => Promise<MoodEntry[]>;
   getByMonth: (year: number, month: number) => Promise<Map<number, MoodEntry[]>>;
@@ -113,6 +115,7 @@ function getEndOfYesterday(): number {
 }
 
 export const moodService: MoodServiceInterface = {
+  getHistorySummary: () => getMoodHistorySummary(),
   /**
    * Create a new mood entry
    */
