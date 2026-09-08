@@ -78,14 +78,15 @@ name: Isolated Android entry lifecycle
     id: "entry-notes"
     text: "QA smoke edited note"
 - tapOn: "Save entry"
-- tapOn:
-    id: "mood-entry-actions-.*"
-- tapOn: "Delete entry"
-- tapOn: "Undo delete"
-- assertVisible:
-    id: "mood-entry-actions-.*"
+# Check Insights before deletion; Undo has a separate native timing check.
 - tapOn: "Insights tab, view mood history and summaries"
 - assertVisible: "Your history · 1 entry"
 - tapOn: "Refresh insights"
 - assertVisible: "Your history · 1 entry"
 - runFlow: flows/insights.yaml
+- tapOn: "Home tab, log your mood"
+- tapOn:
+    id: "mood-entry-actions-.*"
+- tapOn: "Delete entry"
+- assertNotVisible:
+    id: "mood-entry-actions-.*"
