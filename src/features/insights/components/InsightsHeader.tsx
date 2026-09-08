@@ -92,8 +92,8 @@ export function InsightsHeader({ moods, totalEntries, onRefresh }: InsightsHeade
 
   const subtitle = useMemo(() => {
     if (totalEntries === 0) return "Tracked moods will gather here";
-    if (totalEntries === 1) return "Patterns across 1 entry";
-    return `Patterns across ${totalEntries} entries`;
+    if (totalEntries === 1) return "Your history · 1 entry";
+    return `Your history · ${totalEntries} entries`;
   }, [totalEntries]);
 
   const slots = useMemo(() => {

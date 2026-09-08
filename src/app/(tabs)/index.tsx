@@ -9,6 +9,7 @@ import {
   type NativeScrollEvent,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "expo-router";
 import { FlashList, type FlashListRef } from "@shopify/flash-list";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -97,6 +98,7 @@ function HomeScreenContent() {
   const status = useMoodsStore((state) => state.status);
   const error = useMoodsStore((state) => state.error);
   const loadAll = useMoodsStore((state) => state.loadAll);
+  const ensureFresh = useMoodsStore((state) => state.ensureFresh);
   const refreshMoods = useMoodsStore((state) => state.refreshMoods);
   const createMood = useMoodsStore((state) => state.create);
   const updateMood = useMoodsStore((state) => state.update);
@@ -127,9 +129,11 @@ function HomeScreenContent() {
     setEditingEntry: modals.setEditingEntry,
   });
 
-  useEffect(() => {
-    loadAll();
-  }, [loadAll]);
+  useFocusEffect(
+    useCallback(() => {
+      void ensureFresh();
+    }, [ensureFresh])
+  );
 
   const handleEditEntrySave = useCallback(
     async (values: MoodEntryFormValues) => {

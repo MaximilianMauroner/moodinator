@@ -1,6 +1,6 @@
 # Terms of Service
 
-**Last Updated: July 21, 2026**
+**Last Updated: September 7, 2026**
 
 ## Agreement to Terms
 
@@ -8,7 +8,7 @@ By downloading, installing, or using Moodinator ("the app"), you agree to these 
 
 ## Description and Permitted Use
 
-Moodinator is a personal wellness tool that lets you record moods on a 0–10 scale, add notes and tags, configure local reminders, view on-device patterns and insights, and create exports and backups. On this scale, lower ratings are better; 9 is Crisis and 10 is Emergency.
+Moodinator is a personal wellness tool that lets you record moods on a 0–10 scale, add notes and tags, configure local reminders, view mood history and summaries on your device, and create exports and backups. On this scale, lower ratings are better; 9 is Crisis and 10 is Emergency.
 
 You may use the app for lawful personal purposes. Do not use it to violate applicable law, interfere with the app's operation, or misrepresent the app or its source. Rights to use, copy, modify, merge, publish, distribute, sublicense, or sell copies of the open-source software are governed by the MIT License described below.
 
@@ -22,7 +22,7 @@ Export flows may use a temporary app-cache file and the operating-system share s
 
 ## Health and Medical Disclaimer
 
-**Moodinator is a personal wellness journal. It is not a medical device and does not diagnose, treat, cure, or prevent any medical condition.** It does not provide medical advice, diagnosis, or treatment. Mood ratings, patterns, and insights are informational and may be incomplete or inaccurate. Consult a doctor or other qualified healthcare professional for medical advice, diagnosis, or treatment, and do not disregard professional advice because of information in the app.
+**Moodinator is a personal wellness journal. It is not a medical device and does not diagnose, treat, cure, or prevent any medical condition.** It does not provide medical advice, diagnosis, or treatment. Mood ratings and summaries are informational and may be incomplete or inaccurate. Consult a doctor or other qualified healthcare professional for medical advice, diagnosis, or treatment, and do not disregard professional advice because of information in the app.
 
 Moodinator does not monitor entries, provide live crisis support, contact emergency services, or dispatch help. If you or another person may be in immediate danger, call your local emergency number. In the United States, you can call or text 988. Elsewhere, you can use <https://findahelpline.com/> to look for local support. Availability and accuracy of third-party services are outside Moodinator's control.
 

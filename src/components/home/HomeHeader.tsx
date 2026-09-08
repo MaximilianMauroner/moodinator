@@ -5,7 +5,7 @@ import { useColorScheme } from "@/hooks/useColorScheme";
 import { typography } from "@/constants/typography";
 import { colors, semanticToneColors } from "@/constants/colors";
 import { useMoodsStore } from "@/shared/state/moodsStore";
-import { calculateStreak } from "@/features/insights/utils/patternDetection";
+import { calculateStreak } from "@/features/insights/utils/streaks";
 
 function getGreeting(date: Date): string {
 	const h = date.getHours();

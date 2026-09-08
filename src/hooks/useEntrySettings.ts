@@ -48,7 +48,7 @@ export function useEntrySettings() {
                 return { value: existing, created: false };
             }
 
-            const value: Emotion = { name: trimmed, category };
+            const value: Emotion = { name: trimmed, category, energy: "neutral" };
             await settings.setEmotions([...settings.emotions, value]);
             return { value, created: true };
         },

@@ -1,4 +1,4 @@
-import { calculateStreak } from "../../../src/features/insights/utils/patternDetection";
+import { calculateStreak } from "../../../src/features/insights/utils/streaks";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createMockMoodEntry } from "../../db/mockClient";
@@ -12,23 +12,14 @@ import {
 function mood(
   id: number,
   value: number,
-  localDateTime: string,
-  overrides: Partial<ReturnType<typeof createMockMoodEntry>> = {}
+  localDateTime: string
 ) {
   return createMockMoodEntry({
     id,
     mood: value,
     timestamp: new Date(localDateTime).getTime(),
-    ...overrides,
   });
 }
-
-const higherIsBetterScale = {
-  version: 2,
-  min: 0,
-  max: 10,
-  lowerIsBetter: false,
-};
 
 describe("moodInsights", () => {
   afterEach(() => {
@@ -52,7 +43,6 @@ describe("moodInsights", () => {
     expect(insights.periodMoods.map((entry) => entry.id)).toEqual([2, 3]);
     expect(insights.previousPeriodMoods.map((entry) => entry.id)).toEqual([1]);
     expect(insights.stats.entryCount).toBe(2);
-    expect(insights.patterns).toEqual([]);
   });
 
   it("calculates period navigation dates from the same module as the hook", () => {
@@ -74,52 +64,6 @@ describe("moodInsights", () => {
 
     expect(getMoodsInPeriod(allMoods, "all", new Date("2024-03-13T12:00:00")))
       .toBe(allMoods);
-  });
-
-  it("runs pattern detection for month and all-time insights", () => {
-    const allMoods = [
-      mood(1, 9, "2024-03-01T12:00:00", {
-        moodScale: higherIsBetterScale,
-        emotions: [{ name: "Calm", category: "positive" }],
-      }),
-      mood(2, 9, "2024-03-02T12:00:00", {
-        moodScale: higherIsBetterScale,
-        emotions: [{ name: "Calm", category: "positive" }],
-      }),
-      mood(3, 9, "2024-03-03T12:00:00", {
-        moodScale: higherIsBetterScale,
-        emotions: [{ name: "Calm", category: "positive" }],
-      }),
-      mood(4, 2, "2024-03-04T12:00:00", {
-        moodScale: higherIsBetterScale,
-        emotions: [{ name: "Anxious", category: "negative" }],
-      }),
-      mood(5, 2, "2024-03-05T12:00:00", {
-        moodScale: higherIsBetterScale,
-        emotions: [{ name: "Anxious", category: "negative" }],
-      }),
-      mood(6, 2, "2024-03-06T12:00:00", {
-        moodScale: higherIsBetterScale,
-        emotions: [{ name: "Anxious", category: "negative" }],
-      }),
-      mood(7, 5, "2024-03-07T12:00:00"),
-    ];
-
-    const insights = buildMoodInsights(
-      allMoods,
-      "month",
-      new Date("2024-03-13T12:00:00")
-    );
-
-    expect(insights.patterns).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          id: "emotion_correlation",
-          type: "emotion",
-          description: expect.stringContaining("Calm"),
-        }),
-      ])
-    );
   });
 
   it("calculates streaks from the full Mood history", () => {

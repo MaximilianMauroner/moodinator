@@ -99,7 +99,7 @@ export default function AboutSettingsScreen() {
           </Text>
 
           <Text className="text-center text-paper-700 dark:text-sand-400 px-4" style={typography.bodySm}>
-            Track your moods, understand your patterns, and gain insights into your emotional wellbeing.
+            Keep a private mood history and reflect on how you feel over time.
           </Text>
         </View>
 

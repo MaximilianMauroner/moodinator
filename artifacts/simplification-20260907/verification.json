@@ -1,0 +1,82 @@
+{
+  "base_commit": "dcd51b0684ff1b1566e3f90c2618e481fe2caf0d",
+  "qa_workspace": "/tmp/moodinator-qa-gML92y",
+  "added_lines": 121,
+  "deleted_lines": 1632,
+  "net_deleted": 1511,
+  "authored_files": {
+    ".maestro/flows/onboarding.yaml": "5b0a5ac9dbb7a5c20d971506dbe755ceee8954676634972d1c4f10cd65d94f45",
+    ".maestro/smoke.yaml": "c5f4a2b35d8a86e0539897f4b04984c74572e15f4e98591a5a2e8bda56227fc0",
+    "README.md": "f17a6fc4a38c6b77d086c1269f873dc612fd0b8a03616e77cb14a1804f0910de",
+    "TERMS_OF_SERVICE.md": "34b8cddc7ca498e1f0b4e4152122cdcc73e8bc59a48b98f1fb104ea025136bf9",
+    "__tests__/features/insights/moodInsights.test.ts": "97734c6b137a151b1d352defc799ddda3a3fc20495016743605ed9d3cd178a5a",
+    "__tests__/features/insights/useInsightsData.hook.test.tsx": "6e293327b928bfe1ac64f693d8b551aa602609b3b0adb6d5fa3e96b51ff91af2",
+    "__tests__/lib/moodChartData.test.ts": null,
+    "__tests__/lib/moodPresentation.test.ts": "c17a9b43fea97a6fdf9e1a56ef7b0468e6f5dddfa50ccf90605eb5e7236f9c4c",
+    "__tests__/shared/state/moodsStore.test.ts": "22e42af800cb5b0894267a693cd609ef55bb6206d049b9686ca7e775131fab1d",
+    "src/app/(tabs)/index.tsx": "ad3cce5afec98e54ac681e7d0d031038d02f529c6d9a00ef58718973a100ff75",
+    "src/app/settings/about.tsx": "a52cd359ef98fe9106df5add4ae7baf98ea45daeac179b0350b827a3a33dfe71",
+    "src/app/settings/display.tsx": "f425f93937e96f8facfe4e98e98216d34af95087db10d00957d06766175a65ee",
+    "src/app/settings/terms-of-service.tsx": "77bbf62d6e20f54ea1bc87cc180f528befaf344ec0f79ccf8f2eba9f94629e8f",
+    "src/components/home/HomeHeader.tsx": "a94db68b23296655b388de27b18d97d8466ac4eace5476cf2dfffa1a1bf8e194",
+    "src/constants/accessibility.ts": "9dd221a0d2c59397f394245d5cf7da67f075ff43f7790a762dbe292d9a64e2a1",
+    "src/features/insights/components/InsightsHeader.tsx": "e20555b925995b1302ed06c4c862e70f23a15042cefde54ea431bd5529a008f3",
+    "src/features/insights/components/PatternCard.tsx": null,
+    "src/features/insights/hooks/useInsightsData.ts": "f2917e9aaf1849550f6f1650854f6ece75f1a59756ea482ec087a10d30ebd521",
+    "src/features/insights/index.ts": "d209fa0013897e5c1cb9b77a9e92796cd2b5ffc8676bece4ed298d38c9828552",
+    "src/features/insights/screens/InsightsScreen.tsx": "45e1d9b0cf93ce4d3a265edf10d513cfb7aa56c630ebf13adcf5e78875d4b798",
+    "src/features/insights/utils/moodInsights.ts": "cec3e08b506cba040f993482998bf797b3e1a69924edb4afcdce65f71e648124",
+    "src/features/insights/utils/patternDetection.ts": null,
+    "src/features/insights/utils/streaks.ts": "fe03666569772c01933697be1b46a2ca8ed8e5b641c9f3803d0176cdef7d7950",
+    "src/features/onboarding/content.ts": "86f434c515646cebef221cec155fa504284465d280f02a5fae88eb21b77bfeb4",
+    "src/features/settings/components/ProfileCard.tsx": null,
+    "src/features/settings/screens/SettingsScreen.tsx": "615504bd3b512f7ab4760bd1bd1797d58fe1bef46bcbb64fd9c0feb02ccbab3d",
+    "src/lib/moodChartData.ts": null,
+    "src/lib/moodPresentation.ts": "1e6e82a581398198759d0308f58ad2cae713b1ad281a6cc93c5d2d0ac1896819",
+    "src/shared/state/moodsStore.ts": "c1ffb0de2c386e89ca79602267206aa1386800bb191856533c7606d932753c8c"
+  },
+  "qa_mismatches": [],
+  "android_build": {
+    "status": "passed",
+    "type": "release",
+    "abi": "x86_64",
+    "package": "com.lab4code.moodinator.qa",
+    "api": 35,
+    "target_sdk": 36,
+    "apk_sha256": "58cf53376f97b38588ea128a0f6b660626382d6c2635f59fdfb881090dc61fc0",
+    "log": "/tmp/moodinator-simplify-android-build.log"
+  },
+  "native_verification": {
+    "smoke": "incomplete",
+    "first_attempt": "Failed at onboarding because a Pixel Launcher ANR dialog obscured the app.",
+    "retry": "Stopped after continued host memory pressure; device ADB connection subsequently went offline.",
+    "manual_confirmed": [
+      "QA APK installed successfully",
+      "Updated welcome screen rendered after closing the launcher error"
+    ],
+    "not_verified": [
+      "Full onboarding flow",
+      "Entry lifecycle",
+      "Insights and Settings interactions",
+      "Home refocus after historical emotion rename",
+      "iOS"
+    ],
+    "evidence": [
+      "emulator-launcher-anr.png",
+      "onboarding.png"
+    ],
+    "smoke_log": "/tmp/moodinator-simplify-smoke.log"
+  },
+  "qa_workspace_removed": true,
+  "final_verification": {
+    "command": "bun run verify",
+    "status": "passed",
+    "head": "14c96f4",
+    "time_utc": "2026-09-07 22:33:42",
+    "test_files": 47,
+    "tests": 406,
+    "expo_doctor": "20/20",
+    "android_release_config": "passed",
+    "authored_files_match_native_snapshot": true
+  }
+}

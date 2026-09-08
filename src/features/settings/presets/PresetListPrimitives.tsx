@@ -385,7 +385,7 @@ export function PresetChip({
       >
         {label}
       </Text>
-      {isCustom && onEdit && (
+      {onEdit && (
         <Pressable
           onPress={(event) => {
             event.stopPropagation?.();
