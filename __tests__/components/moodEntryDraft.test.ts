@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildMoodEntrySubmitValues,
   createMoodEntryFormValues,
+  DEFAULT_MOOD_ENTRY_ENERGY,
   getMoodEntrySteps,
   getNotesPlaceholder,
   resolveMoodEntryBackAction,
@@ -65,6 +66,11 @@ describe("moodEntryDraft", () => {
       energy: 8,
       basedOnEntryId: 12,
     });
+  });
+
+  it("starts new entries at neutral energy while preserving an explicit clear", () => {
+    expect(createMoodEntryFormValues(5).energy).toBe(DEFAULT_MOOD_ENTRY_ENERGY);
+    expect(createMoodEntryFormValues(5, { energy: null }).energy).toBeNull();
   });
 
   it("omits disabled fields from submit values", () => {

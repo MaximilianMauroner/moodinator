@@ -150,6 +150,7 @@ export const emotionService: EmotionServiceInterface = {
       await addEmotion({
         name: trimmedName,
         category: "neutral",
+        energy: "neutral",
       });
       existing.add(normalizedName);
     }

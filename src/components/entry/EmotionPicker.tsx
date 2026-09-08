@@ -9,6 +9,12 @@ import Animated, {
 import { Ionicons } from "@expo/vector-icons";
 import { useThemeColors } from "@/constants/colors";
 import { haptics } from "@/lib/haptics";
+import {
+    EMOTION_ENERGY_BAND_LABELS,
+    EMOTION_ENERGY_BAND_ORDER,
+    resolveEmotionEnergyBand,
+    type EmotionEnergyBand,
+} from "@/lib/entrySettings";
 import type { Emotion } from "@db/types";
 
 interface EmotionPickerProps {
@@ -16,27 +22,56 @@ interface EmotionPickerProps {
     selected: Emotion[];
     onChange: (emotions: Emotion[]) => void;
     maxSelections?: number;
-    showCategoryHeaders?: boolean;
-    reserveSummarySpace?: boolean;
-    disabledOpacity?: number;
-    categoryOrder?: readonly EmotionCategory[];
 }
 
-const CATEGORY_ORDER = ["positive", "negative", "neutral"] as const;
-type EmotionCategory = (typeof CATEGORY_ORDER)[number];
+// Chips are drawn at 36 and the press target is extended to 48 with hitSlop, so
+// the layout stays dense without shrinking the touch area. The 6dp of slop stays
+// inside the 8dp row gap, so neighbouring targets never overlap.
+const CHIP_HEIGHT = 36;
+const CHIP_HIT_SLOP = { top: 6, bottom: 6, left: 3, right: 3 };
+const DISABLED_OPACITY = 0.28;
 
-const CATEGORY_LABELS: Record<EmotionCategory, string> = {
-    positive: "Positive",
-    negative: "Negative",
-    neutral: "Neutral",
+type EmotionGroup = EmotionEnergyBand;
+
+const GROUP_LABELS: Record<EmotionGroup, string> = {
+    ...EMOTION_ENERGY_BAND_LABELS,
 };
+
+// Bar heights for the small activation meter beside each band label.
+const GROUP_BARS: Record<EmotionGroup, number> = {
+    high: 3,
+    neutral: 2,
+    low: 1,
+};
+
+const GROUP_ORDER: readonly EmotionGroup[] = EMOTION_ENERGY_BAND_ORDER;
+
+// ─── Activation meter ───────────────────────────────────────────────────────
+const BandMeter: React.FC<{ filled: number; color: string; dimColor: string }> = ({
+    filled,
+    color,
+    dimColor,
+}) => (
+    <View className="flex-row items-end gap-0.5" accessible={false}>
+        {[1, 2, 3].map((step) => (
+            <View
+                key={step}
+                style={{
+                    width: 3,
+                    height: 4 + step * 3,
+                    borderRadius: 1,
+                    backgroundColor: step <= filled ? color : dimColor,
+                }}
+            />
+        ))}
+    </View>
+);
 
 // ─── Animated emotion chip ──────────────────────────────────────────────────
 interface EmotionChipProps {
     emotion: Emotion;
     isSelected: boolean;
     disabled: boolean;
-    disabledOpacity: number;
     bgColor: string;
     borderColor: string;
     textColor: string;
@@ -47,7 +82,6 @@ const EmotionChip: React.FC<EmotionChipProps> = ({
     emotion,
     isSelected,
     disabled,
-    disabledOpacity,
     bgColor,
     borderColor,
     textColor,
@@ -78,14 +112,16 @@ const EmotionChip: React.FC<EmotionChipProps> = ({
                     scale.value = withSpring(1, { damping: 18, stiffness: 380 });
                 }}
                 disabled={disabled}
+                hitSlop={CHIP_HIT_SLOP}
                 testID={`emotion-option-${emotion.name}`}
-                className="min-h-12 min-w-12 justify-center px-3 py-2 rounded-xl"
+                className="justify-center px-3 rounded-[10px]"
                 style={{
+                    minHeight: CHIP_HEIGHT,
                     backgroundColor: bgColor,
                     // Keep layout stable: borderWidth must NOT change on select.
                     borderWidth: 1,
                     borderColor,
-                    opacity: disabled ? disabledOpacity : 1,
+                    opacity: disabled ? DISABLED_OPACITY : 1,
                     // Selection emphasis uses transform + shadow (no layout change)
                     shadowColor: isSelected ? textColor : "transparent",
                     shadowOffset: { width: 0, height: 2 },
@@ -144,9 +180,10 @@ const SelectedChip: React.FC<{
         <Animated.View style={selectedChipAnimatedStyle}>
             <Pressable
                 onPress={onRemove}
+                hitSlop={CHIP_HIT_SLOP}
                 testID={`emotion-remove-${emotion.name}`}
-                className="min-h-12 min-w-12 flex-row items-center justify-center px-2.5 py-1.5 rounded-full gap-1"
-                style={{ backgroundColor: bgColor }}
+                className="flex-row items-center justify-center px-2.5 rounded-[9px] gap-1.5"
+                style={{ minHeight: 28, backgroundColor: bgColor }}
                 accessibilityRole="button"
                 accessibilityLabel={`Remove ${emotion.name}`}
             >
@@ -169,10 +206,6 @@ export const EmotionPicker: React.FC<EmotionPickerProps> = ({
     selected,
     onChange,
     maxSelections = 3,
-    showCategoryHeaders = true,
-    reserveSummarySpace = true,
-    disabledOpacity = 0.28,
-    categoryOrder = CATEGORY_ORDER,
 }) => {
     const { isDark, getCategoryColors } = useThemeColors();
 
@@ -181,20 +214,22 @@ export const EmotionPicker: React.FC<EmotionPickerProps> = ({
         [selected]
     );
     const atLimit = selected.length >= maxSelections;
-    const shouldRenderSummary = reserveSummarySpace || selected.length > 0;
+
+    const labelColor = isDark ? "#9EB894" : "#7A6B55";
+    const meterDimColor = isDark ? "rgba(158, 184, 148, 0.28)" : "rgba(122, 107, 85, 0.25)";
+    const ruleColor = isDark ? "rgba(61, 53, 42, 0.25)" : "rgba(229, 217, 191, 0.5)";
 
     const grouped = useMemo(() => {
-        const map: Record<EmotionCategory, Emotion[]> = {
-            positive: [],
-            negative: [],
+        const map: Record<EmotionGroup, Emotion[]> = {
+            high: [],
             neutral: [],
+            low: [],
         };
         for (const emotion of options) {
-            const cat = (emotion.category as EmotionCategory) ?? "neutral";
-            if (cat in map) map[cat].push(emotion);
+            map[resolveEmotionEnergyBand(emotion)].push(emotion);
         }
-        for (const cat of CATEGORY_ORDER) {
-            map[cat].sort((a, b) => a.name.localeCompare(b.name));
+        for (const group of GROUP_ORDER) {
+            map[group].sort((a, b) => a.name.localeCompare(b.name));
         }
         return map;
     }, [options]);
@@ -224,7 +259,6 @@ export const EmotionPicker: React.FC<EmotionPickerProps> = ({
                 emotion={emotion}
                 isSelected={isSelected}
                 disabled={disabled}
-                disabledOpacity={disabledOpacity}
                 bgColor={catColors.bg}
                 borderColor={catColors.border ?? catColors.bg}
                 textColor={catColors.text}
@@ -233,143 +267,101 @@ export const EmotionPicker: React.FC<EmotionPickerProps> = ({
         );
     };
 
-    const orderedCategories = useMemo(() => {
-        const seen = new Set<EmotionCategory>();
-        const preferred = categoryOrder.filter((cat) => {
-            if (!CATEGORY_ORDER.includes(cat) || seen.has(cat)) return false;
-            seen.add(cat);
-            return true;
-        });
-        return [
-            ...preferred,
-            ...CATEGORY_ORDER.filter((cat) => !seen.has(cat)),
-        ];
-    }, [categoryOrder]);
-    const flatOptions = orderedCategories.flatMap((cat) => grouped[cat]);
-
     return (
         <View>
-            {/* Selected summary. Detailed mode reserves height; quick mode stays compact. */}
-            {shouldRenderSummary && (
-                <View
-                    className={reserveSummarySpace ? "mb-4" : "mb-3"}
-                    style={
-                        reserveSummarySpace
-                            ? {
-                                  minHeight: 82,
-                                  paddingTop: 2,
-                                  paddingBottom: 2,
-                              }
-                            : undefined
-                    }
-                >
-                    {selected.length > 0 ? (
-                        <View style={reserveSummarySpace ? { flex: 1 } : undefined}>
-                            <ScrollView
-                                horizontal
-                                showsHorizontalScrollIndicator={false}
-                                contentContainerStyle={{
-                                    flexDirection: "row",
-                                    alignItems: "center",
-                                    gap: 8,
-                                    paddingVertical: reserveSummarySpace ? 6 : 2,
-                                }}
-                            >
-                                {selected.map((e) => {
-                                    const catColors = getCategoryColors(e.category, true);
-                                    return (
-                                        <SelectedChip
-                                            key={e.name}
-                                            emotion={e}
-                                            bgColor={catColors.bg}
-                                            textColor={catColors.text}
-                                            onRemove={() => toggle(e)}
-                                        />
-                                    );
-                                })}
-                            </ScrollView>
-                        </View>
-                    ) : (
-                        <Animated.View
-                            entering={FadeIn.duration(160)}
+            {/* Selected summary. Fixed height so the grid never shifts when the
+                selection changes, but only one row tall. */}
+            <View style={{ height: 34, justifyContent: "center" }}>
+                {selected.length > 0 ? (
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: 8,
+                        }}
+                    >
+                        {selected.map((e) => {
+                            const catColors = getCategoryColors(e.category, true);
+                            return (
+                                <SelectedChip
+                                    key={e.name}
+                                    emotion={e}
+                                    bgColor={catColors.bg}
+                                    textColor={catColors.text}
+                                    onRemove={() => toggle(e)}
+                                />
+                            );
+                        })}
+                    </ScrollView>
+                ) : (
+                    <Animated.View entering={FadeIn.duration(160)}>
+                        <Text
+                            className="text-xs"
                             style={{
-                                flex: 1,
-                                justifyContent: "center",
-                            }}
-                        >
-                            <Text
-                                className="text-xs"
-                                style={{
-                                    color: isDark ? "#9EB894" : "#7A6B55",
-                                    fontStyle: "italic",
-                                    opacity: 0.95,
-                                }}
-                            >
-                                Pick up to {maxSelections}
-                            </Text>
-                        </Animated.View>
-                    )}
-
-                    {atLimit && (
-                        <Animated.Text
-                            entering={FadeIn.duration(160)}
-                            style={{
-                                fontSize: 12,
-                                color: isDark ? "#9EB894" : "#7A6B55",
+                                color: labelColor,
                                 fontStyle: "italic",
-                                marginTop: 2,
+                                opacity: 0.95,
                             }}
                         >
-                            Tap a selected emotion to remove it
-                        </Animated.Text>
-                    )}
-                </View>
-            )}
+                            Pick up to {maxSelections}
+                        </Text>
+                    </Animated.View>
+                )}
+            </View>
 
-            {!showCategoryHeaders ? (
-                <View className="flex-row flex-wrap gap-2">
-                    {flatOptions.map(renderEmotionChip)}
-                </View>
-            ) : (
-                /* Category groups — no layout animation (avoid “related” vertical movement). */
-                orderedCategories.map((cat) => {
-                    const list = grouped[cat];
-                    if (!list.length) return null;
+            {/* Reserved line, so reaching the limit never shifts the bands below. */}
+            <View className="mb-3" style={{ height: 15, justifyContent: "center" }}>
+                {atLimit && (
+                    <Animated.Text
+                        entering={FadeIn.duration(160)}
+                        style={{ fontSize: 12, color: labelColor, fontStyle: "italic" }}
+                    >
+                        Tap a selected emotion to remove it
+                    </Animated.Text>
+                )}
+            </View>
 
-                    return (
-                        <View key={cat} className="mb-4">
-                            {/* Category header */}
-                            <View
-                                className="flex-row items-center mb-2.5 gap-2"
+            {/* Energy bands. Colour still carries valence, so both axes read at once. */}
+            {GROUP_ORDER.map((group) => {
+                const list = grouped[group];
+                if (!list.length) return null;
+
+                return (
+                    <View key={group} className="mb-3.5">
+                        <View className="flex-row items-center mb-2 gap-2">
+                            <BandMeter
+                                filled={GROUP_BARS[group]}
+                                color={labelColor}
+                                dimColor={meterDimColor}
+                            />
+                            <Text
                                 style={{
-                                    borderBottomWidth: 1,
-                                    borderBottomColor: isDark
-                                        ? "rgba(61, 53, 42, 0.25)"
-                                        : "rgba(229, 217, 191, 0.5)",
-                                    paddingBottom: 5,
+                                    fontSize: 11.5,
+                                    fontWeight: "700",
+                                    letterSpacing: 1.1,
+                                    textTransform: "uppercase",
+                                    color: labelColor,
                                 }}
                             >
-                                <Text
-                                    style={{
-                                        fontSize: 12,
-                                        fontWeight: "700",
-                                        letterSpacing: 1.2,
-                                        textTransform: "uppercase",
-                                        color: isDark ? "#9EB894" : "#7A6B55",
-                                    }}
-                                >
-                                    {CATEGORY_LABELS[cat]}
-                                </Text>
-                            </View>
-
-                            {/* Chips */}
-                            <View className="flex-row flex-wrap gap-2">
-                                {list.map(renderEmotionChip)}
-                            </View>
+                                {GROUP_LABELS[group]}
+                            </Text>
+                            <Text style={{ fontSize: 11, color: labelColor, opacity: 0.7 }}>
+                                {list.length}
+                            </Text>
+                            <View
+                                className="flex-1"
+                                style={{ height: 1, backgroundColor: ruleColor }}
+                            />
                         </View>
-                    );
-                })
-            )}
+
+                        <View className="flex-row flex-wrap gap-2">
+                            {list.map(renderEmotionChip)}
+                        </View>
+                    </View>
+                );
+            })}
         </View>
     );
 };

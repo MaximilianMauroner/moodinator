@@ -1,6 +1,6 @@
 import { Tabs } from "expo-router";
 import React from "react";
-import { Platform } from "react-native";
+import { Platform, StyleSheet, View } from "react-native";
 import type { BottomTabBarButtonProps } from "@react-navigation/bottom-tabs";
 
 import { HapticTab } from "@/components/HapticTab";
@@ -8,7 +8,22 @@ import { IconSymbol } from "@/components/ui/IconSymbol";
 import TabBarBackground from "@/components/ui/TabBarBackground";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { TAB_ACCESSIBILITY_LABELS } from "@/constants/accessibility";
+import { useToastTabBarHeight } from "@/hooks/useToastOffset";
 import { emitHomeTabDoublePress } from "@/lib/homeTabEvents";
+
+function MeasuredTabBarBackground() {
+  return (
+    <View
+      pointerEvents="none"
+      style={StyleSheet.absoluteFill}
+      onLayout={({ nativeEvent }) => {
+        useToastTabBarHeight.setState({ height: nativeEvent.layout.height });
+      }}
+    >
+      <TabBarBackground />
+    </View>
+  );
+}
 
 const HOME_TAB_DOUBLE_PRESS_MS = 450;
 
@@ -52,7 +67,7 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: false,
         tabBarButton: HapticTab,
-        tabBarBackground: TabBarBackground,
+        tabBarBackground: MeasuredTabBarBackground,
         tabBarActiveTintColor: colors.active,
         tabBarInactiveTintColor: colors.inactive,
         sceneStyle: {

@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Moodinator — Emotion step, 5 utility directions</title>
+<style>
+  :root {
+    --page-bg: #0A0F0C;
+    --card-bg: #101A14;
+    --card-border: #1E3226;
+    --ink: #EAF3E4;
+    --ink-dim: #9EB894;
+    --ink-faint: #6E8768;
+    --accent: #A6E39B;
+
+    --sheet: #0D1A13;
+    --sheet-2: #0B160F;
+    --text-subtle: #9EB894;
+
+    --pos-bg: #122A1A;  --pos-bg-sel: #34703D;  --pos-border: #2F5A39;
+    --pos-text: #C8F5BE; --pos-text-sel: #FDFCFA;
+    --neg-bg: #482721;  --neg-bg-sel: #D87561;  --neg-border: #693930;
+    --neg-text: #F2B4A6; --neg-text-sel: #08150F;
+    --neu-bg: #332D3D;  --neu-bg-sel: #8A7AA0;  --neu-border: #51485F;
+    --neu-text: #D5CCDD; --neu-text-sel: #08150F;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 40px 28px 90px;
+    background: var(--page-bg); color: var(--ink);
+    font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1 { font-size: 26px; margin: 0 0 8px; letter-spacing: -0.4px; }
+  h2 { font-size: 17px; margin: 46px 0 14px; letter-spacing: -0.2px; }
+  p { margin: 0 0 10px; color: var(--ink-dim); font-size: 14px; line-height: 1.55; max-width: 82ch; }
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12.5px; background: #16241B; border: 1px solid var(--card-border);
+    border-radius: 5px; padding: 1px 5px; color: #C8F5BE;
+  }
+  .legend { display: flex; gap: 20px; flex-wrap: wrap; margin: 6px 0 20px; font-size: 12.5px; color: var(--ink-faint); }
+  .legend b { color: var(--ink-dim); font-weight: 650; }
+
+  .rail { display: flex; gap: 26px; align-items: flex-start; overflow-x: auto; padding: 6px 0 24px; }
+  .col { flex: 0 0 auto; width: 411px; }
+  .col-head { margin-bottom: 12px; height: 112px; }
+  .col-tag {
+    display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: 1px;
+    text-transform: uppercase; padding: 4px 9px; border-radius: 999px; margin-bottom: 8px;
+    background: #122A1A; color: #C8F5BE; border: 1px solid #2F5A39;
+  }
+  .col-title { font-size: 16px; font-weight: 650; margin: 0 0 4px; }
+  .col-sub { font-size: 13px; color: var(--ink-faint); line-height: 1.5; margin: 0; }
+
+  .frame {
+    width: 411px; height: 820px; border-radius: 26px; background: var(--sheet);
+    border: 1px solid #22382A; overflow: hidden; display: flex; flex-direction: column;
+    position: relative; box-shadow: 0 18px 50px rgba(0,0,0,0.55);
+  }
+  .sheet-head { flex: 0 0 auto; padding: 14px 20px 0; }
+  .grabber { width: 44px; height: 4px; border-radius: 99px; background: #2C4433; margin: 0 auto 14px; }
+  .sheet-title-row { display: flex; align-items: center; justify-content: space-between; }
+  .sheet-title { font-size: 20px; font-weight: 700; color: #F0F7EA; }
+  .sheet-x { font-size: 22px; color: #B9CFAE; line-height: 1; }
+  .mood-row { display: flex; align-items: center; gap: 12px; margin: 14px 0 10px; }
+  .mood-chip {
+    width: 116px; height: 74px; border-radius: 16px; background: #2E2A3E;
+    border: 1px solid #4A4360; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+  }
+  .mood-num { font-size: 27px; font-weight: 700; color: #EDE7F5; line-height: 1.05; }
+  .mood-lab { font-size: 12px; color: #C4BBCF; }
+  .arrow {
+    width: 38px; height: 38px; border-radius: 999px; background: #17261C;
+    border: 1px solid #2A4230; display: flex; align-items: center;
+    justify-content: center; color: #9EB894; font-size: 15px;
+  }
+  .last-entry {
+    margin-left: auto; height: 42px; padding: 0 14px; border-radius: 12px;
+    background: #12251A; border: 1px solid #2F5A39; color: #C8F5BE;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.6px;
+    display: flex; align-items: center; gap: 7px;
+  }
+  .dots { display: flex; gap: 6px; justify-content: center; margin: 8px 0 6px; }
+  .dot { width: 7px; height: 7px; border-radius: 99px; background: #2C4433; }
+  .dot.on { width: 20px; background: var(--accent); }
+  .step-q {
+    text-align: center; font-size: 12.5px; font-weight: 700; letter-spacing: 1.3px;
+    text-transform: uppercase; color: var(--text-subtle); padding-bottom: 12px;
+  }
+  .scrollArea {
+    flex: 1 1 auto; overflow-y: auto; padding: 0 20px;
+    border-top: 1px solid rgba(47,81,59,0.35);
+    scrollbar-width: thin; scrollbar-color: #2C4433 transparent;
+  }
+  .scrollArea::-webkit-scrollbar { width: 5px; }
+  .scrollArea::-webkit-scrollbar-thumb { background: #2C4433; border-radius: 99px; }
+  .fold {
+    position: absolute; left: 0; right: 0; z-index: 9;
+    border-top: 1px dashed rgba(216,117,97,0.6); pointer-events: none;
+  }
+  .fold::after {
+    content: "fold"; position: absolute; right: 6px; top: -13px;
+    font-size: 9px; letter-spacing: 0.6px; color: rgba(216,117,97,0.85);
+  }
+  .sheet-foot {
+    flex: 0 0 auto; height: 76px; padding: 0 20px; display: flex;
+    align-items: center; gap: 12px; border-top: 1px solid rgba(47,81,59,0.35);
+    background: var(--sheet-2);
+  }
+  .btn-ghost {
+    flex: 1; height: 48px; border-radius: 14px; background: #1A2A20; color: #D6E7CC;
+    display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 650;
+  }
+  .btn-go {
+    flex: 1.35; height: 48px; border-radius: 14px; background: #BFEDB2; color: #0B1A12;
+    display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 750;
+  }
+
+  /* section label */
+  .sec-row { display: flex; align-items: center; gap: 10px; padding: 12px 0 0; }
+  .sec-label {
+    font-size: 11.5px; font-weight: 700; letter-spacing: 1.15px;
+    text-transform: uppercase; color: var(--text-subtle);
+  }
+  .sec-n { font-size: 11px; font-weight: 600; color: var(--ink-faint); }
+  .sec-rule { flex: 1; height: 1px; background: rgba(47,81,59,0.30); }
+  .sec-count { font-size: 12.5px; font-weight: 650; color: #E0C993; }
+  .sec-add {
+    width: 30px; height: 30px; border-radius: 9px; background: var(--neg-bg-sel);
+    color: #08150F; display: flex; align-items: center; justify-content: center;
+    font-size: 18px; cursor: pointer;
+  }
+
+  /* chips */
+  .chip {
+    min-height: 36px; padding: 0 11px; border-radius: 10px; border: 1px solid;
+    display: inline-flex; align-items: center; font-size: 13.5px; font-weight: 550;
+    line-height: 1; position: relative; cursor: pointer; user-select: none;
+  }
+  .chip.xs { min-height: 32px; padding: 0 10px; font-size: 13px; border-radius: 9px; }
+  .chip.blocked { opacity: 0.32; cursor: not-allowed; }
+  .grid { display: flex; flex-wrap: wrap; gap: 8px 7px; }
+  .grid.tight { gap: 7px 6px; }
+  .c-pos { background: var(--pos-bg); border-color: var(--pos-border); color: var(--pos-text); }
+  .c-neg { background: var(--neg-bg); border-color: var(--neg-border); color: var(--neg-text); }
+  .c-neu { background: var(--neu-bg); border-color: var(--neu-border); color: var(--neu-text); }
+  .c-pos.sel { background: var(--pos-bg-sel); border-color: #4E9A58; color: var(--pos-text-sel); font-weight: 700; }
+  .c-neg.sel { background: var(--neg-bg-sel); border-color: #E89685; color: var(--neg-text-sel); font-weight: 700; }
+  .c-neu.sel { background: var(--neu-bg-sel); border-color: #A697BA; color: var(--neu-text-sel); font-weight: 700; }
+  .tickdot {
+    position: absolute; top: -4px; right: -4px; width: 15px; height: 15px;
+    border-radius: 999px; background: #EAF7E4; color: #143B1C; font-size: 10px;
+    font-weight: 800; display: flex; align-items: center; justify-content: center;
+    border: 1.5px solid var(--sheet);
+  }
+  .c-neg.sel .tickdot { background: #3A1F19; color: #F7D8CF; }
+  .c-neu.sel .tickdot { background: #241F2C; color: #E4DCEC; }
+
+  /* picked strip */
+  .selstrip { display: flex; align-items: center; gap: 7px; height: 34px; margin: 8px 0 2px; }
+  .selstrip .lbl {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.9px;
+    text-transform: uppercase; color: var(--ink-faint); flex: 0 0 auto;
+  }
+  .selchip {
+    height: 28px; padding: 0 8px 0 10px; border-radius: 9px; display: inline-flex;
+    align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; cursor: pointer;
+  }
+  .selchip .x { font-size: 14px; opacity: 0.75; }
+  .selchip.pos { background: var(--pos-bg-sel); color: var(--pos-text-sel); }
+  .selchip.neg { background: var(--neg-bg-sel); color: var(--neg-text-sel); }
+  .selchip.neu { background: var(--neu-bg-sel); color: var(--neu-text-sel); }
+  .selstrip .empty { font-size: 12.5px; font-style: italic; color: var(--ink-faint); }
+
+  /* D — usual row */
+  .usual-band {
+    background: rgba(91,138,91,0.07); border: 1px solid rgba(47,90,57,0.45);
+    border-radius: 13px; padding: 9px 10px 10px; margin: 4px 0 2px;
+  }
+  .usual-head { display: flex; align-items: center; gap: 7px; margin-bottom: 8px; }
+  .usual-head .t {
+    font-size: 11px; font-weight: 700; letter-spacing: 1.05px;
+    text-transform: uppercase; color: #A6E39B;
+  }
+  .usual-head .s { font-size: 10.5px; color: var(--ink-faint); margin-left: auto; }
+  .rank { font-size: 9.5px; opacity: 0.55; margin-left: 5px; font-weight: 700; }
+
+  /* E — search */
+  .searchwrap { position: sticky; top: 0; z-index: 6; background: var(--sheet); padding: 10px 0 8px; }
+  .searchbox {
+    height: 42px; border-radius: 12px; background: #16261C; border: 1px solid #2C4634;
+    display: flex; align-items: center; gap: 9px; padding: 0 12px;
+  }
+  .searchbox .mag { color: #7FA277; font-size: 15px; }
+  .searchbox input {
+    flex: 1; background: none; border: none; outline: none; color: #E7F3E1;
+    font-size: 14.5px; font-family: inherit;
+  }
+  .searchbox input::placeholder { color: #63805D; }
+  .searchbox .clr { color: #7FA277; font-size: 16px; cursor: pointer; }
+  .kbd-hint { font-size: 11px; color: var(--ink-faint); margin: 2px 0 6px; }
+  .createchip {
+    min-height: 36px; padding: 0 12px; border-radius: 10px;
+    border: 1px dashed var(--neg-bg-sel); color: #F2B4A6; background: rgba(216,117,97,0.10);
+    display: inline-flex; align-items: center; font-size: 13.5px; font-weight: 650; cursor: pointer;
+  }
+  .noresult { font-size: 13px; color: var(--ink-faint); font-style: italic; margin: 6px 0 10px; }
+
+  /* F — collapsed group */
+  .fold-row {
+    display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 12px;
+    border-radius: 12px; border: 1px solid; cursor: pointer; margin-bottom: 8px;
+  }
+  .fold-row .nm { font-size: 12px; font-weight: 700; letter-spacing: 1.05px; text-transform: uppercase; }
+  .fold-row .ct { font-size: 11px; opacity: 0.75; }
+  .fold-row .chev { margin-left: auto; font-size: 15px; opacity: 0.8; }
+  .fr-neg { background: rgba(72,39,33,0.42); border-color: var(--neg-border); color: var(--neg-text); }
+  .fr-neu { background: rgba(51,45,61,0.42); border-color: var(--neu-border); color: var(--neu-text); }
+  .fr-pos { background: rgba(18,42,26,0.55); border-color: var(--pos-border); color: var(--pos-text); }
+  .relevant-note {
+    font-size: 11px; color: var(--ink-faint); font-style: italic; margin: 2px 0 8px;
+  }
+  .badge-here {
+    font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 99px;
+    background: rgba(255,255,255,0.16);
+  }
+
+  /* G — complete grid */
+  .cellgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .cell {
+    height: 32px; border-radius: 8px; border: 1px solid; display: flex;
+    align-items: center; justify-content: center; font-size: 11.5px; font-weight: 600;
+    overflow: hidden; white-space: nowrap; text-overflow: ellipsis; padding: 0 4px;
+    position: relative; cursor: pointer; user-select: none;
+  }
+  .glegend { display: flex; gap: 12px; align-items: center; margin: 8px 0 9px; }
+  .glegend span { font-size: 10.5px; color: var(--ink-faint); display: flex; align-items: center; gap: 5px; }
+  .swatch { width: 9px; height: 9px; border-radius: 3px; display: inline-block; }
+
+  /* H — energy bands */
+  .band { margin-bottom: 12px; }
+  .band-head { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+  .band-name {
+    font-size: 11.5px; font-weight: 700; letter-spacing: 1.05px;
+    text-transform: uppercase; color: var(--text-subtle);
+  }
+  .band-meter { display: flex; gap: 2px; align-items: flex-end; height: 12px; }
+  .band-meter i { width: 3px; border-radius: 1px; background: #3E6147; display: block; }
+  .band-meter i.on { background: var(--accent); }
+  .band-rule { flex: 1; height: 1px; background: rgba(47,81,59,0.30); }
+  .band-n { font-size: 11px; color: var(--ink-faint); }
+
+  /* tables + cards */
+  table { border-collapse: collapse; width: 100%; max-width: 1500px; margin: 10px 0 6px; }
+  th, td { text-align: left; font-size: 13.5px; padding: 10px 12px; border-bottom: 1px solid var(--card-border); vertical-align: top; }
+  th { color: var(--ink-faint); font-weight: 650; font-size: 12px; text-transform: uppercase; letter-spacing: 0.7px; }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .good { color: #A6E39B; font-weight: 700; }
+  .warn { color: #E0C993; font-weight: 700; }
+  .bad { color: #F2B4A6; font-weight: 700; }
+
+  .cards { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 6px; }
+  .card { flex: 1 1 320px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 14px; padding: 16px 18px; }
+  .card h3 { margin: 0 0 8px; font-size: 14px; }
+  .card ul { margin: 0; padding-left: 18px; }
+  .card li { font-size: 13.5px; color: var(--ink-dim); line-height: 1.6; margin-bottom: 5px; }
+  .note { border-left: 3px solid var(--accent); background: #101E15; padding: 12px 16px; border-radius: 0 10px 10px 0; margin: 16px 0; max-width: 1500px; }
+  .note p { margin: 0; color: #CFE3C6; }
+</style>
+</head>
+<body>
+
+<h1>Emotion step — 5 directions that maximise utility</h1>
+<p>
+  These five are not density tweaks. Each one changes <b>how you find the emotion you want</b> among 40.
+  Every frame is a true <b>411 &times; 820 dp</b> viewport with the real default list and the real dark tokens.
+  <b>The frames are live:</b> tap chips to select and deselect (limit 3), type in the search box, open the
+  collapsed groups. Numbers in the tables are measured from the rendered DOM.
+</p>
+
+<div class="legend">
+  <span><b>D</b> learns from your history</span>
+  <span><b>E</b> lets you type</span>
+  <span><b>F</b> uses the mood you already picked</span>
+  <span><b>G</b> shows all 40 at once</span>
+  <span><b>H</b> sorts by energy instead of alphabet</span>
+</div>
+
+<div class="rail" id="rail"></div>
+
+<h2>Measured result</h2>
+<table id="metrics">
+  <thead>
+    <tr>
+      <th>Direction</th>
+      <th>Visible without scrolling</th>
+      <th>How you find an emotion</th>
+      <th>Worst case for a rare emotion</th>
+      <th>New data or code needed</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<h2>Why each one earns its place</h2>
+<div class="cards" id="cards"></div>
+
+<h2>The search stat, computed from your real list</h2>
+<div class="note"><p id="prefixStat">measuring…</p></div>
+
+<h2>Cost and risk, stated plainly</h2>
+<table>
+  <thead><tr><th>Direction</th><th>Build cost</th><th>Main risk</th><th>Reversible?</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><b>D — Your usual</b></td>
+      <td>One SQL query. <code>mood_emotions</code> already has <code>idx_mood_emotions_emotion_id</code>, so
+          <code>GROUP BY emotion_id ORDER BY COUNT(*) DESC LIMIT 8</code> is cheap. No schema change.</td>
+      <td>A new user sees an empty row. Needs a fallback to the plain list until roughly 5 entries exist.</td>
+      <td class="good">Yes</td>
+    </tr>
+    <tr>
+      <td><b>E — Search first</b></td>
+      <td>One <code>TextInput</code> and a filter. Also replaces the separate add-emotion modal
+          (<code>openCreateEmotionModal</code>) with an inline create.</td>
+      <td>The keyboard covers the lower half. Needs the list to shrink to the visible area, not scroll under it.</td>
+      <td class="good">Yes</td>
+    </tr>
+    <tr>
+      <td><b>F — Mood-aware</b></td>
+      <td>Reuses <code>getDefaultEmotionCategory(mood)</code>, which already exists at
+          <code>MoodEntryModal.tsx:98</code>. Collapse state is local.</td>
+      <td>Guessing wrong is a real cost. A person at mood 4 who feels anxious must open a group.
+          Never hide a group that holds a current pick.</td>
+      <td class="good">Yes</td>
+    </tr>
+    <tr>
+      <td><b>G — Complete grid</b></td>
+      <td>Layout only. No new data.</td>
+      <td class="bad">Does not scale with custom emotions. Your device already has Calm, Optimistic and
+          Dissatisfied on top of the defaults, and each addition erodes the no-scroll promise.
+          11.5 px labels also break under large system text.</td>
+      <td class="good">Yes</td>
+    </tr>
+    <tr>
+      <td><b>H — Energy bands</b></td>
+      <td>Needs one static <code>arousal: "high" | "mid" | "low"</code> per emotion in
+          <code>domain/entrySettings.ts</code>. 40 values, no DB migration.</td>
+      <td>Custom emotions have no arousal value. They need a default band and a way to move between bands.</td>
+      <td class="warn">Mostly</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>What I would ship</h2>
+<div class="note">
+  <p>
+    <b>D plus E, in that order.</b> They are the only two that get better the more you use the app, they
+    solve different halves of the same problem, and they compose: the usual row covers the repeat case with
+    zero effort, and search covers the long tail in about three keystrokes. Neither hides anything from you,
+    which is the flaw in F and the risk in G. H is the most interesting of the five and the one I would
+    keep for later, because it needs a new field and it helps most when you cannot name the feeling.
+  </p>
+</div>
+
+<script>
+/* ── Real data ─────────────────────────────────────────────── */
+const EMOTIONS = {
+  positive: ["Affectionate","Amused","Awe","Confident","Content","Energetic","Excited","Grateful","Happy","Hopeful","Inspired","Loved","Motivated","Proud","Relaxed"],
+  negative: ["Angry","Anxious","Ashamed","Disappointed","Disgusted","Embarrassed","Fearful","Frustrated","Grieving","Guilty","Hopeless","Hurt","Insecure","Irritable","Jealous","Lonely","Numb","Overwhelmed","Sad","Stressed"],
+  neutral:  ["Bored","Confused","Curious","Surprised","Tired"]
+};
+const ORDER = ["positive","negative","neutral"];
+const LABEL = { positive:"Positive", negative:"Negative", neutral:"Neutral" };
+const CLS   = { positive:"c-pos", negative:"c-neg", neutral:"c-neu" };
+const SELCLS= { positive:"pos", negative:"neg", neutral:"neu" };
+const ALL = ORDER.flatMap(c => EMOTIONS[c]);
+const catOf = n => ORDER.find(c => EMOTIONS[c].includes(n)) || "neutral";
+const esc = s => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+
+/* Illustrative history ranking for D. Real version reads mood_emotions. */
+const USUAL = ["Tired","Anxious","Content","Stressed","Happy","Overwhelmed","Grateful","Calm"]
+  .filter(n => ALL.includes(n)).concat(["Hopeful"]).slice(0,8);
+
+/* Static arousal map for H. 40 values, no migration. */
+const AROUSAL = {
+  Energetic:"high", Excited:"high", Inspired:"high", Motivated:"high",
+  Affectionate:"mid", Amused:"mid", Awe:"mid", Confident:"mid", Grateful:"mid",
+  Happy:"mid", Hopeful:"mid", Loved:"mid", Proud:"mid",
+  Content:"low", Relaxed:"low",
+  Angry:"high", Anxious:"high", Embarrassed:"high", Fearful:"high",
+  Frustrated:"high", Overwhelmed:"high", Stressed:"high",
+  Ashamed:"mid", Disgusted:"mid", Guilty:"mid", Hurt:"mid", Insecure:"mid",
+  Irritable:"mid", Jealous:"mid",
+  Disappointed:"low", Grieving:"low", Hopeless:"low", Lonely:"low", Numb:"low", Sad:"low",
+  Surprised:"high", Confused:"mid", Curious:"mid", Bored:"low", Tired:"low"
+};
+const BANDS = [
+  { key:"high", name:"High energy", hint:"activated, keyed up", bars:3 },
+  { key:"mid",  name:"Steady",      hint:"present, not driven", bars:2 },
+  { key:"low",  name:"Low energy",  hint:"flat, slowed down",  bars:1 }
+];
+
+const MOOD = 4;                      // matches the screenshot
+const relevantCat = MOOD <= 4 ? "positive" : MOOD >= 6 ? "negative" : "neutral";
+
+/* #q=ho pre-fills Option E's search box, for static capture */
+const HASH_Q = (location.hash.match(/q=([^&]*)/) || [])[1];
+
+/* ── Per-frame state ───────────────────────────────────────── */
+const VARIANTS = ["D","E","F","G","H"];
+const state = {};
+VARIANTS.forEach(v => state[v] = {
+  sel: new Set(["Amused","Awe"]),
+  q: v === "E" && HASH_Q ? decodeURIComponent(HASH_Q) : "",
+  open: new Set([relevantCat])
+});
+
+/* ── Shared chrome ─────────────────────────────────────────── */
+function sheetHead() {
+  return `
+    <div class="sheet-head">
+      <div class="grabber"></div>
+      <div class="sheet-title-row">
+        <div class="sheet-title">Quick Entry</div><div class="sheet-x">&times;</div>
+      </div>
+      <div class="mood-row">
+        <div class="arrow">&lsaquo;</div>
+        <div class="mood-chip"><div class="mood-num">4</div><div class="mood-lab">Okay</div></div>
+        <div class="arrow">&rsaquo;</div>
+        <div class="last-entry">&#9634; LAST ENTRY</div>
+      </div>
+      <div class="dots"><div class="dot on"></div><div class="dot"></div></div>
+      <div class="step-q">What emotions are present?</div>
+    </div>`;
+}
+const foot = () => `<div class="sheet-foot">
+    <div class="btn-ghost">Cancel</div><div class="btn-go">Next &rsaquo;</div></div>`;
+
+function chip(v, name, extraCls) {
+  const s = state[v].sel;
+  const sel = s.has(name);
+  const blocked = !sel && s.size >= 3;
+  return `<div class="chip ${extraCls||""} ${CLS[catOf(name)]}${sel?" sel":""}${blocked?" blocked":""}"
+    data-pick="${esc(name)}" data-chip="1">${sel?'<div class="tickdot">&#10003;</div>':""}${esc(name)}</div>`;
+}
+
+function pickedStrip(v, showAdd) {
+  const s = [...state[v].sel];
+  return `<div class="selstrip">
+    <div class="lbl">Picked</div>
+    ${s.length
+      ? s.map(n => `<div class="selchip ${SELCLS[catOf(n)]}" data-pick="${esc(n)}">${esc(n)}<span class="x">&times;</span></div>`).join("")
+      : `<div class="empty">Pick up to 3</div>`}
+    ${showAdd ? `<div class="sec-add" style="margin-left:auto">+</div>` : ""}
+  </div>`;
+}
+const secRow = (label, n, right) => `<div class="sec-row">
+    <div class="sec-label">${label}</div>${n!=null?`<div class="sec-n">${n}</div>`:""}
+    <div class="sec-rule"></div>${right||""}</div>`;
+
+/* ── D — Your usual ────────────────────────────────────────── */
+function bodyD(v) {
+  const rest = ORDER.map(cat => `
+    <div style="margin-bottom:12px">
+      ${secRow(LABEL[cat], EMOTIONS[cat].length)}
+      <div class="grid" style="margin-top:8px">${EMOTIONS[cat].map(n => chip(v,n)).join("")}</div>
+    </div>`).join("");
+  return `
+    ${pickedStrip(v, true)}
+    <div class="usual-band">
+      <div class="usual-head">
+        <div class="t">&#9733; Your usual</div>
+        <div class="s">most logged, all time</div>
+      </div>
+      <div class="grid">${USUAL.map((n,i) =>
+        chip(v, n).replace("</div>", `<span class="rank">${i+1}</span></div>`)).join("")}</div>
+    </div>
+    <div style="height:6px"></div>
+    <div data-firstchip="1"></div>
+    ${rest}
+    <div style="height:16px"></div>`;
+}
+
+/* ── E — Search first ──────────────────────────────────────── */
+function resultsE(v) {
+  const q = state[v].q.trim().toLowerCase();
+  if (!q) {
+    return `
+      ${secRow("Recent", null)}
+      <div class="grid" style="margin:8px 0 12px">${USUAL.slice(0,5).map(n => chip(v,n)).join("")}</div>
+      ${ORDER.map(cat => `
+        ${secRow(LABEL[cat], EMOTIONS[cat].length)}
+        <div class="grid" style="margin:8px 0 12px">${EMOTIONS[cat].map(n => chip(v,n)).join("")}</div>`).join("")}`;
+  }
+  const hits = ALL.filter(n => n.toLowerCase().includes(q));
+  if (!hits.length) {
+    return `<div class="noresult">No emotion matches “${esc(state[v].q)}”.</div>
+      <div class="createchip">+ Add “${esc(state[v].q)}” as a new emotion</div>`;
+  }
+  // The create affordance appears only when nothing matches, or when the query
+  // is a complete word that is not already an emotion. Otherwise it is noise.
+  const exact = hits.some(n => n.toLowerCase() === q);
+  const offerCreate = !exact && q.length >= 4;
+  return `${secRow("Matches", hits.length)}
+    <div class="grid" style="margin:8px 0 12px">${hits.map(n => chip(v,n)).join("")}</div>
+    ${offerCreate ? `<div class="createchip">+ Add “${esc(state[v].q)}” as a new emotion</div>` : ""}`;
+}
+function bodyE(v) {
+  return `
+    <div class="searchwrap">
+      <div class="searchbox">
+        <span class="mag">&#9906;</span>
+        <input data-search="${v}" placeholder="Search 40 emotions" value="${esc(state[v].q)}" />
+        ${state[v].q ? `<span class="clr" data-clear="${v}">&times;</span>` : ""}
+      </div>
+    </div>
+    ${pickedStrip(v, false)}
+    <div data-firstchip="1"></div>
+    <div id="res-${v}">${resultsE(v)}</div>
+    <div style="height:16px"></div>`;
+}
+
+/* ── F — Mood-aware ────────────────────────────────────────── */
+function bodyF(v) {
+  const st = state[v];
+  const groups = [relevantCat, ...ORDER.filter(c => c !== relevantCat)];
+  const html = groups.map(cat => {
+    const picksHere = [...st.sel].filter(n => catOf(n) === cat);
+    // never hide a group that holds a pick
+    const forced = picksHere.length > 0;
+    const open = st.open.has(cat) || forced;
+    if (open) {
+      return `<div style="margin-bottom:12px">
+        ${secRow(LABEL[cat], EMOTIONS[cat].length,
+          cat !== relevantCat || forced ? `<div class="sec-add" data-collapse="${cat}" style="background:#1B2C21;color:#9EB894">&minus;</div>` : "")}
+        <div class="grid" style="margin-top:8px">${EMOTIONS[cat].map(n => chip(v,n)).join("")}</div>
+      </div>`;
+    }
+    return `<div class="fold-row fr-${SELCLS[cat]}" data-expand="${cat}">
+      <div class="nm">${LABEL[cat]}</div>
+      <div class="ct">${EMOTIONS[cat].length}</div>
+      <div class="chev">&rsaquo;</div>
+    </div>`;
+  }).join("");
+  return `
+    ${pickedStrip(v, true)}
+    <div class="relevant-note">You chose 4 (Okay), so Positive opens first. The others stay one tap away.</div>
+    <div data-firstchip="1"></div>
+    ${html}
+    <div style="height:16px"></div>`;
+}
+
+/* ── G — Complete grid ─────────────────────────────────────── */
+function bodyG(v) {
+  const cells = ORDER.flatMap(c => EMOTIONS[c]).map(n => {
+    const s = state[v].sel, sel = s.has(n), blocked = !sel && s.size >= 3;
+    return `<div class="cell ${CLS[catOf(n)]}${sel?" sel":""}${blocked?" blocked":""}"
+      data-pick="${esc(n)}" data-chip="1">${esc(n)}</div>`;
+  }).join("");
+  return `
+    ${pickedStrip(v, true)}
+    <div class="glegend">
+      <span><i class="swatch" style="background:#34703D"></i>Positive 15</span>
+      <span><i class="swatch" style="background:#D87561"></i>Negative 20</span>
+      <span><i class="swatch" style="background:#8A7AA0"></i>Neutral 5</span>
+      <span style="margin-left:auto">fixed positions</span>
+    </div>
+    <div data-firstchip="1"></div>
+    <div class="cellgrid">${cells}</div>
+    <div style="height:16px"></div>`;
+}
+
+/* ── H — Energy bands ──────────────────────────────────────── */
+function bodyH(v) {
+  const bands = BANDS.map(b => {
+    const list = ALL.filter(n => AROUSAL[n] === b.key);
+    return `<div class="band">
+      <div class="band-head">
+        <div class="band-meter">
+          ${[1,2,3].map(i => `<i class="${i <= b.bars ? "on":""}" style="height:${4+i*3}px"></i>`).join("")}
+        </div>
+        <div class="band-name">${b.name}</div>
+        <div class="band-n">${list.length}</div>
+        <div class="band-rule"></div>
+      </div>
+      <div class="grid tight">${list.map(n => chip(v,n,"xs")).join("")}</div>
+    </div>`;
+  }).join("");
+  return `
+    ${pickedStrip(v, true)}
+    <div class="relevant-note">Grouped by how activated the feeling is, then coloured by valence.</div>
+    <div data-firstchip="1"></div>
+    ${bands}
+    <div style="height:16px"></div>`;
+}
+
+const BODY = { D: bodyD, E: bodyE, F: bodyF, G: bodyG, H: bodyH };
+
+const META = [
+  { v:"D", title:"Your usual", sub:"A history-ranked shortcut row. Most entries reuse the same few emotions, so the common case needs no scrolling." },
+  { v:"E", title:"Search first", sub:"Type to filter all 40. No match becomes an inline create, which removes the separate add-emotion modal." },
+  { v:"F", title:"Mood-aware", sub:"You already chose 4. The matching category opens, the rest collapse to one tappable row each." },
+  { v:"G", title:"Complete grid", sub:"All 40 on one screen in fixed positions. Nothing to scroll, nothing to navigate, spatial memory over time." },
+  { v:"H", title:"Energy bands", sub:"Sorted by activation, not the alphabet. For when you know how charged you feel but not the word." }
+];
+
+document.getElementById("rail").innerHTML = META.map(m => `
+  <div class="col">
+    <div class="col-head">
+      <div class="col-tag">Option ${m.v}</div>
+      <div class="col-title">${m.title}</div>
+      <p class="col-sub">${m.sub}</p>
+    </div>
+    <div class="frame" data-v="${m.v}">
+      ${sheetHead()}
+      <div class="scrollArea">${BODY[m.v](m.v)}</div>
+      ${foot()}
+    </div>
+  </div>`).join("");
+
+/* ── Fold marker, pinned to the frame not the scroll content ─ */
+function placeFold(frame) {
+  const area = frame.querySelector(".scrollArea");
+  let f = frame.querySelector(".fold");
+  if (!f) { f = document.createElement("div"); f.className = "fold"; frame.appendChild(f); }
+  const fb = frame.getBoundingClientRect(), ab = area.getBoundingClientRect();
+  f.style.bottom = (fb.bottom - ab.bottom) + "px";
+}
+
+/* ── Re-render one frame, keeping scroll and caret ─────────── */
+function rerender(v) {
+  const frame = document.querySelector(`.frame[data-v="${v}"]`);
+  const area = frame.querySelector(".scrollArea");
+  const top = area.scrollTop;
+  const input = area.querySelector("input[data-search]");
+  const hadFocus = input && document.activeElement === input;
+  const caret = input ? input.selectionStart : 0;
+  area.innerHTML = BODY[v](v);
+  area.scrollTop = top;
+  if (hadFocus) {
+    const ni = area.querySelector("input[data-search]");
+    if (ni) { ni.focus(); try { ni.setSelectionRange(caret, caret); } catch (e) {} }
+  }
+  placeFold(frame);
+}
+
+function toggle(v, name) {
+  const s = state[v].sel;
+  if (s.has(name)) s.delete(name);
+  else if (s.size < 3) s.add(name);
+  else return;
+  rerender(v);
+}
+
+document.getElementById("rail").addEventListener("click", e => {
+  const frame = e.target.closest(".frame");
+  if (!frame) return;
+  const v = frame.dataset.v;
+  const pick = e.target.closest("[data-pick]");
+  if (pick) { toggle(v, pick.dataset.pick); return; }
+  const exp = e.target.closest("[data-expand]");
+  if (exp) { state[v].open.add(exp.dataset.expand); rerender(v); return; }
+  const col = e.target.closest("[data-collapse]");
+  if (col) { state[v].open.delete(col.dataset.collapse); rerender(v); return; }
+  const clr = e.target.closest("[data-clear]");
+  if (clr) { state[v].q = ""; rerender(v); return; }
+});
+
+document.getElementById("rail").addEventListener("input", e => {
+  const inp = e.target.closest("input[data-search]");
+  if (!inp) return;
+  const v = inp.dataset.search;
+  state[v].q = inp.value;
+  const res = document.getElementById("res-" + v);
+  if (res) res.innerHTML = resultsE(v);   // keeps the input alive and focused
+});
+
+/* ── Measure ───────────────────────────────────────────────── */
+function countVisible(area) {
+  const bottom = area.getBoundingClientRect().bottom + 0.5;
+  let n = 0;
+  area.querySelectorAll('[data-chip="1"]').forEach(c => {
+    if (c.getBoundingClientRect().bottom <= bottom) n++;
+  });
+  return n;
+}
+
+const measured = {};
+document.querySelectorAll(".frame").forEach(frame => {
+  placeFold(frame);
+  const area = frame.querySelector(".scrollArea");
+  measured[frame.dataset.v] = {
+    visible: countVisible(area),
+    unique: new Set([...area.querySelectorAll('[data-chip="1"]')]
+      .filter(c => c.getBoundingClientRect().bottom <= area.getBoundingClientRect().bottom + 0.5)
+      .map(c => c.dataset.pick)).size,
+    full: Math.round(area.scrollHeight)
+  };
+});
+
+/* F: how many are reachable after opening every group */
+const fAllOpen = (() => {
+  ORDER.forEach(c => state.F.open.add(c));
+  rerender("F");
+  const area = document.querySelector('.frame[data-v="F"] .scrollArea');
+  const n = countVisible(area);
+  state.F.open = new Set([relevantCat]);
+  rerender("F");
+  return n;
+})();
+
+/* Shortest unique prefix across the real 40 names */
+const prefix = (() => {
+  const lens = ALL.map(n => {
+    for (let k = 1; k <= n.length; k++) {
+      const p = n.slice(0, k).toLowerCase();
+      if (ALL.filter(o => o.toLowerCase().startsWith(p)).length === 1) return k;
+    }
+    return n.length;
+  });
+  const avg = lens.reduce((a, b) => a + b, 0) / lens.length;
+  const max = Math.max(...lens);
+  const worst = ALL.filter((n, i) => lens[i] === max);
+  return { avg, max, worst, one: lens.filter(l => l === 1).length, le3: lens.filter(l => l <= 3).length };
+})();
+
+document.getElementById("prefixStat").innerHTML =
+  `Typing beats scrolling here because the names barely collide. Across your 40 default emotions the
+   <b>average unique prefix is ${prefix.avg.toFixed(1)} characters</b>, and
+   <b>${prefix.le3} of 40 (${Math.round(prefix.le3/40*100)}%) are unique within 3 characters</b>.
+   ${prefix.one} need only a single letter. The worst case is ${prefix.max} characters
+   (${prefix.worst.join(", ")}). Substring matching, which Option E uses, is better still: typing
+   <code>anx</code>, <code>over</code> or <code>numb</code> lands on one result.`;
+
+const ROWS = [
+  { v:"D", find:"Recognition. Your top 8 sit above everything else, ranked by how often you logged them.",
+    worst:"Same as a plain dense list: scroll to the category.",
+    cost:'One <code>GROUP BY</code> on <code>mood_emotions</code>. No schema change.' },
+  { v:"E", find:"Recall. Type 2 to 3 characters and the list collapses to the match.",
+    worst:"Still 2 to 3 characters. Length of the list stops mattering.",
+    cost:"A <code>TextInput</code> and a filter. Removes the add-emotion modal." },
+  { v:"F", find:"Prediction. The category that fits mood 4 is already open.",
+    worst:'One tap to open the group, then it behaves like a dense list.',
+    cost:'Reuses <code>getDefaultEmotionCategory</code>, already in the file.' },
+  { v:"G", find:"Position. Every emotion has a fixed cell, so you learn where things are.",
+    worst:"None. Everything is on screen at all times.",
+    cost:"Layout only. Needs a fallback for large system text." },
+  { v:"H", find:"Structure. Pick the energy band first, then the word.",
+    worst:"Scroll to the third band.",
+    cost:'One static <code>arousal</code> value per emotion.' }
+];
+
+document.querySelector("#metrics tbody").innerHTML = ROWS.map(r => {
+  const m = measured[r.v];
+  const extra = r.v === "F"
+    ? ` <span class="warn">(${fAllOpen} with all groups open)</span>`
+    : r.v === "E" ? ` <span class="good">(any of 40 after ~3 keystrokes)</span>`
+    : r.v === "G" ? ` <span class="good">(all of them)</span>` : "";
+  return `<tr>
+    <td><b>${r.v} — ${META.find(x => x.v === r.v).title}</b></td>
+    <td class="num"><b>${m.visible}</b>${r.v==="G"?" of 40":""}${extra}</td>
+    <td>${r.find}</td>
+    <td>${r.worst}</td>
+    <td>${r.cost}</td>
+  </tr>`;
+}).join("");
+
+document.getElementById("cards").innerHTML = [
+  { t:"D — Your usual", li:[
+    "Mood tracking is repetitive. The same handful of emotions comes back most days, and today the app makes you hunt for them every time.",
+    "The ranking is real data, not a guess: <code>mood_emotions</code> already carries the reverse index needed for it.",
+    "It keeps the full list underneath, so nothing is taken away.",
+    "It is the only option that gets better the longer you use the app."]},
+  { t:"E — Search first", li:[
+    "40 items is past the point where scanning is fast, but far below the point where typing is slow.",
+    "It folds the add-emotion flow into the same box: no match becomes “Add …”, so one control does both jobs.",
+    "It is the only option where list length stops mattering, which matters as your custom emotions grow.",
+    "Cost: the keyboard eats the lower half, so the results area must shrink rather than scroll under it."]},
+  { t:"F — Mood-aware", li:[
+    "The app already knows you picked 4. Nothing currently uses that on this step.",
+    "It removes a scroll for the common case without adding a control to learn.",
+    "Guard rail: a group holding one of your picks can never collapse, so a selection can never hide.",
+    "Honest weakness: feeling low at a good mood rating is exactly when the guess is wrong."]},
+  { t:"G — Complete grid", li:[
+    "The only layout where the answer to “where is Tired” never changes. That is worth a lot after a month.",
+    "No scrolling, no tabs, no typing, no prediction. It is the simplest model of the five.",
+    "Cost is legibility: 11.5 px labels and truncation on the longest names.",
+    "<b>It only holds while the list stays near 40.</b> Your own screenshot shows Calm, Optimistic and " +
+    "Dissatisfied, which are custom additions, so your list is already larger than the default. " +
+    "Every custom emotion pushes this design closer to scrolling, which is the one thing it promises to remove.",
+    "It also fails on large system text, so it needs a documented fallback."]},
+  { t:"H — Energy bands", li:[
+    "The alphabet is meaningless here. Energy is not, and the app already asks for energy on the next step.",
+    "It helps most in the case the other four ignore: you feel something and cannot name it.",
+    "It fits the psychometric intent already in <code>domain/entrySettings.ts</code>.",
+    "Cost: one new static field, plus a rule for where custom emotions land."]}
+].map(c => `<div class="card"><h3>${c.t}</h3><ul>${c.li.map(x => `<li>${x}</li>`).join("")}</ul></div>`).join("");
+
+window.addEventListener("resize", () => document.querySelectorAll(".frame").forEach(placeFold));
+</script>
+</body>
+</html>

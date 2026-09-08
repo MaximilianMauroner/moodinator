@@ -5,6 +5,11 @@ import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeIn, FadeInUp, FadeOut, SlideOutDown } from "react-native-reanimated";
 import type { Emotion } from "@db/types";
 import { haptics } from "@/lib/haptics";
+import {
+  EMOTION_ENERGY_BAND_LABELS,
+  EMOTION_ENERGY_BAND_ORDER,
+  type EmotionEnergyBand,
+} from "@/lib/entrySettings";
 import { CATEGORIES, CATEGORY_CONFIG } from "./emotionSettingsConfig";
 import { styles } from "./emotionSettingsStyles";
 import { colors } from "@/constants/colors";
@@ -16,11 +21,17 @@ interface EmotionModalProps {
   editingEmotion: {
     name: string;
     category: Emotion["category"];
+    energy: EmotionEnergyBand;
     isNew: boolean;
   } | null;
   isDark: boolean;
   onClose: () => void;
-  onSave: (name: string, category: Emotion["category"], originalName?: string) => void;
+  onSave: (
+    name: string,
+    category: Emotion["category"],
+    energy: EmotionEnergyBand,
+    originalName?: string
+  ) => void;
 }
 
 interface RemoveEmotionDialogProps {
@@ -49,6 +60,7 @@ function EmotionModal({
 }: EmotionModalProps) {
   const [name, setName] = useState("");
   const [category, setCategory] = useState<Emotion["category"]>("positive");
+  const [energy, setEnergy] = useState<EmotionEnergyBand>("neutral");
   const inputRef = useRef<TextInput>(null);
   const scrollViewRef = useRef<ScrollView>(null);
   const focusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -59,8 +71,10 @@ function EmotionModal({
     if (visible && editingEmotion) {
       setName(editingEmotion.name);
       setCategory(editingEmotion.category);
+      setEnergy(editingEmotion.energy);
     } else if (!visible) {
       setName("");
+      setEnergy("neutral");
     }
   }, [visible, editingEmotion]);
 
@@ -104,6 +118,7 @@ function EmotionModal({
     onSave(
       name,
       category,
+      energy,
       editingEmotion?.isNew ? undefined : editingEmotion?.name
     );
     setName("");
@@ -236,6 +251,87 @@ function EmotionModal({
                   </Pressable>
                 );
               })}
+            </View>
+
+            {/* Energy Selector */}
+            <View style={styles.modalEnergySection}>
+              <Text
+                style={[
+                  styles.modalEnergyTitle,
+                  { color: isDark ? "#F0EDE6" : "#3D352A" },
+                ]}
+              >
+                Energy
+              </Text>
+              <Text
+                style={[
+                  styles.modalEnergyHint,
+                  {
+                    color: isDark
+                      ? colors.textMuted.dark
+                      : colors.textMuted.light,
+                  },
+                ]}
+              >
+                How activated or calm this emotion feels. New emotions start neutral.
+              </Text>
+              <View style={styles.modalEnergyRow}>
+                {EMOTION_ENERGY_BAND_ORDER.map((band) => {
+                  const isSelected = band === energy;
+                  const color = isDark
+                    ? colors.sand.text.dark
+                    : colors.sand.text.light;
+
+                  return (
+                    <Pressable
+                      key={band}
+                      onPress={() => {
+                        if (isSelected) return;
+                        haptics.tick();
+                        setEnergy(band);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${EMOTION_ENERGY_BAND_LABELS[band]} emotion energy`}
+                      accessibilityState={{ selected: isSelected }}
+                      style={[
+                        styles.modalEnergyPill,
+                        {
+                          backgroundColor: isSelected
+                            ? isDark
+                              ? colors.sand.bgSelected.dark
+                              : colors.sand.bgSelected.light
+                            : isDark
+                              ? "rgba(255,255,255,0.04)"
+                              : "rgba(0,0,0,0.025)",
+                          borderColor: isSelected
+                            ? color
+                            : isDark
+                              ? "rgba(255,255,255,0.12)"
+                              : "rgba(0,0,0,0.08)",
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.modalEnergyText,
+                          {
+                            color: isSelected
+                              ? isDark
+                                ? "#08150F"
+                                : "#FFFFFF"
+                              : isDark
+                                ? colors.textMuted.dark
+                                : colors.textMuted.light,
+                            fontWeight: isSelected ? "700" : "500",
+                          },
+                        ]}
+                      >
+                        {EMOTION_ENERGY_BAND_LABELS[band]}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
             </View>
 
             {/* Input */}

@@ -15,8 +15,8 @@ interface DeletedMoodToastProps {
 interface MoodChangeToastProps {
   entry: MoodEntry;
   title: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  iconColor: string;
+  icon?: keyof typeof Ionicons.glyphMap;
+  iconColor?: string;
   action?: {
     label: string;
     accessibilityLabel: string;
@@ -49,11 +49,6 @@ function MoodChangeToast({
     [entry.timestamp]
   );
 
-  const moodLabel = mood.label;
-  const moodChipBg = mood.backgroundHex;
-  const moodChipText = mood.colorHex;
-  const moodChipBorder = isDark ? get("borderSubtle") : mood.borderColor;
-
   return (
     <View style={styles.frame}>
       <View
@@ -61,7 +56,7 @@ function MoodChangeToast({
           styles.card,
           isDark ? styles.shadowDark : styles.shadowLight,
           {
-            backgroundColor: get("surface"),
+            backgroundColor: get("surfaceElevated"),
             borderColor: get("border"),
           },
         ]}
@@ -69,9 +64,8 @@ function MoodChangeToast({
         <View style={styles.content}>
           <View style={styles.copy}>
             <View style={styles.titleRow}>
-              <Ionicons name={icon} size={15} color={iconColor} />
+              {icon && <Ionicons name={icon} size={16} color={iconColor} />}
               <Text
-                numberOfLines={1}
                 style={[
                   typography.bodyMd,
                   styles.title,
@@ -82,50 +76,29 @@ function MoodChangeToast({
               </Text>
             </View>
 
-            <View style={styles.metaRow}>
-              <View
-                style={[
-                  styles.moodChip,
-                  {
-                    backgroundColor: moodChipBg,
-                    borderColor: moodChipBorder,
-                  },
-                ]}
-              >
-                <Text
-                  numberOfLines={1}
-                  style={[
-                    typography.bodySm,
-                    styles.moodChipText,
-                    { color: moodChipText, fontFamily: fontFamilies.bodyMedium },
-                  ]}
-                >
-                  {moodLabel}
-                </Text>
-              </View>
+            {action && (
               <Text
-                numberOfLines={1}
                 style={[
                   typography.bodySm,
-                  styles.timestamp,
+                  styles.identity,
                   { color: get("textMuted") },
                 ]}
               >
-                {timestampLabel}
+                {mood.label} · {timestampLabel}
               </Text>
-            </View>
+            )}
           </View>
 
           {action ? (
             <Pressable
               onPress={action.onPress}
-              style={({ pressed }) => [
+              className="active:opacity-80"
+              style={[
                 styles.undoButton,
                 {
-                  backgroundColor: get("primaryBg"),
+                  backgroundColor: get("primaryBgHover"),
                   borderColor: isDark ? "#4A6653" : "#D1DFD1",
                 },
-                pressed ? styles.undoButtonPressed : null,
               ]}
               accessibilityRole="button"
               accessibilityLabel={action.accessibilityLabel}
@@ -151,14 +124,10 @@ function MoodChangeToast({
 }
 
 export function DeletedMoodToast({ entry, onUndo }: DeletedMoodToastProps) {
-  const { isDark } = useThemeColors();
-
   return (
     <MoodChangeToast
       entry={entry}
       title="Entry removed"
-      icon="heart"
-      iconColor={isDark ? "#F5A899" : "#E06B55"}
       action={{
         label: "Undo",
         accessibilityLabel: "Undo delete",
@@ -184,19 +153,18 @@ export function RestoredMoodToast({ entry }: { entry: MoodEntry }) {
 const styles = StyleSheet.create({
   frame: {
     width: "100%",
-    paddingHorizontal: 16,
   },
   card: {
     overflow: "hidden",
     borderWidth: 1,
-    borderRadius: 18,
+    borderRadius: 12,
   },
   content: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 12,
   },
   copy: {
     flex: 1,
@@ -212,44 +180,21 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 20,
     fontWeight: "600",
-  },
-  metaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    minWidth: 0,
-  },
-  moodChip: {
-    alignSelf: "flex-start",
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 1,
-    maxWidth: 112,
     flexShrink: 1,
   },
-  moodChipText: {
+  identity: {
     fontSize: 12,
-    lineHeight: 16,
-    fontWeight: "600",
-  },
-  timestamp: {
-    fontSize: 12,
-    lineHeight: 16,
-    flexShrink: 1,
+    lineHeight: 18,
   },
   undoButton: {
     minWidth: 54,
-    minHeight: 44,
+    minHeight: 48,
     paddingHorizontal: 10,
-    borderRadius: 14,
+    borderRadius: 10,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
-  },
-  undoButtonPressed: {
-    opacity: 0.82,
   },
   undoLabel: {
     fontSize: 13,

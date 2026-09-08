@@ -19,8 +19,8 @@ describe("parseEmotionList", () => {
 
   test("parses legacy string arrays and resolves categories from defaults", () => {
     expect(parseEmotionList(["Happy", "mystery"])).toEqual([
-      { name: "Happy", category: "positive" },
-      { name: "mystery", category: "neutral" },
+      { name: "Happy", category: "positive", energy: "neutral" },
+      { name: "mystery", category: "neutral", energy: "neutral" },
     ]);
   });
 
@@ -34,10 +34,16 @@ describe("parseEmotionList", () => {
         42,
       ])
     ).toEqual([
-      { name: "Lonely", category: "negative" },
-      { name: "Relaxed", category: "positive" },
-      { name: "Custom", category: "neutral" },
+      { name: "Lonely", category: "negative", energy: "low" },
+      { name: "Relaxed", category: "positive", energy: "low" },
+      { name: "Custom", category: "neutral", energy: "neutral" },
     ]);
+  });
+
+  test("preserves an explicitly configured energy band", () => {
+    expect(
+      parseEmotionList([{ name: "Calm", category: "positive", energy: "high" }])
+    ).toEqual([{ name: "Calm", category: "positive", energy: "high" }]);
   });
 });
 

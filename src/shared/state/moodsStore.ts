@@ -13,16 +13,9 @@ export type MoodsStore = {
   error: string | null;
   lastLoadedAt: number | null;
   isStale: boolean;
-  lastTracked: Date | null;
-
-  // Pagination state
-  totalCount: number;
-  hasMore: boolean;
-  currentOffset: number;
 
   // Actions
   loadAll: () => Promise<void>;
-  loadMore: (pageSize?: number) => Promise<void>;
   refreshMoods: () => Promise<void>;
   invalidate: () => void;
   ensureFresh: () => Promise<void>;
@@ -35,31 +28,7 @@ export type MoodsStore = {
   restore: (entry: MoodEntryInput) => Promise<MoodEntry>;
   updateTimestamp: (id: number, timestamp: number) => Promise<MoodEntry | null>;
   setLocal: (moods: MoodEntry[]) => void;
-
-  // Selectors
-  getMoodById: (id: number) => MoodEntry | undefined;
-  getMoodCount: () => number;
 };
-
-/**
- * Compute lastTracked date from moods
- */
-function computeLastTracked(moods: MoodEntry[]): Date | null {
-  if (moods.length === 0) return null;
-  return new Date(moods.reduce((latest, mood) => Math.max(latest, mood.timestamp), -Infinity));
-}
-
-const DEFAULT_PAGE_SIZE = 50;
-
-function applyCollectionState(moods: MoodEntry[]) {
-  return {
-    moods,
-    lastTracked: computeLastTracked(moods),
-    totalCount: moods.length,
-    hasMore: false,
-    currentOffset: moods.length,
-  };
-}
 
 let activeHydrationPromise: Promise<void> | null = null;
 
@@ -104,7 +73,7 @@ export const useMoodsStore = create<MoodsStore>((set, get) => {
           error: null,
           lastLoadedAt: Date.now(),
           isStale: false,
-          ...applyCollectionState(moods),
+          moods,
         });
       } catch (error) {
         if (nextStatus === "loading") {
@@ -135,7 +104,7 @@ export const useMoodsStore = create<MoodsStore>((set, get) => {
     applyMutation: (moods) => {
       collectionRevision += 1;
       set((state) => ({
-        ...applyCollectionState(moods),
+        moods,
         isStale: state.isStale || activeHydrationPromise !== null,
       }));
       if (get().isStale && !activeHydrationPromise) {
@@ -150,10 +119,6 @@ export const useMoodsStore = create<MoodsStore>((set, get) => {
     error: null,
     lastLoadedAt: null,
     isStale: true,
-    lastTracked: null,
-    totalCount: 0,
-    hasMore: false,
-    currentOffset: 0,
 
     setLocal: (moods) => {
       collectionRevision += 1;
@@ -161,38 +126,11 @@ export const useMoodsStore = create<MoodsStore>((set, get) => {
         status: "idle",
         error: null,
         isStale: false,
-        ...applyCollectionState(moods),
+        moods,
       });
     },
 
     loadAll: () => hydrateAll("loading", { clearError: true }),
-
-    loadMore: async (pageSize = DEFAULT_PAGE_SIZE) => {
-      const { status, currentOffset, hasMore } = get();
-      if (status === "loading" || !hasMore) return;
-
-      set({ status: "loading" });
-      try {
-        const result = await moodService.getPaginated({
-          limit: pageSize,
-          offset: currentOffset,
-        });
-        set((state) => ({
-          moods: [...state.moods, ...result.data],
-          status: "idle",
-          error: null,
-          totalCount: result.total,
-          hasMore: result.hasMore,
-          currentOffset: state.currentOffset + result.data.length,
-        }));
-      } catch (error) {
-        console.error("[moodsStore] Failed to load more moods:", error);
-        set({
-          status: "idle",
-          error: error instanceof Error ? error.message : "Failed to load more moods",
-        });
-      }
-    },
 
     refreshMoods: () => hydrateAll("refreshing"),
 
@@ -234,9 +172,5 @@ export const useMoodsStore = create<MoodsStore>((set, get) => {
     restore: async (entry) => {
       return workflow.restore(entry);
     },
-
-    // Selectors
-    getMoodById: (id) => get().moods.find((m) => m.id === id),
-    getMoodCount: () => get().moods.length,
   };
 });
