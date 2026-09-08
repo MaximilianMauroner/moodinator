@@ -89,3 +89,39 @@ these conditions the same when comparing runs.
 
 Do not report a performance improvement without comparable captures. The
 prepared smoke flow is a functional check and does not measure frame rate.
+
+## Insights, filters and recorded dates
+
+Use fabricated entries with known ratings. Seed five entries tagged Outside at mood
+2 and five untagged entries at mood 6 inside the selected range. Findings should
+say Outside entries average 4.0 better, with 5 with and 5 without. Removing one
+tagged entry must remove that comparison and identify the sample shortfall.
+Charts must show the same driver numbers. Check 7, 30, 90 and All ranges, including
+empty periods and isolated days. Missing dates must leave gaps in the trend; an
+isolated day with multiple ratings must still show its min/max range.
+
+On a narrow device and with large text, verify Findings/Charts/Calendar and all
+four ranges remain reachable without overlapping labels. Check both themes and
+reduced motion; capture 30 idle seconds on Charts after transitions settle.
+
+On Home, open Filter history and apply note text, mood 7 or worse, an emotion,
+a context and a date range separately, then combine them. Verify empty results,
+Clear filters and a failed refresh after deleting a filtered row. Scroll past two
+50-entry pages, refresh, then edit/delete/undo: no duplicate or skipped rows.
+Home's streak and the Insights history total must ignore Home's filters.
+
+For timezone checks, create an entry near midnight, note its calendar date and
+rhythm time slot, change the QA device timezone, and reopen the same period.
+The recorded date/time slot must stay the same. Export/import the fixture and
+repeat. Legacy fixtures with no recorded offset intentionally use the current
+device timezone. Note-only edits and undo preserve the original offset; changing
+the timestamp records the offset for the selected time.
+
+Android encryption and notification quick-log delivery require their separately
+tracked migration rehearsal and physical-device spike. Emulator success does not
+establish terminated-process notification behavior on a physical device.
+
+The smoke also opens Findings, Charts and Calendar with its one-entry fixture,
+checks the insufficient-sample message and the empty driver comparison, and
+returns to Findings. It does not establish populated chart correctness or
+large-history performance; use the fabricated comparisons above for those.

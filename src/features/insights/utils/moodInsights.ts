@@ -1,4 +1,5 @@
 import {
+  format,
   addMonths,
   addWeeks,
   endOfMonth,
@@ -8,6 +9,7 @@ import {
   subMonths,
   subWeeks,
 } from "date-fns";
+import { getEntryLocalDayKey } from "@/lib/entryTimezone";
 import type { MoodEntry } from "@db/types";
 import type { TimePeriod } from "../components/TimePeriodSelector";
 import { calculatePeriodStats, type PeriodStats } from "./periodStats";
@@ -21,7 +23,7 @@ export type MoodInsightsResult = {
 export function getMoodsInPeriod(
   moods: MoodEntry[],
   period: TimePeriod,
-  date: Date
+  date: Date,
 ): MoodEntry[] {
   if (period === "all") return moods;
 
@@ -39,8 +41,10 @@ export function getMoodsInPeriod(
   }
 
   return moods.filter((mood) => {
-    const moodDate = new Date(mood.timestamp);
-    return moodDate >= start && moodDate <= end;
+    const day = getEntryLocalDayKey(mood);
+    return (
+      day >= format(start, "yyyy-MM-dd") && day <= format(end, "yyyy-MM-dd")
+    );
   });
 }
 
@@ -67,7 +71,7 @@ export function getNextPeriodDate(period: TimePeriod, date: Date): Date {
 export function buildMoodInsights(
   allMoods: MoodEntry[],
   period: TimePeriod,
-  currentDate: Date
+  currentDate: Date,
 ): MoodInsightsResult {
   const periodMoods = getMoodsInPeriod(allMoods, period, currentDate);
   const previousPeriodMoods =
@@ -76,7 +80,7 @@ export function buildMoodInsights(
       : getMoodsInPeriod(
           allMoods,
           period,
-          getPreviousPeriodDate(period, currentDate)
+          getPreviousPeriodDate(period, currentDate),
         );
 
   return {

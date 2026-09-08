@@ -13,6 +13,10 @@ import { format } from "date-fns";
 import Animated, { FadeInUp } from "react-native-reanimated";
 import type { MoodEntry, MoodScaleSnapshot } from "@db/types";
 import { getEnergySegmentColor } from "@/constants/colors";
+import {
+  getEntryLocalDayKey,
+  getEntryLocalTimeLabel,
+} from "@/lib/entryTimezone";
 import { motion } from "@/constants/motion";
 import { getInterpretedMoodRating } from "@/constants/moodScaleInterpretation";
 
@@ -104,7 +108,10 @@ export function EntryDetailModal({
             <View className="flex-row items-center">
               <View
                 className="w-16 h-16 rounded-2xl items-center justify-center mr-4"
-                style={{ backgroundColor: getMoodColor(entry.mood, entry.moodScale) + "20" }}
+                style={{
+                  backgroundColor:
+                    getMoodColor(entry.mood, entry.moodScale) + "20",
+                }}
               >
                 <Text
                   className="text-3xl font-bold"
@@ -124,13 +131,16 @@ export function EntryDetailModal({
                   className="text-sm mt-1"
                   style={{ color: isDark ? "#BDA77D" : "#9D8660" }}
                 >
-                  {format(new Date(entry.timestamp), "EEEE, MMMM d, yyyy")}
+                  {format(
+                    new Date(`${getEntryLocalDayKey(entry)}T12:00:00`),
+                    "EEEE, MMMM d, yyyy",
+                  )}
                 </Text>
                 <Text
                   className="text-sm"
                   style={{ color: isDark ? "#BDA77D" : "#9D8660" }}
                 >
-                  {format(new Date(entry.timestamp), "h:mm a")}
+                  {getEntryLocalTimeLabel(entry)}
                 </Text>
               </View>
             </View>
@@ -177,7 +187,10 @@ export function EntryDetailModal({
                     className="h-3 rounded-full"
                     style={{
                       width: `${(entry.energy! / 10) * 100}%`,
-                      backgroundColor: getEnergySegmentColor(entry.energy!, isDark),
+                      backgroundColor: getEnergySegmentColor(
+                        entry.energy!,
+                        isDark,
+                      ),
                     }}
                   />
                 </View>
@@ -226,11 +239,21 @@ export function EntryDetailModal({
               <View className="flex-row flex-wrap gap-2">
                 {entry.emotions.map((emotion, index) => {
                   const categoryColors = {
-                    positive: { bg: isDark ? "#2D3D2D" : "#E8EFE8", text: isDark ? "#A8C5A8" : "#5B8A5B" },
-                    negative: { bg: isDark ? "#3C1A14" : "#F5E8E8", text: isDark ? "#C5A8A8" : "#8A5B5B" },
-                    neutral: { bg: isDark ? "#2D2D3D" : "#E8E8F5", text: isDark ? "#A8A8C5" : "#5B5B8A" },
+                    positive: {
+                      bg: isDark ? "#2D3D2D" : "#E8EFE8",
+                      text: isDark ? "#A8C5A8" : "#5B8A5B",
+                    },
+                    negative: {
+                      bg: isDark ? "#3C1A14" : "#F5E8E8",
+                      text: isDark ? "#C5A8A8" : "#8A5B5B",
+                    },
+                    neutral: {
+                      bg: isDark ? "#2D2D3D" : "#E8E8F5",
+                      text: isDark ? "#A8A8C5" : "#5B5B8A",
+                    },
                   };
-                  const colors = categoryColors[emotion.category] || categoryColors.neutral;
+                  const colors =
+                    categoryColors[emotion.category] || categoryColors.neutral;
                   return (
                     <View
                       key={index}

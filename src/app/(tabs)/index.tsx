@@ -48,6 +48,7 @@ import {
   UNIFIED_COMPACT_EXPANDED_HEIGHT,
 } from "@/components/home";
 
+import { HistoryFilterSheet } from "@/features/history/HistoryFilterSheet";
 import { useMoodsStore } from "@/shared/state/moodsStore";
 import { useEntrySettings } from "@/hooks/useEntrySettings";
 import { useMoodModals } from "@/hooks/useMoodModals";
@@ -94,6 +95,11 @@ function HomeScreenContent() {
   const isDark = colorScheme === "dark";
   const insets = useSafeAreaInsets();
 
+  const filters = useMoodsStore((state) => state.filters);
+  const clearFilters = useMoodsStore((state) => state.clearFilters);
+  const total = useMoodsStore((state) => state.total);
+  const loadMore = useMoodsStore((state) => state.loadMore);
+  const loadingMore = useMoodsStore((state) => state.loadingMore);
   const moods = useMoodsStore((state) => state.moods);
   const status = useMoodsStore((state) => state.status);
   const error = useMoodsStore((state) => state.error);
@@ -552,6 +558,8 @@ function HomeScreenContent() {
             void loadAll();
           }}
         />
+      ) : Object.keys(filters).length ? (
+        <EmptyState icon="search-outline" tone="sage" title="No matching entries" description="Try changing or clearing your filters." actionLabel="Clear filters" onAction={() => { void clearFilters(); }} />
       ) : (
         <EmptyState
           icon="leaf-outline"
@@ -560,7 +568,7 @@ function HomeScreenContent() {
           description="Tap a mood above to log how you're feeling right now"
         />
       ),
-    [error, loadAll, loading, status]
+    [clearFilters, error, filters, loadAll, loading, status]
   );
 
   const listContentContainerStyle = useMemo(
@@ -612,6 +620,11 @@ function HomeScreenContent() {
               // a working native scroll ref.
               renderScrollComponent={RNScrollView}
               data={moods}
+              onEndReached={() => { void loadMore(); }}
+              onEndReachedThreshold={0.4}
+              ListFooterComponent={loadingMore ? <LoadingSpinner message="Loading more..." /> : error && moods.length > 0 ? (
+                <EmptyState icon="warning-outline" tone="coral" title="History could not load" description={error} actionLabel="Try again" onAction={() => { void refreshMoods(); }} />
+              ) : null}
               keyExtractor={keyExtractor}
               renderItem={renderMoodItem}
               ListEmptyComponent={listEmptyComponent}
@@ -707,11 +720,14 @@ function HomeScreenContent() {
               </Animated.View>
 
               <View
-                pointerEvents="none"
+                pointerEvents="auto"
                 onLayout={handleHistoryChromeLayout}
                 style={{ paddingTop: HEADER_SECTION_GAP }}
               >
-                <HistoryListHeader moodCount={moods.length} />
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-1"><HistoryListHeader moodCount={total} /></View>
+                  <HistoryFilterSheet />
+                </View>
               </View>
             </Animated.View>
 

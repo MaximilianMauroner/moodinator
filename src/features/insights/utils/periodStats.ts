@@ -1,4 +1,4 @@
-import { format } from "date-fns";
+import { getEntryLocalWeekday } from "@/lib/entryTimezone";
 import type { MoodEntry } from "@db/types";
 import {
   getMoodTrendDirection,
@@ -21,7 +21,7 @@ export interface PeriodStats {
 
 export function calculatePeriodStats(
   currentMoods: MoodEntry[],
-  previousMoods: MoodEntry[]
+  previousMoods: MoodEntry[],
 ): PeriodStats {
   const entryCount = currentMoods.length;
   const neutralMoodRating = getNeutralMoodRating();
@@ -40,15 +40,18 @@ export function calculatePeriodStats(
   }
 
   const interpretedCurrentMoods = currentMoods.map((mood) =>
-    getInterpretedMoodRating(mood)
+    getInterpretedMoodRating(mood),
   );
-  const totalMood = interpretedCurrentMoods.reduce((sum, mood) => sum + mood, 0);
+  const totalMood = interpretedCurrentMoods.reduce(
+    (sum, mood) => sum + mood,
+    0,
+  );
   const averageMood = totalMood / entryCount;
 
   let moodChange = 0;
   if (previousMoods.length > 0) {
     const interpretedPreviousMoods = previousMoods.map((mood) =>
-      getInterpretedMoodRating(mood)
+      getInterpretedMoodRating(mood),
     );
     const previousAverage =
       interpretedPreviousMoods.reduce((sum, mood) => sum + mood, 0) /
@@ -58,7 +61,15 @@ export function calculatePeriodStats(
 
   const moodsByDay: Record<string, { total: number; count: number }> = {};
   currentMoods.forEach((mood) => {
-    const dayKey = format(new Date(mood.timestamp), "EEEE");
+    const dayKey = [
+      "Sunday",
+      "Monday",
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday",
+      "Saturday",
+    ][getEntryLocalWeekday(mood)];
     if (!moodsByDay[dayKey]) {
       moodsByDay[dayKey] = { total: 0, count: 0 };
     }
@@ -78,11 +89,11 @@ export function calculatePeriodStats(
 
   const mostCommonMood = Object.entries(moodCounts).sort(
     (a, b) =>
-      b[1] - a[1] || sortMoodRatingsBestFirst(Number(a[0]), Number(b[0]))
+      b[1] - a[1] || sortMoodRatingsBestFirst(Number(a[0]), Number(b[0])),
   )[0]?.[0];
 
   const moodsWithEnergy = currentMoods.filter(
-    (mood) => mood.energy !== undefined && mood.energy !== null
+    (mood) => mood.energy !== undefined && mood.energy !== null,
   );
   const energyAvg =
     moodsWithEnergy.length > 0

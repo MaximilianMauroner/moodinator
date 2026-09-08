@@ -86,3 +86,4 @@ name: Isolated Android entry lifecycle
 - assertVisible: "Your history · 1 entry"
 - tapOn: "Refresh insights"
 - assertVisible: "Your history · 1 entry"
+- runFlow: flows/insights.yaml

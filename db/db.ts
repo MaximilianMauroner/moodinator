@@ -4,6 +4,7 @@ export {
   deleteMood,
   getAllMoods,
   getMoodCount,
+  getMoodHistorySummary,
   getMoodsWithinRange,
   getMoodsInRange,
   getMoodsByMonth,
@@ -19,6 +20,7 @@ export {
   updateMoodNote,
   updateMoodTimestamp,
   type PaginationOptions,
+  type MoodHistoryFilters,
   type PaginatedResult,
 } from "./moods/repository";
 export {

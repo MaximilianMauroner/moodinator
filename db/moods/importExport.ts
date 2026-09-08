@@ -4,6 +4,7 @@ import { getMoodsWithinRange } from "./repository";
 import type { MoodDateRange } from "./range";
 import {
   sanitizeEnergy,
+  sanitizeUtcOffset,
   sanitizeImportedArray,
   sanitizeImportedEmotions,
   sanitizeImportedMoodScale,
@@ -27,6 +28,7 @@ type NormalizedImportedMood = {
   mood: number;
   note: string | null;
   timestamp: number;
+  utcOffsetMinutes: number | null;
   emotions: Emotion[];
   contextTags: string[];
   energy: number | null;
@@ -84,6 +86,7 @@ function normalizeReplacementImportEntries(parsed: unknown[]): {
       mood: moodValue,
       note,
       timestamp: sanitizeTimestamp(rawMood.timestamp),
+      utcOffsetMinutes: sanitizeUtcOffset(rawMood.utcOffsetMinutes),
       emotions: sanitizeImportedEmotions(rawMood.emotions),
       contextTags: sanitizeImportedArray(contextSource),
       energy: sanitizeEnergy(rawMood.energy),
@@ -105,6 +108,7 @@ export async function exportMoods(range?: MoodDateRange): Promise<string> {
   return JSON.stringify(
     moods.map((entry) => ({
       timestamp: entry.timestamp,
+      utcOffsetMinutes: entry.utcOffsetMinutes ?? null,
       mood: entry.mood,
       emotions: entry.emotions,
       context: entry.contextTags,
@@ -168,7 +172,7 @@ export async function importMoods(jsonData: string): Promise<ImportResult> {
 
     for (const entry of entries) {
       const dbResult = await db.runAsync(
-        "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy, mood_scale_json, photos_json, location_json, voice_memos_json, based_on_entry_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
+        "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy, mood_scale_json, utc_offset_minutes, based_on_entry_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);",
         entry.mood,
         entry.note,
         entry.timestamp,
@@ -176,9 +180,7 @@ export async function importMoods(jsonData: string): Promise<ImportResult> {
         serializeArray(entry.contextTags),
         entry.energy,
         serializeMoodScale(entry.moodScale),
-        "[]",
-        null,
-        "[]",
+        entry.utcOffsetMinutes,
         entry.basedOnEntryId
       );
 
@@ -244,7 +246,7 @@ export async function importOldBackup(jsonData: string): Promise<ImportResult> {
       const moodScale = sanitizeImportedMoodScale(mood?.moodScale);
 
       const dbResult = await db.runAsync(
-        "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy, mood_scale_json, photos_json, location_json, voice_memos_json, based_on_entry_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
+        "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy, mood_scale_json, utc_offset_minutes, based_on_entry_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);",
         moodValue,
         note,
         timestamp,
@@ -252,9 +254,7 @@ export async function importOldBackup(jsonData: string): Promise<ImportResult> {
         serializeArray(contextTags),
         energy,
         serializeMoodScale(moodScale),
-        "[]",
-        null,
-        "[]",
+        sanitizeUtcOffset(mood.utcOffsetMinutes),
         basedOnEntryId
       );
 

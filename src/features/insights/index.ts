@@ -17,4 +17,5 @@ export { calculateStreak } from "./utils/streaks";
 // Types
 export type { TimePeriod } from "./components/TimePeriodSelector";
 export type { TrendDirection } from "./components/TrendIndicator";
-export type { InsightsData, PeriodStats } from "./hooks/useInsightsData";
+export type { InsightsData } from "./hooks/useInsightsData";
+export type { PeriodStats } from "./utils/periodStats";
