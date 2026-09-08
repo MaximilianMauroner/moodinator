@@ -142,9 +142,6 @@ describe("toMoodEntry", () => {
       context_tags: '["work"]',
       energy: 8,
       mood_scale_json: null,
-      photos_json: null,
-      location_json: null,
-      voice_memos_json: null,
       based_on_entry_id: null,
     };
 
@@ -165,6 +162,7 @@ describe("toMoodEntry", () => {
         lowerIsBetter: true,
       },
       basedOnEntryId: null,
+      utcOffsetMinutes: null,
     });
   });
 
@@ -178,9 +176,6 @@ describe("toMoodEntry", () => {
       context_tags: "[]",
       energy: null,
       mood_scale_json: null,
-      photos_json: null,
-      location_json: null,
-      voice_memos_json: null,
       based_on_entry_id: null,
     };
 
@@ -198,9 +193,6 @@ describe("toMoodEntry", () => {
       context_tags: "[]",
       energy: null,
       mood_scale_json: null,
-      photos_json: null,
-      location_json: null,
-      voice_memos_json: null,
       based_on_entry_id: null,
     };
 
@@ -218,9 +210,6 @@ describe("toMoodEntry", () => {
       context_tags: "[]",
       energy: null,
       mood_scale_json: null,
-      photos_json: null,
-      location_json: null,
-      voice_memos_json: null,
       based_on_entry_id: null,
     };
 
@@ -238,9 +227,6 @@ describe("toMoodEntry", () => {
       context_tags: "[]",
       energy: undefined,
       mood_scale_json: null,
-      photos_json: null,
-      location_json: null,
-      voice_memos_json: null,
       based_on_entry_id: null,
     };
 
@@ -258,9 +244,6 @@ describe("toMoodEntry", () => {
       context_tags: "[]",
       energy: null,
       mood_scale_json: null,
-      photos_json: null,
-      location_json: null,
-      voice_memos_json: null,
       based_on_entry_id: null,
     };
 
@@ -286,9 +269,6 @@ describe("toMoodEntry", () => {
         max: 10,
         lowerIsBetter: false,
       }),
-      photos_json: null,
-      location_json: null,
-      voice_memos_json: null,
       based_on_entry_id: null,
     };
 
@@ -317,9 +297,6 @@ describe("toMoodEntry", () => {
         max: 5,
         lowerIsBetter: false,
       }),
-      photos_json: null,
-      location_json: null,
-      voice_memos_json: null,
       based_on_entry_id: null,
     };
 
@@ -343,9 +320,6 @@ describe("toMoodEntry", () => {
       context_tags: "[]",
       energy: null,
       mood_scale_json: null,
-      photos_json: null,
-      location_json: null,
-      voice_memos_json: null,
       based_on_entry_id: null,
     };
 
@@ -363,9 +337,6 @@ describe("toMoodEntry", () => {
       context_tags: "[]",
       energy: null,
       mood_scale_json: null,
-      photos_json: null,
-      location_json: null,
-      voice_memos_json: null,
       based_on_entry_id: null,
     };
 
@@ -383,9 +354,6 @@ describe("toMoodEntry", () => {
       context_tags: "[]",
       energy: null,
       mood_scale_json: null,
-      photos_json: '["file://photo1.jpg","file://photo2.jpg"]',
-      location_json: '{"latitude":40.7128,"longitude":-74.006,"name":"New York"}',
-      voice_memos_json: '["file://memo1.m4a"]',
       based_on_entry_id: 5,
     };
 

@@ -29,6 +29,7 @@ export function useMoodItemActions({
           mood: deletedMood.mood,
           note: deletedMood.note,
           timestamp: deletedMood.timestamp,
+          utcOffsetMinutes: deletedMood.utcOffsetMinutes ?? null,
           emotions: deletedMood.emotions,
           contextTags: deletedMood.contextTags,
           energy: deletedMood.energy,

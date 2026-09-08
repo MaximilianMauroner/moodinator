@@ -19,7 +19,7 @@ export default function TermsOfServiceScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Text className="text-xs text-paper-700 dark:text-sand-400 mb-4">
-          Last Updated: September 7, 2026
+          Last Updated: September 8, 2026
         </Text>
 
         <Section title="Agreement to Terms">
@@ -35,7 +35,7 @@ export default function TermsOfServiceScreen() {
           <BulletList items={[
             "Record moods on a 0–10 scale, where lower is better and 9–10 require the most support",
             "Add notes, emotions, contexts, and energy values",
-            "Configure local reminders and view mood history and summaries on your device",
+            "Configure local reminders and view mood history, descriptive comparisons, and charts on your device",
             "Create plaintext JSON mood exports/backups and plaintext CSV therapy exports",
           ]} />
         </Section>
@@ -48,7 +48,7 @@ export default function TermsOfServiceScreen() {
 
         <Section title="Your Data">
           <Paragraph>
-            You retain your rights in mood entries, notes, tags, settings, exports, and backups you create. Moodinator has no developer-operated account or server copy. You are responsible for device security and protecting plaintext JSON mood exports/backups and plaintext CSV therapy exports.
+            Entry timestamps may include a recorded UTC offset, which is also included in JSON exports and backups. Comparisons describe your recorded entries and do not establish causes. You retain your rights in mood entries, notes, tags, settings, exports, and backups you create. Moodinator has no developer-operated account or server copy. You are responsible for device security and protecting plaintext JSON mood exports/backups and plaintext CSV therapy exports.
           </Paragraph>
           <Paragraph>
             Delete Mood Data removes mood history, including mood rows, mood–emotion link records, and database emotion records used by that history. It retains the user-visible Emotion List presets, context-tag presets, other settings, reminders, app-lock data, and external files.

@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last Updated: July 21, 2026**
+**Last Updated: September 8, 2026**
 
 ## Introduction
 
@@ -10,13 +10,15 @@ Moodinator ("we", "our", or "the app") is a local-first mood tracking applicatio
 
 Moodinator stores information you choose to enter or configure, including:
 
-- **Mood data:** ratings on the 0–10 scale, timestamps, notes, emotions, context tags, energy values, and related history
+- **Mood data:** ratings on the 0–10 scale, timestamps, recorded UTC offsets, notes, emotions, context tags, energy values, and related history
 - **Settings:** entry preferences, display preferences, onboarding state, and other app configuration
 - **Reminders:** local notification titles, messages, schedules, permission state, and scheduling identifiers
 - **App lock data:** whether app lock and biometrics are enabled, PIN length, failed-attempt state, and a salted hash of your PIN
 - **Backup metadata:** the selected backup folder and the time of the latest backup
 
 This information is processed and stored locally. Moodinator has no developer-operated server, user account system, cloud synchronization, advertising, or analytics. We do not receive your mood data or app settings.
+
+New entries retain the UTC offset at their recorded time so calendar days remain stable when you travel. Exports and backups include this offset. Older entries without a recorded offset use the current device timezone.
 
 ## Storage and Security
 

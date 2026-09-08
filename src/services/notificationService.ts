@@ -10,7 +10,7 @@ const NOTIFICATIONS_LIST_KEY = 'notificationsList';
 const NOTIFICATION_SCHEDULE_TIME_ZONE_KEY = 'notificationScheduleTimeZone';
 
 const MOOD_REMINDER_TITLE = 'How are you feeling?';
-const MOOD_REMINDER_BODY = "Don't forget to log your mood for today!";
+const MOOD_REMINDER_BODY = "Take a moment to check in with yourself.";
 const MOOD_REMINDER_TAG = 'mood-reminder';
 const LEGACY_SINGLE_NOTIFICATION_ID = 'legacy-single';
 const DEFAULT_NOTIFICATION_HOUR = 20;

@@ -1,339 +1,278 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import {
-  View,
-  Text,
-  ScrollView,
-  RefreshControl,
   Platform,
   Pressable,
+  RefreshControl,
+  ScrollView,
+  Text,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import { useColorScheme } from "nativewind";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { format } from "date-fns";
-import Animated, {
-  FadeIn,
-  FadeInUp,
-  FadeOut,
-  LinearTransition,
-} from "react-native-reanimated";
-
+import { Ionicons } from "@expo/vector-icons";
 import { useInsightsData } from "../hooks/useInsightsData";
-import { TimePeriodSelector } from "../components/TimePeriodSelector";
-import { WeekNavigator } from "../components/WeekNavigator";
 import { InsightCard, CompactInsightCard } from "../components/InsightCard";
 import { StreakBadge } from "../components/StreakBadge";
 import { EntryDetailModal } from "../components/EntryDetailModal";
 import { InsightsHeader } from "../components/InsightsHeader";
+import { FindingCard } from "../components/FindingCard";
+import { TrendBand } from "../components/TrendBand";
+import { RhythmGrid } from "../components/RhythmGrid";
+import { DriverRow } from "../components/DriverRow";
+import { calculatePeriodStats } from "../utils/periodStats";
+import type { AnalysisRange } from "../utils/analysis";
 import { MoodCalendar } from "@/components/calendar";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
-import { IconBadge } from "@/components/ui/IconBadge";
 import { ScreenBackgroundAccent } from "@/components/layout/ScreenBackgroundAccent";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
-import { typography } from "@/constants/typography";
-import { motion, staggerDelay } from "@/constants/motion";
-import { haptics } from "@/lib/haptics";
+import { useThemeColors } from "@/constants/colors";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
-import { useReducedMotion } from "@/hooks/useReducedMotion";
 import type { MoodEntry } from "@db/types";
-import { getInterpretedMoodRating } from "@/constants/moodScaleInterpretation";
 
-type ViewMode = "calendar" | "summary";
-
-const viewModes: { id: ViewMode; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+type ViewMode = "findings" | "charts" | "calendar";
+const viewModes: {
+  id: ViewMode;
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+}[] = [
+  { id: "findings", label: "Findings", icon: "bulb-outline" },
+  { id: "charts", label: "Charts", icon: "analytics" },
   { id: "calendar", label: "Calendar", icon: "calendar" },
-  { id: "summary", label: "Summary", icon: "analytics" },
 ];
-
+const ranges: { id: AnalysisRange; label: string }[] = [
+  { id: "7", label: "7" },
+  { id: "30", label: "30" },
+  { id: "90", label: "90" },
+  { id: "all", label: "All" },
+];
+function ChartCard({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <SurfaceCard tone="sage" style={{ marginBottom: 12 }}>
+      <Text className="mb-3 text-base font-semibold text-paper-800 dark:text-paper-200">
+        {title}
+      </Text>
+      {children}
+    </SurfaceCard>
+  );
+}
 export function InsightsScreen() {
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === "dark";
-  const reducedMotion = useReducedMotion();
+  const { get } = useThemeColors();
   const [selectedEntry, setSelectedEntry] = useState<MoodEntry | null>(null);
-  const [showAllEntries, setShowAllEntries] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>("calendar");
+  const [viewMode, setViewMode] = useState<ViewMode>("findings");
   const calendarRefreshRef = useRef<(() => Promise<void>) | null>(null);
-
   const {
-    allMoods,
-    periodMoods,
+    recentMoods,
+    totalCount,
     loading,
     error,
-    period,
-    currentDate,
-    setPeriod,
-    goToPrevious,
-    goToNext,
-    goToToday,
-    canGoNext,
-    canGoPrevious,
-    stats,
     streak,
     getMoodLabel,
     getMoodColor,
     refresh,
+    analysis,
+    analysisRange,
+    setAnalysisRange,
+    analysisMoods,
   } = useInsightsData();
-
-  // Reset expanded state when period or date changes
-  useEffect(() => {
-    setShowAllEntries(false);
-  }, [period, currentDate]);
-
-  const handleViewModeChange = useCallback((mode: ViewMode) => {
-    haptics.tick();
-    setViewMode(mode);
-  }, []);
-
-  const handleCalendarRefreshReady = useCallback((refreshCalendar: (() => Promise<void>) | null) => {
-    calendarRefreshRef.current = refreshCalendar;
-  }, []);
-
-  const handleCalendarEntryPress = useCallback((entry: MoodEntry) => {
-    setSelectedEntry(entry);
-  }, []);
-
-  const handleRefreshAction = React.useCallback(async () => {
-    await Promise.all([
-      refresh(),
-      calendarRefreshRef.current?.() ?? Promise.resolve(),
-    ]);
+  const handleCalendarRefreshReady = useCallback(
+    (callback: (() => Promise<void>) | null) => {
+      calendarRefreshRef.current = callback;
+    },
+    [],
+  );
+  const handleRefresh = useCallback(async () => {
+    await Promise.all([refresh(), calendarRefreshRef.current?.()]);
   }, [refresh]);
-
-  const { refreshing, onRefresh } = usePullToRefresh(handleRefreshAction);
-
-  if (loading && allMoods.length === 0) {
-    return (
-      <View
-        className="flex-1 justify-center items-center"
-        style={{ backgroundColor: isDark ? "#08150F" : "#FAF8F4" }}
+  const { refreshing, onRefresh } = usePullToRefresh(handleRefresh);
+  const stats = calculatePeriodStats(analysisMoods, []);
+  const dailyValues = analysis.dailySeries.filter(
+    (point) => point.min !== null,
+  );
+  const best = dailyValues.reduce(
+    (value, point) => Math.min(value, point.min!),
+    Infinity,
+  );
+  const worst = dailyValues.reduce(
+    (value, point) => Math.max(value, point.max!),
+    -Infinity,
+  );
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaView
+        className="flex-1"
+        style={{ backgroundColor: get("background") }}
+        edges={["top"]}
       >
-        <LoadingSpinner message="Loading insights..." />
-      </View>
-    );
-  }
-
-  if (error && allMoods.length === 0) {
-    return (
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <SafeAreaView
-          className="flex-1"
-          style={{ backgroundColor: isDark ? "#08150F" : "#FAF8F4" }}
-          edges={["top"]}
-        >
-          <ScreenBackgroundAccent />
-          <InsightsHeader
-            moods={allMoods}
-            totalEntries={allMoods.length}
-            onRefresh={refresh}
-          />
+        <ScreenBackgroundAccent />
+        <InsightsHeader
+          moods={recentMoods}
+          totalEntries={totalCount}
+          onRefresh={onRefresh}
+        />
+        <SegmentedControl
+          value={viewMode}
+          items={viewModes}
+          onChange={setViewMode}
+          variant="primary"
+          padding={4}
+        />
+        {viewMode !== "calendar" && (
+          <>
+            <View className="mx-4 mb-3 flex-row gap-2">
+              {ranges.map((range) => (
+                <Pressable
+                  key={range.id}
+                  onPress={() => setAnalysisRange(range.id)}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    range.id === "all" ? "All history" : `Last ${range.id} days`
+                  }
+                  accessibilityState={{ selected: analysisRange === range.id }}
+                  className="flex-1 rounded-xl px-2 py-3"
+                  style={{
+                    minHeight: 44,
+                    backgroundColor: get(
+                      analysisRange === range.id ? "primaryBg" : "surfaceAlt",
+                    ),
+                  }}
+                >
+                  <Text className="text-center font-semibold text-paper-800 dark:text-paper-200">
+                    {range.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text className="px-4 mb-3 text-sm text-paper-700 dark:text-sand-300">
+              {analysisRange === "all"
+                ? "All history"
+                : `Last ${analysisRange} days`}{" "}
+              · {analysisMoods.length} entries
+            </Text>
+          </>
+        )}
+        {loading && viewMode !== "calendar" ? (
+          <LoadingSpinner message="Loading insights..." />
+        ) : error && analysisMoods.length === 0 ? (
           <EmptyState
             icon="warning-outline"
             tone="coral"
             title="Insights could not load"
             description={error}
             actionLabel="Try Again"
-            onAction={() => {
-              void refresh();
+            onAction={() => void refresh()}
+          />
+        ) : (
+          <ScrollView
+            className="flex-1 px-4"
+            contentContainerStyle={{
+              paddingBottom: Platform.OS === "ios" ? 100 : 24,
             }}
-          />
-        </SafeAreaView>
-      </GestureHandlerRootView>
-    );
-  }
-
-  const hasData = allMoods.length > 0;
-  const hasPeriodData = periodMoods.length > 0;
-  const reveal = (index: number) =>
-    reducedMotion
-      ? undefined
-      : FadeInUp.duration(motion.duration.normal).delay(staggerDelay(index));
-
-  return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaView
-        className="flex-1"
-        style={{ backgroundColor: isDark ? "#08150F" : "#FAF8F4" }}
-        edges={["top"]}
-      >
-        <ScreenBackgroundAccent />
-        <InsightsHeader
-          moods={allMoods}
-          totalEntries={allMoods.length}
-          onRefresh={onRefresh}
-        />
-
-        {error && hasData ? (
-          <View
-            accessibilityRole="alert"
-            className="mx-4 mb-2 flex-row items-center rounded-2xl px-3 py-2"
-            style={{ backgroundColor: isDark ? "#2B251B" : "#F4ECDC" }}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={get("text")}
+              />
+            }
           >
-            <Ionicons name="warning-outline" size={18} color={isDark ? "#D4C49C" : "#9D8660"} />
-            <Text className="ml-2 flex-1 text-xs text-paper-700 dark:text-sand-300">
-              Showing saved insights. Refresh failed.
-            </Text>
-            <Pressable
-              onPress={() => void refresh()}
-              accessibilityRole="button"
-              accessibilityLabel="Retry refreshing insights"
-            >
-              <Text className="text-xs font-bold text-sage-600 dark:text-sage-300">Retry</Text>
-            </Pressable>
-          </View>
-        ) : null}
-
-        {/* View Mode Toggle */}
-        {hasData && (
-          <Animated.View entering={FadeIn.duration(motion.duration.normal)}>
-            <SegmentedControl
-              value={viewMode}
-              items={viewModes}
-              onChange={handleViewModeChange}
-              variant="primary"
-              padding={4}
-            />
-          </Animated.View>
-        )}
-
-        {!hasData ? (
-          <EmptyState
-            icon="bar-chart-outline"
-            tone="sage"
-            title="No Insights Yet"
-            description="Log your mood to review your history and see summaries over time."
-          />
-        ) : viewMode === "calendar" ? (
-          <Animated.View
-            key="calendar-view"
-            entering={FadeIn.duration(motion.duration.normal)}
-            exiting={FadeOut.duration(motion.duration.fast)}
-            style={{ flex: 1 }}
-          >
-            <ScrollView
-              className="flex-1 px-4"
-              contentContainerStyle={{ paddingBottom: Platform.OS === "ios" ? 100 : 24 }}
-              contentInsetAdjustmentBehavior="automatic"
-              showsVerticalScrollIndicator={false}
-              refreshControl={
-                <RefreshControl
-                  refreshing={refreshing}
-                  onRefresh={onRefresh}
-                  tintColor={isDark ? "#A6E39B" : "#5B8A5B"}
-                />
-              }
-            >
+            {error && (
+              <Text
+                accessibilityRole="alert"
+                className="mb-3 text-paper-700 dark:text-sand-300"
+              >
+                Showing saved insights. Refresh failed.
+              </Text>
+            )}
+            {viewMode === "calendar" ? (
               <MoodCalendar
                 onRefreshReady={handleCalendarRefreshReady}
-                onEditEntry={handleCalendarEntryPress}
+                onEditEntry={setSelectedEntry}
               />
-            </ScrollView>
-          </Animated.View>
-        ) : (
-          <Animated.View
-            key="summary-view"
-            entering={FadeIn.duration(motion.duration.normal)}
-            exiting={FadeOut.duration(motion.duration.fast)}
-            style={{ flex: 1 }}
-          >
-            {/* Time Period Selector */}
-            <TimePeriodSelector value={period} onChange={setPeriod} />
-
-            {/* Week/Day Navigator */}
-            <WeekNavigator
-              currentDate={currentDate}
-              period={period}
-              onPrevious={goToPrevious}
-              onNext={goToNext}
-              onToday={goToToday}
-              canGoNext={canGoNext}
-              canGoPrevious={canGoPrevious}
-            />
-
-            <ScrollView
-              className="flex-1"
-              contentContainerStyle={{
-                paddingHorizontal: 16,
-                paddingBottom: Platform.OS === "ios" ? 100 : 24,
-              }}
-              contentInsetAdjustmentBehavior="automatic"
-              showsVerticalScrollIndicator={false}
-              refreshControl={
-                <RefreshControl
-                  refreshing={refreshing}
-                  onRefresh={onRefresh}
-                  tintColor={isDark ? "#A6E39B" : "#5B8A5B"}
-                />
-              }
-            >
-              {hasPeriodData ? (
-                <>
-                  {/* Hero metric */}
-                  <Animated.View entering={reveal(0)} className="mb-4">
-                    <InsightCard
-                      icon="analytics"
-                      title="Average Mood"
-                      metric={stats.averageMood.toFixed(1)}
-                      animateMetric={false}
-                      metricSuffix="/ 10"
-                      interpretation={`${getMoodLabel(stats.averageMood)}. Lower is better.`}
-                      trend={
-                        stats.moodChange !== 0
-                          ? {
-                              direction: stats.trendDirection,
-                              value: Math.abs(stats.moodChange),
-                            }
-                          : undefined
-                      }
-                      metricColor={getMoodColor(stats.averageMood)}
-                      variant="accent"
-                    />
-                  </Animated.View>
-
-                  {/* Supporting metrics */}
-                  <Animated.View entering={reveal(1)} className="flex-row gap-4 mb-4">
-                    <View className="flex-1">
-                      <CompactInsightCard
-                        icon="layers"
-                        title="Entries"
-                        metric={stats.entryCount}
-                        interpretation={
-                          period === "week"
-                            ? "this week"
-                            : period === "month"
-                            ? "this month"
-                            : "total"
-                        }
-                        variant="warm"
-                      />
-                    </View>
-                    <View className="flex-1">
-                      <CompactInsightCard
+            ) : viewMode === "findings" ? (
+              <>
+                {analysis.findings.map((finding) => (
+                  <FindingCard key={finding.id} finding={finding} />
+                ))}
+                <Text className="mb-4 text-xs text-paper-700 dark:text-sand-300">
+                  These are associations in your entries, not explanations.
+                  Logging habits and other circumstances can affect the
+                  patterns.
+                </Text>
+              </>
+            ) : (
+              <>
+                <ChartCard title="Trend">
+                  <TrendBand series={analysis.dailySeries} />
+                </ChartCard>
+                <ChartCard title="Rhythm">
+                  <RhythmGrid cells={analysis.rhythm} />
+                </ChartCard>
+                <ChartCard title="Drivers">
+                  <Text className="text-xs text-paper-700 dark:text-sand-300">
+                    Mean with above · mean without below. Lower is better.
+                  </Text>
+                  {analysis.drivers.length ? (
+                    analysis.drivers.map((driver) => (
+                      <DriverRow key={driver.id} driver={driver} />
+                    ))
+                  ) : (
+                    <Text className="mt-3 text-sm text-paper-700 dark:text-sand-300">
+                      A comparison needs 5 entries with a tag or emotion and 5
+                      without it.
+                    </Text>
+                  )}
+                </ChartCard>
+                {stats.entryCount > 0 && (
+                  <>
+                    <View className="mb-3">
+                      <InsightCard
                         icon="analytics"
-                        title="Mood Range"
-                        metric={
-                          periodMoods.length > 0
-                            ? `${Math.min(...periodMoods.map(getInterpretedMoodRating))}-${Math.max(...periodMoods.map(getInterpretedMoodRating))}`
-                            : "-"
-                        }
-                        interpretation="best to most difficult"
+                        title="Average Mood"
+                        metric={stats.averageMood.toFixed(1)}
+                        animateMetric={false}
+                        metricSuffix="/ 10"
+                        interpretation={`${getMoodLabel(stats.averageMood)}. Lower is better.`}
+                        metricColor={getMoodColor(stats.averageMood)}
+                        variant="accent"
                       />
                     </View>
-                  </Animated.View>
-
-                  {/* Energy & Most Common Mood */}
-                  {(stats.energyAvg !== null || stats.mostCommonMood !== undefined) && (
-                    <Animated.View entering={reveal(2)} className="flex-row gap-4 mb-4">
+                    <View className="flex-row gap-3 mb-3">
+                      <View className="flex-1">
+                        <CompactInsightCard
+                          icon="layers"
+                          title="Entries"
+                          metric={stats.entryCount}
+                          animateMetric={false}
+                        />
+                      </View>
+                      <View className="flex-1">
+                        <CompactInsightCard
+                          icon="analytics"
+                          title="Mood Range"
+                          metric={`${best}–${worst}`}
+                          animateMetric={false}
+                          interpretation="best to most difficult"
+                        />
+                      </View>
+                    </View>
+                    <View className="flex-row gap-3 mb-3">
                       {stats.energyAvg !== null && (
                         <View className="flex-1">
                           <CompactInsightCard
                             icon="flash"
                             title="Avg Energy"
                             metric={stats.energyAvg.toFixed(1)}
+                            animateMetric={false}
                             metricSuffix="/ 10"
-                            variant="warm"
                           />
                         </View>
                       )}
@@ -345,136 +284,20 @@ export function InsightsScreen() {
                           animateMetric={false}
                           interpretation={getMoodLabel(stats.mostCommonMood)}
                           metricColor={getMoodColor(stats.mostCommonMood)}
-                          variant="accent"
                         />
                       </View>
-                    </Animated.View>
-                  )}
-
-                  {/* Streak Badge (always show for non-week snapshots) */}
-                  {period !== "week" && (
-                    <Animated.View entering={reveal(3)} className="mb-4">
-                      <StreakBadge current={streak.current} longest={streak.longest} />
-                    </Animated.View>
-                  )}
-
-                  {/* Entries List */}
-                  {periodMoods.length > 0 && (
-                    <Animated.View entering={reveal(4)}>
-                    <SurfaceCard tone="sage" style={{ marginBottom: 4 }}>
-                      <View className="flex-row items-center mb-4">
-                        <IconBadge
-                          icon={
-                            period === "week"
-                              ? "time-outline"
-                              : period === "month"
-                              ? "calendar-outline"
-                              : "list-outline"
-                          }
-                          tone="sage"
-                          size="md"
-                          style={{ marginRight: 12 }}
-                        />
-                        <Text className="text-paper-800 dark:text-paper-200" style={typography.bodyMd}>
-                          {period === "week"
-                            ? "This Week's Entries"
-                            : period === "month"
-                            ? "This Month's Entries"
-                            : "Recent Entries"}
-                        </Text>
-                      </View>
-
-                      {(showAllEntries ? periodMoods : periodMoods.slice(0, 5)).map((mood, index, arr) => (
-                        <Animated.View
-                          key={mood.id}
-                          entering={reveal(index)}
-                          layout={LinearTransition.duration(motion.duration.normal)}
-                        >
-                          <Pressable
-                            onPress={() => setSelectedEntry(mood)}
-                            style={({ pressed }) => (pressed ? { opacity: 0.7 } : null)}
-                            className={`flex-row items-center py-3 ${
-                              index < arr.length - 1
-                                ? "border-b border-paper-200 dark:border-paper-800"
-                                : ""
-                            }`}
-                            accessibilityRole="button"
-                            accessibilityLabel={`${getMoodLabel(mood.mood, mood.moodScale)}, Mood Rating ${getInterpretedMoodRating(mood)} of 10, ${format(new Date(mood.timestamp), "EEE, MMM d 'at' h:mm a")}`}
-                          >
-                            <View
-                              className="w-10 h-10 rounded-2xl items-center justify-center mr-3"
-                              style={{ backgroundColor: getMoodColor(mood.mood, mood.moodScale) + "20" }}
-                            >
-                              <Text
-                                className="text-lg font-bold"
-                                style={{ color: getMoodColor(mood.mood, mood.moodScale) }}
-                              >
-                                {getInterpretedMoodRating(mood)}
-                              </Text>
-                            </View>
-                            <View className="flex-1">
-                              <Text className="text-paper-800 dark:text-paper-200" style={typography.bodyMd}>
-                                {getMoodLabel(mood.mood, mood.moodScale)}
-                              </Text>
-                              <Text className="text-paper-700 dark:text-sand-400" style={typography.bodySm}>
-                                {period === "week"
-                                  ? format(new Date(mood.timestamp), "EEE 'at' h:mm a")
-                                  : format(new Date(mood.timestamp), "EEE, MMM d 'at' h:mm a")}
-                              </Text>
-                            </View>
-                            <Ionicons
-                              name="chevron-forward"
-                              size={16}
-                              color={isDark ? "#9FB39A" : "#BDA77D"}
-                            />
-                          </Pressable>
-                        </Animated.View>
-                      ))}
-
-                      {periodMoods.length > 5 && (
-                        <Pressable
-                          onPress={() => setShowAllEntries(!showAllEntries)}
-                          style={({ pressed }) => (pressed ? { opacity: 0.7 } : null)}
-                          className="mt-3 py-2"
-                        >
-                          <Text
-                            className="text-center"
-                            style={[
-                              typography.bodySm,
-                              { color: isDark ? "#A8C5A8" : "#5B8A5B", fontWeight: "700" },
-                            ]}
-                          >
-                            {showAllEntries
-                              ? "Show less"
-                              : `+${periodMoods.length - 5} more entries`}
-                          </Text>
-                        </Pressable>
-                      )}
-                    </SurfaceCard>
-                    </Animated.View>
-                  )}
-                </>
-              ) : (
-                /* No data for this period */
-                <EmptyState
-                  icon="calendar-clear-outline"
-                  tone="sand"
-                  title="No entries yet"
-                  description={
-                    period === "week"
-                      ? "You haven't logged any moods for this week."
-                      : period === "month"
-                      ? "You haven't logged any moods for this month."
-                      : "No mood entries for this time period."
-                  }
+                    </View>
+                  </>
+                )}
+                <StreakBadge
+                  current={streak.current}
+                  longest={streak.longest}
                 />
-              )}
-            </ScrollView>
-          </Animated.View>
+              </>
+            )}
+          </ScrollView>
         )}
       </SafeAreaView>
-
-      {/* Entry Detail Modal */}
       <EntryDetailModal
         entry={selectedEntry}
         onClose={() => setSelectedEntry(null)}

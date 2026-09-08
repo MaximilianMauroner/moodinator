@@ -16,9 +16,7 @@ export interface MoodRow {
   context_tags: string; // JSON string
   energy: number | null;
   mood_scale_json: string | null; // JSON string snapshot of the Mood Scale used at entry creation
-  photos_json: string | null; // JSON string array of file URIs
-  location_json: string | null; // JSON string of location object
-  voice_memos_json: string | null; // JSON string array of audio file URIs
+  utc_offset_minutes?: number | null;
   based_on_entry_id: number | null; // Reference to copied entry
 }
 

@@ -28,6 +28,8 @@ export type MoodEntry = {
     mood: number; // 0-10
     note: string | null;
     timestamp: number; // milliseconds since epoch
+    /** UTC minus local time in minutes; missing on legacy entries. */
+    utcOffsetMinutes?: number | null;
     emotions: Emotion[];
     contextTags: string[];
     energy: number | null;
@@ -49,6 +51,7 @@ export type MoodEntryInput = {
     mood: number;
     note?: string | null;
     timestamp?: number;
+    utcOffsetMinutes?: number | null;
     emotions?: Emotion[];
     contextTags?: string[];
     energy?: number | null;
