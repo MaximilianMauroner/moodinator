@@ -20,6 +20,14 @@ Moodinator package or a device that holds personal mood data.
 5. Record the commit, Android API level, emulator profile, build type, command,
    result, and artifact paths in the task tracker.
 
+On hosts with limited RAM, check available memory before builds, dependency installs
+and emulator launches. Compile before starting the emulator; do not overlap native
+compilation, the emulator and broad test runs. In the disposable checkout, cap Metro
+workers with `config.maxWorkers = 1` and Gradle with `--max-workers=1`; bound JVM and
+Node heaps to fit the available memory. Keep these machine-specific limits out of
+the production app configuration. Stop or reduce an owned workload if memory
+pressure keeps rising.
+
 Use an installed build that starts directly into the app. If a debug build opens
 an Expo development launcher, resolve that setup before running the flow. The
 flow does not dismiss unexpected screens or skip failed steps.
