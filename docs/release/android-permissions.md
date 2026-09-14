@@ -28,3 +28,8 @@ explicitly disables notification badges.
 
 Any permission change requires a clean merged-manifest review and corresponding
 Data Safety review before release.
+
+After a clean prebuild and Gradle `:app:processReleaseMainManifest`, run
+`bun run verify:android-release-manifest`. Unlike the source-only check used by
+the normal fresh-checkout verification suite, this strict command fails when no
+generated release manifest exists.

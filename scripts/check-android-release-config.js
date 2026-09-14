@@ -4,6 +4,30 @@ const path = require("path");
 const root = path.resolve(__dirname, "..");
 const systemAlertWindowPermission = "android.permission.SYSTEM_ALERT_WINDOW";
 const advertisingIdPermission = "com.google.android.gms.permission.AD_ID";
+const requiredBlockedPermissions = new Set([
+  systemAlertWindowPermission,
+  advertisingIdPermission,
+  "android.permission.READ_EXTERNAL_STORAGE",
+  "android.permission.WRITE_EXTERNAL_STORAGE",
+  "com.google.android.c2dm.permission.RECEIVE",
+  "com.google.android.finsky.permission.BIND_GET_INSTALL_REFERRER_SERVICE",
+  "com.sec.android.provider.badge.permission.READ",
+  "com.sec.android.provider.badge.permission.WRITE",
+  "com.htc.launcher.permission.READ_SETTINGS",
+  "com.htc.launcher.permission.UPDATE_SHORTCUT",
+  "com.sonyericsson.home.permission.BROADCAST_BADGE",
+  "com.sonymobile.home.permission.PROVIDER_INSERT_BADGE",
+  "com.anddoes.launcher.permission.UPDATE_COUNT",
+  "com.majeur.launcher.permission.UPDATE_BADGE",
+  "com.huawei.android.launcher.permission.CHANGE_BADGE",
+  "com.huawei.android.launcher.permission.READ_SETTINGS",
+  "com.huawei.android.launcher.permission.WRITE_SETTINGS",
+  "android.permission.READ_APP_BADGE",
+  "com.oppo.launcher.permission.READ_SETTINGS",
+  "com.oppo.launcher.permission.WRITE_SETTINGS",
+  "me.everything.badger.permission.BADGE_COUNT_READ",
+  "me.everything.badger.permission.BADGE_COUNT_WRITE",
+]);
 const approvedReleasePermissions = new Set([
   "android.permission.INTERNET",
   "android.permission.USE_BIOMETRIC",
@@ -130,6 +154,8 @@ const gradle = readOptionalText("android/app/build.gradle");
 const mainManifest = readOptionalText("android/app/src/main/AndroidManifest.xml");
 const strings = readOptionalText("android/app/src/main/res/values/strings.xml");
 const developerRoute = readText("src/app/settings/developer.tsx");
+const generatedReleaseManifests = findGeneratedReleaseManifests();
+const requireGeneratedManifest = process.argv.includes("--require-generated-manifest");
 
 const productionAndroid = eas.build?.production?.android ?? {};
 const androidPermissions = app.expo.android?.permissions ?? [];
@@ -160,6 +186,13 @@ assert(
 assert(
   androidBlockedPermissions.includes(advertisingIdPermission),
   "app.json expo.android.blockedPermissions must include com.google.android.gms.permission.AD_ID"
+);
+const missingBlockedPermissions = [...requiredBlockedPermissions].filter(
+  (permission) => !androidBlockedPermissions.includes(permission)
+);
+assert(
+  missingBlockedPermissions.length === 0,
+  `app.json is missing required blocked permissions: ${missingBlockedPermissions.join(", ")}`
 );
 assert(
   productionAndroid.buildType !== "apk",
@@ -216,7 +249,12 @@ if (mainManifest) {
   );
 }
 
-for (const manifestPath of findGeneratedReleaseManifests()) {
+assert(
+  !requireGeneratedManifest || generatedReleaseManifests.length > 0,
+  "No generated release manifest found. Run a clean Expo Android prebuild and Gradle :app:processReleaseMainManifest first."
+);
+
+for (const manifestPath of generatedReleaseManifests) {
   const manifest = fs.readFileSync(manifestPath, "utf8");
   const relativeManifestPath = path.relative(root, manifestPath);
   const manifestTag = findTag(manifest, "manifest");
