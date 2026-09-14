@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 describe("Android privacy configuration", () => {
-  it("disables Auto Backup and blocks the overlay permission", () => {
+  it("disables Auto Backup and blocks unused sensitive permissions", () => {
     const appConfig = JSON.parse(readFileSync("app.json", "utf8")) as {
       expo: {
         android: { allowBackup?: boolean; blockedPermissions?: string[] };
@@ -15,6 +15,9 @@ describe("Android privacy configuration", () => {
     );
     expect(appConfig.expo.android.blockedPermissions).toContain(
       "com.google.android.gms.permission.AD_ID"
+    );
+    expect(appConfig.expo.android.blockedPermissions).toContain(
+      "android.permission.FOREGROUND_SERVICE"
     );
   });
 
