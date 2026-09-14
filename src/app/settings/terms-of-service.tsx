@@ -19,7 +19,7 @@ export default function TermsOfServiceScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Text className="text-xs text-paper-700 dark:text-sand-400 mb-4">
-          Last Updated: September 8, 2026
+          Last Updated: September 14, 2026
         </Text>
 
         <Section title="Agreement to Terms">
@@ -108,7 +108,7 @@ export default function TermsOfServiceScreen() {
 
         <Section title="Contact Us">
           <Paragraph>
-            If you have any questions about these Terms, please contact us at support.moodinator@lab4code.com
+            If you have any questions about these Terms, please contact us at lab4code.dev@gmail.com
           </Paragraph>
         </Section>
 
