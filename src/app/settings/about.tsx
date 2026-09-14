@@ -12,7 +12,7 @@ import { IconBadge } from "@/components/ui/IconBadge";
 import { typography } from "@/constants/typography";
 import { Alert } from "@/components/ui/AppAlert";
 
-const SUPPORT_EMAIL = "support.moodinator@lab4code.com";
+const SUPPORT_EMAIL = "lab4code.dev@gmail.com";
 const ANDROID_PACKAGE = "com.lab4code.moodinator";
 
 export default function AboutSettingsScreen() {
