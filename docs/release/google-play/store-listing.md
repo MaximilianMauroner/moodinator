@@ -9,11 +9,11 @@ fabricated data only.
 - App name: Moodinator
 - Package: `com.lab4code.moodinator`
 - Category: Health & Fitness
-- Pricing: Free
+- Pricing assumption: Free
 - Ads: None
 - In-app purchases: None
 - Initial distribution: Global
-- Target audience: 13 and over
+- Target audience: Pending human approval in #53
 - Support email: `lab4code.dev@gmail.com`
 - Privacy policy: <https://github.com/MaximilianMauroner/moodinator/blob/main/PRIVACY_POLICY.md>
 
@@ -73,9 +73,9 @@ and backups.
 
 ## Graphic inventory
 
-- `assets/store/google-play/icon-512.png`: 512×512 PNG store icon.
+- `assets/store/google-play/icon-512.png`: 512×512 32-bit RGBA PNG store icon.
 - `assets/store/google-play/feature-graphic-1024x500.png`: 1024×500 PNG feature graphic draft; human visual approval required.
-- `assets/store/google-play/screenshots/`: portrait phone screenshots from a release QA build with fabricated data. Recapture from the final audited release candidate if its UI differs.
+- `assets/store/google-play/screenshots/`: 1080×2160 24-bit RGB portrait phone screenshots from a release QA build with fabricated data. Recapture from the final audited release candidate if its UI differs.
 
 ## Screenshot order and captions
 
