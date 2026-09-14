@@ -14,6 +14,7 @@
     "doctor": "expo-doctor",
     "verify": "bun run lint && bun run typecheck && bun run test:run && bun run doctor && bun run verify:android-release-config",
     "verify:android-release-config": "node scripts/check-android-release-config.js",
+    "verify:android-release-manifest": "node scripts/check-android-release-config.js --require-generated-manifest",
     "build": "node scripts/build-local-android.js",
     "build:preview": "node scripts/build-local-android.js",
     "build:production": "eas build --platform android --profile production",
