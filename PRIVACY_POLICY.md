@@ -44,9 +44,11 @@ Moodinator registers a periodic backup task with the operating system. The opera
 
 For ratings 9 and 10, Moodinator offers crisis-support actions. If you choose one, the app asks the operating system to open the phone or messaging app for U.S. 988, or opens Find A Helpline at <https://findahelpline.com/>. These actions are user-initiated. Moodinator does not monitor entries, contact emergency services, or send your mood entry to those services. Your carrier, browser, operating system, or selected service may process information under its own terms and privacy policy.
 
+If you choose **Send Feedback**, Moodinator opens a prefilled issue form on GitHub. The template does not include mood entries, app settings, or device metadata. Anything you add and submit is shared with GitHub and posted publicly in the Moodinator repository, subject to GitHub's terms and privacy policy. Do not include private mood entries or other sensitive information.
+
 ## Data Sharing and Sale
 
-We do not operate servers that receive your Moodinator data, and we do not sell it. Moodinator contains no advertising or analytics SDKs. Data can leave the app when you deliberately export, share, copy, import, or open an external support action; when an OS-scheduled periodic backup runs after backup storage is available; or when the operating system handles device backup or transfer outside our control.
+We do not operate servers that receive your Moodinator data, and we do not sell it. Moodinator contains no advertising or analytics SDKs. Data can leave the app when you deliberately export, share, copy, import, open an external support action, or submit feedback to GitHub; when an OS-scheduled periodic backup runs after backup storage is available; or when the operating system handles device backup or transfer outside our control.
 
 ## Your Control and Deletion
 

@@ -22,6 +22,8 @@ Export flows may use a temporary app-cache file and the operating-system share s
 
 Entry timestamps may include a recorded UTC offset, which is also included in JSON exports and backups. Comparisons describe your recorded entries and do not establish causes.
 
+The **Send Feedback** action opens a prefilled issue form on GitHub. If you submit it, the content you provide is posted publicly in the Moodinator repository and is handled under GitHub's terms and privacy policy. Do not include private mood entries or other sensitive information.
+
 ## Health and Medical Disclaimer
 
 **Moodinator is a personal wellness journal. It is not a medical device and does not diagnose, treat, cure, or prevent any medical condition.** It does not provide medical advice, diagnosis, or treatment. Mood ratings and summaries are informational and may be incomplete or inaccurate. Consult a doctor or other qualified healthcare professional for medical advice, diagnosis, or treatment, and do not disregard professional advice because of information in the app.

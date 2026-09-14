@@ -11,6 +11,7 @@ import { SettingRow } from "@/features/settings/components/SettingRow";
 import { IconBadge } from "@/components/ui/IconBadge";
 import { typography } from "@/constants/typography";
 import { Alert } from "@/components/ui/AppAlert";
+import { FEEDBACK_ISSUES_URL, getFeedbackIssueUrl } from "@/lib/feedback";
 
 const SUPPORT_EMAIL = "lab4code.dev@gmail.com";
 const ANDROID_PACKAGE = "com.lab4code.moodinator";
@@ -41,6 +42,15 @@ export default function AboutSettingsScreen() {
   const handleContactSupport = () => {
     Linking.openURL(`mailto:${SUPPORT_EMAIL}`).catch(() => {
       Alert.alert("Contact Support", `Email: ${SUPPORT_EMAIL}`);
+    });
+  };
+
+  const handleFeedback = () => {
+    Linking.openURL(getFeedbackIssueUrl()).catch(() => {
+      Alert.alert(
+        "Send Feedback",
+        `We couldn't open GitHub. You can create an issue at:\n${FEEDBACK_ISSUES_URL}`
+      );
     });
   };
 
@@ -135,8 +145,14 @@ export default function AboutSettingsScreen() {
 
         <SettingsSection title="Support">
           <SettingRow
+            label="Send Feedback"
+            subLabel="Open a prefilled GitHub issue"
+            icon="chatbubble-ellipses-outline"
+            onPress={handleFeedback}
+          />
+          <SettingRow
             label="Contact Support"
-            subLabel="Get help or send feedback"
+            subLabel="Get help by email"
             icon="mail-outline"
             onPress={handleContactSupport}
           />

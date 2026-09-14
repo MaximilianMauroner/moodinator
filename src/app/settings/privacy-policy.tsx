@@ -77,11 +77,14 @@ export default function PrivacyPolicyScreen() {
           <Paragraph>
             For ratings 9 and 10, Moodinator offers actions to call or text U.S. 988 or open findahelpline.com. These actions are user-initiated. Moodinator does not monitor entries, contact emergency services, or send your mood entry to a support provider.
           </Paragraph>
+          <Paragraph>
+            Send Feedback opens a prefilled public GitHub issue form. The template does not include mood entries, app settings, or device metadata. Anything you add and submit is shared with GitHub and posted publicly. Do not include private mood entries or other sensitive information.
+          </Paragraph>
         </Section>
 
         <Section title="Sharing and Sale">
           <Paragraph>
-            We do not operate servers that receive your Moodinator data, sell it, or use advertising or analytics SDKs. Data can leave through a deliberate export, share, copy, import, or support action; when an OS-scheduled periodic backup runs after storage is available; or through platform backup or transfer behavior outside our control.
+            We do not operate servers that receive your Moodinator data, sell it, or use advertising or analytics SDKs. Data can leave through a deliberate export, share, copy, import, support action, or feedback submission to GitHub; when an OS-scheduled periodic backup runs after storage is available; or through platform backup or transfer behavior outside our control.
           </Paragraph>
         </Section>
 
