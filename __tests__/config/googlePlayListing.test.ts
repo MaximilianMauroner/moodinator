@@ -4,6 +4,15 @@ import { describe, expect, it } from "vitest";
 
 const listingPath = "docs/release/google-play/store-listing.md";
 const assetRoot = "assets/store/google-play";
+const publicContactPaths = [
+  "README.md",
+  "PRIVACY_POLICY.md",
+  "TERMS_OF_SERVICE.md",
+  "src/app/settings/about.tsx",
+  "src/app/settings/privacy-policy.tsx",
+  "src/app/settings/terms-of-service.tsx",
+  listingPath,
+];
 
 function readPngMetadata(path: string) {
   const png = readFileSync(path);
@@ -26,15 +35,24 @@ describe("Google Play listing package", () => {
     const fullDescription = listing.match(
       /## Full description\n\n([\s\S]*?)\n## Release notes/
     )?.[1];
+    const releaseNotes = listing.match(
+      /## Release notes\n\n([\s\S]*?)\n## Graphic inventory/
+    )?.[1];
 
     expect(shortDescription).toBeDefined();
     expect(shortDescription!.length).toBeLessThanOrEqual(80);
     expect(fullDescription).toBeDefined();
     expect(fullDescription!.length).toBeLessThanOrEqual(4_000);
-    expect(listing).toContain("lab4code.dev@gmail.com");
+    expect(releaseNotes).toBeDefined();
+    expect(releaseNotes!.length).toBeLessThanOrEqual(500);
     expect(fullDescription).toContain(
       "Moodinator is not a medical device and does not diagnose, treat, cure, or prevent any medical condition. Consult a healthcare professional for medical advice, diagnosis, or treatment."
     );
+    for (const publicContactPath of publicContactPaths) {
+      const surface = readFileSync(publicContactPath, "utf8");
+      expect(surface).toContain("lab4code.dev@gmail.com");
+      expect(surface).not.toContain("support.moodinator@lab4code.com");
+    }
   });
 
   it("includes upload-ready icon and feature-graphic files", () => {
@@ -43,7 +61,7 @@ describe("Google Play listing package", () => {
       join(assetRoot, "feature-graphic-1024x500.png")
     );
 
-    expect(icon).toMatchObject({ width: 512, height: 512, colorType: 2 });
+    expect(icon).toMatchObject({ width: 512, height: 512, colorType: 6 });
     expect(featureGraphic).toMatchObject({
       width: 1024,
       height: 500,
@@ -64,6 +82,8 @@ describe("Google Play listing package", () => {
       expect(screenshot.width).toBeGreaterThanOrEqual(320);
       expect(screenshot.height).toBeGreaterThan(screenshot.width);
       expect(screenshot.height).toBeLessThanOrEqual(3_840);
+      expect(screenshot.height).toBeLessThanOrEqual(screenshot.width * 2);
+      expect(screenshot.colorType).toBe(2);
       expect(screenshot.size).toBeLessThan(8_388_608);
     }
   });
