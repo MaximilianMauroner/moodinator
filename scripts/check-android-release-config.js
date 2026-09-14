@@ -3,6 +3,43 @@ const path = require("path");
 
 const root = path.resolve(__dirname, "..");
 const systemAlertWindowPermission = "android.permission.SYSTEM_ALERT_WINDOW";
+const advertisingIdPermission = "com.google.android.gms.permission.AD_ID";
+const requiredBlockedPermissions = new Set([
+  systemAlertWindowPermission,
+  advertisingIdPermission,
+  "android.permission.FOREGROUND_SERVICE",
+  "android.permission.READ_EXTERNAL_STORAGE",
+  "android.permission.WRITE_EXTERNAL_STORAGE",
+  "com.google.android.c2dm.permission.RECEIVE",
+  "com.google.android.finsky.permission.BIND_GET_INSTALL_REFERRER_SERVICE",
+  "com.sec.android.provider.badge.permission.READ",
+  "com.sec.android.provider.badge.permission.WRITE",
+  "com.htc.launcher.permission.READ_SETTINGS",
+  "com.htc.launcher.permission.UPDATE_SHORTCUT",
+  "com.sonyericsson.home.permission.BROADCAST_BADGE",
+  "com.sonymobile.home.permission.PROVIDER_INSERT_BADGE",
+  "com.anddoes.launcher.permission.UPDATE_COUNT",
+  "com.majeur.launcher.permission.UPDATE_BADGE",
+  "com.huawei.android.launcher.permission.CHANGE_BADGE",
+  "com.huawei.android.launcher.permission.READ_SETTINGS",
+  "com.huawei.android.launcher.permission.WRITE_SETTINGS",
+  "android.permission.READ_APP_BADGE",
+  "com.oppo.launcher.permission.READ_SETTINGS",
+  "com.oppo.launcher.permission.WRITE_SETTINGS",
+  "me.everything.badger.permission.BADGE_COUNT_READ",
+  "me.everything.badger.permission.BADGE_COUNT_WRITE",
+]);
+const approvedReleasePermissions = new Set([
+  "android.permission.INTERNET",
+  "android.permission.USE_BIOMETRIC",
+  "android.permission.USE_FINGERPRINT",
+  "android.permission.VIBRATE",
+  "android.permission.ACCESS_NETWORK_STATE",
+  "android.permission.RECEIVE_BOOT_COMPLETED",
+  "android.permission.POST_NOTIFICATIONS",
+  "android.permission.WAKE_LOCK",
+  "com.lab4code.moodinator.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
+]);
 const generatedManifestDirectoryNames = [
   "merged_manifest",
   "merged_manifests",
@@ -68,6 +105,24 @@ function findPermissionDeclarations(manifest, permission) {
   });
 }
 
+function findDeclaredPermissions(manifest) {
+  const manifestWithoutComments = manifest.replace(/<!--[\s\S]*?-->/g, "");
+  const permissionTags =
+    manifestWithoutComments.match(/<uses-permission(?:-sdk-\d+)?\b[^>]*>/gi) ?? [];
+
+  return permissionTags
+    .map((tag) => tag.match(/\bandroid:name\s*=\s*(["'])(.*?)\1/i)?.[2])
+    .filter(Boolean);
+}
+
+function findTag(manifest, tagName) {
+  return manifest.match(new RegExp(`<${tagName}\\b[^>]*>`, "i"))?.[0] ?? "";
+}
+
+function readAndroidAttribute(tag, attribute) {
+  return tag.match(new RegExp(`\\bandroid:${attribute}\\s*=\\s*(["'])(.*?)\\1`, "i"))?.[2];
+}
+
 function removesPermissionDuringMerge(permissionDeclaration) {
   return (
     permissionDeclaration.match(/\btools:node\s*=\s*(["'])(.*?)\1/i)?.[2] ===
@@ -98,6 +153,9 @@ const eas = readJson("eas.json");
 const gradle = readOptionalText("android/app/build.gradle");
 const mainManifest = readOptionalText("android/app/src/main/AndroidManifest.xml");
 const strings = readOptionalText("android/app/src/main/res/values/strings.xml");
+const developerRoute = readText("src/app/settings/developer.tsx");
+const generatedReleaseManifests = findGeneratedReleaseManifests();
+const requireGeneratedManifest = process.argv.includes("--require-generated-manifest");
 
 const productionAndroid = eas.build?.production?.android ?? {};
 const androidPermissions = app.expo.android?.permissions ?? [];
@@ -112,6 +170,11 @@ assert(
   app.expo.android?.package === "com.lab4code.moodinator",
   "Android package must be com.lab4code.moodinator"
 );
+assert(app.expo.scheme === "moodinator", "Expo deep-link scheme must be moodinator");
+assert(
+  app.expo.android?.allowBackup === false,
+  "app.json expo.android.allowBackup must be false"
+);
 assert(
   !androidPermissions.includes(systemAlertWindowPermission),
   "app.json Android permissions must not request SYSTEM_ALERT_WINDOW"
@@ -121,8 +184,27 @@ assert(
   "app.json expo.android.blockedPermissions must include android.permission.SYSTEM_ALERT_WINDOW"
 );
 assert(
+  androidBlockedPermissions.includes(advertisingIdPermission),
+  "app.json expo.android.blockedPermissions must include com.google.android.gms.permission.AD_ID"
+);
+const missingBlockedPermissions = [...requiredBlockedPermissions].filter(
+  (permission) => !androidBlockedPermissions.includes(permission)
+);
+assert(
+  missingBlockedPermissions.length === 0,
+  `app.json is missing required blocked permissions: ${missingBlockedPermissions.join(", ")}`
+);
+assert(
   productionAndroid.buildType !== "apk",
   "EAS production Android build must not be configured as APK; Play release needs an AAB"
+);
+assert(
+  eas.cli?.appVersionSource === "remote" && eas.build?.production?.autoIncrement === true,
+  "EAS production builds must use remote, auto-incremented Android version codes"
+);
+assert(
+  /if \(!__DEV__\) \{\s*return <Redirect href="\/\(tabs\)\/settings" \/>;/m.test(developerRoute),
+  "Developer settings route must redirect away in production builds"
 );
 
 if (gradle) {
@@ -133,30 +215,89 @@ if (gradle) {
     gradleVersionName === app.expo.version,
     `android/app/build.gradle versionName ${gradleVersionName} does not match app.json ${app.expo.version}`
   );
-  assert(
-    Number.isInteger(gradleVersionCode) && gradleVersionCode > 1,
-    "android/app/build.gradle versionCode must be greater than the initial debug value"
-  );
+  assert(Number.isInteger(gradleVersionCode) && gradleVersionCode > 0,
+    "android/app/build.gradle versionCode must be a positive integer");
 }
 
 if (mainManifest) {
+  const applicationTag = findTag(mainManifest, "application");
   const systemAlertWindowDeclarations = findPermissionDeclarations(
     mainManifest,
     systemAlertWindowPermission
+  );
+  const advertisingIdDeclarations = findPermissionDeclarations(
+    mainManifest,
+    advertisingIdPermission
+  );
+
+  assert(
+    readAndroidAttribute(applicationTag, "allowBackup") === "false",
+    "Main Android manifest must set android:allowBackup=\"false\"; regenerate stale native files"
   );
 
   assert(
     systemAlertWindowDeclarations.every(removesPermissionDuringMerge),
     "Main Android manifest may only declare SYSTEM_ALERT_WINDOW with tools:node=\"remove\""
   );
+  assert(
+    advertisingIdDeclarations.every(removesPermissionDuringMerge),
+    "Main Android manifest may only declare AD_ID with tools:node=\"remove\""
+  );
+  assert(
+    /<data\b[^>]*\bandroid:scheme\s*=\s*(["'])moodinator\1/i.test(mainManifest),
+    "Main Android manifest must use the moodinator deep-link scheme"
+  );
 }
 
-for (const manifestPath of findGeneratedReleaseManifests()) {
+assert(
+  !requireGeneratedManifest || generatedReleaseManifests.length > 0,
+  "No generated release manifest found. Run a clean Expo Android prebuild and Gradle :app:processReleaseMainManifest first."
+);
+
+for (const manifestPath of generatedReleaseManifests) {
   const manifest = fs.readFileSync(manifestPath, "utf8");
+  const relativeManifestPath = path.relative(root, manifestPath);
+  const manifestTag = findTag(manifest, "manifest");
+  const usesSdkTag = findTag(manifest, "uses-sdk");
+  const applicationTag = findTag(manifest, "application");
+  const actualPermissions = new Set(findDeclaredPermissions(manifest));
+  const unexpectedPermissions = [...actualPermissions].filter(
+    (permission) => !approvedReleasePermissions.has(permission)
+  );
+  const missingPermissions = [...approvedReleasePermissions].filter(
+    (permission) => !actualPermissions.has(permission)
+  );
+
+  assert(
+    /\bpackage\s*=\s*(["'])com\.lab4code\.moodinator\1/i.test(manifestTag),
+    `${relativeManifestPath} must use package com.lab4code.moodinator`
+  );
+  assert(
+    readAndroidAttribute(usesSdkTag, "targetSdkVersion") === "36",
+    `${relativeManifestPath} must target Android API 36`
+  );
+  assert(
+    readAndroidAttribute(applicationTag, "allowBackup") === "false",
+    `${relativeManifestPath} must set android:allowBackup=\"false\"`
+  );
+  assert(
+    /<data\b[^>]*\bandroid:scheme\s*=\s*(["'])moodinator\1/i.test(manifest),
+    `${relativeManifestPath} must use the moodinator deep-link scheme`
+  );
 
   assert(
     findPermissionDeclarations(manifest, systemAlertWindowPermission).length === 0,
-    `${path.relative(root, manifestPath)} must not contain SYSTEM_ALERT_WINDOW`
+    `${relativeManifestPath} must not contain SYSTEM_ALERT_WINDOW`
+  );
+  assert(
+    findPermissionDeclarations(manifest, advertisingIdPermission).length === 0,
+    `${relativeManifestPath} must not contain AD_ID`
+  );
+  assert(
+    unexpectedPermissions.length === 0 && missingPermissions.length === 0,
+    `${relativeManifestPath} permission surface differs from the approved baseline. ` +
+      `Unexpected: ${unexpectedPermissions.join(", ") || "none"}. ` +
+      `Missing: ${missingPermissions.join(", ") || "none"}.`
   );
 }
 

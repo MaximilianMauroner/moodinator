@@ -1,5 +1,6 @@
 import React, { useCallback } from "react";
 import { View, Text, ScrollView } from "react-native";
+import { Redirect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
@@ -15,7 +16,15 @@ import { SettingRow } from "@/features/settings/components/SettingRow";
 import { ToggleRow } from "@/features/settings/components/ToggleRow";
 import { Alert } from "@/components/ui/AppAlert";
 
-export default function DeveloperSettingsScreen() {
+export default function DeveloperSettingsRoute() {
+  if (!__DEV__) {
+    return <Redirect href="/(tabs)/settings" />;
+  }
+
+  return <DeveloperSettingsScreen />;
+}
+
+export function DeveloperSettingsScreen() {
   const devOptionsEnabled = useSettingsStore((state) => state.devOptionsEnabled);
   const setDevOptionsEnabled = useSettingsStore((state) => state.setDevOptionsEnabled);
   // hydrateSettings is called explicitly after AsyncStorage.clear() in the dev
