@@ -75,7 +75,8 @@ and backups.
 
 - `assets/store/google-play/icon-512.png`: 512×512 32-bit RGBA PNG store icon.
 - `assets/store/google-play/feature-graphic-1024x500.png`: 1024×500 PNG feature graphic draft; human visual approval required.
-- `assets/store/google-play/screenshots/`: 1080×2160 24-bit RGB portrait phone screenshots from a release QA build with fabricated data. Recapture from the final audited release candidate if its UI differs.
+- `assets/store/google-play/screenshots/01-home.png` through `04-quick-entry.png`: 1080×2160 24-bit RGB portrait phone screenshots from a release QA build with fabricated data. Recapture from the final audited release candidate if its UI differs.
+- `assets/store/google-play/screenshots/05-history-insights.png`: 1080×2160 24-bit RGB populated Findings screenshot captured on the `moodqa` Android 35 AVD from a locally signed universal APK generated from the audited production AAB version code 34. Its 100 entries came from the repository's synthetic QA fixture generator.
 
 ## Screenshot order and captions
 
@@ -83,6 +84,7 @@ and backups.
 2. Detailed entry — “Add the detail that matters to you”
 3. Data export — “Your history stays under your control”
 4. Quick entry — “Log how you feel in a moment”
+5. History and insights — “See descriptive findings from your history”
 
 ## Claim and submission guardrails
 

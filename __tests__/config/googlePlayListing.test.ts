@@ -76,7 +76,10 @@ describe("Google Play listing package", () => {
       .filter((name) => name.endsWith(".png"))
       .map((name) => join(assetRoot, "screenshots", name));
 
-    expect(screenshotPaths.length).toBeGreaterThanOrEqual(4);
+    expect(screenshotPaths.length).toBeGreaterThanOrEqual(5);
+    expect(screenshotPaths).toContain(
+      join(assetRoot, "screenshots", "05-history-insights.png")
+    );
     for (const screenshotPath of screenshotPaths) {
       const screenshot = readPngMetadata(screenshotPath);
       expect(screenshot.width).toBeGreaterThanOrEqual(320);
