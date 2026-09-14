@@ -56,6 +56,9 @@ export default function TermsOfServiceScreen() {
           <Paragraph>
             Export flows may use a temporary app-cache file and share sheet, or offer a clipboard copy. Failed sharing can leave a temporary file until the operating system clears it. Periodic OS-scheduled backups are not guaranteed to run; after storage is available, the background task may run automatically and limits its successful backups to at most once per week, while manual backups are not subject to that cadence. Android requires a selected folder. Moodinator keeps the eight newest app-managed backups it can identify and removes older identified managed backups, but cannot delete arbitrary exports, renamed copies, clipboard contents, or provider copies. Uninstall and platform backup or transfer behavior can vary. We cannot recover lost data or delete external copies.
           </Paragraph>
+          <Paragraph>
+            Send Feedback opens a prefilled GitHub issue form. Submitted feedback is public in the Moodinator repository and is handled under GitHub terms and privacy policy. Do not include private mood entries or other sensitive information.
+          </Paragraph>
         </Section>
 
         <View className="my-4 p-4 rounded-2xl bg-coral-100 dark:bg-coral-900">

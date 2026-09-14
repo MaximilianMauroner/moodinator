@@ -41,6 +41,9 @@ describe("legal document parity", () => {
       expect(source).toContain("database emotion records");
       expect(source).toContain("Emotion List presets");
       expect(source).toContain("no developer-side");
+      expect(source).toContain("prefilled");
+      expect(source).toContain("GitHub");
+      expect(source).toContain("Do not include private mood entries");
       expect(source).not.toContain("Android database is encrypted");
     }
   });
@@ -62,6 +65,9 @@ describe("legal document parity", () => {
       expect(source).toContain("Copyright (c) 2026 Moodinator contributors");
       expect(source).toContain("jurisdiction in which the app developer resides");
       expect(source).toContain("https://github.com/MaximilianMauroner/moodinator");
+      expect(source).toContain("Send Feedback");
+      expect(source).toContain("GitHub");
+      expect(source).toContain("Do not include private mood entries");
     }
   });
 
