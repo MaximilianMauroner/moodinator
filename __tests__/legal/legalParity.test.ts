@@ -71,4 +71,11 @@ describe("legal document parity", () => {
     expect(license).toContain("Permission is hereby granted, free of charge");
   });
 
+  it("keeps the public support email aligned across legal surfaces", () => {
+    for (const source of [privacyPolicy, privacyScreen, terms, termsScreen]) {
+      expect(source).toContain("lab4code.dev@gmail.com");
+      expect(source).not.toContain("support.moodinator@lab4code.com");
+    }
+  });
+
 });

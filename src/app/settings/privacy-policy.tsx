@@ -19,7 +19,7 @@ export default function PrivacyPolicyScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Text className="text-xs text-paper-700 dark:text-sand-400 mb-4">
-          Last Updated: September 8, 2026
+          Last Updated: September 14, 2026
         </Text>
 
         <Section title="Introduction">
@@ -113,7 +113,7 @@ export default function PrivacyPolicyScreen() {
 
         <Section title="Contact Us">
           <Paragraph>
-            Questions: support.moodinator@lab4code.com. Source: https://github.com/MaximilianMauroner/moodinator
+            Questions: lab4code.dev@gmail.com. Source: https://github.com/MaximilianMauroner/moodinator
           </Paragraph>
         </Section>
 
