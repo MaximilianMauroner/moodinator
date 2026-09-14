@@ -71,7 +71,7 @@ describe("Google Play listing package", () => {
     expect(featureGraphic.size).toBeLessThan(15_728_640);
   });
 
-  it("includes at least four portrait phone screenshots", () => {
+  it("includes at least five portrait phone screenshots", () => {
     const screenshotPaths = readdirSync(join(assetRoot, "screenshots"))
       .filter((name) => name.endsWith(".png"))
       .map((name) => join(assetRoot, "screenshots", name));
