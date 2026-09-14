@@ -7,6 +7,7 @@ const advertisingIdPermission = "com.google.android.gms.permission.AD_ID";
 const requiredBlockedPermissions = new Set([
   systemAlertWindowPermission,
   advertisingIdPermission,
+  "android.permission.FOREGROUND_SERVICE",
   "android.permission.READ_EXTERNAL_STORAGE",
   "android.permission.WRITE_EXTERNAL_STORAGE",
   "com.google.android.c2dm.permission.RECEIVE",
@@ -37,7 +38,6 @@ const approvedReleasePermissions = new Set([
   "android.permission.RECEIVE_BOOT_COMPLETED",
   "android.permission.POST_NOTIFICATIONS",
   "android.permission.WAKE_LOCK",
-  "android.permission.FOREGROUND_SERVICE",
   "com.lab4code.moodinator.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
 ]);
 const generatedManifestDirectoryNames = [
