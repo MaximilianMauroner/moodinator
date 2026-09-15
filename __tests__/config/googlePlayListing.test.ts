@@ -29,6 +29,10 @@ function readPngMetadata(path: string) {
 describe("Google Play listing package", () => {
   it("keeps required copy within Play limits and includes release guardrails", () => {
     const listing = readFileSync(listingPath, "utf8");
+    const onboarding = readFileSync(
+      "src/features/onboarding/content.ts",
+      "utf8"
+    );
     const shortDescription = listing.match(
       /## Short description\n\n([^\n]+)/
     )?.[1];
@@ -65,6 +69,9 @@ describe("Google Play listing package", () => {
     expect(listing).toContain("Mental and behavioral health");
     expect(listing).toContain("No required data collection or sharing");
     expect(listing).toMatch(/No preconfigured PIN is\s+supplied\./);
+    expect(onboarding).toContain("Your working data is stored locally.");
+    expect(onboarding).toContain("You control exports and backups.");
+    expect(onboarding).not.toContain("All your data stays on your device.");
   });
 
   it("includes upload-ready icon and feature-graphic files", () => {
