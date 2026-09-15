@@ -9,13 +9,26 @@ fabricated data only.
 - App name: Moodinator
 - Package: `com.lab4code.moodinator`
 - Category: Health & Fitness
-- Pricing assumption: Free
+- Pricing: Free
 - Ads: None
 - In-app purchases: None
 - Initial distribution: Global
-- Target audience: Pending human approval in #53
-- Support email: `lab4code.dev@gmail.com`
+- Target audience: Ages 13–15, 16–17, and 18+ (approved September 15, 2026)
+- Support email: `support.moodinator@lab4code.com`
+- Website: <https://github.com/MaximilianMauroner/moodinator>
 - Privacy policy: <https://github.com/MaximilianMauroner/moodinator/blob/main/PRIVACY_POLICY.md>
+
+## Declaration reference
+
+- Health apps: Mental and behavioral health; personal wellness only.
+- Ads, Advertising ID, government, and financial features: None.
+- IARC: ESRB E10+ (Violent References), PEGI 3, and USK 6+. Bundled
+  self-harm/crisis-support text was disclosed in the questionnaire.
+- Data Safety: No required data collection or sharing. This is based on no
+  developer-operated backend, account, analytics, advertising, or remote sync;
+  disabled Android Auto Backup; and user-initiated export, share, document
+  provider, and external-link flows. Revalidate this answer against every final
+  signed candidate and revise it if dependencies or data flows change.
 
 ## Short description
 
@@ -70,6 +83,20 @@ elsewhere can open Find A Helpline to locate external support resources.
 Initial Google Play release with private mood logging, searchable history,
 descriptive insights, local reminders, app lock, and user-controlled exports
 and backups.
+
+## App access and reviewer instructions
+
+- No Moodinator account, sign-in, subscription, or access credential is required.
+- App lock is optional and disabled on a fresh install. It does not block review.
+- On first launch, use **Next** to view the four onboarding pages, then choose
+  **Get Started**. Tap a mood on Home to create a quick entry, or press and hold
+  a mood to open the detailed entry form.
+- To review the optional local lock, open **Settings > Security > Enable App
+  Lock** and create any temporary 4- or 6-digit PIN. No preconfigured PIN is
+  supplied. Biometric review appears only when strong biometrics are supported
+  and enrolled. The PIN and biometric match remain on the device.
+- Use fabricated mood data only. No reviewer identity or personal health data is
+  needed.
 
 ## Graphic inventory
 

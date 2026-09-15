@@ -36,7 +36,7 @@ describe("Google Play listing package", () => {
       /## Full description\n\n([\s\S]*?)\n## Release notes/
     )?.[1];
     const releaseNotes = listing.match(
-      /## Release notes\n\n([\s\S]*?)\n## Graphic inventory/
+      /## Release notes\n\n([\s\S]*?)\n## App access and reviewer instructions/
     )?.[1];
 
     expect(shortDescription).toBeDefined();
@@ -50,9 +50,21 @@ describe("Google Play listing package", () => {
     );
     for (const publicContactPath of publicContactPaths) {
       const surface = readFileSync(publicContactPath, "utf8");
-      expect(surface).toContain("lab4code.dev@gmail.com");
-      expect(surface).not.toContain("support.moodinator@lab4code.com");
+      expect(surface).toContain("support.moodinator@lab4code.com");
+      expect(surface).not.toContain("lab4code.dev@gmail.com");
     }
+    expect(listing).toContain(
+      "Target audience: Ages 13–15, 16–17, and 18+"
+    );
+    expect(listing).toContain(
+      "No Moodinator account, sign-in, subscription, or access credential is required."
+    );
+    expect(listing).toContain(
+      "App lock is optional and disabled on a fresh install."
+    );
+    expect(listing).toContain("Mental and behavioral health");
+    expect(listing).toContain("No required data collection or sharing");
+    expect(listing).toMatch(/No preconfigured PIN is\s+supplied\./);
   });
 
   it("includes upload-ready icon and feature-graphic files", () => {
