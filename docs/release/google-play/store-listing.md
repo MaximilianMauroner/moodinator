@@ -8,6 +8,8 @@ fabricated data only.
 
 - App name: Moodinator
 - Package: `com.lab4code.moodinator`
+- Release candidate version: `0.1.5` (Android versionCode is assigned from the
+  monotonically increasing EAS remote counter)
 - Category: Health & Fitness
 - Pricing: Free
 - Ads: None

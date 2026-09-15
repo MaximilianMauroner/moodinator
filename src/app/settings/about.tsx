@@ -23,7 +23,7 @@ export default function AboutSettingsScreen() {
   const appVersion =
     Application.nativeApplicationVersion ??
     Constants.expoConfig?.version ??
-    "1.1.0";
+    "0.1.5";
   const buildVersion =
     Application.nativeBuildVersion ??
     Constants.expoConfig?.ios?.buildNumber ??

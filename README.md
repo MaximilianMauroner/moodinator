@@ -124,6 +124,10 @@ coverage, fixture generation, manual checks and performance captures.
 
 ### Versions and builds
 
+The current Google Play release candidate uses marketing version `0.1.5`.
+Android build numbers come from EAS's remote counter and must remain
+monotonically increasing independently of the marketing version.
+
 `bun run version:bump` explicitly increments the minor version in `app.json`
 and `package.json`. Build commands do not invoke it automatically. Run it only
 when preparing an intended version change. Native generation uses
