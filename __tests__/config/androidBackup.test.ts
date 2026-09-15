@@ -2,6 +2,23 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 describe("Android privacy configuration", () => {
+  it("keeps the release marketing version consistent", () => {
+    const appConfig = JSON.parse(readFileSync("app.json", "utf8")) as {
+      expo: { version?: string };
+    };
+    const packageMetadata = JSON.parse(
+      readFileSync("package.json", "utf8")
+    ) as { version?: string };
+    const aboutScreen = readFileSync(
+      "src/app/settings/about.tsx",
+      "utf8"
+    );
+
+    expect(appConfig.expo.version).toBe("0.1.5");
+    expect(packageMetadata.version).toBe(appConfig.expo.version);
+    expect(aboutScreen).toContain('??\n    "0.1.5"');
+  });
+
   it("disables Auto Backup and blocks unused sensitive permissions", () => {
     const appConfig = JSON.parse(readFileSync("app.json", "utf8")) as {
       expo: {

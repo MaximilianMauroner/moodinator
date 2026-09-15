@@ -163,6 +163,10 @@ const androidBlockedPermissions = app.expo.android?.blockedPermissions ?? [];
 
 assert(pkg.version === app.expo.version, "package.json and app.json versions differ");
 assert(
+  app.expo.version === "0.1.5",
+  `Google Play release marketing version must be 0.1.5, got ${app.expo.version}`
+);
+assert(
   app.expo.name === "Moodinator",
   "app.json expo.name must be Moodinator"
 );
