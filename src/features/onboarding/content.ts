@@ -40,7 +40,7 @@ export const onboardingPages: OnboardingPage[] = [
     id: "privacy",
     title: "Your Data, Your Control",
     subtitle: "Private and secure",
-    description: "All your data stays on your device. No accounts, no cloud sync, no tracking. Your thoughts remain yours alone.",
+    description: "Your working data is stored locally. No accounts, developer cloud sync, analytics, or ads. You control exports and backups.",
     icon: "lock-closed",
     accentColor: "#7A6545",
     accentColorDark: "#E0C993",
