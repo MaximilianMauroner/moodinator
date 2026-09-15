@@ -155,7 +155,7 @@ handoff; pull requests should reference the relevant task when one exists.
 
 ## Contact
 
-For support or feedback: lab4code.dev@gmail.com
+For support or feedback: support.moodinator@lab4code.com
 
 ## License
 

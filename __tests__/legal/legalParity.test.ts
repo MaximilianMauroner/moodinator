@@ -79,8 +79,8 @@ describe("legal document parity", () => {
 
   it("keeps the public support email aligned across legal surfaces", () => {
     for (const source of [privacyPolicy, privacyScreen, terms, termsScreen]) {
-      expect(source).toContain("lab4code.dev@gmail.com");
-      expect(source).not.toContain("support.moodinator@lab4code.com");
+      expect(source).toContain("support.moodinator@lab4code.com");
+      expect(source).not.toContain("lab4code.dev@gmail.com");
     }
   });
 

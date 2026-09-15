@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last Updated: September 14, 2026**
+**Last Updated: September 15, 2026**
 
 ## Introduction
 
@@ -72,6 +72,6 @@ We may update this Privacy Policy from time to time. We will identify changes by
 
 ## Contact and Source
 
-Questions about this Privacy Policy can be sent to **lab4code.dev@gmail.com**.
+Questions about this Privacy Policy can be sent to **support.moodinator@lab4code.com**.
 
 Source repository: <https://github.com/MaximilianMauroner/moodinator>

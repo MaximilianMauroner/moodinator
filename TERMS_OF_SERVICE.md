@@ -1,6 +1,6 @@
 # Terms of Service
 
-**Last Updated: September 14, 2026**
+**Last Updated: September 15, 2026**
 
 ## Agreement to Terms
 
@@ -56,6 +56,6 @@ If a provision is found unenforceable or invalid, it will be limited or eliminat
 
 ## Contact
 
-Questions about these Terms can be sent to **lab4code.dev@gmail.com**.
+Questions about these Terms can be sent to **support.moodinator@lab4code.com**.
 
 By using Moodinator, you acknowledge that you have read, understood, and agree to these Terms.
