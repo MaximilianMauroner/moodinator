@@ -48,7 +48,7 @@ If you choose **Send Feedback**, Moodinator opens a prefilled issue form on GitH
 
 ## Data Sharing and Sale
 
-We do not operate servers that receive your Moodinator data, and we do not sell it. Moodinator contains no advertising or analytics SDKs. Data can leave the app when you deliberately export, share, copy, import, open an external support action, or submit feedback to GitHub; when an OS-scheduled periodic backup runs after backup storage is available; or when the operating system handles device backup or transfer outside our control.
+We do not operate servers that receive your Moodinator data, and we do not sell it. Moodinator does not use advertising or analytics. Data can leave the app when you deliberately export, share, copy, import, open an external support action, or submit feedback to GitHub; when an OS-scheduled periodic backup runs after backup storage is available; or when the operating system handles device backup or transfer outside our control.
 
 ## Your Control and Deletion
 

@@ -84,7 +84,7 @@ export default function PrivacyPolicyScreen() {
 
         <Section title="Sharing and Sale">
           <Paragraph>
-            We do not operate servers that receive your Moodinator data, sell it, or use advertising or analytics SDKs. Data can leave through a deliberate export, share, copy, import, support action, or feedback submission to GitHub; when an OS-scheduled periodic backup runs after storage is available; or through platform backup or transfer behavior outside our control.
+            We do not operate servers that receive your Moodinator data or sell it. Moodinator does not use advertising or analytics. Data can leave through a deliberate export, share, copy, import, support action, or feedback submission to GitHub; when an OS-scheduled periodic backup runs after storage is available; or through platform backup or transfer behavior outside our control.
           </Paragraph>
         </Section>
 

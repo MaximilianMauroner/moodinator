@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { View, Text, AppState, AppStateStatus, ActivityIndicator, Pressable } from "react-native";
 import { Stack, useNavigationContainerRef, useRouter } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { registerBackgroundBackupTask } from "@db/backgroundBackup";
@@ -9,6 +10,7 @@ import { OnboardingScreen, useOnboardingStore } from "@/features/onboarding";
 import { AppToaster } from "@/components/ui/AppToaster";
 import { AppAlertProvider } from "@/components/ui/AppAlert";
 import { useSettingsStore } from "@/shared/state/settingsStore";
+import { useColorScheme } from "@/hooks/useColorScheme";
 import { runAppBootstrap, type AppBootstrapStatus } from "@/services/bootstrapService";
 import {
   startPendingReminderNavigation,
@@ -64,6 +66,7 @@ function AppLockRecovery({ retry }: { retry: () => void }) {
 export default function Layout() {
   const router = useRouter();
   const navigationRef = useNavigationContainerRef();
+  const isDark = useColorScheme() === "dark";
   const [bootstrapStatus, setBootstrapStatus] =
     useState<AppBootstrapStatus>("running");
   const [hasPendingReminderNavigation, setHasPendingReminderNavigation] =
@@ -158,6 +161,7 @@ export default function Layout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
+      <StatusBar style={isDark ? "light" : "dark"} />
       <View className="flex-1 bg-paper-100 dark:bg-paper-900">
         <View
           className="flex-1"
