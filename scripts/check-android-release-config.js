@@ -204,14 +204,14 @@ assert(
   "EAS production Android build must not be configured as APK; Play release needs an AAB"
 );
 assert(
-  eas.cli?.appVersionSource === "remote" && eas.build?.production?.autoIncrement === true,
-  "EAS production builds must use remote, auto-incremented Android version codes"
+  eas.cli?.appVersionSource === "local" && eas.build?.production?.autoIncrement === false,
+  "Release builds must use locally stamped version codes reserved by the shared release ledger"
 );
 assert(
   productionApk.extends === "production" &&
     productionApk.autoIncrement === false &&
     productionApk.android?.buildType === "apk",
-  "EAS production-apk builds must reuse the reserved remote version code"
+  "EAS production-apk builds must reuse the reserved version code"
 );
 assert(
   /if \(!__DEV__\) \{\s*return <Redirect href="\/\(tabs\)\/settings" \/>;/m.test(developerRoute),

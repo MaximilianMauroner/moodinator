@@ -52,7 +52,8 @@
         "com.oppo.launcher.permission.WRITE_SETTINGS",
         "me.everything.badger.permission.BADGE_COUNT_READ",
         "me.everything.badger.permission.BADGE_COUNT_WRITE"
-      ]
+      ],
+      "versionCode": 40
     },
     "web": {
       "bundler": "metro",
