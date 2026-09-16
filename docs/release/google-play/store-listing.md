@@ -64,7 +64,7 @@ LOCAL-FIRST BY DESIGN
 
 - No Moodinator account
 - No developer-operated data server
-- No advertising or analytics SDKs
+- Moodinator does not use advertising or analytics
 - Core mood tracking works offline
 - Export, share, and back up data only through destinations you select
 
