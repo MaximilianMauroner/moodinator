@@ -54,15 +54,5 @@
       },
       "autoIncrement": false
     }
-  },
-  "submit": {
-    "production": {},
-    "nightly": {
-      "android": {
-        "track": "internal",
-        "releaseStatus": "completed",
-        "changesNotSentForReview": true
-      }
-    }
   }
 }
