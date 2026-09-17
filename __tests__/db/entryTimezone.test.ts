@@ -1,7 +1,13 @@
 import { vi } from "vitest";
 import { createMockDb } from "./mockClient";
 import { getEntryLocalDayKey, getEntryLocalHour, getEntryLocalWeekday } from "../../src/lib/entryTimezone";
-import { insertMoodEntry, updateMoodEntry, getMoodsByMonth, getMoodHistorySummary } from "../../db/moods/repository";
+import {
+  insertMoodEntry,
+  updateMoodEntry,
+  updateMoodTimestamp,
+  getMoodsByMonth,
+  getMoodHistorySummary,
+} from "../../db/moods/repository";
 import { exportMoods, importMoods, importOldBackup } from "../../db/moods/importExport";
 
 const db = createMockDb();
@@ -15,6 +21,23 @@ it("retains the captured day and hour across travel and DST offsets", () => {
   expect(getEntryLocalWeekday({ timestamp, utcOffsetMinutes: -120 })).toBe(1);
   expect(getEntryLocalDayKey({ timestamp, utcOffsetMinutes: 420 })).toBe("2026-03-29");
   expect(getEntryLocalHour({ timestamp, utcOffsetMinutes: 420 })).toBe(16);
+});
+
+it("keeps an explicitly supplied recorded offset when a wall time is changed", async () => {
+  const original = await insertMoodEntry({
+    mood: 2,
+    timestamp: Date.parse("2026-03-31T12:00:56.789Z"),
+    utcOffsetMinutes: -120,
+  });
+
+  const changed = await updateMoodTimestamp(
+    original.id,
+    Date.parse("2026-04-01T03:30:56.789Z"),
+    -120,
+  );
+
+  expect(changed?.timestamp).toBe(Date.parse("2026-04-01T03:30:56.789Z"));
+  expect(changed?.utcOffsetMinutes).toBe(-120);
 });
 
 it("uses device local time for legacy records", () => {

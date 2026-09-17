@@ -4,6 +4,7 @@ import { getMoodItemLabel } from "@/constants/accessibility";
 import {
   getEntryLocalDateLabel,
   getEntryLocalDateParts,
+  getEntryLocalDayKey,
   getEntryLocalTimeLabel,
 } from "@/lib/entryTimezone";
 
@@ -21,6 +22,8 @@ describe("recorded entry time presentation", () => {
       day: 1,
       hour: 1,
       minute: 30,
+      second: 0,
+      millisecond: 0,
     });
     expect(getEntryLocalDateParts({ timestamp, utcOffsetMinutes: 420 })).toEqual({
       year: 2026,
@@ -28,6 +31,8 @@ describe("recorded entry time presentation", () => {
       day: 31,
       hour: 16,
       minute: 30,
+      second: 0,
+      millisecond: 0,
     });
     expect(getEntryLocalDateParts({ timestamp, utcOffsetMinutes: -345 })).toEqual({
       year: 2026,
@@ -35,6 +40,8 @@ describe("recorded entry time presentation", () => {
       day: 1,
       hour: 5,
       minute: 15,
+      second: 0,
+      millisecond: 0,
     });
   });
 
@@ -70,7 +77,14 @@ describe("recorded entry time presentation", () => {
     expect(getEntryLocalDateParts(invalid)).toBeNull();
 
     const epoch = { timestamp: 0, utcOffsetMinutes: null };
-    expect(getEntryLocalDateParts(epoch)?.year).toBeLessThan(new Date().getFullYear());
+    expect(getEntryLocalDateLabel(epoch)).toBe("Unknown date");
+    expect(getEntryLocalTimeLabel(epoch)).toBe("Unknown time");
+    expect(getEntryLocalDateParts(epoch)).toBeNull();
+    expect(getEntryLocalDayKey(epoch)).toBeNull();
+    expect(getMoodItemLabel(5, "Neutral", "Unknown date", "Unknown time")).toContain(
+      "Unknown date at Unknown time",
+    );
+    expect(getEntryLocalDateParts({ timestamp: Number.POSITIVE_INFINITY, utcOffsetMinutes: null })).toBeNull();
   });
 
   it("uses the same canonical labels for the history accessibility announcement", () => {

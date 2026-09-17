@@ -106,6 +106,14 @@ function normalizeEntryPresetKey(value: string): string {
     return value.trim().toLowerCase();
 }
 
+function runPostCommitEffect(label: string, effect: () => void): void {
+    try {
+        effect();
+    } catch (error) {
+        console.error(`${label} failed after the entry was saved:`, error);
+    }
+}
+
 const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     visible,
     title,
@@ -313,27 +321,34 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                     fieldConfig
                 )
             );
-            const offersCrisisSupport = shouldOfferCrisisSupport(mood);
-            if (offersCrisisSupport) haptics.reject();
-            else {
-                haptics.commit();
-                toastService.success(title === "Edit Entry" ? "Entry updated" : "Entry saved");
-            }
-
-            onClose();
-            if (offersCrisisSupport) {
-                setTimeout(showCrisisSupportAlert, 250);
-            }
         } catch (error) {
+            saveInFlightRef.current = false;
+            if (mountedRef.current) setIsSaving(false);
             console.error("Failed to save mood entry:", error);
-            haptics.reject();
+            runPostCommitEffect("Save failure haptic", () => haptics.reject());
             Alert.alert(
                 "Save failed",
                 "Unable to save your entry. Please try again."
             );
-        } finally {
-            saveInFlightRef.current = false;
-            if (mountedRef.current) setIsSaving(false);
+            return;
+        }
+
+        const offersCrisisSupport = shouldOfferCrisisSupport(mood);
+        if (offersCrisisSupport) {
+            runPostCommitEffect("Crisis haptic", () => haptics.reject());
+        } else {
+            runPostCommitEffect("Save haptic", () => haptics.commit());
+            runPostCommitEffect(
+                "Save acknowledgement",
+                () => toastService.success(title === "Edit Entry" ? "Entry updated" : "Entry saved"),
+            );
+        }
+
+        runPostCommitEffect("Save close", onClose);
+        if (offersCrisisSupport) {
+            setTimeout(() => {
+                runPostCommitEffect("Crisis support prompt", showCrisisSupportAlert);
+            }, 250);
         }
     }, [
         basedOnEntryId,

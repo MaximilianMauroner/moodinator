@@ -54,6 +54,7 @@ import {
   commitThenRunPostCommitEffects,
   getMoodEntryPersistenceValues,
   updateMoodEntryOrThrow,
+  updateMoodTimestampOrThrow,
 } from "@/lib/moodEntryPersistence";
 
 import type { MoodEntry } from "@db/types";
@@ -120,8 +121,13 @@ function HomeScreenContent() {
   );
 
   const handleDateTimeSave = useCallback(
-    async (moodId: number, newTimestamp: number) => {
-      await updateMoodTimestamp(moodId, newTimestamp);
+    async (moodId: number, newTimestamp: number, utcOffsetMinutes?: number | null) => {
+      await updateMoodTimestampOrThrow(
+        updateMoodTimestamp,
+        moodId,
+        newTimestamp,
+        utcOffsetMinutes,
+      );
       modals.closeDateModal();
     },
     [modals, updateMoodTimestamp]

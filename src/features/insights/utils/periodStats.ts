@@ -61,6 +61,8 @@ export function calculatePeriodStats(
 
   const moodsByDay: Record<string, { total: number; count: number }> = {};
   currentMoods.forEach((mood) => {
+    const weekday = getEntryLocalWeekday(mood);
+    if (weekday === null) return;
     const dayKey = [
       "Sunday",
       "Monday",
@@ -69,7 +71,7 @@ export function calculatePeriodStats(
       "Thursday",
       "Friday",
       "Saturday",
-    ][getEntryLocalWeekday(mood)];
+    ][weekday];
     if (!moodsByDay[dayKey]) {
       moodsByDay[dayKey] = { total: 0, count: 0 };
     }

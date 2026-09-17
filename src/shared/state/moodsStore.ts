@@ -37,7 +37,11 @@ export type MoodsStore = {
   ) => Promise<MoodEntry | null>;
   remove: (id: number) => Promise<MoodEntry | null>;
   restore: (entry: MoodEntryInput) => Promise<MoodEntry>;
-  updateTimestamp: (id: number, timestamp: number) => Promise<MoodEntry | null>;
+  updateTimestamp: (
+    id: number,
+    timestamp: number,
+    utcOffsetMinutes?: number | null,
+  ) => Promise<MoodEntry | null>;
   setLocal: (moods: MoodEntry[]) => void;
 };
 
@@ -240,8 +244,8 @@ export const useMoodsStore = create<MoodsStore>((set, get) => {
       await loadAll();
     },
 
-    updateTimestamp: async (id, timestamp) => {
-      return workflow.reschedule(id, timestamp);
+    updateTimestamp: async (id, timestamp, utcOffsetMinutes) => {
+      return workflow.reschedule(id, timestamp, utcOffsetMinutes);
     },
 
     create: async (entry) => {

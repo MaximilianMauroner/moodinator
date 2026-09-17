@@ -4,7 +4,13 @@ import type { MoodEntryFormValues } from "@/components/entry/moodEntryDraft";
 type UpdateMoodEntry = (
   id: number,
   updates: Partial<MoodEntryInput & { mood: number }>,
-) => Promise<MoodEntry | null>;
+) => Promise<MoodEntry | null | undefined>;
+
+type UpdateMoodTimestamp = (
+  id: number,
+  timestamp: number,
+  utcOffsetMinutes?: number | null,
+) => Promise<MoodEntry | null | undefined>;
 
 export function getMoodEntryPersistenceValues(
   values: MoodEntryFormValues,
@@ -25,6 +31,20 @@ export async function updateMoodEntryOrThrow(
   values: MoodEntryFormValues,
 ): Promise<MoodEntry> {
   const updated = await updateMood(id, getMoodEntryPersistenceValues(values));
+  if (!updated) {
+    throw new Error("This entry is no longer available.");
+  }
+
+  return updated;
+}
+
+export async function updateMoodTimestampOrThrow(
+  updateMoodTimestamp: UpdateMoodTimestamp,
+  id: number,
+  timestamp: number,
+  utcOffsetMinutes?: number | null,
+): Promise<MoodEntry> {
+  const updated = await updateMoodTimestamp(id, timestamp, utcOffsetMinutes);
   if (!updated) {
     throw new Error("This entry is no longer available.");
   }

@@ -364,6 +364,67 @@ describe("entry save acknowledgement", () => {
     expect(renderer.root.findByProps({ testID: "entry-notes" }).props.value).toBe("private draft");
   });
 
+  it("does not turn a throwing success toast into a retryable save", async () => {
+    const onClose = vi.fn();
+    const onSubmit = vi.fn(async () => {});
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    entryFeedback.toastSuccess.mockImplementationOnce(() => {
+      throw new Error("toast unavailable");
+    });
+
+    try {
+      await render(<SaveEntryModal variant="quick" onClose={onClose} onSubmit={onSubmit} />);
+      await act(async () => {
+        renderer.root.findByProps({ accessibilityLabel: "Save entry" }).props.onPress();
+        await Promise.resolve();
+      });
+      await act(async () => {
+        renderer.root.findByProps({ accessibilityLabel: "Saving" }).props.onPress();
+        await Promise.resolve();
+      });
+
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(entryFeedback.toastSuccess).toHaveBeenCalledTimes(1);
+      expect(entryFeedback.alert).not.toHaveBeenCalledWith(
+        "Save failed",
+        "Unable to save your entry. Please try again.",
+      );
+    } finally {
+      consoleSpy.mockRestore();
+    }
+  });
+
+  it("does not retry a committed write when closing the modal throws", async () => {
+    const onClose = vi.fn(() => {
+      throw new Error("close unavailable");
+    });
+    const onSubmit = vi.fn(async () => {});
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      await render(<SaveEntryModal variant="quick" onClose={onClose} onSubmit={onSubmit} />);
+      await act(async () => {
+        renderer.root.findByProps({ accessibilityLabel: "Save entry" }).props.onPress();
+        await Promise.resolve();
+      });
+      await act(async () => {
+        renderer.root.findByProps({ accessibilityLabel: "Saving" }).props.onPress();
+        await Promise.resolve();
+      });
+
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(entryFeedback.toastSuccess).toHaveBeenCalledTimes(1);
+      expect(entryFeedback.alert).not.toHaveBeenCalledWith(
+        "Save failed",
+        "Unable to save your entry. Please try again.",
+      );
+    } finally {
+      consoleSpy.mockRestore();
+    }
+  });
+
   it("keeps a disappeared edit open through the real workflow callback", async () => {
     const update = vi.fn(async () => undefined);
     const workflow = createMoodEntryWorkflow(

@@ -11,6 +11,8 @@ export type EntryLocalDateParts = {
   day: number;
   hour: number;
   minute: number;
+  second: number;
+  millisecond: number;
 };
 
 function hasRecordedOffset(entry: EntryTime): entry is EntryTime & { utcOffsetMinutes: number } {
@@ -19,7 +21,7 @@ function hasRecordedOffset(entry: EntryTime): entry is EntryTime & { utcOffsetMi
 }
 
 function getDisplayDate(entry: EntryTime): { date: Date; recordedOffset: boolean } | null {
-  if (!Number.isFinite(entry.timestamp)) {
+  if (!Number.isFinite(entry.timestamp) || entry.timestamp === UNREADABLE_TIMESTAMP) {
     return null;
   }
 
@@ -31,11 +33,14 @@ function getDisplayDate(entry: EntryTime): { date: Date; recordedOffset: boolean
   return Number.isNaN(date.getTime()) ? null : { date, recordedOffset };
 }
 
-function localParts(entry: EntryTime) {
-  const offset = entry.utcOffsetMinutes;
-  const recorded = typeof offset === "number" && Number.isInteger(offset) && Math.abs(offset) <= 840;
-  const date = new Date(entry.timestamp - (recorded ? offset * 60_000 : 0));
-  return recorded
+function localParts(entry: EntryTime): [number, number, number, number, number] | null {
+  const display = getDisplayDate(entry);
+  if (!display) {
+    return null;
+  }
+
+  const { date, recordedOffset } = display;
+  return recordedOffset
     ? [date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), date.getUTCHours(), date.getUTCDay()]
     : [date.getFullYear(), date.getMonth(), date.getDate(), date.getHours(), date.getDay()];
 }
@@ -51,11 +56,16 @@ function localParts(entry: EntryTime) {
  * the real history into its last pixels.
  */
 export function hasKnownDate(entry: EntryTime): boolean {
-  return entry.timestamp !== UNREADABLE_TIMESTAMP;
+  return Number.isFinite(entry.timestamp) && entry.timestamp !== UNREADABLE_TIMESTAMP;
 }
 
-export function getEntryLocalDayKey(entry: EntryTime): string {
-  const [year, month, day] = localParts(entry);
+export function getEntryLocalDayKey(entry: EntryTime): string | null {
+  const parts = localParts(entry);
+  if (!parts) {
+    return null;
+  }
+
+  const [year, month, day] = parts;
   return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
@@ -107,6 +117,8 @@ export function getEntryLocalDateParts(entry: EntryTime): EntryLocalDateParts | 
         day: date.getUTCDate(),
         hour: date.getUTCHours(),
         minute: date.getUTCMinutes(),
+        second: date.getUTCSeconds(),
+        millisecond: date.getUTCMilliseconds(),
       }
     : {
         year: date.getFullYear(),
@@ -114,15 +126,28 @@ export function getEntryLocalDateParts(entry: EntryTime): EntryLocalDateParts | 
         day: date.getDate(),
         hour: date.getHours(),
         minute: date.getMinutes(),
+        second: date.getSeconds(),
+        millisecond: date.getMilliseconds(),
       };
 }
 
-export function getEntryLocalHour(entry: EntryTime): number {
-  return localParts(entry)[3];
+export function getEntryLocalHour(entry: EntryTime): number | null {
+  return localParts(entry)?.[3] ?? null;
 }
 
-export function getEntryLocalWeekday(entry: EntryTime): number {
-  return localParts(entry)[4];
+export function getEntryLocalWeekday(entry: EntryTime): number | null {
+  return localParts(entry)?.[4] ?? null;
+}
+
+/** Convert captured wall-clock parts back to an instant using UTC-minus-local offset. */
+export function getTimestampFromEntryLocalDateParts(
+  parts: EntryLocalDateParts,
+  utcOffsetMinutes: number,
+): number {
+  const wallClock = new Date(0);
+  wallClock.setUTCFullYear(parts.year, parts.month, parts.day);
+  wallClock.setUTCHours(parts.hour, parts.minute, parts.second, parts.millisecond);
+  return wallClock.getTime() + utcOffsetMinutes * 60_000;
 }
 
 /** Locale-aware clock time in the entry's captured offset, without rebucketing it. */

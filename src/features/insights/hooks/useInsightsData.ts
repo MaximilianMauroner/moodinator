@@ -49,6 +49,7 @@ async function queryLocalDays(range: AnalysisRange, today: number) {
   const lastDay = format(end, "yyyy-MM-dd");
   return entries.filter((entry) => {
     const day = getEntryLocalDayKey(entry);
+    if (!day) return false;
     return day >= firstDay && day <= lastDay;
   });
 }
@@ -160,6 +161,7 @@ export function useInsightsData(): InsightsData {
           return oldest;
         }
         const day = getEntryLocalDayKey(entry);
+        if (!day) return oldest;
         return day < oldest ? day : oldest;
       },
       format(new Date(localDay), "yyyy-MM-dd"),

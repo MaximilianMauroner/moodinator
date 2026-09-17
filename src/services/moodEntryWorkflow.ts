@@ -9,7 +9,8 @@ export interface MoodEntryWorkflowRepository {
   delete: (id: number) => Promise<void>;
   updateTimestamp: (
     id: number,
-    timestamp: number
+    timestamp: number,
+    utcOffsetMinutes?: number | null,
   ) => Promise<MoodEntry | undefined>;
 }
 
@@ -60,8 +61,12 @@ export function createMoodEntryWorkflow(
       return updated;
     },
 
-    async reschedule(id: number, timestamp: number): Promise<MoodEntry | null> {
-      const updated = await repository.updateTimestamp(id, timestamp);
+    async reschedule(
+      id: number,
+      timestamp: number,
+      utcOffsetMinutes?: number | null,
+    ): Promise<MoodEntry | null> {
+      const updated = await repository.updateTimestamp(id, timestamp, utcOffsetMinutes);
       if (!updated) {
         return null;
       }

@@ -15,7 +15,7 @@ export function calculateStreak(
   const dateSet = new Set<string>();
   moods.forEach((mood) => {
     const dateKey = getEntryLocalDayKey(mood);
-    dateSet.add(dateKey);
+    if (dateKey) dateSet.add(dateKey);
   });
 
   const dates = Array.from(dateSet).sort().reverse(); // Most recent first
