@@ -1,6 +1,6 @@
 import { vi } from "vitest";
 import { createMockDb } from "./mockClient";
-import { getMoodsPaginated, getMoodsInRange, getAllMoods } from "../../db/moods/repository";
+import { getMoodsPaginated, getMoodsWithinRange, getAllMoods } from "../../db/moods/repository";
 import type { MoodHistoryFilters } from "../../db/moods/repository";
 import { LEGACY_HIGHER_IS_BETTER_MOOD_SCALE_SNAPSHOT } from "../../domain/moodScale";
 const db = createMockDb();
@@ -46,7 +46,7 @@ it("orders equal timestamps by id across pages and matches full-range totals", a
   expect(first.total).toBe(100);
   expect(first.hasMore).toBe(true);
   expect([...first.data, ...second.data].map(entry => entry.id)).toEqual((await getAllMoods()).slice(0, 26).map(entry => entry.id));
-  const range = await getMoodsInRange(1010, 1020);
+  const range = await getMoodsWithinRange({ startDate: 1010, endDate: 1020 });
   expect(range).toEqual((await getAllMoods()).filter(entry => entry.timestamp >= 1010 && entry.timestamp <= 1020));
   expect((await query({ startDate: 1010, endDate: 1020 })).total).toBe(range.length);
 });

@@ -74,20 +74,7 @@ describe("runAppBootstrap", () => {
     const result = await runAppBootstrap();
     const state = await readMigrationState();
 
-    expect(result).toMatchObject({
-      status: "ready",
-      navigationPolicy: "wait-for-migrations",
-      migrations: [
-        {
-          id: LEGACY_EMOTION_CATEGORY_MIGRATION_ID,
-          version: 1,
-          status: "completed",
-          attempts: 1,
-          migrated: 2,
-          skipped: 1,
-        },
-      ],
-    });
+    expect(result).toEqual({ status: "ready" });
     expect(mocks.invalidate).toHaveBeenCalledTimes(1);
     expect(mocks.ensureFresh).toHaveBeenCalledTimes(1);
     expect(state.migrations[LEGACY_EMOTION_CATEGORY_MIGRATION_ID]).toMatchObject({
@@ -95,6 +82,17 @@ describe("runAppBootstrap", () => {
       status: "completed",
       attempts: 1,
     });
+  });
+
+  it("does not refresh history when the migration changed nothing", async () => {
+    mocks.migrateEmotionsToCategories.mockResolvedValue({
+      migrated: 0,
+      skipped: 4,
+    });
+
+    await runAppBootstrap();
+
+    expect(mocks.invalidate).not.toHaveBeenCalled();
   });
 
   it("skips a completed versioned migration", async () => {
@@ -107,9 +105,20 @@ describe("runAppBootstrap", () => {
     const result = await runAppBootstrap();
 
     expect(mocks.migrateEmotionsToCategories).not.toHaveBeenCalled();
-    expect(result.migrations[0]).toMatchObject({
-      status: "skipped",
-      attempts: 1,
+    expect(result.status).toBe("ready");
+  });
+
+  it("adopts the pre-state completion flag instead of rerunning", async () => {
+    // Installs that completed before the state record existed must not rescan.
+    await AsyncStorage.setItem("emotionCategoryMigrationCompleted", "true");
+
+    const result = await runAppBootstrap();
+    const state = await readMigrationState();
+
+    expect(mocks.migrateEmotionsToCategories).not.toHaveBeenCalled();
+    expect(result.status).toBe("ready");
+    expect(state.migrations[LEGACY_EMOTION_CATEGORY_MIGRATION_ID]).toMatchObject({
+      status: "completed",
     });
   });
 
@@ -120,10 +129,6 @@ describe("runAppBootstrap", () => {
     const state = await readMigrationState();
 
     expect(result.status).toBe("ready-with-warning");
-    expect(result.migrations[0]).toMatchObject({
-      status: "retryable-failure",
-      attempts: 1,
-    });
     expect(mocks.toastError).not.toHaveBeenCalled();
     expect(state.migrations[LEGACY_EMOTION_CATEGORY_MIGRATION_ID]).toMatchObject({
       status: "retryable-failure",
@@ -144,10 +149,6 @@ describe("runAppBootstrap", () => {
     const state = await readMigrationState();
 
     expect(result.status).toBe("ready-with-warning");
-    expect(result.migrations[0]).toMatchObject({
-      status: "failed",
-      attempts: 3,
-    });
     expect(mocks.toastError).toHaveBeenCalledWith(
       "Migration issue",
       "We couldn't finish updating some past mood entries. New entries will still work."
@@ -171,9 +172,6 @@ describe("runAppBootstrap", () => {
     const result = await runAppBootstrap();
 
     expect(mocks.migrateEmotionsToCategories).not.toHaveBeenCalled();
-    expect(result.migrations[0]).toMatchObject({
-      status: "skipped",
-      attempts: 1,
-    });
+    expect(result.status).toBe("ready");
   });
 });

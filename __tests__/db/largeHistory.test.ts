@@ -2,7 +2,7 @@ import { vi } from "vitest";
 import { createMockDb } from "./mockClient";
 import {
   getMoodHistorySummary,
-  getMoodsInRange,
+  getMoodsWithinRange,
   getMoodsPaginated,
 } from "../../db/moods/repository";
 import { getEntryLocalDayKey } from "../../src/lib/entryTimezone";
@@ -80,7 +80,7 @@ it.each([1_000, 10_000])(
     const inRange = newestFirst.filter(
       (entry) => entry.timestamp >= startDate && entry.timestamp <= endDate
     );
-    expect((await getMoodsInRange(startDate, endDate)).map((entry) => entry.id))
+    expect((await getMoodsWithinRange({ startDate, endDate })).map((entry) => entry.id))
       .toEqual(inRange.map((entry) => entry.id));
 
     const expectedFiltered = inRange.filter((entry) => {

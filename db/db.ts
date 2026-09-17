@@ -6,7 +6,6 @@ export {
   getMoodCount,
   getMoodHistorySummary,
   getMoodsWithinRange,
-  getMoodsInRange,
   getMoodsByMonth,
   getMoodsPaginated,
   hasMoodBeenLoggedToday,

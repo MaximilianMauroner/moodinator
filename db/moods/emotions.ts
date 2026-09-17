@@ -477,16 +477,3 @@ export async function applyEmotionHistoricalUpdate(
   });
 }
 
-export async function renameEmotionInMoodEntries(
-  oldName: string,
-  newName: string
-): Promise<{ updated: number }> {
-  return applyEmotionHistoricalUpdate({ type: "rename", oldName, newName });
-}
-
-export async function recategorizeEmotionInMoodEntries(
-  name: string,
-  category: Emotion["category"]
-): Promise<{ updated: number }> {
-  return applyEmotionHistoricalUpdate({ type: "category", name, category });
-}

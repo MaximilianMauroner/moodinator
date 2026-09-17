@@ -486,24 +486,6 @@ export async function getMoodsWithinRange(
 }
 
 /**
- * Get moods in a specific timestamp range (optimized for index usage)
- * @param startDate - Start timestamp in milliseconds
- * @param endDate - End timestamp in milliseconds
- */
-export async function getMoodsInRange(
-  startDate: number,
-  endDate: number
-): Promise<MoodEntry[]> {
-  const db = await getDb();
-  const rows = await db.getAllAsync<MoodRow>(
-    "SELECT * FROM moods WHERE timestamp >= ? AND timestamp <= ? ORDER BY timestamp DESC, id DESC;",
-    startDate,
-    endDate
-  );
-  return rows.map(toMoodEntry);
-}
-
-/**
  * Get moods grouped by day for a specific month
  * @param year - The year (e.g., 2024)
  * @param month - The month (0-11, where 0 is January)

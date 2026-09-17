@@ -6,7 +6,6 @@
 
 import type { MoodEntry, MoodEntryInput, Emotion } from "@db/types";
 import {
-  insertMood,
   insertMoodEntry,
   updateMoodEntry,
   updateMoodNote,
@@ -50,7 +49,6 @@ export interface MoodServiceInterface {
   getPaginated: (options: PaginationOptions) => Promise<PaginatedResult<MoodEntry>>;
   getInRange: (range?: MoodDateRange) => Promise<MoodEntry[]>;
   getByMonth: (year: number, month: number) => Promise<Map<number, MoodEntry[]>>;
-  getToday: () => Promise<MoodEntry | null>;
   getYesterday: () => Promise<MoodEntry | null>;
   getLastEntry: () => Promise<MoodEntry | null>;
   getCount: () => Promise<number>;
@@ -62,13 +60,6 @@ export interface MoodServiceInterface {
   updateNote: (id: number, note: string) => Promise<MoodEntry | undefined>;
   updateTimestamp: (id: number, timestamp: number) => Promise<MoodEntry | undefined>;
 
-  // Legacy insert function
-  insertLegacy: (
-    mood: number,
-    note?: string,
-    metadata?: Omit<MoodEntryInput, "mood" | "note">
-  ) => Promise<MoodEntry>;
-
   // Emotion management in moods
   updateEmotionCategory: (
     emotionName: string,
@@ -76,24 +67,6 @@ export interface MoodServiceInterface {
   ) => Promise<{ updated: number }>;
   getEmotionNames: () => Promise<string[]>;
   getContextTags: () => Promise<string[]>;
-}
-
-/**
- * Helper to get start of today in ms
- */
-function getStartOfToday(): number {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return today.getTime();
-}
-
-/**
- * Helper to get end of today in ms
- */
-function getEndOfToday(): number {
-  const today = new Date();
-  today.setHours(23, 59, 59, 999);
-  return today.getTime();
 }
 
 /**
@@ -118,16 +91,10 @@ function getEndOfYesterday(): number {
 
 export const moodService: MoodServiceInterface = {
   getHistorySummary: () => getMoodHistorySummary(),
-  /**
-   * Create a new mood entry
-   */
   async create(entry: MoodEntryInput): Promise<MoodEntry> {
     return insertMoodEntry(entry);
   },
 
-  /**
-   * Update an existing mood entry
-   */
   async update(
     id: number,
     updates: Partial<MoodEntryInput>
@@ -135,30 +102,18 @@ export const moodService: MoodServiceInterface = {
     return updateMoodEntry(id, updates);
   },
 
-  /**
-   * Delete a mood entry
-   */
   async delete(id: number): Promise<void> {
     await deleteMood(id);
   },
 
-  /**
-   * Get all mood entries, sorted by timestamp descending
-   */
   async getAll(): Promise<MoodEntry[]> {
     return getAllMoods();
   },
 
-  /**
-   * Get mood entries with pagination
-   */
   async getPaginated(options: PaginationOptions): Promise<PaginatedResult<MoodEntry>> {
     return getMoodsPaginated(options);
   },
 
-  /**
-   * Get mood entries within a date range
-   */
   async getInRange(range?: MoodDateRange): Promise<MoodEntry[]> {
     return getMoodsWithinRange(range);
   },
@@ -167,20 +122,6 @@ export const moodService: MoodServiceInterface = {
     return getMoodsByMonth(year, month);
   },
 
-  /**
-   * Get the most recent mood entry from today
-   */
-  async getToday(): Promise<MoodEntry | null> {
-    const moods = await getMoodsWithinRange({
-      startDate: getStartOfToday(),
-      endDate: getEndOfToday(),
-    });
-    return moods.length > 0 ? moods[0] : null;
-  },
-
-  /**
-   * Get the most recent mood entry from yesterday (for "same as yesterday" feature)
-   */
   async getYesterday(): Promise<MoodEntry | null> {
     const moods = await getMoodsWithinRange({
       startDate: getStartOfYesterday(),
@@ -189,23 +130,14 @@ export const moodService: MoodServiceInterface = {
     return moods.length > 0 ? moods[0] : null;
   },
 
-  /**
-   * Get the most recent mood entry (for "same as last entry" feature)
-   */
   async getLastEntry(): Promise<MoodEntry | null> {
     return getLatestMood();
   },
 
-  /**
-   * Get total count of mood entries
-   */
   async getCount(): Promise<number> {
     return getMoodCount();
   },
 
-  /**
-   * Check if a mood has been logged today
-   */
   async hasLoggedToday(): Promise<boolean> {
     return hasMoodBeenLoggedToday();
   },
@@ -218,16 +150,10 @@ export const moodService: MoodServiceInterface = {
     return seedMoods();
   },
 
-  /**
-   * Update just the note of a mood entry
-   */
   async updateNote(id: number, note: string): Promise<MoodEntry | undefined> {
     return updateMoodNote(id, note);
   },
 
-  /**
-   * Update just the timestamp of a mood entry
-   */
   async updateTimestamp(
     id: number,
     timestamp: number
@@ -235,20 +161,6 @@ export const moodService: MoodServiceInterface = {
     return updateMoodTimestamp(id, timestamp);
   },
 
-  /**
-   * Legacy insert function (for backwards compatibility)
-   */
-  async insertLegacy(
-    mood: number,
-    note?: string,
-    metadata?: Omit<MoodEntryInput, "mood" | "note">
-  ): Promise<MoodEntry> {
-    return insertMood(mood, note, metadata);
-  },
-
-  /**
-   * Update emotion category across all moods
-   */
   async updateEmotionCategory(
     emotionName: string,
     category: Emotion["category"]
@@ -256,16 +168,10 @@ export const moodService: MoodServiceInterface = {
     return updateEmotionCategoryInMoods(emotionName, category);
   },
 
-  /**
-   * Get all unique emotion names used in moods
-   */
   async getEmotionNames(): Promise<string[]> {
     return getEmotionNamesFromMoods();
   },
 
-  /**
-   * Get all unique context tags used in moods
-   */
   async getContextTags(): Promise<string[]> {
     return getContextTagsFromMoods();
   },
