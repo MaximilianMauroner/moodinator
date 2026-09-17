@@ -2,6 +2,7 @@ import React from "react";
 import { Text } from "react-native";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import type { Finding } from "../utils/findings";
+import { rangeWords } from "../utils/findings";
 import { ComparisonBars } from "./DriverRow";
 export function FindingCard({ finding }: { finding: Finding }) {
   return (
@@ -12,6 +13,11 @@ export function FindingCard({ finding }: { finding: Finding }) {
       <Text className="text-base font-semibold text-paper-800 dark:text-paper-200">
         {finding.text}
       </Text>
+      {finding.range && (
+        <Text className="mt-1 text-sm text-paper-700 dark:text-sand-300">
+          {rangeWords(finding.range[0], finding.range[1])}
+        </Text>
+      )}
       <Text className="mt-2 text-sm text-paper-700 dark:text-sand-300">
         {finding.sample}
       </Text>

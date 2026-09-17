@@ -3,6 +3,7 @@ import type { MoodEntry } from "@db/types";
 import { getInterpretedMoodRating } from "@/constants/moodScaleInterpretation";
 import { getMoodHex } from "@/lib/moodPresentation";
 import { getThemedColor } from "@/constants/colors";
+import { addToGroup, emptyGroup, groupMean, type GroupStats } from "./statistics";
 export const DAYPARTS = ["Morning", "Midday", "Evening", "Night"] as const;
 export const WEEKDAYS = [
   "Monday",
@@ -18,24 +19,25 @@ export interface RhythmCell {
   daypart: number;
   count: number;
   mean: number | null;
+  /** Second moment, so a cell can be compared against the rest with a spread. */
+  stats: GroupStats;
 }
 export function rhythm(entries: MoodEntry[]): RhythmCell[] {
   const cells = Array.from({ length: 28 }, (_, i) => ({
     weekday: i % 7,
     daypart: Math.floor(i / 7),
-    count: 0,
-    total: 0,
+    stats: emptyGroup(),
   }));
   for (const entry of entries) {
     const hour = getEntryLocalHour(entry);
     const part = hour < 12 ? 0 : hour < 17 ? 1 : hour < 22 ? 2 : 3;
     const cell = cells[part * 7 + ((getEntryLocalWeekday(entry) + 6) % 7)];
-    cell.count++;
-    cell.total += getInterpretedMoodRating(entry);
+    addToGroup(cell.stats, getInterpretedMoodRating(entry));
   }
-  return cells.map(({ total, ...cell }) => ({
+  return cells.map((cell) => ({
     ...cell,
-    mean: cell.count ? total / cell.count : null,
+    count: cell.stats.count,
+    mean: cell.stats.count ? groupMean(cell.stats) : null,
   }));
 }
 export function rhythmCellColor(cell: RhythmCell, isDark: boolean): string {

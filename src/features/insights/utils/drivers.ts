@@ -1,5 +1,15 @@
 import type { MoodEntry } from "@db/types";
 import { getInterpretedMoodRating } from "@/constants/moodScaleInterpretation";
+import {
+  addToGroup,
+  compareGroups,
+  emptyGroup,
+  groupMean,
+  subtractGroup,
+  type GroupStats,
+} from "./statistics";
+
+export const MIN_GROUP_SIZE = 5;
 
 export interface Driver {
   id: string;
@@ -10,20 +20,25 @@ export interface Driver {
   withMean: number;
   withoutMean: number;
   effect: number;
+  ciLow: number;
+  ciHigh: number;
 }
 export interface DriverAnalysis {
   drivers: Driver[];
+  /** Too few entries on one side to compare at all. */
   shortfalls: { name: string; withMissing: number; withoutMissing: number }[];
+  /** Enough entries, but the groups overlap too much to claim a difference. */
+  inconclusive: { name: string }[];
 }
 export function drivers(entries: MoodEntry[]): DriverAnalysis {
   const groups = new Map<
     string,
-    { name: string; kind: Driver["kind"]; sum: number; count: number }
+    { name: string; kind: Driver["kind"]; stats: GroupStats }
   >();
-  let total = 0;
+  const overall = emptyGroup();
   for (const entry of entries) {
     const value = getInterpretedMoodRating(entry);
-    total += value;
+    addToGroup(overall, value);
     const labels: { name: string; kind: Driver["kind"] }[] = [
       ...new Set(entry.contextTags),
     ].map((name) => ({ name, kind: "context" as const }));
@@ -35,34 +50,43 @@ export function drivers(entries: MoodEntry[]): DriverAnalysis {
     );
     for (const { name, kind } of labels) {
       const id = `${kind}:${name}`;
-      const group = groups.get(id) ?? { name, kind, sum: 0, count: 0 };
-      group.sum += value;
-      group.count++;
+      const group = groups.get(id) ?? { name, kind, stats: emptyGroup() };
+      addToGroup(group.stats, value);
       groups.set(id, group);
     }
   }
-  const result: DriverAnalysis = { drivers: [], shortfalls: [] };
+  const result: DriverAnalysis = {
+    drivers: [],
+    shortfalls: [],
+    inconclusive: [],
+  };
   for (const [id, group] of groups) {
-    const withoutCount = entries.length - group.count;
-    if (group.count < 5 || withoutCount < 5) {
+    const rest = subtractGroup(overall, group.stats);
+    if (group.stats.count < MIN_GROUP_SIZE || rest.count < MIN_GROUP_SIZE) {
       result.shortfalls.push({
         name: group.name,
-        withMissing: Math.max(0, 5 - group.count),
-        withoutMissing: Math.max(0, 5 - withoutCount),
+        withMissing: Math.max(0, MIN_GROUP_SIZE - group.stats.count),
+        withoutMissing: Math.max(0, MIN_GROUP_SIZE - rest.count),
       });
       continue;
     }
-    const withMean = group.sum / group.count;
-    const withoutMean = (total - group.sum) / withoutCount;
+    const comparison = compareGroups(group.stats, rest);
+    if (!comparison.separated) {
+      // Enough entries to look, not enough separation to say anything.
+      result.inconclusive.push({ name: group.name });
+      continue;
+    }
     result.drivers.push({
       id,
       name: group.name,
       kind: group.kind,
-      withCount: group.count,
-      withoutCount,
-      withMean,
-      withoutMean,
-      effect: withMean - withoutMean,
+      withCount: group.stats.count,
+      withoutCount: rest.count,
+      withMean: groupMean(group.stats),
+      withoutMean: groupMean(rest),
+      effect: comparison.effect,
+      ciLow: comparison.ciLow,
+      ciHigh: comparison.ciHigh,
     });
   }
   result.drivers.sort(
