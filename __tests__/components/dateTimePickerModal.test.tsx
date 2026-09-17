@@ -112,7 +112,10 @@ function picker(mode: "date" | "time") {
   return renderer.root.findByProps({ mode });
 }
 
-function pickerEvent(type: "set" | "dismissed", date: Date) {
+function pickerEvent(
+  type: "set" | "dismissed" | "neutralButtonPressed",
+  date: Date,
+) {
   return {
     type,
     nativeEvent: { timestamp: date.getTime(), utcOffset: 0 },
@@ -180,7 +183,6 @@ describe("DateTimePickerModal timestamp round trips", () => {
     const onClose = vi.fn();
     const onSave = async (id: number, timestamp: number, offset?: number | null) => {
       await updateMoodTimestampOrThrow(workflow.reschedule, id, timestamp, offset);
-      onClose();
     };
 
     await renderModal(original, onSave, onClose);
@@ -203,6 +205,92 @@ describe("DateTimePickerModal timestamp round trips", () => {
     );
   });
 
+  it("uses the workflow persistence boundary and closes once after a date commit", async () => {
+    process.env.TZ = "UTC";
+    const original = entry(Date.parse("2026-03-31T23:30:56.123Z"), -120);
+    const updated = { ...original, timestamp: Date.parse("2026-04-01T23:30:56.123Z") };
+    const repository = {
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      updateTimestamp: vi.fn(async () => updated),
+    };
+    const applyMutation = vi.fn();
+    const workflow = createMoodEntryWorkflow(repository, {
+      getMoods: () => [original],
+      applyMutation,
+    });
+    const onClose = vi.fn();
+    const onSave = (id: number, timestamp: number, offset?: number | null) =>
+      updateMoodTimestampOrThrow(workflow.reschedule, id, timestamp, offset);
+
+    await renderModal(original, onSave, onClose);
+    await act(async () => button("Change entry date").props.onPress());
+    await act(async () => setPickerValue("date", new Date("2026-04-02T01:30:00.000Z")));
+    await act(async () => button("Save date and time changes").props.onPress());
+
+    expect(repository.updateTimestamp).toHaveBeenCalledWith(
+      7,
+      Date.parse("2026-04-01T23:30:56.123Z"),
+      -120,
+    );
+    expect(applyMutation).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(dateFeedback.commit).toHaveBeenCalledTimes(1);
+  });
+
+  it("retains a missing-row draft through refresh and permits a genuine retry", async () => {
+    process.env.TZ = "UTC";
+    const original = entry(Date.parse("2026-03-31T23:30:56.123Z"), -120);
+    const refreshed = { ...original, note: "Store refreshed" };
+    const updated = { ...refreshed, timestamp: Date.parse("2026-04-01T23:30:56.123Z") };
+    const repository = {
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      updateTimestamp: vi.fn()
+        .mockResolvedValueOnce(undefined)
+        .mockResolvedValueOnce(updated),
+    };
+    const applyMutation = vi.fn();
+    const workflow = createMoodEntryWorkflow(repository, {
+      getMoods: () => [original],
+      applyMutation,
+    });
+    const onClose = vi.fn();
+    const onSave = (id: number, timestamp: number, offset?: number | null) =>
+      updateMoodTimestampOrThrow(workflow.reschedule, id, timestamp, offset);
+
+    await renderModal(original, onSave, onClose);
+    await act(async () => button("Change entry date").props.onPress());
+    await act(async () => setPickerValue("date", new Date("2026-04-02T01:30:00.000Z")));
+    await act(async () => button("Save date and time changes").props.onPress());
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(textValues()).toContain("Modified");
+    expect(button("Save date and time changes").props.accessibilityState.disabled).toBe(false);
+
+    await act(async () => {
+      renderer.update(
+        <DateTimePickerModal
+          visible
+          mood={refreshed}
+          onClose={onClose}
+          onSave={onSave}
+        />,
+      );
+    });
+    expect(textValues()).toContain("Modified");
+    expect(button("Save date and time changes").props.accessibilityState.disabled).toBe(false);
+
+    await act(async () => button("Save date and time changes").props.onPress());
+
+    expect(repository.updateTimestamp).toHaveBeenCalledTimes(2);
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(dateFeedback.reject).toHaveBeenCalledTimes(1);
+    expect(dateFeedback.commit).toHaveBeenCalledTimes(1);
+  });
+
   it("converts an explicitly changed recorded wall date using the saved offset", async () => {
     process.env.TZ = "UTC";
     const timestamp = Date.parse("2026-03-31T23:30:56.789Z");
@@ -216,6 +304,23 @@ describe("DateTimePickerModal timestamp round trips", () => {
       7,
       Date.parse("2026-04-01T23:30:56.789Z"),
       -120,
+    );
+  });
+
+  it("preserves known sub-minute precision when the native time callback is minute-only", async () => {
+    process.env.TZ = "UTC";
+    const { onSave } = await renderModal(
+      entry(Date.parse("2026-03-31T12:34:56.789Z"), 0),
+    );
+
+    await act(async () => button("Change entry time").props.onPress());
+    await act(async () => setPickerValue("time", new Date("2026-03-31T13:45:00.000Z")));
+    await act(async () => button("Save date and time changes").props.onPress());
+
+    expect(onSave).toHaveBeenCalledWith(
+      7,
+      Date.parse("2026-03-31T13:45:56.789Z"),
+      0,
     );
   });
 
@@ -259,7 +364,7 @@ describe("DateTimePickerModal timestamp round trips", () => {
     expect(onSave).toHaveBeenCalledWith(7, Date.parse("2026-01-15T17:00:00.000Z"), 300);
   });
 
-  it("does not assign fallback dates when Android dismisses either picker", async () => {
+  it("does not assign fallback dates for Android non-selection events", async () => {
     process.env.TZ = "UTC";
     nativePlatform.OS = "android";
     vi.useFakeTimers();
@@ -277,7 +382,10 @@ describe("DateTimePickerModal timestamp round trips", () => {
     await act(async () => button("Change entry time").props.onPress());
     const dismissedTime = picker("time").props.value;
     await act(async () => {
-      picker("time").props.onChange(pickerEvent("dismissed", dismissedTime), dismissedTime);
+      picker("time").props.onChange(
+        pickerEvent("neutralButtonPressed", dismissedTime),
+        dismissedTime,
+      );
     });
 
     expect(button("Save date and time changes").props.accessibilityState.disabled).toBe(true);
@@ -285,7 +393,7 @@ describe("DateTimePickerModal timestamp round trips", () => {
     expect(onSave).not.toHaveBeenCalled();
   });
 
-  it("preserves an existing draft when Android dismisses either picker with a date", async () => {
+  it("preserves an existing draft for Android non-selection events with a date", async () => {
     process.env.TZ = "UTC";
     nativePlatform.OS = "android";
     const { onSave } = await renderModal(
@@ -301,7 +409,10 @@ describe("DateTimePickerModal timestamp round trips", () => {
     await act(async () => button("Change entry date").props.onPress());
     const dismissedDate = picker("date").props.value;
     await act(async () => {
-      picker("date").props.onChange(pickerEvent("dismissed", dismissedDate), dismissedDate);
+      picker("date").props.onChange(
+        pickerEvent("neutralButtonPressed", dismissedDate),
+        dismissedDate,
+      );
     });
 
     await act(async () => button("Change entry time").props.onPress());
@@ -369,6 +480,10 @@ describe("DateTimePickerModal timestamp round trips", () => {
         "Error",
         "Could not update this entry's date and time.",
       );
+
+      await act(async () => button("Save date and time changes").props.onPress());
+      expect(onSave).toHaveBeenCalledTimes(1);
+      expect(onClose).toHaveBeenCalledTimes(1);
     } finally {
       errorSpy.mockRestore();
     }

@@ -128,9 +128,8 @@ function HomeScreenContent() {
         newTimestamp,
         utcOffsetMinutes,
       );
-      modals.closeDateModal();
     },
-    [modals, updateMoodTimestamp]
+    [updateMoodTimestamp]
   );
 
   const handleMoodItemLongPress = useCallback(
