@@ -121,12 +121,12 @@ export const DateTimePickerModal: React.FC<Props> = ({
       : [];
   }, [mood?.emotions]);
 
-  const handleDateChange = (_event: DateTimePickerEvent, date?: Date) => {
+  const handleDateChange = (event: DateTimePickerEvent, date?: Date) => {
     if (saving) return;
     if (Platform.OS === "android") {
       setShowDatePicker(false);
     }
-    if (date) {
+    if (event.type === "set" && date) {
       const current = wallClockParts ?? getDeviceDateParts(date);
       const next = {
         ...current,
@@ -139,12 +139,12 @@ export const DateTimePickerModal: React.FC<Props> = ({
     }
   };
 
-  const handleTimeChange = (_event: DateTimePickerEvent, time?: Date) => {
+  const handleTimeChange = (event: DateTimePickerEvent, time?: Date) => {
     if (saving) return;
     if (Platform.OS === "android") {
       setShowTimePicker(false);
     }
-    if (time) {
+    if (event.type === "set" && time) {
       const current = wallClockParts ?? getDeviceDateParts(time);
       const next = {
         ...current,

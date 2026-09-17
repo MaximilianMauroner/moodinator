@@ -112,6 +112,17 @@ function picker(mode: "date" | "time") {
   return renderer.root.findByProps({ mode });
 }
 
+function pickerEvent(type: "set" | "dismissed", date: Date) {
+  return {
+    type,
+    nativeEvent: { timestamp: date.getTime(), utcOffset: 0 },
+  };
+}
+
+function setPickerValue(mode: "date" | "time", date: Date) {
+  picker(mode).props.onChange(pickerEvent("set", date), date);
+}
+
 function textValues() {
   return renderer.root
     .findAllByType("Text")
@@ -174,9 +185,7 @@ describe("DateTimePickerModal timestamp round trips", () => {
 
     await renderModal(original, onSave, onClose);
     await act(async () => button("Change entry date").props.onPress());
-    await act(async () => {
-      picker("date").props.onChange({}, new Date("2026-04-02T01:30:00.000Z"));
-    });
+    await act(async () => setPickerValue("date", new Date("2026-04-02T01:30:00.000Z")));
     await act(async () => button("Save date and time changes").props.onPress());
 
     expect(repository.updateTimestamp).toHaveBeenCalledWith(
@@ -200,9 +209,7 @@ describe("DateTimePickerModal timestamp round trips", () => {
     const { onSave } = await renderModal(entry(timestamp, -120));
 
     await act(async () => button("Change entry date").props.onPress());
-    await act(async () => {
-      picker("date").props.onChange({}, new Date("2026-04-02T01:30:00.000Z"));
-    });
+    await act(async () => setPickerValue("date", new Date("2026-04-02T01:30:00.000Z")));
     await act(async () => button("Save date and time changes").props.onPress());
 
     expect(onSave).toHaveBeenCalledWith(
@@ -232,9 +239,7 @@ describe("DateTimePickerModal timestamp round trips", () => {
     const { onSave } = await renderModal(entry(Date.parse(now), null));
 
     await act(async () => button("Change entry date").props.onPress());
-    await act(async () => {
-      picker("date").props.onChange({}, new Date(selected));
-    });
+    await act(async () => setPickerValue("date", new Date(selected)));
     await act(async () => button("Save date and time changes").props.onPress());
 
     expect(onSave).toHaveBeenCalledWith(7, Date.parse(expected), expect.any(Number));
@@ -248,12 +253,66 @@ describe("DateTimePickerModal timestamp round trips", () => {
     const { onSave } = await renderModal(entry(0, null));
 
     await act(async () => button("Change entry date").props.onPress());
-    await act(async () => {
-      picker("date").props.onChange({}, new Date("2026-01-15T12:00:00-05:00"));
-    });
+    await act(async () => setPickerValue("date", new Date("2026-01-15T12:00:00-05:00")));
     await act(async () => button("Save date and time changes").props.onPress());
 
     expect(onSave).toHaveBeenCalledWith(7, Date.parse("2026-01-15T17:00:00.000Z"), 300);
+  });
+
+  it("does not assign fallback dates when Android dismisses either picker", async () => {
+    process.env.TZ = "UTC";
+    nativePlatform.OS = "android";
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-01T12:00:00.000Z"));
+    const { onSave } = await renderModal(entry(0, null));
+
+    expect(button("Save date and time changes").props.accessibilityState.disabled).toBe(true);
+
+    await act(async () => button("Change entry date").props.onPress());
+    const dismissedDate = picker("date").props.value;
+    await act(async () => {
+      picker("date").props.onChange(pickerEvent("dismissed", dismissedDate), dismissedDate);
+    });
+
+    await act(async () => button("Change entry time").props.onPress());
+    const dismissedTime = picker("time").props.value;
+    await act(async () => {
+      picker("time").props.onChange(pickerEvent("dismissed", dismissedTime), dismissedTime);
+    });
+
+    expect(button("Save date and time changes").props.accessibilityState.disabled).toBe(true);
+    expect(textValues()).not.toContain("Modified");
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it("preserves an existing draft when Android dismisses either picker with a date", async () => {
+    process.env.TZ = "UTC";
+    nativePlatform.OS = "android";
+    const { onSave } = await renderModal(
+      entry(Date.parse("2026-04-01T12:00:00.000Z"), 0),
+    );
+    const selectedDate = new Date("2026-04-02T12:00:00.000Z");
+
+    await act(async () => button("Change entry date").props.onPress());
+    await act(async () => setPickerValue("date", selectedDate));
+    expect(button("Save date and time changes").props.accessibilityState.disabled).toBe(false);
+    expect(textValues()).toContain("Modified");
+
+    await act(async () => button("Change entry date").props.onPress());
+    const dismissedDate = picker("date").props.value;
+    await act(async () => {
+      picker("date").props.onChange(pickerEvent("dismissed", dismissedDate), dismissedDate);
+    });
+
+    await act(async () => button("Change entry time").props.onPress());
+    const dismissedTime = picker("time").props.value;
+    await act(async () => {
+      picker("time").props.onChange(pickerEvent("dismissed", dismissedTime), dismissedTime);
+    });
+
+    expect(button("Save date and time changes").props.accessibilityState.disabled).toBe(false);
+    expect(textValues()).toContain("Modified");
+    expect(onSave).not.toHaveBeenCalled();
   });
 
   it("persists the normalized visible time when a legacy date edit crosses a spring DST gap", async () => {
@@ -262,9 +321,7 @@ describe("DateTimePickerModal timestamp round trips", () => {
     const { onSave } = await renderModal(original);
 
     await act(async () => button("Change entry date").props.onPress());
-    await act(async () => {
-      picker("date").props.onChange({}, new Date(2026, 2, 8, 3, 30, 12, 345));
-    });
+    await act(async () => setPickerValue("date", new Date(2026, 2, 8, 3, 30, 12, 345)));
     await act(async () => button("Save date and time changes").props.onPress());
 
     expect(onSave).toHaveBeenCalledWith(
@@ -281,7 +338,7 @@ describe("DateTimePickerModal timestamp round trips", () => {
     const { onSave } = await renderModal(original);
 
     await act(async () => button("Change entry date").props.onPress());
-    await act(async () => picker("date").props.onChange({}, selected));
+    await act(async () => setPickerValue("date", selected));
     await act(async () => button("Save date and time changes").props.onPress());
 
     expect(onSave).toHaveBeenCalledWith(
@@ -302,9 +359,7 @@ describe("DateTimePickerModal timestamp round trips", () => {
     try {
       await renderModal(entry(Date.parse("2026-04-01T12:00:00.000Z"), 0), onSave, onClose);
       await act(async () => button("Change entry date").props.onPress());
-      await act(async () => {
-        picker("date").props.onChange({}, new Date("2026-04-02T12:00:00.000Z"));
-      });
+      await act(async () => setPickerValue("date", new Date("2026-04-02T12:00:00.000Z")));
       await act(async () => button("Save date and time changes").props.onPress());
 
       expect(onSave).toHaveBeenCalledTimes(1);
@@ -327,7 +382,7 @@ describe("DateTimePickerModal timestamp round trips", () => {
     const { onSave } = await renderModal(entry(0, null));
 
     await act(async () => button("Change entry date").props.onPress());
-    await act(async () => picker("date").props.onChange({}, normalized));
+    await act(async () => setPickerValue("date", normalized));
     await act(async () => button("Save date and time changes").props.onPress());
 
     expect(normalized.getHours()).toBe(3);
@@ -355,9 +410,7 @@ describe("DateTimePickerModal timestamp round trips", () => {
     expect(onSave).not.toHaveBeenCalled();
 
     await act(async () => button("Change entry date").props.onPress());
-    await act(async () => {
-      picker("date").props.onChange({}, new Date("2026-04-05T09:15:00.000Z"));
-    });
+    await act(async () => setPickerValue("date", new Date("2026-04-05T09:15:00.000Z")));
     await act(async () => button("Save date and time changes").props.onPress());
 
     expect(onSave).toHaveBeenCalledWith(7, Date.parse("2026-04-05T07:15:00.000Z"), -120);
