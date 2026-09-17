@@ -18,20 +18,28 @@ export interface Finding {
   /** Range the comparison supports, shown so a claim is not read as exact. */
   range?: [number, number];
 }
-export function effectWords(effect: number): string {
-  return Math.abs(effect) < 0.05
-    ? "about the same"
-    : `${Math.abs(effect).toFixed(1)} ${effect < 0 ? "better" : "worse"}`;
-}
 /**
- * A range is only shown for a claim whose interval excludes zero, so a bound
- * that rounds to 0.0 has to read as small rather than as nothing. Printing
- * [-0.044, -0.016] as "between 0.0 and 0.0 better" denies the very evidence
- * the claim was shown for.
+ * An effect or a bound is only ever put into words for a comparison that
+ * separated, meaning its interval excludes zero. A magnitude that rounds to 0.0
+ * therefore has to read as small rather than as nothing. Printing
+ * [-0.044, -0.016] as "between 0.0 and 0.0 better" denies the very evidence the
+ * claim was shown for.
  */
 const SMALLEST_SHOWN = 0.05;
 const size = (value: number) => Math.abs(value).toFixed(1);
 const tooSmallToShow = (value: number) => Math.abs(value) < SMALLEST_SHOWN;
+
+/**
+ * Only call this for an effect from a separated comparison. A tiny effect can
+ * still be supported by a large history, so it keeps its direction: calling a
+ * 0.04 gap "about the same" contradicts the range printed directly beneath it.
+ */
+export function effectWords(effect: number): string {
+  const direction = effect < 0 ? "better" : "worse";
+  return tooSmallToShow(effect)
+    ? `less than 0.1 ${direction}`
+    : `${size(effect)} ${direction}`;
+}
 
 export function rangeWords(low: number, high: number): string {
   const direction = (value: number) => (value < 0 ? "better" : "worse");
@@ -89,7 +97,7 @@ export function findings(
   };
   const claims: Candidate[] = analysis.drivers.map((d) => ({
     id: d.id,
-    text: `Entries ${d.kind === "context" ? "tagged" : "with"} ${d.name} average ${effectWords(d.effect)} ${Math.abs(d.effect) < 0.05 ? "as" : "than"} entries without.`,
+    text: `Entries ${d.kind === "context" ? "tagged" : "with"} ${d.name} average ${effectWords(d.effect)} than entries without.`,
     sample: `${d.withCount} with · ${d.withoutCount} without`,
     effect: d.effect,
     means: [d.withMean, d.withoutMean],
@@ -108,7 +116,7 @@ export function findings(
     }
     claims.push({
       id: `rhythm:${cell.weekday}:${cell.daypart}`,
-      text: `${WEEKDAYS[cell.weekday]} ${DAYPARTS[cell.daypart].toLowerCase()} entries average ${effectWords(comparison.effect)} ${Math.abs(comparison.effect) < 0.05 ? "as" : "than"} the rest of this period.`,
+      text: `${WEEKDAYS[cell.weekday]} ${DAYPARTS[cell.daypart].toLowerCase()} entries average ${effectWords(comparison.effect)} than the rest of this period.`,
       sample: `${cell.stats.count} in this time slot · ${rest.count} other entries`,
       effect: comparison.effect,
       means: [cell.mean, rest.sum / rest.count],

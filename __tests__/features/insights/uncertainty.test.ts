@@ -7,7 +7,11 @@ vi.mock("@/hooks/useColorScheme", () => ({ useColorScheme: () => "dark" }));
 import { analyzeMoods } from "../../../src/features/insights/utils/analysis";
 import { drivers } from "../../../src/features/insights/utils/drivers";
 import { rhythm } from "../../../src/features/insights/utils/rhythm";
-import { findings, rangeWords } from "../../../src/features/insights/utils/findings";
+import {
+  effectWords,
+  findings,
+  rangeWords,
+} from "../../../src/features/insights/utils/findings";
 import {
   compareGroups,
   confidenceInterval,
@@ -393,6 +397,30 @@ describe("analyzeMoods", () => {
 
     expect(result.drivers).toEqual([]);
     expect(result.findings.every((f) => f.effect === null)).toBe(true);
+  });
+});
+
+/**
+ * A claim's heading and its range sit one above the other on the same card, so
+ * they must not disagree. A large history can support an effect below 0.05, and
+ * calling that "about the same" while the range underneath says "better"
+ * contradicts itself.
+ */
+describe("effectWords", () => {
+  it("keeps a supported tiny effect directional", () => {
+    expect(effectWords(-0.04)).toBe("less than 0.1 better");
+    expect(effectWords(0.04)).toBe("less than 0.1 worse");
+    expect(effectWords(-0.04)).not.toContain("about the same");
+  });
+
+  it("still reads the magnitude when there is one to read", () => {
+    expect(effectWords(-1.24)).toBe("1.2 better");
+    expect(effectWords(2.4)).toBe("2.4 worse");
+  });
+
+  it("agrees with the range printed under it", () => {
+    expect(effectWords(-0.03)).toContain("better");
+    expect(rangeWords(-0.044, -0.016)).toContain("better");
   });
 });
 
