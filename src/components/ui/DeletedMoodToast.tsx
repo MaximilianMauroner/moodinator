@@ -6,6 +6,7 @@ import type { MoodEntry } from "@db/types";
 import { useThemeColors, getThemedColor } from "@/constants/colors";
 import { getMoodRatingDisplay } from "@/constants/moodScaleInterpretation";
 import { fontFamilies, typography } from "@/constants/typography";
+import { getEntryLocalDateLabel, getEntryLocalTimeLabel } from "@/lib/entryTimezone";
 
 interface DeletedMoodToastProps {
   entry: MoodEntry;
@@ -39,14 +40,8 @@ function MoodChangeToast({
   );
 
   const timestampLabel = useMemo(
-    () =>
-      new Date(entry.timestamp).toLocaleString([], {
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-      }),
-    [entry.timestamp]
+    () => `${getEntryLocalDateLabel(entry)}, ${getEntryLocalTimeLabel(entry)}`,
+    [entry]
   );
 
   return (

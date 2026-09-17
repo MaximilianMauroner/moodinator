@@ -9,12 +9,11 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useColorScheme } from "nativewind";
-import { format } from "date-fns";
 import Animated, { FadeInUp } from "react-native-reanimated";
 import type { MoodEntry, MoodScaleSnapshot } from "@db/types";
 import { getEnergySegmentColor, getThemedColor } from "@/constants/colors";
 import {
-  getEntryLocalDayKey,
+  getEntryLocalDateLabel,
   getEntryLocalTimeLabel,
 } from "@/lib/entryTimezone";
 import { motion } from "@/constants/motion";
@@ -131,10 +130,7 @@ export function EntryDetailModal({
                   className="text-sm mt-1"
                   style={{ color: getThemedColor("iconSand", isDark) }}
                 >
-                  {format(
-                    new Date(`${getEntryLocalDayKey(entry)}T12:00:00`),
-                    "EEEE, MMMM d, yyyy",
-                  )}
+                  {getEntryLocalDateLabel(entry, "detail")}
                 </Text>
                 <Text
                   className="text-sm"

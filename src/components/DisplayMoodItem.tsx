@@ -25,6 +25,7 @@ import { Alert } from "@/components/ui/AppAlert";
 import { getMoodItemLabel, getMoodItemHint } from "@/constants/accessibility";
 import { motion, springs } from "@/constants/motion";
 import { haptics } from "@/lib/haptics";
+import { getEntryLocalDateLabel, getEntryLocalTimeLabel } from "@/lib/entryTimezone";
 import { useSettingsStore } from "@/shared/state/settingsStore";
 
 interface Props {
@@ -157,20 +158,14 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
       [getCategoryColors, mood.contextTags, mood.id, sortedEmotions]
     );
 
-    const formattedDate = new Date(mood.timestamp).toLocaleDateString([], {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-    });
-    const formattedTime = new Date(mood.timestamp).toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    const formattedDate = getEntryLocalDateLabel(mood);
+    const formattedTime = getEntryLocalTimeLabel(mood);
 
     const accessibilityLabel = getMoodItemLabel(
       mood.mood,
       moodData.label,
-      new Date(mood.timestamp)
+      formattedDate,
+      formattedTime,
     );
 
     const triggerSwipeAction = useCallback(

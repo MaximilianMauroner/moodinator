@@ -37,6 +37,7 @@ import {
 import { haptics } from "@/lib/haptics";
 import { shouldOfferCrisisSupport } from "@/lib/crisisSupport";
 import { showCrisisSupportAlert } from "@/lib/showCrisisSupportAlert";
+import { toastService } from "@/services/toastService";
 import {
     ContextTagChip,
     MoodAdjustRow,
@@ -127,6 +128,8 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     const notesFocusedRef = useRef(false);
     const notesContainerYRef = useRef(0);
     const notesScrollTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+    const saveInFlightRef = useRef(false);
+    const mountedRef = useRef(true);
 
     // ── Form state
     const [mood, setMood] = useState(initialMood);
@@ -255,6 +258,12 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
 
     // ── Reset on open
     useEffect(() => {
+        return () => {
+            mountedRef.current = false;
+        };
+    }, []);
+
+    useEffect(() => {
         if (visible) {
             const draft = initialDraft;
             setMood(draft.mood);
@@ -263,6 +272,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
             setEnergy(draft.energy);
             setNote(draft.note);
             setBasedOnEntryId(draft.basedOnEntryId);
+            saveInFlightRef.current = false;
             setIsSaving(false);
             setCurrentStep(0);
             setIsNotesFocused(false);
@@ -292,8 +302,10 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
 
     // ── Save
     const handleSave = useCallback(async () => {
-        if (isSaving) return;
+        if (saveInFlightRef.current) return;
+        saveInFlightRef.current = true;
         setIsSaving(true);
+
         try {
             await onSubmit(
                 buildMoodEntrySubmitValues(
@@ -301,12 +313,12 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                     fieldConfig
                 )
             );
-            // A crisis level entry is still a successful write, but a celebratory
-            // confirmation reads as the wrong response. Pair it with the support
-            // alert instead, so the feedback matches what follows.
             const offersCrisisSupport = shouldOfferCrisisSupport(mood);
             if (offersCrisisSupport) haptics.reject();
-            else haptics.commit();
+            else {
+                haptics.commit();
+                toastService.success(title === "Edit Entry" ? "Entry updated" : "Entry saved");
+            }
 
             onClose();
             if (offersCrisisSupport) {
@@ -320,7 +332,8 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                 "Unable to save your entry. Please try again."
             );
         } finally {
-            setIsSaving(false);
+            saveInFlightRef.current = false;
+            if (mountedRef.current) setIsSaving(false);
         }
     }, [
         basedOnEntryId,
@@ -328,11 +341,11 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
         emotions,
         energy,
         fieldConfig,
-        isSaving,
         mood,
         note,
         onClose,
         onSubmit,
+        title,
     ]);
 
     const handleNext = useCallback(() => {

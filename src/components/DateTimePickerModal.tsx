@@ -10,6 +10,7 @@ import { getMoodRatingDisplay } from "@/constants/moodScaleInterpretation";
 import { useThemeColors, colors } from "@/constants/colors";
 import { haptics } from "@/lib/haptics";
 import { Alert } from "@/components/ui/AppAlert";
+import { getEntryLocalDateParts } from "@/lib/entryTimezone";
 
 interface Props {
   visible: boolean;
@@ -17,6 +18,17 @@ interface Props {
   onClose: () => void;
   onSave: (moodId: number, newTimestamp: number) => Promise<void> | void;
   onEdit?: (mood: MoodEntry) => void;
+}
+
+function getPickerDate(mood: MoodEntry): Date {
+  const parts = getEntryLocalDateParts(mood);
+  if (!parts) {
+    // Keep an unreadable legacy value visibly historical rather than turning it
+    // into a plausible current date.
+    return new Date(0);
+  }
+
+  return new Date(parts.year, parts.month, parts.day, parts.hour, parts.minute);
 }
 
 export const DateTimePickerModal: React.FC<Props> = ({
@@ -34,7 +46,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
 
   React.useEffect(() => {
     if (mood) {
-      setSelectedDate(new Date(mood.timestamp));
+      setSelectedDate(getPickerDate(mood));
     }
   }, [mood]);
 

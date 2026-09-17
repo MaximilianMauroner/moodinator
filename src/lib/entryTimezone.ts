@@ -3,6 +3,34 @@ import type { MoodEntry } from "../../db/types";
 
 type EntryTime = Pick<MoodEntry, "timestamp" | "utcOffsetMinutes">;
 
+type EntryDateStyle = "history" | "detail";
+
+export type EntryLocalDateParts = {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+};
+
+function hasRecordedOffset(entry: EntryTime): entry is EntryTime & { utcOffsetMinutes: number } {
+  const offset = entry.utcOffsetMinutes;
+  return typeof offset === "number" && Number.isInteger(offset) && Math.abs(offset) <= 840;
+}
+
+function getDisplayDate(entry: EntryTime): { date: Date; recordedOffset: boolean } | null {
+  if (!Number.isFinite(entry.timestamp)) {
+    return null;
+  }
+
+  const recordedOffset = hasRecordedOffset(entry);
+  const date = new Date(
+    entry.timestamp - (recordedOffset ? entry.utcOffsetMinutes * 60_000 : 0),
+  );
+
+  return Number.isNaN(date.getTime()) ? null : { date, recordedOffset };
+}
+
 function localParts(entry: EntryTime) {
   const offset = entry.utcOffsetMinutes;
   const recorded = typeof offset === "number" && Number.isInteger(offset) && Math.abs(offset) <= 840;
@@ -31,6 +59,64 @@ export function getEntryLocalDayKey(entry: EntryTime): string {
   return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
+function formatEntryDate(
+  entry: EntryTime,
+  options: Intl.DateTimeFormatOptions,
+): string {
+  const display = getDisplayDate(entry);
+  if (!display) {
+    return "Unknown date";
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    ...options,
+    ...(display.recordedOffset ? { timeZone: "UTC" } : {}),
+  }).format(display.date);
+}
+
+/** Locale-aware date in the entry's captured offset, without rebucketing it. */
+export function getEntryLocalDateLabel(
+  entry: EntryTime,
+  style: EntryDateStyle = "history",
+): string {
+  return formatEntryDate(
+    entry,
+    style === "detail"
+      ? { weekday: "long", month: "long", day: "numeric", year: "numeric" }
+      : { weekday: "short", month: "short", day: "numeric" },
+  );
+}
+
+/**
+ * Wall-clock parts for controls that edit an entry's date and time.
+ *
+ * This intentionally returns numeric parts instead of a YYYY-MM-DD string so
+ * callers do not reparse a recorded day through a timezone-sensitive midnight.
+ */
+export function getEntryLocalDateParts(entry: EntryTime): EntryLocalDateParts | null {
+  const display = getDisplayDate(entry);
+  if (!display) {
+    return null;
+  }
+
+  const date = display.date;
+  return display.recordedOffset
+    ? {
+        year: date.getUTCFullYear(),
+        month: date.getUTCMonth(),
+        day: date.getUTCDate(),
+        hour: date.getUTCHours(),
+        minute: date.getUTCMinutes(),
+      }
+    : {
+        year: date.getFullYear(),
+        month: date.getMonth(),
+        day: date.getDate(),
+        hour: date.getHours(),
+        minute: date.getMinutes(),
+      };
+}
+
 export function getEntryLocalHour(entry: EntryTime): number {
   return localParts(entry)[3];
 }
@@ -41,11 +127,14 @@ export function getEntryLocalWeekday(entry: EntryTime): number {
 
 /** Locale-aware clock time in the entry's captured offset, without rebucketing it. */
 export function getEntryLocalTimeLabel(entry: EntryTime): string {
-  const offset = entry.utcOffsetMinutes;
-  const recorded = typeof offset === "number" && Number.isInteger(offset) && Math.abs(offset) <= 840;
+  const display = getDisplayDate(entry);
+  if (!display) {
+    return "Unknown time";
+  }
+
   return new Intl.DateTimeFormat(undefined, {
     hour: "numeric",
     minute: "2-digit",
-    ...(recorded ? { timeZone: "UTC" } : {}),
-  }).format(new Date(entry.timestamp - (recorded ? offset * 60_000 : 0)));
+    ...(display.recordedOffset ? { timeZone: "UTC" } : {}),
+  }).format(display.date);
 }
