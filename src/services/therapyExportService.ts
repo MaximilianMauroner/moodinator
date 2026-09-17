@@ -8,17 +8,25 @@ import { getMoodRatingLabel } from "@/constants/moodScaleInterpretation";
 // The control characters are here because a spreadsheet may trim them while
 // importing and evaluate what follows, so a line feed counts alongside tab and
 // carriage return.
-const FORMULA_LEAD = /^[=+@\t\r\n]/;
-// A leading "-" only starts a formula when a token follows it, so "- bullet"
-// and a bare "-" stay readable.
-const NEGATIVE_LEAD = /^-(?!\s|$)/;
+//
+// A leading "-" is guarded without trying to tell a dash from a negation.
+// Formula parsers accept whitespace after a unary minus, so "- 2+3" evaluates,
+// and any rule written to keep dashed prose clean leaves a hole somewhere. A
+// dashed list item is exported with a visible apostrophe as a result, which is
+// the cost of not guessing.
+const FORMULA_LEAD = /^[=+@\-\t\r\n]/;
 
 function csvEscape(value: string | number | null | undefined) {
   if (value === null || value === undefined) {
     return "";
   }
-  const str = String(value);
-  const startsFormula = FORMULA_LEAD.test(str) || NEGATIVE_LEAD.test(str);
+  // A number cannot be a formula, and prefixing one would turn a numeric column
+  // into text for the person reading the export.
+  if (typeof value === "number") {
+    return String(value);
+  }
+  const str = value;
+  const startsFormula = FORMULA_LEAD.test(str);
   // The apostrophe forces text in Excel and Sheets and stays hidden in the cell.
   const body = startsFormula ? `'${str}` : str;
   if (startsFormula || /[",\n\r]/.test(body)) {

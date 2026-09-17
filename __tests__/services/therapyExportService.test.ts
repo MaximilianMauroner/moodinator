@@ -80,11 +80,22 @@ describe("therapyExportService", () => {
       expect(csv.split("\n")[1]).toBe(`"'=cmd"`);
     });
 
-    it("leaves ordinary text and dashed list items untouched", () => {
-      expect(notesCsv("- bullet point")).toBe("- bullet point");
-      expect(notesCsv("-")).toBe("-");
-      expect(notesCsv("Felt okay today")).toBe("Felt okay today");
+    /**
+     * A formula parser accepts whitespace after a unary minus, so "- 2+3"
+     * evaluates. Every leading minus is guarded rather than guessing which ones
+     * are prose, which costs a visible apostrophe on dashed list items.
+     */
+    it("guards every leading minus, including one behind whitespace", () => {
+      expect(notesCsv("- 2+3")).toBe(`"'- 2+3"`);
+      expect(notesCsv("- bullet point")).toBe(`"'- bullet point"`);
+      expect(notesCsv("-")).toBe(`"'-"`);
     });
+
+    it("leaves ordinary text untouched", () => {
+      expect(notesCsv("Felt okay today")).toBe("Felt okay today");
+      expect(notesCsv("Slept well, mostly")).toBe(`"Slept well, mostly"`);
+    });
+
 
     it("does not guard numeric columns", () => {
       const csv = buildTherapyExportCsv(
