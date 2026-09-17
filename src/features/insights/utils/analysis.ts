@@ -29,6 +29,12 @@ export function analyzeMoods(entries: MoodEntry[], start: Date, end: Date) {
     dailySeries: dailySeries(entries, start, end),
     rhythm: cells,
     drivers: driverAnalysis.drivers,
+    /**
+     * Groups that were large enough to compare and did not separate. The
+     * Drivers card needs these to tell "measured, no difference" apart from
+     * "not enough entries yet", which look identical in `drivers` alone.
+     */
+    inconclusiveDrivers: driverAnalysis.inconclusive,
     findings: findings(driverAnalysis, cells, entries.length, driverCount),
   };
 }

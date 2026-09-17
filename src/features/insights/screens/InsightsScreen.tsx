@@ -226,8 +226,9 @@ export function InsightsScreen() {
                     ))
                   ) : (
                     <Text className="mt-3 text-sm text-paper-700 dark:text-sand-300">
-                      A comparison needs 5 entries with a tag or emotion and 5
-                      without it.
+                      {analysis.inconclusiveDrivers.length
+                        ? "Nothing stands apart yet. Your tags and emotions were compared against the rest of your entries and none of them differ."
+                        : "A comparison needs 5 entries with a tag or emotion and 5 without it."}
                     </Text>
                   )}
                 </ChartCard>

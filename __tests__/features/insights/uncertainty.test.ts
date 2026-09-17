@@ -242,6 +242,29 @@ describe("analyzeMoods", () => {
     expect(result.findings.some((f) => f.effect !== null)).toBe(true);
   });
 
+  /**
+   * The Drivers card shows one of two messages when it has no driver to list.
+   * Both cases leave `drivers` empty, so the card reads `inconclusiveDrivers`
+   * to tell "measured, no difference" apart from "not enough entries yet".
+   */
+  it("reports a measured group that did not separate", () => {
+    const data = [...tagged([5, 5, 5, 5, 5], ["Work"]), ...tagged([5, 5, 5, 5, 5])];
+
+    const result = analyzeMoods(data, start, end);
+
+    expect(result.drivers).toEqual([]);
+    expect(result.inconclusiveDrivers).toEqual([{ name: "Work" }]);
+  });
+
+  it("leaves the inconclusive list empty when a group is only too small", () => {
+    const data = [...tagged([2, 3], ["Rare"]), ...tagged([7, 8, 7, 8, 7])];
+
+    const result = analyzeMoods(data, start, end);
+
+    expect(result.drivers).toEqual([]);
+    expect(result.inconclusiveDrivers).toEqual([]);
+  });
+
   it("claims nothing from noise spread over many candidates", () => {
     // Ratings cycle independently of the tag, so no group differs from the
     // rest. Testing this many candidates at a flat 95% would be likely to

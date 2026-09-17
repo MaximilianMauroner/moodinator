@@ -352,45 +352,55 @@ function parseMoodRowEmotions(row: Pick<MoodRow, "emotions">): Emotion[] {
     .filter((emotion): emotion is Emotion => emotion !== null);
 }
 
+/**
+ * Renaming an emotion or changing its category rewrites the emotions column of
+ * every mood row, so it reads the whole table and writes it back.
+ *
+ * Both the conflict check and that read happen inside the transaction. Reading
+ * first and then queueing the rewrite would let an entry edit commit in the gap
+ * while this call waits for its turn, and the rewrite would then restore the
+ * pre-edit emotions from its stale snapshot.
+ */
 export async function applyEmotionHistoricalUpdate(
   update: EmotionHistoricalUpdate
 ): Promise<{ updated: number }> {
-  const db = await getDb();
-
   if (update.type === "rename") {
-    const oldName = update.oldName.trim();
-    const newName = update.newName.trim();
-    const normalizedOldName = normalizeEmotionName(oldName);
-    const normalizedNewName = normalizeEmotionName(newName);
+    const normalizedOldName = normalizeEmotionName(update.oldName);
+    const normalizedNewName = normalizeEmotionName(update.newName);
 
     if (!normalizedOldName || !normalizedNewName) {
       return { updated: 0 };
     }
-
-    if (normalizedOldName !== normalizedNewName) {
-      const [existingOld, existingNew] = await Promise.all([
-        db.getFirstAsync<Pick<EmotionRow, "id">>(
-          "SELECT id FROM emotions WHERE name = ?;",
-          oldName
-        ),
-        db.getFirstAsync<Pick<EmotionRow, "id">>(
-          "SELECT id FROM emotions WHERE name = ?;",
-          newName
-        ),
-      ]);
-
-      if (existingNew && existingNew.id !== existingOld?.id) {
-        throw new Error("An emotion with this name already exists");
-      }
-    }
   }
-
-  const rows = await db.getAllAsync<Pick<MoodRow, "id" | "emotions">>(
-    "SELECT id, emotions FROM moods;"
-  );
 
   return runInTransaction(async (db) => {
     let updated = 0;
+
+    if (update.type === "rename") {
+      const oldName = update.oldName.trim();
+      const newName = update.newName.trim();
+
+      if (normalizeEmotionName(oldName) !== normalizeEmotionName(newName)) {
+        const [existingOld, existingNew] = await Promise.all([
+          db.getFirstAsync<Pick<EmotionRow, "id">>(
+            "SELECT id FROM emotions WHERE name = ?;",
+            oldName
+          ),
+          db.getFirstAsync<Pick<EmotionRow, "id">>(
+            "SELECT id FROM emotions WHERE name = ?;",
+            newName
+          ),
+        ]);
+
+        if (existingNew && existingNew.id !== existingOld?.id) {
+          throw new Error("An emotion with this name already exists");
+        }
+      }
+    }
+
+    const rows = await db.getAllAsync<Pick<MoodRow, "id" | "emotions">>(
+      "SELECT id, emotions FROM moods;"
+    );
 
     if (update.type === "rename") {
       const oldName = update.oldName.trim();

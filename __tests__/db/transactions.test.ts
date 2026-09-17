@@ -13,6 +13,8 @@ import { createMockDb } from "./mockClient";
 
 import { insertMoodEntry, updateMoodEntry, deleteMood } from "../../db/moods/repository";
 import { importMoods } from "../../db/moods/importExport";
+import { applyEmotionHistoricalUpdate } from "../../db/moods/emotions";
+import { runInTransaction } from "../../db/writeQueue";
 
 const mockDb = createMockDb();
 
@@ -91,5 +93,51 @@ describe("concurrent writes", () => {
 
     expect(settled.every((result) => result.status === "fulfilled")).toBe(true);
     expect(mockDb.__getMoods()).toHaveLength(0);
+  });
+
+  /**
+   * Renaming an emotion reads every mood row and writes the rewritten emotions
+   * back, so its read has to sit inside the transaction.
+   *
+   * The failure needs the queue to be busy while the rename reads. A slow write
+   * holds the queue, an entry edit queues behind it, and the rename then takes
+   * its snapshot before that edit can commit. Reading outside the queue, the
+   * rename wrote the pre-edit emotions back and the edit was lost.
+   */
+  it("does not discard an entry edit queued ahead of an emotion rename", async () => {
+    const entry = await insertMoodEntry({
+      mood: 4,
+      timestamp: 1705320000000,
+      emotions: [{ name: "Calm", category: "positive" }],
+    });
+
+    const occupied = runInTransaction(
+      () => new Promise((resolve) => setTimeout(resolve, 30))
+    );
+    const edit = updateMoodEntry(entry.id, {
+      emotions: [
+        { name: "Calm", category: "positive" },
+        { name: "Tired", category: "negative" },
+      ],
+    });
+
+    // Let the rename reach its reads while the queue is still blocked, so its
+    // view of the moods table predates the edit above.
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const rename = applyEmotionHistoricalUpdate({
+      type: "rename",
+      oldName: "Calm",
+      newName: "Settled",
+    });
+
+    await Promise.all([occupied, edit, rename]);
+
+    const [stored] = mockDb.__getMoods();
+    const names = (JSON.parse(stored.emotions) as { name: string }[])
+      .map((emotion) => emotion.name)
+      .sort();
+
+    // The edit commits first, so the rename must see Tired and keep it.
+    expect(names).toEqual(["Settled", "Tired"]);
   });
 });
