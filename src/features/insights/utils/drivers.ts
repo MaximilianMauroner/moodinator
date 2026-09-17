@@ -20,8 +20,13 @@ export interface Driver {
   withMean: number;
   withoutMean: number;
   effect: number;
-  ciLow: number;
-  ciHigh: number;
+  /**
+   * The two groups the effect came from, kept so the interval can be drawn
+   * later. Only the handful of claims that reach the screen need one, and
+   * producing it is two orders of magnitude dearer than the comparison.
+   */
+  stats: GroupStats;
+  rest: GroupStats;
 }
 export interface DriverAnalysis {
   drivers: Driver[];
@@ -103,8 +108,8 @@ export function drivers(
       withMean: groupMean(group.stats),
       withoutMean: groupMean(rest),
       effect: comparison.effect,
-      ciLow: comparison.ciLow,
-      ciHigh: comparison.ciHigh,
+      stats: group.stats,
+      rest,
     });
   }
   result.drivers.sort(

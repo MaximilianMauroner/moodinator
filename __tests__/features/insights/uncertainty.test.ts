@@ -10,6 +10,7 @@ import { rhythm } from "../../../src/features/insights/utils/rhythm";
 import { findings, rangeWords } from "../../../src/features/insights/utils/findings";
 import {
   compareGroups,
+  confidenceInterval,
   emptyGroup,
   addToGroup,
 } from "../../../src/features/insights/utils/statistics";
@@ -40,27 +41,28 @@ describe("comparison intervals", () => {
 
     expect(result.separated).toBe(true);
     expect(result.effect).toBeLessThan(0);
-    expect(result.ciLow).toBeLessThan(result.effect);
-    expect(result.ciHigh).toBeGreaterThan(result.effect);
-    expect(result.ciHigh).toBeLessThan(0);
+
+    const [low, high] = confidenceInterval(
+      group([1, 1, 2, 1, 2]),
+      group([8, 9, 8, 9, 8]),
+    );
+    expect(low).toBeLessThan(result.effect);
+    expect(high).toBeGreaterThan(result.effect);
+    expect(high).toBeLessThan(0);
   });
 
   it("does not separate groups that overlap heavily", () => {
     const result = compareGroups(group([0, 10, 1, 9, 5]), group([5, 4, 6, 5, 5]));
 
     expect(result.separated).toBe(false);
-    // A suppressed comparison shows no range, so none is computed for it.
-    expect(result.ciLow).toBeNull();
-    expect(result.ciHigh).toBeNull();
   });
 
   it("reports a point interval when neither group varies", () => {
-    const result = compareGroups(group([2, 2, 2, 2, 2]), group([8, 8, 8, 8, 8]));
+    const a = group([2, 2, 2, 2, 2]);
+    const b = group([8, 8, 8, 8, 8]);
 
-    expect(result.effect).toBe(-6);
-    expect(result.ciLow).toBe(-6);
-    expect(result.ciHigh).toBe(-6);
-    expect(result.separated).toBe(true);
+    expect(compareGroups(a, b)).toEqual({ effect: -6, separated: true });
+    expect(confidenceInterval(a, b)).toEqual([-6, -6]);
   });
 
   it("does not separate two identical groups", () => {
@@ -87,23 +89,23 @@ describe("comparison intervals", () => {
 
   it("draws the interval at the same critical value it decides on", () => {
     // Same shape as above, far enough apart to survive. t(8, 0.975) = 2.306.
-    const result = compareGroups(group([0, 0, 0, 0, 5]), group([9, 9, 9, 9, 14]));
+    const a = group([0, 0, 0, 0, 5]);
+    const b = group([9, 9, 9, 9, 14]);
 
-    expect(result.separated).toBe(true);
-    expect(result.ciHigh).not.toBeNull();
-    expect((result.ciHigh! - result.effect) / Math.SQRT2).toBeCloseTo(2.306, 3);
+    expect(compareGroups(a, b).separated).toBe(true);
+    const [, high] = confidenceInterval(a, b);
+    expect((high - compareGroups(a, b).effect) / Math.SQRT2).toBeCloseTo(2.306, 3);
   });
 
   it("widens the interval when the analysis runs many comparisons", () => {
     const a = group([1, 2, 3, 2, 1]);
     const b = group([5, 6, 7, 6, 5]);
-    const alone = compareGroups(a, b);
-    const among = compareGroups(a, b, 28);
+    const [, aloneHigh] = confidenceInterval(a, b);
+    const [, amongHigh] = confidenceInterval(a, b, 28);
+    const { effect } = compareGroups(a, b);
 
-    expect(among.ciHigh - among.effect).toBeGreaterThan(
-      alone.ciHigh - alone.effect,
-    );
-    expect(among.effect).toBe(alone.effect);
+    expect(amongHigh - effect).toBeGreaterThan(aloneHigh - effect);
+    expect(compareGroups(a, b, 28).effect).toBe(effect);
   });
 
   /**
@@ -122,13 +124,11 @@ describe("comparison intervals", () => {
 
     // Same degrees of freedom and standard error, far enough apart to survive,
     // so the critical value the interval is drawn at can be read back.
-    const wider = compareGroups(
-      group([0, 0, 0, 0, 4]),
-      group([20, 20, 20, 20, 20]),
-      100,
-    );
-    expect(wider.separated).toBe(true);
-    expect((wider.ciHigh! - wider.effect) / 0.8).toBeCloseTo(10.3063, 3);
+    const a = group([0, 0, 0, 0, 4]);
+    const b = group([20, 20, 20, 20, 20]);
+    expect(compareGroups(a, b, 100).separated).toBe(true);
+    const [, high] = confidenceInterval(a, b, 100);
+    expect((high - compareGroups(a, b, 100).effect) / 0.8).toBeCloseTo(10.3063, 3);
   });
 
   it("still separates a real difference measured across many entries", () => {
@@ -151,8 +151,9 @@ describe("driver suppression", () => {
     expect(analysis.drivers.map((d) => d.name)).toEqual(["Outside"]);
     expect(analysis.inconclusive).toEqual([]);
     const [driver] = analysis.drivers;
-    expect(driver.ciLow).toBeLessThanOrEqual(driver.effect);
-    expect(driver.ciHigh).toBeGreaterThanOrEqual(driver.effect);
+    const [low, high] = confidenceInterval(driver.stats, driver.rest);
+    expect(low).toBeLessThanOrEqual(driver.effect);
+    expect(high).toBeGreaterThanOrEqual(driver.effect);
   });
 
   it("suppresses a tag whose groups overlap, and says why", () => {
@@ -349,6 +350,36 @@ describe("analyzeMoods", () => {
     expect(result.drivers).toEqual([]);
     expect(result.findings.every((f) => f.effect === null)).toBe(true);
   }, 10_000);
+
+  /**
+   * The same size again, but arranged so every one of the twenty thousand
+   * comparisons separates. Intervals are drawn after ranking, so this still
+   * inverts the CDF four times rather than twenty thousand.
+   */
+  it("shows four claims out of a large history where everything separates", () => {
+    const LABELS = 20_000;
+    const many = Array.from({ length: 1000 }, (_, i) => {
+      const block = Math.floor(i / 5);
+      return createMockMoodEntry({
+        // Blocks of five entries share a hundred labels of their own, so each
+        // label group is five entries of one mood and stands far apart.
+        mood: block % 2 === 0 ? 1 : 9,
+        contextTags: Array.from(
+          { length: 100 },
+          (_, j) => `Tag${(block * 100 + j) % LABELS}`,
+        ),
+        timestamp: new Date(2026, 8, 7 + (i % 20), 12).getTime(),
+      });
+    });
+
+    const result = analyzeMoods(many, start, end);
+
+    expect(result.drivers).toHaveLength(LABELS);
+    expect(result.findings).toHaveLength(4);
+    for (const finding of result.findings) {
+      expect(finding.range).toBeDefined();
+    }
+  }, 30_000);
 
   it("claims nothing from noise spread over many candidates", () => {
     // Ratings cycle independently of the tag, so no group differs from the

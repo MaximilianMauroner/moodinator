@@ -2,7 +2,13 @@ import type { DriverAnalysis } from "./drivers";
 import { MIN_GROUP_SIZE } from "./drivers";
 import type { RhythmCell } from "./rhythm";
 import { DAYPARTS, WEEKDAYS } from "./rhythm";
-import { compareGroups, mergeGroups, subtractGroup } from "./statistics";
+import {
+  compareGroups,
+  confidenceInterval,
+  mergeGroups,
+  subtractGroup,
+  type GroupStats,
+} from "./statistics";
 export interface Finding {
   id: string;
   text: string;
@@ -74,13 +80,20 @@ export function findings(
    */
   otherComparisons = 0,
 ): Finding[] {
-  const claims: Finding[] = analysis.drivers.map((d) => ({
+  // A candidate carries the groups it came from rather than a range. The range
+  // is drawn after ranking, so only the claims that reach the screen pay for
+  // the CDF inversion. A large imported history can produce tens of thousands
+  // of candidates and still show four.
+  type Candidate = Omit<Finding, "range"> & {
+    source: [GroupStats, GroupStats];
+  };
+  const claims: Candidate[] = analysis.drivers.map((d) => ({
     id: d.id,
     text: `Entries ${d.kind === "context" ? "tagged" : "with"} ${d.name} average ${effectWords(d.effect)} ${Math.abs(d.effect) < 0.05 ? "as" : "than"} entries without.`,
     sample: `${d.withCount} with · ${d.withoutCount} without`,
     effect: d.effect,
     means: [d.withMean, d.withoutMean],
-    range: [d.ciLow, d.ciHigh],
+    source: [d.stats, d.rest],
   }));
   const overall = mergeGroups(cells.map((cell) => cell.stats));
   const slots = comparableSlots(cells);
@@ -99,7 +112,7 @@ export function findings(
       sample: `${cell.stats.count} in this time slot · ${rest.count} other entries`,
       effect: comparison.effect,
       means: [cell.mean, rest.sum / rest.count],
-      range: [comparison.ciLow, comparison.ciHigh],
+      source: [cell.stats, rest],
     });
   }
   claims.sort(
@@ -107,7 +120,12 @@ export function findings(
       Math.abs(b.effect ?? 0) - Math.abs(a.effect ?? 0) ||
       a.id.localeCompare(b.id),
   );
-  const result = claims.slice(0, 4);
+  const result: Finding[] = claims
+    .slice(0, 4)
+    .map(({ source, ...finding }) => ({
+      ...finding,
+      range: confidenceInterval(source[0], source[1], comparisons),
+    }));
   if (!result.length || analysis.shortfalls.length) {
     result.push(
       explainSilence(analysis, entryCount, inconclusiveSlots, result.length),

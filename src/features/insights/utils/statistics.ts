@@ -210,20 +210,51 @@ function studentQuantile(p: number, degreesOfFreedom: number): number {
   return (low + high) / 2;
 }
 
+export interface Comparison {
+  effect: number;
+  /** The interval around the effect stays on one side of zero. */
+  separated: boolean;
+}
+
 /**
- * The interval bounds exist only when the comparison separates, so `separated`
- * carries them rather than sitting beside them. A caller that has checked it
- * gets the bounds as plain numbers.
- *
- * Deciding separation costs one CDF evaluation. Producing the bounds means
- * inverting that CDF, which costs about a hundred. A suppressed comparison
- * never shows a range, and an analysis of a large imported history can run tens
- * of thousands of comparisons of which almost none survive, so the bounds are
- * only produced for the ones that do.
+ * Standard error of the difference in means, and the threshold the analysis
+ * holds every comparison to.
  */
-export type Comparison =
-  | { effect: number; separated: false; ciLow: null; ciHigh: null }
-  | { effect: number; separated: true; ciLow: number; ciHigh: number };
+function errorAndAlpha(group: GroupStats, rest: GroupStats, comparisons: number) {
+  return {
+    standardError: Math.sqrt(
+      sampleVariance(group) / Math.max(group.count, 1) +
+        sampleVariance(rest) / Math.max(rest.count, 1)
+    ),
+    alpha: (1 - CONFIDENCE) / Math.max(comparisons, 1),
+  };
+}
+
+/**
+ * The interval the comparison supports, for a claim that is going to be shown.
+ *
+ * This is separate from the decision on purpose. Deciding costs one CDF
+ * evaluation, while the interval means inverting that CDF, which costs about a
+ * hundred. An imported history can produce tens of thousands of comparisons,
+ * and at most four claims are ever displayed, so the inversion runs after
+ * ranking rather than during the scan. Only call it for a comparison that
+ * separated.
+ */
+export function confidenceInterval(
+  group: GroupStats,
+  rest: GroupStats,
+  comparisons = 1
+): [number, number] {
+  const effect = groupMean(group) - groupMean(rest);
+  const { standardError, alpha } = errorAndAlpha(group, rest, comparisons);
+  if (standardError === 0) {
+    return [effect, effect];
+  }
+  const margin =
+    studentQuantile(1 - alpha / 2, welchDegreesOfFreedom(group, rest)) *
+    standardError;
+  return [effect - margin, effect + margin];
+}
 
 export function compareGroups(
   group: GroupStats,
@@ -240,38 +271,21 @@ export function compareGroups(
   comparisons = 1
 ): Comparison {
   const effect = groupMean(group) - groupMean(rest);
-  const standardError = Math.sqrt(
-    sampleVariance(group) / Math.max(group.count, 1) +
-      sampleVariance(rest) / Math.max(rest.count, 1)
-  );
-  const alpha = (1 - CONFIDENCE) / Math.max(comparisons, 1);
-  const degreesOfFreedom = welchDegreesOfFreedom(group, rest);
+  const { standardError, alpha } = errorAndAlpha(group, rest, comparisons);
 
   // Two groups with no spread at all leave nothing to divide by. They differ
   // or they do not, and the interval has no width either way.
   if (standardError === 0) {
-    return effect === 0
-      ? { effect, separated: false, ciLow: null, ciHigh: null }
-      : { effect, separated: true, ciLow: effect, ciHigh: effect };
+    return { effect, separated: effect !== 0 };
   }
 
-  // Comparing the observed statistic against the threshold is the same
+  // Asking whether the observed statistic beats the threshold is the same
   // decision as asking whether the interval excludes zero, and it reads the
   // CDF once instead of inverting it.
   const observed = Math.abs(effect) / standardError;
-  const separated =
-    2 * (1 - studentCdf(observed, degreesOfFreedom)) < alpha;
-
-  if (!separated) {
-    return { effect, separated: false, ciLow: null, ciHigh: null };
-  }
-
-  const margin =
-    studentQuantile(1 - alpha / 2, degreesOfFreedom) * standardError;
+  const degreesOfFreedom = welchDegreesOfFreedom(group, rest);
   return {
     effect,
-    separated: true,
-    ciLow: effect - margin,
-    ciHigh: effect + margin,
+    separated: 2 * (1 - studentCdf(observed, degreesOfFreedom)) < alpha,
   };
 }
