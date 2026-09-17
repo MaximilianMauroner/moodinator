@@ -259,8 +259,18 @@ function isValidTimestamp(timestamp: unknown): timestamp is number {
   );
 }
 
-/** An imported entry with no usable timestamp is recorded as arriving now. */
+/**
+ * An imported entry with no usable timestamp is recorded as arriving now.
+ *
+ * The epoch sentinel is the exception. A row whose stored timestamp cannot be
+ * read is exported at the epoch, and re-importing that export has to leave it
+ * there. Treating the sentinel as a missing timestamp would move the row to the
+ * import date, which is the drift readStoredTimestamp exists to stop.
+ */
 export function sanitizeTimestamp(value: unknown): number {
+  if (value === UNREADABLE_TIMESTAMP) {
+    return UNREADABLE_TIMESTAMP;
+  }
   return isValidTimestamp(value) ? value : Date.now();
 }
 

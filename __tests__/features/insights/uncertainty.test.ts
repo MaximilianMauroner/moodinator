@@ -4,6 +4,7 @@ import { createMockMoodEntry } from "../../db/mockClient";
 // rhythm pulls in the theme, which reaches react-native. Same seam as analysis.test.ts.
 vi.mock("@/hooks/useColorScheme", () => ({ useColorScheme: () => "dark" }));
 
+import { analyzeMoods } from "../../../src/features/insights/utils/analysis";
 import { drivers } from "../../../src/features/insights/utils/drivers";
 import { rhythm } from "../../../src/features/insights/utils/rhythm";
 import { findings, rangeWords } from "../../../src/features/insights/utils/findings";
@@ -66,6 +67,41 @@ describe("comparison intervals", () => {
 
     expect(result.effect).toBe(0);
     expect(result.separated).toBe(false);
+  });
+
+  /**
+   * At the five-entry floor a normal critical value is far too narrow. These
+   * two groups differ by 3 with a standard error of sqrt(2): a normal bound
+   * ends at -0.23 and claims a pattern, a t bound at 8 degrees of freedom ends
+   * at +0.26 and does not.
+   */
+  it("uses a small-sample critical value at the group floor", () => {
+    const result = compareGroups(group([0, 0, 0, 0, 5]), group([3, 3, 3, 3, 8]));
+
+    expect(result.effect).toBe(-3);
+    expect(result.separated).toBe(false);
+    expect(result.ciHigh).toBeGreaterThan(0);
+    // margin / standardError is the critical value. t(8, 0.975) = 2.306.
+    expect((result.ciHigh - result.effect) / Math.SQRT2).toBeCloseTo(2.306, 3);
+  });
+
+  it("widens the interval when the analysis runs many comparisons", () => {
+    const a = group([1, 2, 3, 2, 1]);
+    const b = group([5, 6, 7, 6, 5]);
+    const alone = compareGroups(a, b);
+    const among = compareGroups(a, b, 28);
+
+    expect(among.ciHigh - among.effect).toBeGreaterThan(
+      alone.ciHigh - alone.effect,
+    );
+    expect(among.effect).toBe(alone.effect);
+  });
+
+  it("still separates a real difference measured across many entries", () => {
+    const even = (value: number, other: number) =>
+      group(Array.from({ length: 60 }, (_, i) => (i % 2 ? value : other)));
+
+    expect(compareGroups(even(2, 3), even(7, 8), 28).separated).toBe(true);
   });
 });
 
@@ -140,9 +176,23 @@ describe("findings copy", () => {
 
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe("inconclusive");
-    expect(result[0].text).toContain("too much to tell apart");
+    expect(result[0].text).toContain("does not stand apart");
     // It must not promise that more entries will resolve it.
     expect(result[0].text).not.toMatch(/Add \d+ more/);
+  });
+
+  /**
+   * Identical groups fail to separate for the opposite reason to scattered
+   * ones: there is nothing to tell apart, not too much noise. The message has
+   * to fit both, so it must not name variance as the cause.
+   */
+  it("does not blame variance when no group varies", () => {
+    const flat = [...tagged([5, 5, 5, 5, 5], ["Work"]), ...tagged([5, 5, 5, 5, 5])];
+
+    const result = findings(drivers(flat), rhythm(flat), flat.length);
+
+    expect(result[0].id).toBe("inconclusive");
+    expect(result[0].text).not.toMatch(/var(y|ies|iance)|too much/i);
   });
 
   it("keeps the shortage message when entries are genuinely missing", () => {
@@ -159,6 +209,51 @@ describe("findings copy", () => {
 
     expect(result).toHaveLength(1);
     expect(result[0].text).toContain("5 entries in each group");
+  });
+});
+
+/**
+ * analyzeMoods is where the driver groups and the time slots are joined into
+ * one family of comparisons. Splitting the confidence level across them is only
+ * worth doing if a real pattern still survives it, so both directions are
+ * pinned here rather than on the two halves alone.
+ */
+describe("analyzeMoods", () => {
+  const atDay = (mood: number, day: number, tags: string[] = []) =>
+    createMockMoodEntry({
+      mood,
+      contextTags: tags,
+      timestamp: new Date(2026, 8, 7 + day, 12, 0, 0).getTime(),
+    });
+
+  const start = new Date(2026, 8, 7);
+  const end = new Date(2026, 8, 27);
+
+  it("still reports a strong pattern after splitting the confidence level", () => {
+    const data = Array.from({ length: 40 }, (_, i) =>
+      i % 2 === 0
+        ? atDay(i % 4 === 0 ? 1 : 2, i % 20, ["Outside"])
+        : atDay(i % 4 === 1 ? 8 : 9, i % 20),
+    );
+
+    const result = analyzeMoods(data, start, end);
+
+    expect(result.drivers.map((d) => d.name)).toContain("Outside");
+    expect(result.findings.some((f) => f.effect !== null)).toBe(true);
+  });
+
+  it("claims nothing from noise spread over many candidates", () => {
+    // Ratings cycle independently of the tag, so no group differs from the
+    // rest. Testing this many candidates at a flat 95% would be likely to
+    // surface one of them anyway.
+    const data = Array.from({ length: 80 }, (_, i) =>
+      atDay((i % 9) + 1, i % 20, [`Tag${i % 6}`]),
+    );
+
+    const result = analyzeMoods(data, start, end);
+
+    expect(result.drivers).toEqual([]);
+    expect(result.findings.every((f) => f.effect === null)).toBe(true);
   });
 });
 

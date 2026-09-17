@@ -27,14 +27,25 @@ export interface DriverAnalysis {
   drivers: Driver[];
   /** Too few entries on one side to compare at all. */
   shortfalls: { name: string; withMissing: number; withoutMissing: number }[];
-  /** Enough entries, but the groups overlap too much to claim a difference. */
+  /** Enough entries, but the comparison does not separate it from the rest. */
   inconclusive: { name: string }[];
 }
-export function drivers(entries: MoodEntry[]): DriverAnalysis {
-  const groups = new Map<
-    string,
-    { name: string; kind: Driver["kind"]; stats: GroupStats }
-  >();
+interface LabelGroup {
+  name: string;
+  kind: Driver["kind"];
+  stats: GroupStats;
+}
+export function drivers(
+  entries: MoodEntry[],
+  /**
+   * Comparisons the same analysis runs outside this function, such as the time
+   * slots. Every comparison in one analysis shares one confidence level, so
+   * each half has to know the size of the other. Zero is only correct when
+   * drivers are the whole analysis.
+   */
+  otherComparisons = 0
+): DriverAnalysis {
+  const groups = new Map<string, LabelGroup>();
   const overall = emptyGroup();
   for (const entry of entries) {
     const value = getInterpretedMoodRating(entry);
@@ -60,6 +71,9 @@ export function drivers(entries: MoodEntry[]): DriverAnalysis {
     shortfalls: [],
     inconclusive: [],
   };
+  // Which groups are large enough is settled before any of them is tested,
+  // because the threshold each one faces depends on how many there are.
+  const comparable: { id: string; group: LabelGroup; rest: GroupStats }[] = [];
   for (const [id, group] of groups) {
     const rest = subtractGroup(overall, group.stats);
     if (group.stats.count < MIN_GROUP_SIZE || rest.count < MIN_GROUP_SIZE) {
@@ -70,7 +84,11 @@ export function drivers(entries: MoodEntry[]): DriverAnalysis {
       });
       continue;
     }
-    const comparison = compareGroups(group.stats, rest);
+    comparable.push({ id, group, rest });
+  }
+  const comparisons = comparable.length + otherComparisons;
+  for (const { id, group, rest } of comparable) {
+    const comparison = compareGroups(group.stats, rest, comparisons);
     if (!comparison.separated) {
       // Enough entries to look, not enough separation to say anything.
       result.inconclusive.push({ name: group.name });

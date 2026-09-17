@@ -31,10 +31,32 @@ export function rangeWords(low: number, high: number): string {
 
   return `Somewhere between ${Math.abs(from).toFixed(1)} ${direction(from)} and ${Math.abs(to).toFixed(1)} ${direction(to)}.`;
 }
+/**
+ * Time slots holding enough entries to compare against the rest of the period.
+ *
+ * The caller needs this count before any slot is tested, because the threshold
+ * each slot faces depends on how many comparisons the analysis runs in total.
+ */
+export function comparableSlots(
+  cells: RhythmCell[],
+): (RhythmCell & { mean: number })[] {
+  const overall = mergeGroups(cells.map((cell) => cell.stats));
+  return cells.filter((cell): cell is RhythmCell & { mean: number } => {
+    if (cell.mean === null || cell.stats.count < MIN_GROUP_SIZE) {
+      return false;
+    }
+    return subtractGroup(overall, cell.stats).count >= MIN_GROUP_SIZE;
+  });
+}
 export function findings(
   analysis: DriverAnalysis,
   cells: RhythmCell[],
   entryCount: number,
+  /**
+   * Comparisons the same analysis runs outside the time slots, meaning the
+   * driver groups. Zero is only correct when the slots are the whole analysis.
+   */
+  otherComparisons = 0,
 ): Finding[] {
   const claims: Finding[] = analysis.drivers.map((d) => ({
     id: d.id,
@@ -45,17 +67,12 @@ export function findings(
     range: [d.ciLow, d.ciHigh],
   }));
   const overall = mergeGroups(cells.map((cell) => cell.stats));
+  const slots = comparableSlots(cells);
+  const comparisons = slots.length + otherComparisons;
   let inconclusiveSlots = 0;
-  for (const cell of cells) {
+  for (const cell of slots) {
     const rest = subtractGroup(overall, cell.stats);
-    if (
-      cell.stats.count < MIN_GROUP_SIZE ||
-      rest.count < MIN_GROUP_SIZE ||
-      cell.mean === null
-    ) {
-      continue;
-    }
-    const comparison = compareGroups(cell.stats, rest);
+    const comparison = compareGroups(cell.stats, rest, comparisons);
     if (!comparison.separated) {
       inconclusiveSlots += 1;
       continue;
@@ -85,9 +102,14 @@ export function findings(
 
 /**
  * Two reasons produce no claim, and they need different answers. Too few
- * entries is something the user can fix by logging more. Groups that overlap
- * are already measured and simply do not differ, so promising more data would
- * be misleading.
+ * entries is something the user can fix by logging more. A group that was
+ * measured and did not separate is already answered, so promising more data
+ * would be misleading.
+ *
+ * The second message says only that the group did not stand apart. It must not
+ * name a cause: a group whose entries are all identical to the rest fails to
+ * separate exactly as a wildly scattered group does, and telling the first user
+ * their entries "vary too much" is false.
  */
 function explainSilence(
   analysis: DriverAnalysis,
@@ -112,7 +134,7 @@ function explainSilence(
     return {
       id: "inconclusive",
       effect: null,
-      text: `No clear pattern yet. ${overlapping === 1 ? "One group varies" : `${overlapping} groups vary`} too much to tell apart from the rest of your entries.`,
+      text: `No clear pattern yet. ${overlapping === 1 ? "One group does not stand" : `${overlapping} groups do not stand`} apart from the rest of your entries.`,
       sample,
     };
   }

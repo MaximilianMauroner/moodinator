@@ -7,6 +7,7 @@ import {
   serializeArray,
   serializeEmotions,
   readStoredTimestamp,
+  sanitizeTimestamp,
   UNREADABLE_TIMESTAMP,
   toMoodEntry,
   normalizeInput,
@@ -116,6 +117,24 @@ describe("readStoredTimestamp", () => {
 
     // The old behaviour answered Date.now(), so one row moved on every read.
     expect(first).toBe(second);
+  });
+
+  /**
+   * An unreadable row is exported at the epoch. Import must leave it there:
+   * rewriting the sentinel to the import date reintroduces the drift on the
+   * round trip that a stable read was meant to remove.
+   */
+  it("survives an export and import round trip", () => {
+    const stored = readStoredTimestamp(null);
+
+    expect(sanitizeTimestamp(stored)).toBe(UNREADABLE_TIMESTAMP);
+  });
+
+  it("still dates a genuinely missing import timestamp to now", () => {
+    const before = Date.now();
+
+    expect(sanitizeTimestamp(undefined)).toBeGreaterThanOrEqual(before);
+    expect(sanitizeTimestamp("not a date")).toBeGreaterThanOrEqual(before);
   });
 });
 
