@@ -6,7 +6,7 @@ layout, gestures, haptic strength, or frame timing.
 
 ## Historical smoke record (old head only)
 
-On Android 15 / API 35 emulator `emulator-5554` (QA process record `491382`),
+On Android 15 / API 35 emulator `emulator-5554` (QA emulator record `491382`),
 the provisional QA APK built from old head
 `6dbb79465e6e2cdaceb6d13b3631a1d4d4f8f5d5` passed the synthetic-data smoke
 journey without a crash: all four onboarding pages, quick save, edit note,
