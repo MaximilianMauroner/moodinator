@@ -1,5 +1,6 @@
 import type * as SQLite from "expo-sqlite";
 import { getDb } from "../client";
+import { runInTransaction } from "../writeQueue";
 import type { Emotion } from "../types";
 import type { MoodRow, RawEmotionItem } from "../types/rows";
 import { DEFAULT_EMOTIONS } from "../../domain/entrySettings";
@@ -9,12 +10,10 @@ export async function migrateEmotionsToCategories(): Promise<{
   migrated: number;
   skipped: number;
 }> {
-  const db = await getDb();
   let migrated = 0;
   let skipped = 0;
 
-  await db.execAsync("BEGIN TRANSACTION;");
-  try {
+  return runInTransaction(async (db) => {
     const rows = await db.getAllAsync<Pick<MoodRow, "id" | "emotions">>(
       "SELECT id, emotions FROM moods;"
     );
@@ -76,16 +75,14 @@ export async function migrateEmotionsToCategories(): Promise<{
       }
     }
 
-    await db.execAsync("COMMIT;");
     console.log(
       `Emotion migration complete: ${migrated} migrated, ${skipped} skipped`
     );
     return { migrated, skipped };
-  } catch (error) {
-    await db.execAsync("ROLLBACK;");
+  }).catch((error: unknown) => {
     console.error("Error during emotion migration:", error);
     throw error;
-  }
+  });
 }
 
 export async function backfillMoodScaleJson(

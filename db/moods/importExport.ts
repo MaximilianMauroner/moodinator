@@ -1,5 +1,6 @@
+import type * as SQLite from "expo-sqlite";
 import type { Emotion } from "../types";
-import { getDb } from "../client";
+import { runInTransaction } from "../writeQueue";
 import { getMoodsWithinRange } from "./repository";
 import type { MoodDateRange } from "./range";
 import {
@@ -108,7 +109,7 @@ function normalizeReplacementImportEntries(parsed: unknown[]): {
   return { entries, errors };
 }
 
-async function clearImportedMoodData(db: Awaited<ReturnType<typeof getDb>>) {
+async function clearImportedMoodData(db: SQLite.SQLiteDatabase) {
   await db.runAsync("DELETE FROM mood_emotions;");
   await db.runAsync("DELETE FROM moods;");
 }
@@ -173,11 +174,9 @@ export function previewImportMoods(jsonData: string): ImportPreviewResult {
 export async function importMoods(jsonData: string): Promise<ImportResult> {
   const entries = normalizeReplacementImportData(jsonData);
 
-  const db = await getDb();
-  const result: ImportResult = { imported: 0, skipped: 0, errors: [] };
+  return runInTransaction(async (db) => {
+    const result: ImportResult = { imported: 0, skipped: 0, errors: [] };
 
-  await db.execAsync("BEGIN TRANSACTION;");
-  try {
     await clearImportedMoodData(db);
 
     for (const entry of entries) {
@@ -201,13 +200,13 @@ export async function importMoods(jsonData: string): Promise<ImportResult> {
       result.imported++;
     }
 
-    await db.execAsync("COMMIT;");
     return result;
-  } catch (error) {
-    await db.execAsync("ROLLBACK;");
+  }).catch((error: unknown) => {
     console.error("Error importing moods:", error);
-    throw new Error(`Import failed: ${error instanceof Error ? error.message : "Unknown error"}`);
-  }
+    throw new Error(
+      `Import failed: ${error instanceof Error ? error.message : "Unknown error"}`
+    );
+  });
 }
 
 export async function importOldBackup(jsonData: string): Promise<ImportResult> {
@@ -222,13 +221,13 @@ export async function importOldBackup(jsonData: string): Promise<ImportResult> {
     throw new Error("Backup data must be an array");
   }
 
-  const db = await getDb();
-  const result: ImportResult = { imported: 0, skipped: 0, errors: [] };
+  const entries = parsed;
 
-  await db.execAsync("BEGIN TRANSACTION;");
-  try {
-    for (let i = 0; i < parsed.length; i++) {
-      const mood = parsed[i] as Record<string, unknown>;
+  return runInTransaction(async (db) => {
+    const result: ImportResult = { imported: 0, skipped: 0, errors: [] };
+
+    for (let i = 0; i < entries.length; i++) {
+      const mood = entries[i] as Record<string, unknown>;
 
       // Validate mood value is present
       if (mood?.mood === undefined || mood?.mood === null) {
@@ -277,11 +276,11 @@ export async function importOldBackup(jsonData: string): Promise<ImportResult> {
       result.imported++;
     }
 
-    await db.execAsync("COMMIT;");
     return result;
-  } catch (error) {
-    await db.execAsync("ROLLBACK;");
+  }).catch((error: unknown) => {
     console.error("Error importing old backup:", error);
-    throw new Error(`Backup import failed: ${error instanceof Error ? error.message : "Unknown error"}`);
-  }
+    throw new Error(
+      `Backup import failed: ${error instanceof Error ? error.message : "Unknown error"}`
+    );
+  });
 }

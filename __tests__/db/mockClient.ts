@@ -48,6 +48,34 @@ export function createMockDb() {
       sqlite.prepare(sql).get(...params) ?? null),
     getAllAsync: vi.fn(async (sql: string, ...params: SQLInputValue[]) =>
       sqlite.prepare(sql).all(...params)),
+    // Mirrors expo-sqlite: BEGIN inside the try, COMMIT on success, ROLLBACK
+    // and rethrow on failure. Real SQLite semantics, so a nested BEGIN fails
+    // here exactly as it does on a device.
+    withTransactionAsync: vi.fn(async (task: () => Promise<void>) => {
+      try {
+        sqlite.exec("BEGIN");
+        await task();
+        sqlite.exec("COMMIT");
+      } catch (error) {
+        sqlite.exec("ROLLBACK");
+        throw error;
+      }
+    }),
+    // expo-sqlite runs this on a separate connection. One in-memory handle
+    // cannot model that, so the ordering guarantee is approximated and the
+    // transaction body still sees real BEGIN/COMMIT/ROLLBACK.
+    withExclusiveTransactionAsync: vi.fn(
+      async (task: (tx: unknown) => Promise<void>) => {
+        try {
+          sqlite.exec("BEGIN");
+          await task(mockDb);
+          sqlite.exec("COMMIT");
+        } catch (error) {
+          sqlite.exec("ROLLBACK");
+          throw error;
+        }
+      }
+    ),
     __getMoods: () => sqlite.prepare("SELECT * FROM moods ORDER BY id").all() as MockRow[],
     __getEmotions: () => sqlite.prepare("SELECT * FROM emotions ORDER BY id").all() as MockEmotionRow[],
     __getMoodEmotions: () => sqlite.prepare("SELECT * FROM mood_emotions ORDER BY mood_id, emotion_id").all() as MockMoodEmotionRow[],

@@ -334,14 +334,14 @@ describe("Import/Export", () => {
         mood: 4,
         timestamp: 1000,
       });
-      expect(mockDb.execAsync).not.toHaveBeenCalledWith("BEGIN TRANSACTION;");
+      expect(mockDb.withTransactionAsync).not.toHaveBeenCalled();
     });
 
     it("previews replacement imports without opening a database transaction", () => {
       const data = JSON.stringify([{ mood: 1 }, { mood: 8 }]);
 
       expect(previewImportMoods(data)).toEqual({ entryCount: 2 });
-      expect(mockDb.execAsync).not.toHaveBeenCalledWith("BEGIN TRANSACTION;");
+      expect(mockDb.withTransactionAsync).not.toHaveBeenCalled();
     });
 
     it("rejects invalid replacement previews before confirmation", () => {
@@ -350,7 +350,7 @@ describe("Import/Export", () => {
       expect(() => previewImportMoods(data)).toThrow(
         "Import contains invalid entries"
       );
-      expect(mockDb.execAsync).not.toHaveBeenCalledWith("BEGIN TRANSACTION;");
+      expect(mockDb.withTransactionAsync).not.toHaveBeenCalled();
     });
   });
 
@@ -430,17 +430,20 @@ describe("Import/Export", () => {
 
       await importOldBackup(data);
 
-      expect(mockDb.execAsync).toHaveBeenCalledWith("BEGIN TRANSACTION;");
-      expect(mockDb.execAsync).toHaveBeenCalledWith("COMMIT;");
+      expect(mockDb.withTransactionAsync).toHaveBeenCalledTimes(1);
+      expect(mockDb.__getMoods()).toHaveLength(1);
     });
 
     it("rolls back on error", async () => {
+      mockDb.__addMood({ mood: 9, note: "existing" });
       mockDb.runAsync.mockRejectedValueOnce(new Error("Import failed"));
 
       await expect(importOldBackup(JSON.stringify([{ mood: 5 }]))).rejects.toThrow(
         "Backup import failed"
       );
-      expect(mockDb.execAsync).toHaveBeenCalledWith("ROLLBACK;");
+      // The rollback is observable: the pre-existing row survives untouched.
+      expect(mockDb.__getMoods()).toHaveLength(1);
+      expect(mockDb.__getMoods()[0].note).toBe("existing");
     });
 
     it("handles string emotions by converting to objects", async () => {

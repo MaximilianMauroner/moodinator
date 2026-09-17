@@ -31,7 +31,7 @@ export {
   type ImportPreviewResult,
   type ImportResult,
 } from "./moods/importExport";
-export { clearMoodData, clearMoods, seedMoods, seedMoodsFromFile } from "./moods/seed";
+export { clearMoodData, clearMoods, seedMoods } from "./moods/seed";
 export { backfillMoodScaleJson, migrateEmotionsToCategories } from "./moods/migrations";
 export {
   createEmotionsTable,

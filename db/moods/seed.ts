@@ -1,14 +1,9 @@
 import type { Emotion } from "../types";
-import type * as SQLite from "expo-sqlite";
-import { getDb } from "../client";
+import { runInTransaction } from "../writeQueue";
 import { DEFAULT_CONTEXTS, DEFAULT_EMOTIONS } from "../../domain/entrySettings";
 import {
   serializeArray,
   serializeEmotions,
-  parseTimestamp,
-  sanitizeEnergy,
-  sanitizeImportedArray,
-  sanitizeImportedEmotions,
   serializeMoodScale,
 } from "./serialization";
 import { clearMoods } from "./seedUtils";
@@ -17,7 +12,6 @@ import { linkEmotionsToMood } from "./emotions";
 export { clearMoodData, clearMoods } from "./seedUtils";
 
 export async function seedMoods() {
-  const db = await getDb();
   const days = 1095;
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - days);
@@ -181,7 +175,9 @@ export async function seedMoods() {
   try {
     for (let i = 0; i < entries.length; i += BATCH_SIZE) {
       const batch = entries.slice(i, i + BATCH_SIZE);
-      await db.withExclusiveTransactionAsync(async (tx) => {
+      // One batch per queued transaction, so a user write can land between
+      // batches instead of waiting behind the whole seed.
+      await runInTransaction(async (tx) => {
         for (const entry of batch) {
           const result = await tx.runAsync(
             "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy, mood_scale_json) VALUES (?, ?, ?, ?, ?, ?, ?);",
@@ -195,11 +191,7 @@ export async function seedMoods() {
           );
 
           if (entry.emotions.length > 0) {
-            await linkEmotionsToMood(
-              tx as SQLite.SQLiteDatabase,
-              result.lastInsertRowId,
-              entry.emotions
-            );
+            await linkEmotionsToMood(tx, result.lastInsertRowId, entry.emotions);
           }
 
           insertedCount++;
@@ -217,52 +209,3 @@ export async function seedMoods() {
   return insertedCount;
 }
 
-export async function seedMoodsFromFile(): Promise<{
-  source: "file" | "random";
-  count: number;
-}> {
-  await clearMoods();
-
-  if (__DEV__) {
-    try {
-      const jsonData = require("../export.json");
-
-      if (Array.isArray(jsonData) && jsonData.length > 0) {
-        const db = await getDb();
-
-        for (const mood of jsonData) {
-          const note = (mood as any)?.notes ?? (mood as any)?.note ?? null;
-          const emotions = sanitizeImportedEmotions((mood as any)?.emotions);
-          const contextSource =
-            (mood as any)?.contextTags ?? (mood as any)?.context ?? [];
-          const contextTags = sanitizeImportedArray(contextSource);
-          const energy = sanitizeEnergy((mood as any)?.energy);
-          const timestamp = parseTimestamp((mood as any)?.timestamp);
-          const result = await db.runAsync(
-            "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy, mood_scale_json) VALUES (?, ?, ?, ?, ?, ?, ?);",
-            mood.mood,
-            note,
-            timestamp,
-            serializeEmotions(emotions),
-            serializeArray(contextTags),
-            energy,
-            serializeMoodScale()
-          );
-
-          if (emotions.length > 0) {
-            await linkEmotionsToMood(db, result.lastInsertRowId, emotions);
-          }
-        }
-
-        return { source: "file", count: jsonData.length };
-      }
-    } catch {
-      console.log(
-        "JSON file not found or invalid in dev mode, falling back to random seed"
-      );
-    }
-  }
-
-  const totalEntries = await seedMoods();
-  return { source: "random", count: totalEntries };
-}

@@ -2,6 +2,7 @@ import { getEntryLocalDayKey } from "../../src/lib/entryTimezone";
 import type { Emotion, MoodEntry, MoodEntryInput } from "../types";
 import type { MoodRow, CountResult, QueryParam } from "../types/rows";
 import { getDb } from "../client";
+import { runInTransaction } from "../writeQueue";
 import { resolveDateRange, type MoodDateRange } from "./range";
 import {
   normalizeInput,
@@ -23,51 +24,13 @@ export async function insertMood(
   note?: string,
   metadata?: Omit<MoodEntryInput, "mood" | "note">
 ): Promise<MoodEntry> {
-  const db = await getDb();
-  const normalized = normalizeInput({
-    mood,
-    note: note ?? null,
-    ...metadata,
-  });
-
-  await db.execAsync("BEGIN TRANSACTION;");
-  try {
-    const result = await db.runAsync(
-      "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy, mood_scale_json, utc_offset_minutes, based_on_entry_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);",
-      mood,
-      normalized.note,
-      normalized.timestamp,
-      serializeEmotions(normalized.emotions),
-      serializeArray(normalized.contextTags),
-      normalized.energy,
-      serializeMoodScale(normalized.moodScale),
-      normalized.utcOffsetMinutes,
-      normalized.basedOnEntryId
-    );
-
-    if (normalized.emotions && normalized.emotions.length > 0) {
-      await linkEmotionsToMood(db, result.lastInsertRowId, normalized.emotions);
-    }
-
-    await db.execAsync("COMMIT;");
-
-    const inserted = await db.getFirstAsync<MoodRow>(
-      "SELECT * FROM moods WHERE id = ?;",
-      result.lastInsertRowId
-    );
-    return toMoodEntry(inserted!);
-  } catch (error) {
-    await db.execAsync("ROLLBACK;");
-    throw error;
-  }
+  return insertMoodEntry({ mood, note: note ?? null, ...metadata });
 }
 
 export async function insertMoodEntry(entry: MoodEntryInput): Promise<MoodEntry> {
-  const db = await getDb();
   const normalized = normalizeInput(entry);
 
-  await db.execAsync("BEGIN TRANSACTION;");
-  try {
+  return runInTransaction(async (db) => {
     const result = await db.runAsync(
       "INSERT INTO moods (mood, note, timestamp, emotions, context_tags, energy, mood_scale_json, utc_offset_minutes, based_on_entry_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);",
       entry.mood,
@@ -85,17 +48,15 @@ export async function insertMoodEntry(entry: MoodEntryInput): Promise<MoodEntry>
       await linkEmotionsToMood(db, result.lastInsertRowId, normalized.emotions);
     }
 
-    await db.execAsync("COMMIT;");
-
     const inserted = await db.getFirstAsync<MoodRow>(
       "SELECT * FROM moods WHERE id = ?;",
       result.lastInsertRowId
     );
-    return toMoodEntry(inserted!);
-  } catch (error) {
-    await db.execAsync("ROLLBACK;");
-    throw error;
-  }
+    if (!inserted) {
+      throw new Error("Inserted mood entry could not be read back");
+    }
+    return toMoodEntry(inserted);
+  });
 }
 
 export async function hasMoodBeenLoggedToday(): Promise<boolean> {
@@ -114,30 +75,35 @@ export async function hasMoodBeenLoggedToday(): Promise<boolean> {
   return (result?.count ?? 0) > 0;
 }
 
+// Single-statement writes also run on the queue. A bare statement issued while
+// another transaction is open joins that transaction and is discarded with it
+// if the transaction rolls back.
 export async function updateMoodNote(
   id: number,
   note: string
 ): Promise<MoodEntry | undefined> {
-  const db = await getDb();
-  await db.runAsync("UPDATE moods SET note = ? WHERE id = ?;", note, id);
-  const updated = await db.getFirstAsync<MoodRow>(
-    "SELECT * FROM moods WHERE id = ?;",
-    id
-  );
-  return updated ? toMoodEntry(updated) : undefined;
+  return runInTransaction(async (db) => {
+    await db.runAsync("UPDATE moods SET note = ? WHERE id = ?;", note, id);
+    const updated = await db.getFirstAsync<MoodRow>(
+      "SELECT * FROM moods WHERE id = ?;",
+      id
+    );
+    return updated ? toMoodEntry(updated) : undefined;
+  });
 }
 
 export async function updateMoodTimestamp(
   id: number,
   timestamp: number
 ): Promise<MoodEntry | undefined> {
-  const db = await getDb();
-  await db.runAsync("UPDATE moods SET utc_offset_minutes = CASE WHEN timestamp = ? THEN utc_offset_minutes ELSE ? END, timestamp = ? WHERE id = ?;", timestamp, new Date(timestamp).getTimezoneOffset(), timestamp, id);
-  const updated = await db.getFirstAsync<MoodRow>(
-    "SELECT * FROM moods WHERE id = ?;",
-    id
-  );
-  return updated ? toMoodEntry(updated) : undefined;
+  return runInTransaction(async (db) => {
+    await db.runAsync("UPDATE moods SET utc_offset_minutes = CASE WHEN timestamp = ? THEN utc_offset_minutes ELSE ? END, timestamp = ? WHERE id = ?;", timestamp, new Date(timestamp).getTimezoneOffset(), timestamp, id);
+    const updated = await db.getFirstAsync<MoodRow>(
+      "SELECT * FROM moods WHERE id = ?;",
+      id
+    );
+    return updated ? toMoodEntry(updated) : undefined;
+  });
 }
 
 export async function updateMoodEntry(
@@ -201,29 +167,23 @@ export async function updateMoodEntry(
     return current ? toMoodEntry(current) : undefined;
   }
 
-  await db.execAsync("BEGIN TRANSACTION;");
-  try {
-    await db.runAsync(
+  return runInTransaction(async (tx) => {
+    await tx.runAsync(
       `UPDATE moods SET ${fields.join(", ")} WHERE id = ?;`,
       ...params,
       id
     );
 
     if (updateEmotions) {
-      await linkEmotionsToMood(db, id, emotionsToUpdate);
+      await linkEmotionsToMood(tx, id, emotionsToUpdate);
     }
 
-    await db.execAsync("COMMIT;");
-  } catch (error) {
-    await db.execAsync("ROLLBACK;");
-    throw error;
-  }
-
-  const updated = await db.getFirstAsync<MoodRow>(
-    "SELECT * FROM moods WHERE id = ?;",
-    id
-  );
-  return updated ? toMoodEntry(updated) : undefined;
+    const updated = await tx.getFirstAsync<MoodRow>(
+      "SELECT * FROM moods WHERE id = ?;",
+      id
+    );
+    return updated ? toMoodEntry(updated) : undefined;
+  });
 }
 
 export async function getAllMoods(): Promise<MoodEntry[]> {
@@ -326,8 +286,9 @@ export async function getMoodsPaginated(
 }
 
 export async function deleteMood(id: number) {
-  const db = await getDb();
-  return await db.runAsync("DELETE FROM moods WHERE id = ?;", id);
+  return runInTransaction((db) =>
+    db.runAsync("DELETE FROM moods WHERE id = ?;", id)
+  );
 }
 
 export async function getMoodCount(): Promise<number> {
