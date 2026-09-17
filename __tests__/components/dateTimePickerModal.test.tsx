@@ -81,6 +81,7 @@ beforeEach(() => {
 
 afterEach(async () => {
   if (renderer) await act(async () => renderer.unmount());
+  vi.useRealTimers();
   if (originalTimezone === undefined) delete process.env.TZ;
   else process.env.TZ = originalTimezone;
 });
@@ -119,17 +120,21 @@ function textValues() {
 
 describe("DateTimePickerModal timestamp round trips", () => {
   it.each(["UTC", "Etc/GMT-2"])(
-    "preserves an unchanged recorded-offset instant on a %s device",
+    "does not write an unchanged recorded-offset entry on a %s device",
     async (timezone) => {
       process.env.TZ = timezone;
       const timestamp = Date.parse("2026-03-31T12:00:56.789Z");
-      const { onSave } = await renderModal(entry(timestamp, -120));
+      const original = entry(timestamp, -120);
+      const { onSave } = await renderModal(original);
 
       expect(button("Change entry date")).toBeTruthy();
-      expect(button("Save date and time changes").props.accessibilityState.disabled).toBe(false);
+      expect(button("Save date and time changes").props.accessibilityState.disabled).toBe(true);
       await act(async () => button("Save date and time changes").props.onPress());
 
-      expect(onSave).toHaveBeenCalledWith(7, timestamp, -120);
+      expect(onSave).not.toHaveBeenCalled();
+      expect(original.timestamp).toBe(timestamp);
+      expect(original.utcOffsetMinutes).toBe(-120);
+      expect(original.timestamp % 1000).toBe(789);
     },
   );
 
@@ -137,18 +142,19 @@ describe("DateTimePickerModal timestamp round trips", () => {
     ["reverse offset", Date.parse("2026-03-31T23:30:56.789Z"), 420],
     ["quarter-hour cross-midnight", Date.parse("2026-03-31T23:30:56.789Z"), -345],
     ["half-hour cross-midnight", Date.parse("2026-03-31T23:30:56.789Z"), -330],
-  ] as const)("preserves %s wall time without a write shift", async (_label, timestamp, offset) => {
+  ] as const)("does not write an unchanged %s wall time", async (_label, timestamp, offset) => {
     process.env.TZ = "UTC";
     const { onSave } = await renderModal(entry(timestamp, offset));
 
+    expect(button("Save date and time changes").props.accessibilityState.disabled).toBe(true);
     await act(async () => button("Save date and time changes").props.onPress());
 
-    expect(onSave).toHaveBeenCalledWith(7, timestamp, offset);
+    expect(onSave).not.toHaveBeenCalled();
   });
 
   it("keeps the Home date flow open when the workflow target disappeared", async () => {
     process.env.TZ = "UTC";
-    const original = entry(Date.parse("2026-04-01T12:00:00.123Z"), -120);
+    const original = entry(Date.parse("2026-03-31T23:30:56.123Z"), -120);
     const repository = {
       create: vi.fn(),
       update: vi.fn(),
@@ -167,9 +173,17 @@ describe("DateTimePickerModal timestamp round trips", () => {
     };
 
     await renderModal(original, onSave, onClose);
+    await act(async () => button("Change entry date").props.onPress());
+    await act(async () => {
+      picker("date").props.onChange({}, new Date("2026-04-02T01:30:00.000Z"));
+    });
     await act(async () => button("Save date and time changes").props.onPress());
 
-    expect(repository.updateTimestamp).toHaveBeenCalledWith(7, original.timestamp, -120);
+    expect(repository.updateTimestamp).toHaveBeenCalledWith(
+      7,
+      Date.parse("2026-04-01T23:30:56.123Z"),
+      -120,
+    );
     expect(applyMutation).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
     expect(dateFeedback.commit).not.toHaveBeenCalled();
@@ -196,6 +210,65 @@ describe("DateTimePickerModal timestamp round trips", () => {
       Date.parse("2026-04-01T23:30:56.789Z"),
       -120,
     );
+  });
+
+  it.each([
+    [
+      "summer device date to winter wall date",
+      "2026-09-01T12:00:00-04:00",
+      "2026-01-15T12:00:00-05:00",
+      "2026-01-15T17:00:00.000Z",
+    ],
+    [
+      "winter device date to summer wall date",
+      "2026-01-15T12:00:00-05:00",
+      "2026-07-15T12:00:00-04:00",
+      "2026-07-15T16:00:00.000Z",
+    ],
+  ] as const)("derives a legacy edit offset from the selected %s", async (_label, now, selected, expected) => {
+    process.env.TZ = "America/New_York";
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(now));
+    const { onSave } = await renderModal(entry(Date.parse(now), null));
+
+    await act(async () => button("Change entry date").props.onPress());
+    await act(async () => {
+      picker("date").props.onChange({}, new Date(selected));
+    });
+    await act(async () => button("Save date and time changes").props.onPress());
+
+    expect(onSave).toHaveBeenCalledWith(7, Date.parse(expected), expect.any(Number));
+    expect(onSave.mock.calls[0][2]).toBe(selected.endsWith("-05:00") ? 300 : 240);
+  });
+
+  it("uses the selected device offset for unknown timestamp assignment", async () => {
+    process.env.TZ = "America/New_York";
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-01T12:00:00-04:00"));
+    const { onSave } = await renderModal(entry(0, null));
+
+    await act(async () => button("Change entry date").props.onPress());
+    await act(async () => {
+      picker("date").props.onChange({}, new Date("2026-01-15T12:00:00-05:00"));
+    });
+    await act(async () => button("Save date and time changes").props.onPress());
+
+    expect(onSave).toHaveBeenCalledWith(7, Date.parse("2026-01-15T17:00:00.000Z"), 300);
+  });
+
+  it("follows device normalization for a legacy DST-gap selection", async () => {
+    process.env.TZ = "America/New_York";
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-01T12:00:00-04:00"));
+    const normalized = new Date(2026, 2, 8, 2, 30, 0, 0);
+    const { onSave } = await renderModal(entry(0, null));
+
+    await act(async () => button("Change entry date").props.onPress());
+    await act(async () => picker("date").props.onChange({}, normalized));
+    await act(async () => button("Save date and time changes").props.onPress());
+
+    expect(normalized.getHours()).toBe(3);
+    expect(onSave).toHaveBeenCalledWith(7, normalized.getTime(), 240);
   });
 
   it("does not write when cancelled", async () => {

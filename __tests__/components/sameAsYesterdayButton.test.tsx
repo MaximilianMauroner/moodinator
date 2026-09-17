@@ -87,10 +87,19 @@ function copyButton() {
   return renderer.root.findByProps({ accessibilityLabel: "Copy last entry" });
 }
 
+function visibleText() {
+  return renderer.root
+    .findAllByType("Text")
+    .map((node) => node.children.join(""))
+    .join(" ");
+}
+
 describe("SameAsYesterdayButton", () => {
   it("copies into the draft on tap and describes the real effect", async () => {
     const onCopy = await render();
 
+    expect(visibleText()).toContain("Copy last entry");
+    expect(visibleText()).not.toContain("LAST ENTRY");
     expect(copyButton().props.accessibilityRole).toBe("button");
     expect(copyButton().props.accessibilityHint).toContain("copy");
     await act(async () => copyButton().props.onPress());

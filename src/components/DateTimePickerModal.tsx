@@ -62,11 +62,14 @@ function sameWallClock(
   );
 }
 
-function getEditableOffset(mood: MoodEntry): number {
+function getEditableOffset(
+  mood: MoodEntry,
+  wallClockParts: EntryLocalDateParts,
+): number {
   const offset = mood.utcOffsetMinutes;
   return typeof offset === "number" && Number.isInteger(offset) && Math.abs(offset) <= 840
     ? offset
-    : new Date().getTimezoneOffset();
+    : getPickerDate(wallClockParts).getTimezoneOffset();
 }
 
 export const DateTimePickerModal: React.FC<Props> = ({
@@ -154,10 +157,11 @@ export const DateTimePickerModal: React.FC<Props> = ({
 
     const originalParts = getEntryLocalDateParts(mood);
     const hasChanged = !originalParts || !sameWallClock(wallClockParts, originalParts);
-    const newTimestamp = hasChanged
-      ? getTimestampFromEntryLocalDateParts(wallClockParts, getEditableOffset(mood))
-      : mood.timestamp;
-    const newOffset = hasChanged ? getEditableOffset(mood) : mood.utcOffsetMinutes ?? null;
+    if (!hasChanged) return;
+
+    const editableOffset = getEditableOffset(mood, wallClockParts);
+    const newTimestamp = getTimestampFromEntryLocalDateParts(wallClockParts, editableOffset);
+    const newOffset = editableOffset;
 
     try {
       setSaving(true);
@@ -186,7 +190,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
   const hasChanged = Boolean(
     wallClockParts && (!originalParts || !sameWallClock(wallClockParts, originalParts)),
   );
-  const canSave = Boolean(wallClockParts) && !saving;
+  const canSave = hasChanged && !saving;
 
   return (
     <SafeAreaView>

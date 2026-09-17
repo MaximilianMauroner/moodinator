@@ -278,7 +278,7 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
               className="text-[11px] font-bold tracking-wide"
               style={{ color: isDark ? get("primary") : colors.positive.textDark.light }}
             >
-              LAST ENTRY
+              Copy last entry
             </Text>
           </>
         )}

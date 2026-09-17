@@ -4,6 +4,23 @@ Run the Maestro flow on a disposable Android emulator and record the result in
 the task tracker. Passing unit tests or parsing YAML does not verify native
 layout, gestures, haptic strength, or frame timing.
 
+## Historical smoke record (old head only)
+
+On Android 15 / API 35 emulator `emulator-5554` (QA process record `491382`),
+the provisional QA APK built from old head
+`6dbb79465e6e2cdaceb6d13b3631a1d4d4f8f5d5` passed the synthetic-data smoke
+journey without a crash: all four onboarding pages, quick save, edit note,
+relaunch with persistence, delete, and empty plus filled Insights. APK
+SHA-256: `2c84c16dcebe1d7e61f4182c6f9979c325ea7aa0ec84b69864370bd05c18b3e6`.
+Evidence folder: `/tmp/moodinator-native-smoke-20260917T184657Z`. The emulator
+was safely stopped. This is historical evidence and is not verification of the
+current PR head.
+
+Two observations remain unconfirmed on the current head and need bounded
+scroll/touch/layout checks: possible lower-energy-chip/footer overlap, and
+transient empty-card text not visible in the first screenshot. No screenshot
+URL is asserted here.
+
 ## Recording-trust acceptance matrix
 
 This matrix separates source and test evidence from native proof. A passing
