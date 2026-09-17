@@ -22,7 +22,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Alert } from "@/components/ui/AppAlert";
 import { createScreenErrorFallback } from "@/components/ScreenErrorFallback";
-import { useThemeColors } from "@/constants/colors";
+import { useThemeColors, getThemedColor } from "@/constants/colors";
 import { haptics } from "@/lib/haptics";
 import {
   getReminderScheduleResultWarning,
@@ -208,7 +208,7 @@ function NotificationsScreenContent() {
               className="rounded-2xl py-4 px-5 mb-5 flex-row items-center justify-center"
               style={{
                 backgroundColor: get("primary"),
-                shadowColor: isDark ? "#000" : "#5B8A5B",
+                shadowColor: getThemedColor("shadowSage", isDark),
                 shadowOffset: { width: 0, height: 6 },
                 shadowOpacity: isDark ? 0.4 : 0.25,
                 shadowRadius: 12,
@@ -235,7 +235,7 @@ function NotificationsScreenContent() {
               className="rounded-3xl p-8 items-center"
               style={{
                 backgroundColor: get("surface"),
-                shadowColor: isDark ? "#000" : "#9D8660",
+                shadowColor: getThemedColor("shadowSand", isDark),
                 shadowOffset: { width: 0, height: 4 },
                 shadowOpacity: isDark ? 0.2 : 0.08,
                 shadowRadius: 16,
@@ -272,7 +272,7 @@ function NotificationsScreenContent() {
                     className="rounded-2xl overflow-hidden"
                     style={{
                       backgroundColor: get("surface"),
-                      shadowColor: isDark ? "#000" : "#9D8660",
+                      shadowColor: getThemedColor("shadowSand", isDark),
                       shadowOffset: { width: 0, height: 3 },
                       shadowOpacity: isDark ? 0.15 : 0.06,
                       shadowRadius: 10,
@@ -316,11 +316,11 @@ function NotificationsScreenContent() {
                         handleToggleEnabled(notification.id, value)
                       }
                       trackColor={{
-                        false: isDark ? "#3D352A" : "#E5D9BF",
-                        true: isDark ? "#3D5D3D" : "#A8C5A8",
+                        false: getThemedColor("textOnSand", isDark),
+                        true: getThemedColor("sageFaint", isDark),
                       }}
-                      thumbColor={notification.enabled ? get("primary") : (isDark ? "#8AAE98" : "#BDA77D")}
-                      ios_backgroundColor={isDark ? "#3D352A" : "#E5D9BF"}
+                      thumbColor={notification.enabled ? get("primary") : (getThemedColor("sandSoft", isDark))}
+                      ios_backgroundColor={getThemedColor("textOnSand", isDark)}
                       accessibilityLabel={`${notification.title} reminder`}
                       accessibilityHint={notification.enabled ? "Double tap to pause" : "Double tap to enable"}
                     />
@@ -357,13 +357,13 @@ function NotificationsScreenContent() {
                         <Ionicons
                           name="alert-circle-outline"
                           size={16}
-                          color={isDark ? "#F5A899" : "#C75441"}
+                          color={getThemedColor("iconDanger", isDark)}
                           style={{ marginRight: 8, marginTop: 1 }}
                         />
                         <View className="flex-1">
                           <Text
                             className="text-xs font-semibold"
-                            style={{ color: isDark ? "#F5A899" : "#C75441" }}
+                            style={{ color: getThemedColor("iconDanger", isDark) }}
                           >
                             Not scheduled
                           </Text>
@@ -408,18 +408,18 @@ function NotificationsScreenContent() {
                         handleDelete(notification.id, notification.title)
                       }
                       className="flex-1 rounded-xl py-2.5 items-center flex-row justify-center"
-                      style={{ backgroundColor: isDark ? "#3C1A14" : "#FDE8E4" }}
+                      style={{ backgroundColor: getThemedColor("dangerSurface", isDark) }}
                       accessibilityRole="button"
                       accessibilityLabel={`Delete ${notification.title} reminder`}
                     >
                       <IconSymbol
                         name="trash"
                         size={14}
-                        color={isDark ? "#F5A899" : "#C75441"}
+                        color={getThemedColor("iconDanger", isDark)}
                       />
                       <Text
                         className="font-medium text-sm ml-1.5"
-                        style={{ color: isDark ? "#F5A899" : "#C75441" }}
+                        style={{ color: getThemedColor("iconDanger", isDark) }}
                       >
                         Delete
                       </Text>

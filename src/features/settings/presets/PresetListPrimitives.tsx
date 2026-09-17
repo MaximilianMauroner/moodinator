@@ -6,7 +6,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
-import { colors } from "@/constants/colors";
+import { colors, getThemedColor } from "@/constants/colors";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -72,7 +72,7 @@ export function PresetHeroStats({
           <Text
             style={[
               styles.heroTitle,
-              { color: isDark ? "#F0EDE6" : "#3D352A" },
+              { color: getThemedColor("textOnSurface", isDark) },
             ]}
           >
             {title}
@@ -426,7 +426,7 @@ export function PresetAddChip({
       style={[
         styles.addChip,
         {
-          borderColor: isDark ? "#A6E39B" : "#5B8A5B",
+          borderColor: getThemedColor("primary", isDark),
           backgroundColor: isDark ? "#1B3423" : "#E6EEE1",
         },
       ]}
@@ -482,7 +482,7 @@ export function PresetTipCard({
           <Ionicons
             name="bulb-outline"
             size={18}
-            color={isDark ? "#D4C4A0" : "#9D8660"}
+            color={getThemedColor("sandFaint", isDark)}
           />
         </View>
         <View style={styles.tipsContent}>
@@ -548,7 +548,7 @@ export function PresetHistorySyncCard({
         <View className="flex-1 pr-3">
           <Text
             className="text-sm font-bold"
-            style={{ color: isDark ? "#F0EDE6" : "#3D352A" }}
+            style={{ color: getThemedColor("textOnSurface", isDark) }}
             numberOfLines={1}
           >
             {title}

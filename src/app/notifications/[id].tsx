@@ -22,7 +22,7 @@ import {
 import { IconSymbol } from "@/components/ui/IconSymbol";
 import { Alert } from "@/components/ui/AppAlert";
 import { Ionicons } from "@expo/vector-icons";
-import { useThemeColors } from "@/constants/colors";
+import { useThemeColors, getThemedColor } from "@/constants/colors";
 import { haptics } from "@/lib/haptics";
 import {
   getReminderScheduleResultWarning,
@@ -214,7 +214,7 @@ export default function NotificationDetailScreen() {
               className="rounded-2xl p-4 mb-6"
               style={{
                 backgroundColor: get("surface"),
-                shadowColor: isDark ? "#000" : "#9D8660",
+                shadowColor: getThemedColor("shadowSand", isDark),
                 shadowOffset: { width: 0, height: 4 },
                 shadowOpacity: isDark ? 0.2 : 0.08,
                 shadowRadius: 12,
@@ -442,11 +442,11 @@ export default function NotificationDetailScreen() {
                   setEnabled(value);
                 }}
                 trackColor={{
-                  false: isDark ? "#3D352A" : "#E5D9BF",
-                  true: isDark ? "#3D5D3D" : "#A8C5A8",
+                  false: getThemedColor("textOnSand", isDark),
+                  true: getThemedColor("sageFaint", isDark),
                 }}
-                thumbColor={enabled ? get("primary") : (isDark ? "#8AAE98" : "#BDA77D")}
-                ios_backgroundColor={isDark ? "#3D352A" : "#E5D9BF"}
+                thumbColor={enabled ? get("primary") : (getThemedColor("sandSoft", isDark))}
+                ios_backgroundColor={getThemedColor("textOnSand", isDark)}
                 accessibilityLabel="Reminder active"
                 accessibilityHint={enabled ? "Double tap to save this reminder paused" : "Double tap to save this reminder active"}
               />
@@ -468,7 +468,7 @@ export default function NotificationDetailScreen() {
               className="rounded-2xl py-4 px-4 items-center flex-row justify-center"
               style={{
                 backgroundColor: saving ? get("primaryMuted") : get("primary"),
-                shadowColor: isDark ? "#000" : "#5B8A5B",
+                shadowColor: getThemedColor("shadowSage", isDark),
                 shadowOffset: { width: 0, height: 4 },
                 shadowOpacity: isDark ? 0.3 : 0.2,
                 shadowRadius: 8,

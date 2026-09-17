@@ -39,4 +39,71 @@ describe("therapyExportService", () => {
 
     expect(csv).toContain('"Joy, ""big""","Line 1\nLine 2"');
   });
+
+  describe("spreadsheet formula neutralization", () => {
+    const notesCsv = (note: string) =>
+      buildTherapyExportCsv([createMockMoodEntry({ note })], ["notes"]).split("\n")[1];
+
+    it.each([
+      ["=HYPERLINK(\"http://example.invalid\",\"click\")"],
+      ["+1+1"],
+      ["@SUM(A1)"],
+      ["-2+3"],
+      ["\tleading tab"],
+      ["\rleading carriage return"],
+    ])("quotes and prefixes a note starting with a formula lead: %j", (note) => {
+      expect(notesCsv(note)).toBe(`"'${note.replace(/"/g, '""')}"`);
+    });
+
+    /**
+     * A spreadsheet may trim a leading line feed on import and evaluate what
+     * follows, so it is neutralized alongside tab and carriage return. The
+     * note itself spans lines, so this asserts on the whole file rather than
+     * on a split row.
+     */
+    it("prefixes a formula hidden behind a leading line feed", () => {
+      const note = '\n=HYPERLINK("http://example.invalid","click")';
+      const csv = buildTherapyExportCsv(
+        [createMockMoodEntry({ note })],
+        ["notes"]
+      );
+
+      expect(csv.endsWith(`"'${note.replace(/"/g, '""')}"`)).toBe(true);
+    });
+
+    it("guards a formula lead in the emotions column too", () => {
+      const csv = buildTherapyExportCsv(
+        [createMockMoodEntry({ emotions: [{ name: "=cmd", category: "neutral" }] })],
+        ["emotions"]
+      );
+
+      expect(csv.split("\n")[1]).toBe(`"'=cmd"`);
+    });
+
+    /**
+     * A formula parser accepts whitespace after a unary minus, so "- 2+3"
+     * evaluates. Every leading minus is guarded rather than guessing which ones
+     * are prose, which costs a visible apostrophe on dashed list items.
+     */
+    it("guards every leading minus, including one behind whitespace", () => {
+      expect(notesCsv("- 2+3")).toBe(`"'- 2+3"`);
+      expect(notesCsv("- bullet point")).toBe(`"'- bullet point"`);
+      expect(notesCsv("-")).toBe(`"'-"`);
+    });
+
+    it("leaves ordinary text untouched", () => {
+      expect(notesCsv("Felt okay today")).toBe("Felt okay today");
+      expect(notesCsv("Slept well, mostly")).toBe(`"Slept well, mostly"`);
+    });
+
+
+    it("does not guard numeric columns", () => {
+      const csv = buildTherapyExportCsv(
+        [createMockMoodEntry({ mood: 3, energy: 7 })],
+        ["energy"]
+      );
+
+      expect(csv.split("\n")[1]).toBe("7");
+    });
+  });
 });

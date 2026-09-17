@@ -3,6 +3,7 @@ import { View, Text, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useColorScheme } from "nativewind";
 import { haptics } from "@/lib/haptics";
+import { getThemedColor } from "@/constants/colors";
 
 export function SettingRow({
   label,
@@ -58,8 +59,8 @@ export function SettingRow({
               size={18}
               color={
                 destructive
-                  ? isDark ? "#F5A899" : "#C75441"
-                  : isDark ? "#A8C5A8" : "#5B8A5B"
+                  ? getThemedColor("iconDanger", isDark)
+                  : getThemedColor("iconAccent", isDark)
               }
             />
           </View>
@@ -86,7 +87,7 @@ export function SettingRow({
         <Ionicons
           name="chevron-forward"
           size={20}
-          color={isDark ? "#8AAE98" : "#BDA77D"}
+          color={getThemedColor("sandSoft", isDark)}
         />
       )}
     </Pressable>

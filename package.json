@@ -12,7 +12,7 @@
     "lint": "expo lint",
     "typecheck": "node node_modules/typescript/bin/tsc --noEmit",
     "doctor": "expo-doctor",
-    "verify": "bun run lint && bun run typecheck && bun run test:run && bun run doctor && bun run verify:android-release-config",
+    "verify": "bun run lint && bun run typecheck && bun run test:run && bun run doctor && bun run verify:android-release-config && bun run verify:color-tokens",
     "verify:android-release-config": "node scripts/check-android-release-config.js",
     "verify:android-release-manifest": "node scripts/check-android-release-config.js --require-generated-manifest",
     "build": "node scripts/nightly-release.mjs run",
@@ -23,7 +23,8 @@
     "qa:fixtures": "node scripts/generate-qa-fixtures.js",
     "release:internal": "node scripts/nightly-release.mjs run",
     "release:status": "node scripts/nightly-release.mjs status",
-    "test:nightly": "node --test tests/*.node-test.mjs && python3 tests/nightly-ledger.test.py"
+    "test:nightly": "node --test tests/*.node-test.mjs && python3 tests/nightly-ledger.test.py",
+    "verify:color-tokens": "node scripts/check-color-tokens.mjs"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

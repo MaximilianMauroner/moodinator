@@ -55,8 +55,8 @@ describe("Repository", () => {
       expect(result.mood).toBe(7);
       expect(result.id).toBe(1);
       expect(result.note).toBeNull();
-      expect(mockDb.execAsync).toHaveBeenCalledWith("BEGIN TRANSACTION;");
-      expect(mockDb.execAsync).toHaveBeenCalledWith("COMMIT;");
+      expect(mockDb.withTransactionAsync).toHaveBeenCalledTimes(1);
+      expect(mockDb.__getMoods()).toHaveLength(1);
     });
 
     it("inserts mood with note", async () => {
@@ -94,7 +94,8 @@ describe("Repository", () => {
       mockDb.runAsync.mockRejectedValueOnce(new Error("DB Error"));
 
       await expect(insertMood(7)).rejects.toThrow("DB Error");
-      expect(mockDb.execAsync).toHaveBeenCalledWith("ROLLBACK;");
+      // The rollback is observable: a failed insert leaves no row behind.
+      expect(mockDb.__getMoods()).toHaveLength(0);
     });
   });
 
@@ -262,8 +263,8 @@ describe("Repository", () => {
 
       await updateMoodEntry(1, { mood: 7 });
 
-      expect(mockDb.execAsync).toHaveBeenCalledWith("BEGIN TRANSACTION;");
-      expect(mockDb.execAsync).toHaveBeenCalledWith("COMMIT;");
+      expect(mockDb.withTransactionAsync).toHaveBeenCalledTimes(1);
+      expect(mockDb.__getMoods()[0].mood).toBe(7);
     });
 
     it("rolls back on error", async () => {
@@ -273,7 +274,8 @@ describe("Repository", () => {
       await expect(updateMoodEntry(1, { mood: 7 })).rejects.toThrow(
         "Update failed"
       );
-      expect(mockDb.execAsync).toHaveBeenCalledWith("ROLLBACK;");
+      // The rollback is observable: the stored rating is unchanged.
+      expect(mockDb.__getMoods()[0].mood).toBe(5);
     });
   });
 

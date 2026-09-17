@@ -12,7 +12,7 @@ import {
 } from "@/lib/entrySettings";
 import { CATEGORIES, CATEGORY_CONFIG } from "./emotionSettingsConfig";
 import { styles } from "./emotionSettingsStyles";
-import { colors } from "@/constants/colors";
+import { colors, getThemedColor } from "@/constants/colors";
 
 // ─── EmotionModal Component ──────────────────────────────────────────────────
 
@@ -179,7 +179,7 @@ function EmotionModal({
               <Text
                 style={[
                   styles.modalTitle,
-                  { color: isDark ? "#F0EDE6" : "#3D352A" },
+                  { color: getThemedColor("textOnSurface", isDark) },
                 ]}
               >
                 {editingEmotion?.isNew ? "Add Emotion" : "Edit Emotion"}
@@ -258,7 +258,7 @@ function EmotionModal({
               <Text
                 style={[
                   styles.modalEnergyTitle,
-                  { color: isDark ? "#F0EDE6" : "#3D352A" },
+                  { color: getThemedColor("textOnSurface", isDark) },
                 ]}
               >
                 Energy
@@ -349,7 +349,7 @@ function EmotionModal({
                   styles.modalInput,
                   {
                     backgroundColor: inputBg,
-                    color: isDark ? "#F0EDE6" : "#3D352A",
+                    color: getThemedColor("textOnSurface", isDark),
                     borderColor: isDark
                       ? "rgba(255,255,255,0.10)"
                       : "rgba(0,0,0,0.06)",
@@ -479,14 +479,14 @@ function RemoveEmotionDialog({
             <Ionicons
               name="trash-outline"
               size={18}
-              color={isDark ? "#F5A899" : "#C75441"}
+              color={getThemedColor("iconDanger", isDark)}
             />
           </View>
 
           <Text
             style={[
               styles.confirmTitle,
-              { color: isDark ? "#F0EDE6" : "#3D352A" },
+              { color: getThemedColor("textOnSurface", isDark) },
             ]}
           >
             Remove Emotion?
@@ -609,14 +609,14 @@ function MoveEmotionDialog({
             <Ionicons
               name="swap-horizontal-outline"
               size={18}
-              color={isDark ? "#C4BBCF" : "#695C78"}
+              color={getThemedColor("duskText", isDark)}
             />
           </View>
 
           <Text
             style={[
               styles.confirmTitle,
-              { color: isDark ? "#F0EDE6" : "#3D352A" },
+              { color: getThemedColor("textOnSurface", isDark) },
             ]}
           >
             Move {emotionName}

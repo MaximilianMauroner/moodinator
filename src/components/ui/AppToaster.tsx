@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Toaster } from "sonner-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { colors } from "@/constants/colors";
+import { colors, getThemedColor } from "@/constants/colors";
 import { fontFamilies, typography } from "@/constants/typography";
 import { useToastOffset } from "@/hooks/useToastOffset";
 import { useColorScheme } from "@/hooks/useColorScheme";
@@ -83,7 +83,7 @@ export function AppToaster() {
         actionButtonStyle: {
           backgroundColor: isDark ? colors.primaryBgHover.dark : colors.primaryBgHover.light,
           borderWidth: 1,
-          borderColor: isDark ? "#4A6653" : "#D1DFD1",
+          borderColor: getThemedColor("sageBorder", isDark),
           borderRadius: 10,
           minHeight: 48,
           paddingHorizontal: 12,
@@ -91,7 +91,7 @@ export function AppToaster() {
         },
         actionButtonTextStyle: {
           ...typography.bodySm,
-          color: isDark ? "#C8EEC8" : "#476D47",
+          color: getThemedColor("positiveText", isDark),
           fontSize: 13,
           fontWeight: "600",
         },

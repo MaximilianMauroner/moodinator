@@ -13,6 +13,7 @@ import { formatBackupDate, formatBackupFolderPath } from "@/features/settings/ut
 import { confirmDeleteLocalMoodData } from "@/features/settings/utils/deleteLocalDataConfirmation";
 import { dataPortabilityService } from "@/services/dataPortabilityService";
 import { Alert } from "@/components/ui/AppAlert";
+import { getThemedColor } from "@/constants/colors";
 
 export default function DataSettingsScreen() {
   const { colorScheme } = useColorScheme();
@@ -164,7 +165,7 @@ export default function DataSettingsScreen() {
             <Ionicons
               name={backupInfo && backupInfo.count > 0 ? "folder-open-outline" : "folder-outline"}
               size={20}
-              color={isDark ? "#A8C5A8" : "#5B8A5B"}
+              color={getThemedColor("iconAccent", isDark)}
               style={{ marginRight: 8 }}
             />
             <Text className="text-base font-bold text-sage-600 dark:text-sage-300">
@@ -201,7 +202,7 @@ export default function DataSettingsScreen() {
             isLast
             action={
               loading === "import" ? (
-                <ActivityIndicator size="small" color={isDark ? "#A8C5A8" : "#5B8A5B"} />
+                <ActivityIndicator size="small" color={getThemedColor("iconAccent", isDark)} />
               ) : undefined
             }
           />
@@ -220,7 +221,7 @@ export default function DataSettingsScreen() {
             isLast
             action={
               loading === "delete" ? (
-                <ActivityIndicator size="small" color={isDark ? "#F5A899" : "#C75441"} />
+                <ActivityIndicator size="small" color={getThemedColor("iconDanger", isDark)} />
               ) : undefined
             }
           />
@@ -255,7 +256,7 @@ export default function DataSettingsScreen() {
               <TouchableOpacity onPress={handleRunBackupNow} disabled={loading === "backup"}>
                 <View className="px-3 py-1.5 rounded-full bg-sage-100 dark:bg-sage-600/20">
                   {loading === "backup" ? (
-                    <ActivityIndicator size="small" color={isDark ? "#A8C5A8" : "#5B8A5B"} />
+                    <ActivityIndicator size="small" color={getThemedColor("iconAccent", isDark)} />
                   ) : (
                     <Text className="font-semibold text-xs text-sage-600 dark:text-sage-300">
                       Run Backup

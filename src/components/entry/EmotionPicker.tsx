@@ -7,7 +7,7 @@ import Animated, {
     FadeIn,
 } from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
-import { useThemeColors } from "@/constants/colors";
+import { useThemeColors, getThemedColor } from "@/constants/colors";
 import { haptics } from "@/lib/haptics";
 import {
     EMOTION_ENERGY_BAND_LABELS,
@@ -215,7 +215,7 @@ export const EmotionPicker: React.FC<EmotionPickerProps> = ({
     );
     const atLimit = selected.length >= maxSelections;
 
-    const labelColor = isDark ? "#9EB894" : "#7A6B55";
+    const labelColor = getThemedColor("textSubtle", isDark);
     const meterDimColor = isDark ? "rgba(158, 184, 148, 0.28)" : "rgba(122, 107, 85, 0.25)";
     const ruleColor = isDark ? "rgba(61, 53, 42, 0.25)" : "rgba(229, 217, 191, 0.5)";
 

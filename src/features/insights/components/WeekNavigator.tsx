@@ -6,6 +6,7 @@ import { format, startOfWeek, endOfWeek, isThisWeek, isThisMonth } from "date-fn
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { motion } from "@/constants/motion";
 import { TimePeriod } from "./TimePeriodSelector";
+import { getThemedColor } from "@/constants/colors";
 
 interface WeekNavigatorProps {
   currentDate: Date;
@@ -62,14 +63,14 @@ export function WeekNavigator({
         <View
           className="flex-row items-center justify-center py-3 px-5 rounded-2xl"
           style={{
-            backgroundColor: isDark ? "#2C4038" : "#FDFCFA",
+            backgroundColor: getThemedColor("textOnAccent", isDark),
             ...styles.navContainerLight,
           }}
         >
           <Ionicons
             name="infinite-outline"
             size={18}
-            color={isDark ? "#A8C5A8" : "#5B8A5B"}
+            color={getThemedColor("iconAccent", isDark)}
             style={{ marginRight: 8 }}
           />
           <Text
@@ -93,7 +94,7 @@ export function WeekNavigator({
           className="w-11 h-11 rounded-2xl items-center justify-center"
           style={({ pressed }) => [
             {
-              backgroundColor: isDark ? "#2C4038" : "#FDFCFA",
+              backgroundColor: getThemedColor("textOnAccent", isDark),
               opacity: !canGoPrevious ? 0.4 : pressed ? 0.7 : 1,
             },
             isDark ? styles.navButtonDark : styles.navButtonLight,
@@ -104,7 +105,7 @@ export function WeekNavigator({
           <Ionicons
             name="chevron-back"
             size={20}
-            color={isDark ? "#A8C5A8" : "#5B8A5B"}
+            color={getThemedColor("iconAccent", isDark)}
           />
         </Pressable>
 
@@ -113,7 +114,7 @@ export function WeekNavigator({
           <View
             className="px-4 py-2 rounded-xl"
             style={{
-              backgroundColor: isDark ? "#2C4038" : "#FDFCFA",
+              backgroundColor: getThemedColor("textOnAccent", isDark),
             }}
           >
             <Animated.Text
@@ -137,7 +138,7 @@ export function WeekNavigator({
               className="px-3.5 py-2.5 rounded-xl"
               style={({ pressed }) => [
                 {
-                  backgroundColor: isDark ? "#2D3D2D" : "#E8EFE8",
+                  backgroundColor: getThemedColor("positiveSurface", isDark),
                 },
                 pressed ? { opacity: 0.7 } : null,
               ]}
@@ -146,7 +147,7 @@ export function WeekNavigator({
             >
               <Text
                 className="text-xs font-bold uppercase tracking-wide"
-                style={{ color: isDark ? "#A8C5A8" : "#5B8A5B" }}
+                style={{ color: getThemedColor("iconAccent", isDark) }}
               >
                 Today
               </Text>
@@ -160,7 +161,7 @@ export function WeekNavigator({
             className="w-11 h-11 rounded-2xl items-center justify-center"
             style={({ pressed }) => [
               {
-                backgroundColor: isDark ? "#2C4038" : "#FDFCFA",
+                backgroundColor: getThemedColor("textOnAccent", isDark),
                 opacity: !canGoNext ? 0.4 : pressed ? 0.7 : 1,
               },
               isDark ? styles.navButtonDark : styles.navButtonLight,
@@ -171,7 +172,7 @@ export function WeekNavigator({
             <Ionicons
               name="chevron-forward"
               size={20}
-              color={isDark ? "#A8C5A8" : "#5B8A5B"}
+              color={getThemedColor("iconAccent", isDark)}
             />
           </Pressable>
         </View>

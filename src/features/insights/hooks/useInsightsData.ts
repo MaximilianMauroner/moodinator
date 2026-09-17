@@ -7,7 +7,7 @@ import { moodService } from "@/services/moodService";
 import { useMoodsStore } from "@/shared/state/moodsStore";
 import { useThemeColors } from "@/constants/colors";
 import { getMoodRatingLabel } from "@/constants/moodScaleInterpretation";
-import { getEntryLocalDayKey } from "@/lib/entryTimezone";
+import { getEntryLocalDayKey, hasKnownDate } from "@/lib/entryTimezone";
 import { getMoodHex } from "@/lib/moodPresentation";
 import { calculateStreak } from "../utils/streaks";
 import {
@@ -152,8 +152,13 @@ export function useInsightsData(): InsightsData {
     [summary.days, localDay],
   );
   const analysis = useMemo(() => {
+    // A row with an unreadable timestamp sits at the epoch, and letting it set
+    // the start of "All history" would draw every day since 1970.
     const oldestDay = analysisMoods.reduce(
       (oldest, entry) => {
+        if (!hasKnownDate(entry)) {
+          return oldest;
+        }
         const day = getEntryLocalDayKey(entry);
         return day < oldest ? day : oldest;
       },

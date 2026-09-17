@@ -11,179 +11,146 @@ import { toastService } from "@/services/toastService";
 
 export type AppBootstrapStatus = "running" | "ready" | "ready-with-warning";
 
-type BootstrapNavigationPolicy = "wait-for-migrations";
+export type AppBootstrapResult = {
+  status: Exclude<AppBootstrapStatus, "running">;
+};
 
-type BootstrapMigrationStatus = "completed" | "retryable-failure" | "failed";
+/**
+ * Persisted shape. Installed devices already hold this exact record, and a
+ * completed migration must stay completed, so the shape is kept as-is rather
+ * than simplified. Rewriting it would make every existing user rescan the
+ * moods table once for no gain.
+ */
+type MigrationStatus = "completed" | "retryable-failure" | "failed";
 
-type StoredBootstrapMigration = {
+type StoredMigration = {
   id: string;
   version: number;
-  status: BootstrapMigrationStatus;
+  status: MigrationStatus;
   attempts: number;
   updatedAt: number;
   completedAt?: number;
   error?: string;
 };
 
-type StoredBootstrapMigrationState = {
+type StoredMigrationState = {
   schemaVersion: 1;
-  migrations: Record<string, StoredBootstrapMigration>;
+  migrations: Record<string, StoredMigration>;
 };
 
-export type BootstrapMigrationOutcome = {
-  id: string;
-  version: number;
-  status: "completed" | "skipped" | "retryable-failure" | "failed";
-  attempts: number;
-  migrated?: number;
-  skipped?: number;
-};
-
-export type AppBootstrapResult = {
-  status: Exclude<AppBootstrapStatus, "running">;
-  navigationPolicy: BootstrapNavigationPolicy;
-  migrations: BootstrapMigrationOutcome[];
-};
-
-const LEGACY_EMOTION_CATEGORY_MIGRATION_ID = "legacy-emotion-categories";
-const LEGACY_EMOTION_CATEGORY_MIGRATION_VERSION = 1;
-const MAX_MIGRATION_ATTEMPTS = 3;
-
-function emptyMigrationState(): StoredBootstrapMigrationState {
-  return {
-    schemaVersion: 1,
-    migrations: {},
-  };
-}
+const MIGRATION_ID = "legacy-emotion-categories";
+const MIGRATION_VERSION = 1;
+const MAX_ATTEMPTS = 3;
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-async function loadMigrationState(): Promise<StoredBootstrapMigrationState> {
-  return (await getJson<StoredBootstrapMigrationState>(
-    BOOTSTRAP_MIGRATIONS_STATE_KEY
-  )) ?? emptyMigrationState();
+async function loadState(): Promise<StoredMigrationState> {
+  return (
+    (await getJson<StoredMigrationState>(BOOTSTRAP_MIGRATIONS_STATE_KEY)) ?? {
+      schemaVersion: 1,
+      migrations: {},
+    }
+  );
 }
 
-async function saveMigrationState(
-  state: StoredBootstrapMigrationState
-): Promise<void> {
-  await setJson(BOOTSTRAP_MIGRATIONS_STATE_KEY, state);
-}
-
-async function readLegacyEmotionMigrationState(): Promise<
-  StoredBootstrapMigration | null
-> {
+/** The key used before the state record existed. */
+async function readPreStateRecord(): Promise<StoredMigration | null> {
   const completed = await getString(EMOTION_CATEGORY_MIGRATION_COMPLETED_KEY);
-
-  if (completed === "true") {
-    return {
-      id: LEGACY_EMOTION_CATEGORY_MIGRATION_ID,
-      version: LEGACY_EMOTION_CATEGORY_MIGRATION_VERSION,
-      status: "completed",
-      attempts: 1,
-      updatedAt: Date.now(),
-      completedAt: Date.now(),
-    };
-  }
-
-  if (completed === "failed") {
-    const retriesRaw = await getString(EMOTION_CATEGORY_MIGRATION_RETRIES_KEY);
-    const attempts = retriesRaw ? parseInt(retriesRaw, 10) || 0 : MAX_MIGRATION_ATTEMPTS;
-
-    return {
-      id: LEGACY_EMOTION_CATEGORY_MIGRATION_ID,
-      version: LEGACY_EMOTION_CATEGORY_MIGRATION_VERSION,
-      status: "failed",
-      attempts,
-      updatedAt: Date.now(),
-      error: "Legacy migration state marked failed",
-    };
-  }
-
-  return null;
-}
-
-async function loadLegacyEmotionMigrationRecord(
-  state: StoredBootstrapMigrationState
-): Promise<StoredBootstrapMigration | null> {
-  const existing = state.migrations[LEGACY_EMOTION_CATEGORY_MIGRATION_ID];
-  if (existing?.version === LEGACY_EMOTION_CATEGORY_MIGRATION_VERSION) {
-    return existing;
-  }
-
-  const legacy = await readLegacyEmotionMigrationState();
-  if (!legacy) {
+  if (completed !== "true" && completed !== "failed") {
     return null;
   }
 
-  state.migrations[LEGACY_EMOTION_CATEGORY_MIGRATION_ID] = legacy;
-  await saveMigrationState(state);
-  return legacy;
-}
+  const base = {
+    id: MIGRATION_ID,
+    version: MIGRATION_VERSION,
+    attempts: 1,
+    updatedAt: Date.now(),
+  };
 
-function invalidateMoodHistory() {
-  const store = useMoodsStore.getState();
-  store.invalidate();
-  void store.ensureFresh();
-}
-
-async function runLegacyEmotionCategoryMigration(
-  state: StoredBootstrapMigrationState
-): Promise<BootstrapMigrationOutcome> {
-  const record = await loadLegacyEmotionMigrationRecord(state);
-
-  if (record?.status === "completed" || record?.status === "failed") {
-    return {
-      id: LEGACY_EMOTION_CATEGORY_MIGRATION_ID,
-      version: LEGACY_EMOTION_CATEGORY_MIGRATION_VERSION,
-      status: "skipped",
-      attempts: record.attempts,
-    };
+  if (completed === "true") {
+    return { ...base, status: "completed", completedAt: Date.now() };
   }
 
-  const attempts = (record?.attempts ?? 0) + 1;
+  const retries = await getString(EMOTION_CATEGORY_MIGRATION_RETRIES_KEY);
+  return {
+    ...base,
+    status: "failed",
+    attempts: retries ? parseInt(retries, 10) || 0 : MAX_ATTEMPTS,
+    error: "Legacy migration state marked failed",
+  };
+}
+
+async function loadRecord(
+  state: StoredMigrationState
+): Promise<StoredMigration | null> {
+  const existing = state.migrations[MIGRATION_ID];
+  if (existing?.version === MIGRATION_VERSION) {
+    return existing;
+  }
+
+  const older = await readPreStateRecord();
+  if (!older) {
+    return null;
+  }
+
+  state.migrations[MIGRATION_ID] = older;
+  await setJson(BOOTSTRAP_MIGRATIONS_STATE_KEY, state);
+  return older;
+}
+
+async function record(
+  state: StoredMigrationState,
+  migration: StoredMigration
+): Promise<void> {
+  state.migrations[MIGRATION_ID] = migration;
+  await setJson(BOOTSTRAP_MIGRATIONS_STATE_KEY, state);
+}
+
+/**
+ * Runs the one migration the app still needs, at most MAX_ATTEMPTS times
+ * across launches. Returns true when the app should warn the user.
+ */
+async function runLegacyEmotionCategoryMigration(
+  state: StoredMigrationState
+): Promise<boolean> {
+  const existing = await loadRecord(state);
+  if (existing?.status === "completed" || existing?.status === "failed") {
+    return false;
+  }
+
+  const attempts = (existing?.attempts ?? 0) + 1;
+  const updatedAt = Date.now();
 
   try {
     const result = await migrateEmotionsToCategories();
-    const completed: StoredBootstrapMigration = {
-      id: LEGACY_EMOTION_CATEGORY_MIGRATION_ID,
-      version: LEGACY_EMOTION_CATEGORY_MIGRATION_VERSION,
+    await record(state, {
+      id: MIGRATION_ID,
+      version: MIGRATION_VERSION,
       status: "completed",
       attempts,
-      updatedAt: Date.now(),
-      completedAt: Date.now(),
-    };
-
-    state.migrations[LEGACY_EMOTION_CATEGORY_MIGRATION_ID] = completed;
-    await saveMigrationState(state);
+      updatedAt,
+      completedAt: updatedAt,
+    });
 
     if (result.migrated > 0) {
-      invalidateMoodHistory();
+      const store = useMoodsStore.getState();
+      store.invalidate();
+      void store.ensureFresh();
     }
-
-    return {
-      id: LEGACY_EMOTION_CATEGORY_MIGRATION_ID,
-      version: LEGACY_EMOTION_CATEGORY_MIGRATION_VERSION,
-      status: "completed",
-      attempts,
-      migrated: result.migrated,
-      skipped: result.skipped,
-    };
+    return false;
   } catch (error) {
-    const status: BootstrapMigrationStatus =
-      attempts >= MAX_MIGRATION_ATTEMPTS ? "failed" : "retryable-failure";
-
-    state.migrations[LEGACY_EMOTION_CATEGORY_MIGRATION_ID] = {
-      id: LEGACY_EMOTION_CATEGORY_MIGRATION_ID,
-      version: LEGACY_EMOTION_CATEGORY_MIGRATION_VERSION,
+    const status: MigrationStatus =
+      attempts >= MAX_ATTEMPTS ? "failed" : "retryable-failure";
+    await record(state, {
+      id: MIGRATION_ID,
+      version: MIGRATION_VERSION,
       status,
       attempts,
-      updatedAt: Date.now(),
+      updatedAt,
       error: errorMessage(error),
-    };
-    await saveMigrationState(state);
+    });
 
     if (status === "failed") {
       toastService.error(
@@ -191,27 +158,12 @@ async function runLegacyEmotionCategoryMigration(
         "We couldn't finish updating some past mood entries. New entries will still work."
       );
     }
-
-    return {
-      id: LEGACY_EMOTION_CATEGORY_MIGRATION_ID,
-      version: LEGACY_EMOTION_CATEGORY_MIGRATION_VERSION,
-      status,
-      attempts,
-    };
+    return true;
   }
 }
 
 export async function runAppBootstrap(): Promise<AppBootstrapResult> {
-  const state = await loadMigrationState();
-  const migrations = [await runLegacyEmotionCategoryMigration(state)];
-  const hasWarning = migrations.some(
-    (migration) =>
-      migration.status === "retryable-failure" || migration.status === "failed"
-  );
-
-  return {
-    status: hasWarning ? "ready-with-warning" : "ready",
-    navigationPolicy: "wait-for-migrations",
-    migrations,
-  };
+  const state = await loadState();
+  const warned = await runLegacyEmotionCategoryMigration(state);
+  return { status: warned ? "ready-with-warning" : "ready" };
 }

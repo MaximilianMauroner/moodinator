@@ -5,7 +5,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Alert } from "@/components/ui/AppAlert";
-import { useThemeColors } from "@/constants/colors";
+import { useThemeColors, getThemedColor } from "@/constants/colors";
 import { haptics } from "@/lib/haptics";
 import { PinDots } from "../components/PinDots";
 import { PinPad } from "../components/PinPad";
@@ -282,7 +282,7 @@ export function SetupPinScreen() {
                 selectable
                 accessibilityLiveRegion="assertive"
                 className="text-sm mt-2 text-center"
-                style={{ color: isDark ? "#F2B4A6" : "#A53F30", fontVariant: ["tabular-nums"] }}
+                style={{ color: getThemedColor("dangerText", isDark), fontVariant: ["tabular-nums"] }}
               >
                 {message}
               </Text>

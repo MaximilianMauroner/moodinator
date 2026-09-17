@@ -96,14 +96,12 @@ export function InsightsScreen() {
   const dailyValues = analysis.dailySeries.filter(
     (point) => point.min !== null,
   );
-  const best = dailyValues.reduce(
-    (value, point) => Math.min(value, point.min!),
-    Infinity,
-  );
-  const worst = dailyValues.reduce(
-    (value, point) => Math.max(value, point.max!),
-    -Infinity,
-  );
+  // Entries can exist while no day in the range holds one, because a row with
+  // an unreadable date is counted but never placed on the calendar. Reducing
+  // an empty list would put "Infinity--Infinity" on the card.
+  const moodRange = dailyValues.length
+    ? `${dailyValues.reduce((value, point) => Math.min(value, point.min!), Infinity)}–${dailyValues.reduce((value, point) => Math.max(value, point.max!), -Infinity)}`
+    : "—";
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaView
@@ -226,8 +224,9 @@ export function InsightsScreen() {
                     ))
                   ) : (
                     <Text className="mt-3 text-sm text-paper-700 dark:text-sand-300">
-                      A comparison needs 5 entries with a tag or emotion and 5
-                      without it.
+                      {analysis.inconclusiveDrivers.length
+                        ? "No clear difference yet. The tags and emotions with enough entries did not stand apart from the rest."
+                        : "A comparison needs 5 entries with a tag or emotion and 5 without it."}
                     </Text>
                   )}
                 </ChartCard>
@@ -258,7 +257,7 @@ export function InsightsScreen() {
                         <CompactInsightCard
                           icon="analytics"
                           title="Mood Range"
-                          metric={`${best}–${worst}`}
+                          metric={moodRange}
                           animateMetric={false}
                           interpretation="best to most difficult"
                         />

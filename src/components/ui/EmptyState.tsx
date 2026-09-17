@@ -2,7 +2,7 @@ import React from "react";
 import { View, Text, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInUp, ZoomIn } from "react-native-reanimated";
-import { useThemeColors } from "@/constants/colors";
+import { useThemeColors, getThemedColor } from "@/constants/colors";
 import { typography } from "@/constants/typography";
 import { motion, springs } from "@/constants/motion";
 import { usePressAnimation } from "@/hooks/usePressAnimation";
@@ -55,10 +55,10 @@ export function EmptyState({
   const haloSize = 96;
   const contentWidth = 272;
   const accent = {
-    sage: isDark ? "#7BA87B" : "#5B8A5B",
-    sand: isDark ? "#D4C4A0" : "#9D8660",
+    sage: getThemedColor("sageSoft", isDark),
+    sand: getThemedColor("sandFaint", isDark),
     coral: isDark ? "#F5A899" : "#E06B55",
-    dusk: isDark ? "#C4BBCF" : "#847596",
+    dusk: getThemedColor("iconDusk", isDark),
     neutral: isDark ? "#BDA77D" : "#7A6B55",
   }[tone];
 

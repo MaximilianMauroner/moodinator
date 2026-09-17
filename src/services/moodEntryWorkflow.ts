@@ -85,11 +85,5 @@ export function createMoodEntryWorkflow(
       commitMutation(store, [restored, ...withoutExistingEntry(store.getMoods(), restored.id)]);
       return restored;
     },
-
-    async undoDelete(entry: MoodEntryInput): Promise<MoodEntry> {
-      const restored = await repository.create(entry);
-      commitMutation(store, [restored, ...withoutExistingEntry(store.getMoods(), restored.id)]);
-      return restored;
-    },
   };
 }

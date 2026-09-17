@@ -10,6 +10,7 @@ import { useColorScheme } from "@/hooks/useColorScheme";
 import { TAB_ACCESSIBILITY_LABELS } from "@/constants/accessibility";
 import { useToastTabBarHeight } from "@/hooks/useToastOffset";
 import { emitHomeTabDoublePress } from "@/lib/homeTabEvents";
+import { getThemedColor } from "@/constants/colors";
 
 function MeasuredTabBarBackground() {
   return (
@@ -57,8 +58,8 @@ export default function TabLayout() {
   // as the screens so dark mode keeps the warm field-journal feel.
   const colors = {
     active: isDark ? "#A6E39B" : "#476D47",
-    inactive: isDark ? "#9EB894" : "#7A6B55",
-    background: isDark ? "#08150F" : "#FAF8F4",
+    inactive: getThemedColor("textSubtle", isDark),
+    background: getThemedColor("background", isDark),
     border: isDark ? "#233D2D" : "#E5D9BF",
   };
 

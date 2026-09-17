@@ -1,14 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
-import {
-  ScrollView,
-  Pressable,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import Animated, {
-  FadeInDown,
-  FadeInUp,
-} from "react-native-reanimated";
+import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSettingsStore } from "@/shared/state/settingsStore";
 import {
   DEFAULT_EMOTIONS,
@@ -16,13 +7,11 @@ import {
   type EmotionEnergyBand,
 } from "@/lib/entrySettings";
 import type { Emotion } from "@db/types";
-import { SettingsPageHeader } from "@/features/settings/components/SettingsPageHeader";
 import {
   createPresetListModel,
   normalizePresetKey,
 } from "@/features/settings/utils/defaultPresetSelection";
 import { emotionService } from "@/services/emotionService";
-import { presetSyncService } from "@/services/presetSyncService";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { haptics } from "@/lib/haptics";
 import { Alert } from "@/components/ui/AppAlert";
@@ -38,6 +27,9 @@ import {
   PresetTipCard,
   presetListStyles,
 } from "@/features/settings/presets/PresetListPrimitives";
+import { PresetSettingsScreen } from "@/features/settings/presets/PresetSettingsScreen";
+import { usePresetHistorySync } from "@/features/settings/presets/usePresetHistorySync";
+import { getThemedColor } from "@/constants/colors";
 
 async function promptHistoricalUpdate(options: {
   affectedMoodEntryCount: number;
@@ -88,7 +80,7 @@ export default function EmotionsSettingsScreen() {
   const [emotionPendingRemoval, setEmotionPendingRemoval] = useState<string | null>(
     null
   );
-  const [historySyncLoading, setHistorySyncLoading] = useState(false);
+  const historySync = usePresetHistorySync("emotions");
 
   const presetModel = useMemo(
     () =>
@@ -109,12 +101,12 @@ export default function EmotionsSettingsScreen() {
   }, [emotions]);
   const historySyncTone = useMemo(
     () => ({
-      primary: isDark ? "#A8C5A8" : "#5B8A5B",
+      primary: getThemedColor("iconAccent", isDark),
       cardBg: isDark ? "rgba(30,45,38,0.48)" : "#FDFCFA",
       border: isDark ? "rgba(58,84,72,0.36)" : "rgba(221,212,196,0.80)",
       accentBg: isDark ? "rgba(91,138,91,0.20)" : "rgba(91,138,91,0.12)",
       chipActive: isDark ? "rgba(91,138,91,0.45)" : "#C8E0C8",
-      chipBorder: isDark ? "#7BA87B" : "#5B8A5B",
+      chipBorder: getThemedColor("sageSoft", isDark),
     }),
     [isDark]
   );
@@ -280,58 +272,6 @@ export default function EmotionsSettingsScreen() {
     []
   );
 
-  const handleAddFromHistory = useCallback(async () => {
-    haptics.tap();
-
-    try {
-      setHistorySyncLoading(true);
-      const diff = await presetSyncService.previewMissingFromHistory("emotions");
-      setHistorySyncLoading(false);
-
-      if (diff.emotions.length === 0) {
-        Alert.alert(
-          "Nothing to Add",
-          "Every emotion in your Mood Entry history is already in your Emotion List."
-        );
-        return;
-      }
-
-      Alert.alert(
-        "Add from History",
-        `Add ${diff.emotions.length} emotion${diff.emotions.length === 1 ? "" : "s"} from past Mood Entries to your Emotion List?`,
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Add",
-            onPress: async () => {
-              try {
-                setHistorySyncLoading(true);
-                const result =
-                  await presetSyncService.addMissingFromHistory("emotions");
-                haptics.commit();
-                Alert.alert(
-                  "Added from History",
-                  result.addedEmotions.length > 0
-                    ? `Added ${result.addedEmotions.length} emotion${result.addedEmotions.length === 1 ? "" : "s"}.`
-                    : "No new emotions were found."
-                );
-              } catch {
-                haptics.reject();
-                Alert.alert("Error", "Could not add emotions from history.");
-              } finally {
-                setHistorySyncLoading(false);
-              }
-            },
-          },
-        ]
-      );
-    } catch {
-      haptics.reject();
-      setHistorySyncLoading(false);
-      Alert.alert("Error", "Could not check your Mood Entry history.");
-    }
-  }, []);
-
   const handleEditEmotion = useCallback(
     (emotion: {
       name: string;
@@ -448,23 +388,42 @@ export default function EmotionsSettingsScreen() {
   // ─── Derived styles ────────────────────────────────────────────────────────
 
   return (
-    <SafeAreaView
-      className="flex-1 bg-paper-100 dark:bg-paper-900"
-      edges={["top"]}
+    <PresetSettingsScreen
+      title="Emotions"
+      icon="heart-outline"
+      accentColor="coral"
+      addButtonColor="#476D47"
+      addButtonShadowColor="#5B8A5B"
+      addButtonLabel="Add custom emotion"
+      addButtonDelay={600}
+      onAdd={() => handleOpenAddModal("positive")}
+      overlays={
+        <>
+          <EmotionModal
+            visible={isModalVisible}
+            editingEmotion={editingEmotion}
+            isDark={isDark}
+            onClose={handleCloseModal}
+            onSave={handleSaveEmotion}
+          />
+          <RemoveEmotionDialog
+            visible={emotionPendingRemoval !== null}
+            emotionName={emotionPendingRemoval}
+            isDark={isDark}
+            onCancel={handleCancelRemoveEmotion}
+            onConfirm={handleConfirmRemoveEmotion}
+          />
+          <MoveEmotionDialog
+            visible={emotionPendingMove !== null}
+            emotionName={emotionPendingMove?.name ?? null}
+            currentCategory={emotionPendingMove?.category ?? null}
+            isDark={isDark}
+            onCancel={handleCancelMoveEmotion}
+            onSelectCategory={handleConfirmMoveEmotion}
+          />
+        </>
+      }
     >
-      <SettingsPageHeader
-        title="Emotions"
-        subtitle="Customization"
-        icon="heart-outline"
-        accentColor="coral"
-      />
-
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ paddingBottom: 100 }}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
         {/* Hero Stats Section */}
         <Animated.View
           entering={FadeInDown.delay(100).duration(260)}
@@ -511,57 +470,10 @@ export default function EmotionsSettingsScreen() {
             icon="time-outline"
             isDark={isDark}
             tone={historySyncTone}
-            loading={historySyncLoading}
-            onPress={handleAddFromHistory}
+            loading={historySync.loading}
+            onPress={historySync.addFromHistory}
           />
         </Animated.View>
-      </ScrollView>
-
-      {/* Floating Add Button */}
-      <Animated.View
-        entering={FadeInUp.delay(600).duration(260)}
-        style={presetListStyles.fabContainer}
-      >
-        <Pressable
-          onPress={() => handleOpenAddModal("positive")}
-          style={({ pressed }) => [
-            presetListStyles.fab,
-            {
-              backgroundColor: "#476D47",
-              transform: [{ scale: pressed ? 0.95 : 1 }],
-              shadowColor: "#5B8A5B",
-            },
-          ]}
-        >
-          <Ionicons name="add" size={28} color="#FFFFFF" />
-        </Pressable>
-      </Animated.View>
-
-      {/* Add/Edit Modal */}
-      <EmotionModal
-        visible={isModalVisible}
-        editingEmotion={editingEmotion}
-        isDark={isDark}
-        onClose={handleCloseModal}
-        onSave={handleSaveEmotion}
-      />
-
-      <RemoveEmotionDialog
-        visible={emotionPendingRemoval !== null}
-        emotionName={emotionPendingRemoval}
-        isDark={isDark}
-        onCancel={handleCancelRemoveEmotion}
-        onConfirm={handleConfirmRemoveEmotion}
-      />
-
-      <MoveEmotionDialog
-        visible={emotionPendingMove !== null}
-        emotionName={emotionPendingMove?.name ?? null}
-        currentCategory={emotionPendingMove?.category ?? null}
-        isDark={isDark}
-        onCancel={handleCancelMoveEmotion}
-        onSelectCategory={handleConfirmMoveEmotion}
-      />
-    </SafeAreaView>
+    </PresetSettingsScreen>
   );
 }

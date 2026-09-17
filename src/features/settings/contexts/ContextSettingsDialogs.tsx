@@ -5,7 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeIn, FadeInUp, FadeOut, SlideOutDown } from "react-native-reanimated";
 import { CONTEXT_THEME } from "./contextSettingsConfig";
 import { styles } from "./contextSettingsStyles";
-import { colors } from "@/constants/colors";
+import { colors, getThemedColor } from "@/constants/colors";
 
 function AddContextModal({
   visible,
@@ -106,7 +106,7 @@ function AddContextModal({
               <Text
                 style={[
                   styles.modalTitle,
-                  { color: isDark ? "#F0EDE6" : "#3D352A" },
+                  { color: getThemedColor("textOnSurface", isDark) },
                 ]}
               >
                 Add Context Tag
@@ -164,7 +164,7 @@ function AddContextModal({
                   styles.modalInput,
                   {
                     backgroundColor: isDark ? "rgba(0,0,0,0.25)" : "#F5F1E8",
-                    color: isDark ? "#F0EDE6" : "#3D352A",
+                    color: getThemedColor("textOnSurface", isDark),
                     borderColor: isDark
                       ? "rgba(255,255,255,0.10)"
                       : "rgba(0,0,0,0.06)",
@@ -295,14 +295,14 @@ function RemoveContextDialog({
             <Ionicons
               name="close-outline"
               size={18}
-              color={isDark ? "#D9CCB0" : "#9D8660"}
+              color={getThemedColor("sandMuted", isDark)}
             />
           </View>
 
           <Text
             style={[
               styles.confirmTitle,
-              { color: isDark ? "#F0EDE6" : "#3D352A" },
+              { color: getThemedColor("textOnSurface", isDark) },
             ]}
           >
             Remove Context?

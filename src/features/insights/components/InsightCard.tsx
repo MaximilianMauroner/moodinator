@@ -6,7 +6,7 @@ import { TrendIndicator, TrendDirection } from "./TrendIndicator";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { IconBadge } from "@/components/ui/IconBadge";
 import { typography } from "@/constants/typography";
-import { useThemeColors } from "@/constants/colors";
+import { useThemeColors, getThemedColor } from "@/constants/colors";
 import { useCountUp } from "@/hooks/useCountUp";
 
 /**
@@ -75,8 +75,8 @@ function InsightCardBase({
     switch (variant) {
       case "accent":
         return {
-          iconBg: isDark ? "#2D3D2D" : "#E8EFE8",
-          iconColor: isDark ? "#A8C5A8" : "#5B8A5B",
+          iconBg: getThemedColor("positiveSurface", isDark),
+          iconColor: getThemedColor("iconAccent", isDark),
           accentLine: isDark ? "#5B8A5B" : "#7BA87B",
         };
       case "warm":
@@ -87,8 +87,8 @@ function InsightCardBase({
         };
       default:
         return {
-          iconBg: isDark ? "#2D3D2D" : "#E8EFE8",
-          iconColor: isDark ? "#A8C5A8" : "#5B8A5B",
+          iconBg: getThemedColor("positiveSurface", isDark),
+          iconColor: getThemedColor("iconAccent", isDark),
           accentLine: isDark ? "#455643" : "#E5D9BF",
         };
     }

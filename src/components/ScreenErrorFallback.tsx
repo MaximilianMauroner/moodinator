@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useNavigation } from "expo-router";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import type { ErrorFallbackProps } from "./ErrorBoundary";
+import { getThemedColor } from "@/constants/colors";
 
 interface ScreenErrorFallbackProps extends ErrorFallbackProps {
   /** Optional screen title to display */
@@ -39,15 +40,15 @@ export function ScreenErrorFallback({
     <SafeAreaView
       style={{
         flex: 1,
-        backgroundColor: isDark ? "#1E2D26" : "#FAF8F4",
+        backgroundColor: getThemedColor("backgroundRaised", isDark),
       }}
     >
       <View className="flex-1 justify-center items-center p-8">
         <View
           className="w-full max-w-sm rounded-3xl p-6"
           style={{
-            backgroundColor: isDark ? "#2C4038" : "#FDFCFA",
-            shadowColor: isDark ? "#000" : "#9D8660",
+            backgroundColor: getThemedColor("textOnAccent", isDark),
+            shadowColor: getThemedColor("shadowSand", isDark),
             shadowOffset: { width: 0, height: 8 },
             shadowOpacity: isDark ? 0.3 : 0.1,
             shadowRadius: 24,
@@ -57,15 +58,15 @@ export function ScreenErrorFallback({
           {/* Error Icon */}
           <View
             className="w-16 h-16 rounded-2xl items-center justify-center self-center mb-4"
-            style={{ backgroundColor: isDark ? "#3C1A14" : "#FDE8E4" }}
+            style={{ backgroundColor: getThemedColor("dangerSurface", isDark) }}
           >
-            <Ionicons name="warning-outline" size={30} color={isDark ? "#F5A899" : "#C75441"} />
+            <Ionicons name="warning-outline" size={30} color={getThemedColor("iconDanger", isDark)} />
           </View>
 
           {/* Title */}
           <Text
             className="text-xl font-bold text-center mb-2"
-            style={{ color: isDark ? "#F5F1E8" : "#3D352A" }}
+            style={{ color: getThemedColor("textOnSurfaceAlt", isDark) }}
           >
             Something went wrong
           </Text>
@@ -74,7 +75,7 @@ export function ScreenErrorFallback({
           {screenTitle && (
             <Text
               className="text-sm text-center mb-3"
-              style={{ color: isDark ? "#BDA77D" : "#9D8660" }}
+              style={{ color: getThemedColor("iconSand", isDark) }}
             >
               Error in {screenTitle}
             </Text>
@@ -88,7 +89,7 @@ export function ScreenErrorFallback({
             >
               <Text
                 className="text-xs font-mono"
-                style={{ color: isDark ? "#F5A899" : "#C75441" }}
+                style={{ color: getThemedColor("iconDanger", isDark) }}
                 numberOfLines={4}
               >
                 {error.message}
@@ -112,7 +113,7 @@ export function ScreenErrorFallback({
               className="rounded-2xl py-4 items-center"
               style={{
                 backgroundColor: "#476D47",
-                shadowColor: isDark ? "#000" : "#5B8A5B",
+                shadowColor: getThemedColor("shadowSage", isDark),
                 shadowOffset: { width: 0, height: 4 },
                 shadowOpacity: isDark ? 0.3 : 0.25,
                 shadowRadius: 8,

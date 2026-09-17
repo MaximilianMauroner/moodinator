@@ -6,7 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import PagerView, {
   type PagerViewOnPageSelectedEvent,
 } from "react-native-pager-view";
-import { useThemeColors } from "@/constants/colors";
+import { useThemeColors, getThemedColor } from "@/constants/colors";
 import { haptics } from "@/lib/haptics";
 import { useOnboardingStore } from "../store/onboardingStore";
 import { OnboardingPage } from "../components/OnboardingPage";
@@ -195,7 +195,7 @@ export function OnboardingScreen() {
             className="flex-row items-center justify-center py-4 rounded-2xl"
             style={{
               backgroundColor: get("primary"),
-              shadowColor: isDark ? "#000" : "#5B8A5B",
+              shadowColor: getThemedColor("shadowSage", isDark),
               shadowOffset: { width: 0, height: 8 },
               shadowOpacity: isDark ? 0.3 : 0.25,
               shadowRadius: 16,

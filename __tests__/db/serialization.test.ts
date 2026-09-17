@@ -6,7 +6,9 @@
 import {
   serializeArray,
   serializeEmotions,
-  parseTimestamp,
+  readStoredTimestamp,
+  sanitizeTimestamp,
+  UNREADABLE_TIMESTAMP,
   toMoodEntry,
   normalizeInput,
   sanitizeImportedArray,
@@ -79,55 +81,60 @@ describe("serializeEmotions", () => {
   });
 });
 
-describe("parseTimestamp", () => {
-  it("returns current time for Date object", () => {
+describe("readStoredTimestamp", () => {
+  it("returns the time of a Date object", () => {
     const date = new Date("2024-01-15T12:00:00Z");
-    expect(parseTimestamp(date)).toBe(date.getTime());
+    expect(readStoredTimestamp(date)).toBe(date.getTime());
   });
 
-  it("returns number directly if finite", () => {
-    expect(parseTimestamp(1705320000000)).toBe(1705320000000);
+  it("returns a finite number directly", () => {
+    expect(readStoredTimestamp(1705320000000)).toBe(1705320000000);
   });
 
-  it("returns current time for non-finite numbers", () => {
-    const before = Date.now();
-    const result = parseTimestamp(Infinity);
-    const after = Date.now();
-    expect(result).toBeGreaterThanOrEqual(before);
-    expect(result).toBeLessThanOrEqual(after);
+  it("parses a numeric string", () => {
+    expect(readStoredTimestamp("1705320000000")).toBe(1705320000000);
   });
 
-  it("parses numeric string", () => {
-    expect(parseTimestamp("1705320000000")).toBe(1705320000000);
-  });
-
-  it("parses ISO date string", () => {
+  it("parses an ISO date string", () => {
     const isoString = "2024-01-15T12:00:00Z";
-    expect(parseTimestamp(isoString)).toBe(Date.parse(isoString));
+    expect(readStoredTimestamp(isoString)).toBe(Date.parse(isoString));
   });
 
-  it("returns current time for invalid string", () => {
-    const before = Date.now();
-    const result = parseTimestamp("not a date");
-    const after = Date.now();
-    expect(result).toBeGreaterThanOrEqual(before);
-    expect(result).toBeLessThanOrEqual(after);
+  it.each([
+    ["a non-finite number", Infinity],
+    ["an unparseable string", "not a date"],
+    ["an empty string", ""],
+    ["an invalid Date", new Date("nonsense")],
+    ["null", null],
+    ["undefined", undefined],
+  ])("reads %s as the epoch rather than the current time", (_label, value) => {
+    expect(readStoredTimestamp(value)).toBe(UNREADABLE_TIMESTAMP);
   });
 
-  it("returns current time for null", () => {
-    const before = Date.now();
-    const result = parseTimestamp(null);
-    const after = Date.now();
-    expect(result).toBeGreaterThanOrEqual(before);
-    expect(result).toBeLessThanOrEqual(after);
+  it("returns the same value every time an unreadable row is read", () => {
+    const first = readStoredTimestamp(null);
+    const second = readStoredTimestamp(null);
+
+    // The old behaviour answered Date.now(), so one row moved on every read.
+    expect(first).toBe(second);
   });
 
-  it("returns current time for undefined", () => {
+  /**
+   * An unreadable row is exported at the epoch. Import must leave it there:
+   * rewriting the sentinel to the import date reintroduces the drift on the
+   * round trip that a stable read was meant to remove.
+   */
+  it("survives an export and import round trip", () => {
+    const stored = readStoredTimestamp(null);
+
+    expect(sanitizeTimestamp(stored)).toBe(UNREADABLE_TIMESTAMP);
+  });
+
+  it("still dates a genuinely missing import timestamp to now", () => {
     const before = Date.now();
-    const result = parseTimestamp(undefined);
-    const after = Date.now();
-    expect(result).toBeGreaterThanOrEqual(before);
-    expect(result).toBeLessThanOrEqual(after);
+
+    expect(sanitizeTimestamp(undefined)).toBeGreaterThanOrEqual(before);
+    expect(sanitizeTimestamp("not a date")).toBeGreaterThanOrEqual(before);
   });
 });
 

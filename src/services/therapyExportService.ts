@@ -2,15 +2,37 @@ import type { MoodEntry } from "@db/types";
 import type { TherapyExportField } from "@/lib/entrySettings";
 import { getMoodRatingLabel } from "@/constants/moodScaleInterpretation";
 
+// Therapy exports are opened in a spreadsheet by someone other than the author,
+// so a cell that starts a formula would evaluate on their machine. Notes can
+// carry arbitrary text, including text that arrived through a JSON import.
+// The control characters are here because a spreadsheet may trim them while
+// importing and evaluate what follows, so a line feed counts alongside tab and
+// carriage return.
+//
+// A leading "-" is guarded without trying to tell a dash from a negation.
+// Formula parsers accept whitespace after a unary minus, so "- 2+3" evaluates,
+// and any rule written to keep dashed prose clean leaves a hole somewhere. A
+// dashed list item is exported with a visible apostrophe as a result, which is
+// the cost of not guessing.
+const FORMULA_LEAD = /^[=+@\-\t\r\n]/;
+
 function csvEscape(value: string | number | null | undefined) {
   if (value === null || value === undefined) {
     return "";
   }
-  const str = String(value);
-  if (/[",\n]/.test(str)) {
-    return `"${str.replace(/"/g, '""')}"`;
+  // A number cannot be a formula, and prefixing one would turn a numeric column
+  // into text for the person reading the export.
+  if (typeof value === "number") {
+    return String(value);
   }
-  return str;
+  const str = value;
+  const startsFormula = FORMULA_LEAD.test(str);
+  // The apostrophe forces text in Excel and Sheets and stays hidden in the cell.
+  const body = startsFormula ? `'${str}` : str;
+  if (startsFormula || /[",\n\r]/.test(body)) {
+    return `"${body.replace(/"/g, '""')}"`;
+  }
+  return body;
 }
 
 function formatTimestamp(value: number) {

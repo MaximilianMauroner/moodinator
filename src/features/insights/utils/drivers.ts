@@ -1,5 +1,15 @@
 import type { MoodEntry } from "@db/types";
 import { getInterpretedMoodRating } from "@/constants/moodScaleInterpretation";
+import {
+  addToGroup,
+  compareGroups,
+  emptyGroup,
+  groupMean,
+  subtractGroup,
+  type GroupStats,
+} from "./statistics";
+
+export const MIN_GROUP_SIZE = 5;
 
 export interface Driver {
   id: string;
@@ -10,20 +20,41 @@ export interface Driver {
   withMean: number;
   withoutMean: number;
   effect: number;
+  /**
+   * The two groups the effect came from, kept so the interval can be drawn
+   * later. Only the handful of claims that reach the screen need one, and
+   * producing it is two orders of magnitude dearer than the comparison.
+   */
+  stats: GroupStats;
+  rest: GroupStats;
 }
 export interface DriverAnalysis {
   drivers: Driver[];
+  /** Too few entries on one side to compare at all. */
   shortfalls: { name: string; withMissing: number; withoutMissing: number }[];
+  /** Enough entries, but the comparison does not separate it from the rest. */
+  inconclusive: { name: string }[];
 }
-export function drivers(entries: MoodEntry[]): DriverAnalysis {
-  const groups = new Map<
-    string,
-    { name: string; kind: Driver["kind"]; sum: number; count: number }
-  >();
-  let total = 0;
+interface LabelGroup {
+  name: string;
+  kind: Driver["kind"];
+  stats: GroupStats;
+}
+export function drivers(
+  entries: MoodEntry[],
+  /**
+   * Comparisons the same analysis runs outside this function, such as the time
+   * slots. Every comparison in one analysis shares one confidence level, so
+   * each half has to know the size of the other. Zero is only correct when
+   * drivers are the whole analysis.
+   */
+  otherComparisons = 0
+): DriverAnalysis {
+  const groups = new Map<string, LabelGroup>();
+  const overall = emptyGroup();
   for (const entry of entries) {
     const value = getInterpretedMoodRating(entry);
-    total += value;
+    addToGroup(overall, value);
     const labels: { name: string; kind: Driver["kind"] }[] = [
       ...new Set(entry.contextTags),
     ].map((name) => ({ name, kind: "context" as const }));
@@ -35,34 +66,50 @@ export function drivers(entries: MoodEntry[]): DriverAnalysis {
     );
     for (const { name, kind } of labels) {
       const id = `${kind}:${name}`;
-      const group = groups.get(id) ?? { name, kind, sum: 0, count: 0 };
-      group.sum += value;
-      group.count++;
+      const group = groups.get(id) ?? { name, kind, stats: emptyGroup() };
+      addToGroup(group.stats, value);
       groups.set(id, group);
     }
   }
-  const result: DriverAnalysis = { drivers: [], shortfalls: [] };
+  const result: DriverAnalysis = {
+    drivers: [],
+    shortfalls: [],
+    inconclusive: [],
+  };
+  // Which groups are large enough is settled before any of them is tested,
+  // because the threshold each one faces depends on how many there are.
+  const comparable: { id: string; group: LabelGroup; rest: GroupStats }[] = [];
   for (const [id, group] of groups) {
-    const withoutCount = entries.length - group.count;
-    if (group.count < 5 || withoutCount < 5) {
+    const rest = subtractGroup(overall, group.stats);
+    if (group.stats.count < MIN_GROUP_SIZE || rest.count < MIN_GROUP_SIZE) {
       result.shortfalls.push({
         name: group.name,
-        withMissing: Math.max(0, 5 - group.count),
-        withoutMissing: Math.max(0, 5 - withoutCount),
+        withMissing: Math.max(0, MIN_GROUP_SIZE - group.stats.count),
+        withoutMissing: Math.max(0, MIN_GROUP_SIZE - rest.count),
       });
       continue;
     }
-    const withMean = group.sum / group.count;
-    const withoutMean = (total - group.sum) / withoutCount;
+    comparable.push({ id, group, rest });
+  }
+  const comparisons = comparable.length + otherComparisons;
+  for (const { id, group, rest } of comparable) {
+    const comparison = compareGroups(group.stats, rest, comparisons);
+    if (!comparison.separated) {
+      // Enough entries to look, not enough separation to say anything.
+      result.inconclusive.push({ name: group.name });
+      continue;
+    }
     result.drivers.push({
       id,
       name: group.name,
       kind: group.kind,
-      withCount: group.count,
-      withoutCount,
-      withMean,
-      withoutMean,
-      effect: withMean - withoutMean,
+      withCount: group.stats.count,
+      withoutCount: rest.count,
+      withMean: groupMean(group.stats),
+      withoutMean: groupMean(rest),
+      effect: comparison.effect,
+      stats: group.stats,
+      rest,
     });
   }
   result.drivers.sort(

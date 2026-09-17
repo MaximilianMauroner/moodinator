@@ -60,7 +60,7 @@ describe("createMoodEntryWorkflow", () => {
     expect(applyMutation).toHaveBeenCalledWith([created]);
   });
 
-  it.each(["create", "restore", "undoDelete"] as const)("keeps a backdated %s in timestamp order", async (action) => {
+  it.each(["create", "restore"] as const)("keeps a backdated %s in timestamp order", async (action) => {
     const newer = makeMood(1, 200);
     const backdated = makeMood(2, 100);
     moods = [newer];
@@ -117,17 +117,6 @@ describe("createMoodEntryWorkflow", () => {
 
     await expect(
       workflow().restore({ mood: 4, timestamp: 200 } satisfies MoodEntryInput)
-    ).resolves.toEqual(restored);
-
-    expect(moods).toEqual([restored]);
-  });
-
-  it("undoes delete through the restore workflow", async () => {
-    const restored = makeMood(3, 300);
-    vi.mocked(repository.create).mockResolvedValue(restored);
-
-    await expect(
-      workflow().undoDelete({ mood: 4, timestamp: 300 } satisfies MoodEntryInput)
     ).resolves.toEqual(restored);
 
     expect(moods).toEqual([restored]);
