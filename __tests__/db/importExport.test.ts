@@ -354,6 +354,44 @@ describe("Import/Export", () => {
     });
   });
 
+  describe("note validation", () => {
+    it.each([
+      ["an object", { a: 1 }],
+      ["an array", ["a"]],
+      ["a number", 12],
+      ["a boolean", true],
+    ])("rejects a replacement import whose note is %s", async (_label, note) => {
+      await expect(importMoods(JSON.stringify([{ mood: 3, note }]))).rejects.toThrow(
+        /Entry 0: Note must be text/
+      );
+      expect(mockDb.__getMoods()).toHaveLength(0);
+    });
+
+    it("rejects a non-text legacy notes key too", async () => {
+      await expect(
+        importMoods(JSON.stringify([{ mood: 3, notes: { a: 1 } }]))
+      ).rejects.toThrow(/Entry 0: Note must be text/);
+    });
+
+    it("accepts a null or absent note", async () => {
+      const result = await importMoods(
+        JSON.stringify([{ mood: 3, note: null }, { mood: 4 }])
+      );
+
+      expect(result.imported).toBe(2);
+      expect(mockDb.__getMoods().map((row) => row.note)).toEqual([null, null]);
+    });
+
+    it("drops a non-text note in a legacy backup instead of failing the row", async () => {
+      const result = await importOldBackup(
+        JSON.stringify([{ mood: 3, notes: { a: 1 }, timestamp: 1705320000000 }])
+      );
+
+      expect(result.imported).toBe(1);
+      expect(mockDb.__getMoods()[0].note).toBeNull();
+    });
+  });
+
   describe("importOldBackup", () => {
     it("imports legacy backup format", async () => {
       const data = JSON.stringify([

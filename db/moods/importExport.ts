@@ -8,13 +8,15 @@ import {
   sanitizeImportedArray,
   sanitizeImportedEmotions,
   sanitizeImportedMoodScale,
+  sanitizeImportedNote,
+  sanitizeMoodValue,
+  sanitizeTimestamp,
   serializeArray,
   serializeEmotions,
   serializeMoodScale,
 } from "./serialization";
 import { linkEmotionsToMood } from "./emotions";
 import { parseEmotionItem } from "./emotionUtils";
-import { sanitizeMoodValue, sanitizeTimestamp } from "../validation";
 
 function sanitizeBasedOnEntryId(value: unknown): number | null {
   if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
@@ -79,7 +81,15 @@ function normalizeReplacementImportEntries(parsed: unknown[]): {
       continue;
     }
 
-    const note = (rawMood.notes ?? rawMood.note ?? null) as string | null;
+    // This path replaces the whole history, so a malformed field is reported
+    // rather than silently reshaped. Out-of-range ratings are rejected above
+    // for the same reason, unlike the lenient legacy path below.
+    const note = sanitizeImportedNote(rawMood.notes ?? rawMood.note);
+    if (note === undefined) {
+      errors.push(`Entry ${i}: Note must be text`);
+      continue;
+    }
+
     const contextSource = rawMood.contextTags ?? rawMood.context ?? [];
 
     entries.push({
@@ -227,7 +237,9 @@ export async function importOldBackup(jsonData: string): Promise<ImportResult> {
         continue;
       }
 
-      const note = (mood?.notes ?? mood?.note ?? null) as string | null;
+      // Legacy backups are imported entry by entry and clamp rather than
+      // reject, so an unusable note is dropped and the rest of the entry keeps.
+      const note = sanitizeImportedNote(mood?.notes ?? mood?.note) ?? null;
       const timestamp = sanitizeTimestamp(mood?.timestamp);
       const moodValue = sanitizeMoodValue(mood?.mood);
 
