@@ -131,6 +131,43 @@ export const colors = {
     bg: { light: "#E8EFE8", dark: "#122A1A" },
     text: { light: "#5B8A5B", dark: "#C8F5BE" },
   },
+
+  // Tokens for pairs that were repeated inline across screens. Values are the
+  // ones already in use, so adopting them changes no pixels.
+  //
+  // textOnSurface, textOnSurfaceAlt and `text` are three slightly different
+  // dark greys against the same light value (#F0EDE6, #F5F1E8, #F0F7EA). That
+  // is existing drift, kept exact here rather than merged, because merging is a
+  // design decision and not a refactor. Worth one pass by eye later.
+  iconAccent: { light: "#5B8A5B", dark: "#A8C5A8" },
+  iconDanger: { light: "#C75441", dark: "#F5A899" },
+  iconSand: { light: "#9D8660", dark: "#BDA77D" },
+  iconDusk: { light: "#847596", dark: "#C4BBCF" },
+  textOnAccent: { light: "#FDFCFA", dark: "#2C4038" },
+  textOnSurface: { light: "#3D352A", dark: "#F0EDE6" },
+  textOnSurfaceAlt: { light: "#3D352A", dark: "#F5F1E8" },
+  textOnSand: { light: "#E5D9BF", dark: "#3D352A" },
+  positiveSurface: { light: "#E8EFE8", dark: "#2D3D2D" },
+  // Shadows are cast by warm light surfaces and by plain black in dark mode.
+  shadowSand: { light: "#9D8660", dark: "#000" },
+  shadowSage: { light: "#5B8A5B", dark: "#000" },
+
+  // Second pass: pairs that appeared inline in more than one file. Same rule as
+  // above, values unchanged. Several are near neighbours of tokens already
+  // here (iconSand vs sandSoft, dusk.text vs duskText) and are kept separate
+  // for the same reason: merging them is a design call, not a refactor.
+  sandSoft: { light: "#BDA77D", dark: "#8AAE98" },
+  sandMuted: { light: "#9D8660", dark: "#D9CCB0" },
+  sandFaint: { light: "#9D8660", dark: "#D4C4A0" },
+  duskText: { light: "#695C78", dark: "#C4BBCF" },
+  duskTextSoft: { light: "#695C78", dark: "#A396B3" },
+  sageSoft: { light: "#5B8A5B", dark: "#7BA87B" },
+  sageFaint: { light: "#A8C5A8", dark: "#3D5D3D" },
+  sageBorder: { light: "#D1DFD1", dark: "#4A6653" },
+  positiveText: { light: "#476D47", dark: "#C8EEC8" },
+  dangerText: { light: "#A53F30", dark: "#F2B4A6" },
+  dangerSurface: { light: "#FDE8E4", dark: "#3C1A14" },
+  backgroundRaised: { light: "#FAF8F4", dark: "#1E2D26" },
 } as const;
 
 export type ColorKey = keyof typeof colors;

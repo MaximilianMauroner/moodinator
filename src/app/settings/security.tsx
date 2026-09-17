@@ -10,6 +10,7 @@ import { SettingsSection } from "@/features/settings/components/SettingsSection"
 import { SettingRow } from "@/features/settings/components/SettingRow";
 import { ToggleRow } from "@/features/settings/components/ToggleRow";
 import { Alert } from "@/components/ui/AppAlert";
+import { getThemedColor } from "@/constants/colors";
 
 export default function SecuritySettingsScreen() {
   const { colorScheme } = useColorScheme();
@@ -94,7 +95,7 @@ export default function SecuritySettingsScreen() {
         <View className="flex-1 items-center justify-center">
           {hydrationError ? (
             <>
-              <Ionicons name="warning-outline" size={30} color={isDark ? "#F2B4A6" : "#A53F30"} />
+              <Ionicons name="warning-outline" size={30} color={getThemedColor("dangerText", isDark)} />
               <Text accessibilityRole="header" className="mt-3 text-lg font-semibold text-paper-800 dark:text-paper-100">
                 Security settings unavailable
               </Text>
@@ -112,7 +113,7 @@ export default function SecuritySettingsScreen() {
             </>
           ) : (
             <>
-              <ActivityIndicator size="small" color={isDark ? "#A8C5A8" : "#5B8A5B"} />
+              <ActivityIndicator size="small" color={getThemedColor("iconAccent", isDark)} />
               <Text className="mt-3 text-sm text-paper-700 dark:text-sand-400">Loading security settings…</Text>
             </>
           )}
@@ -138,7 +139,7 @@ export default function SecuritySettingsScreen() {
         {/* Info banner */}
         <View className="mx-4 mb-4 p-4 rounded-2xl bg-sage-100 dark:bg-sage-800/30">
           <View className="flex-row items-center mb-2">
-            <Ionicons name="lock-closed-outline" size={20} color={isDark ? "#A8C5A8" : "#5B8A5B"} style={{ marginRight: 8 }} />
+            <Ionicons name="lock-closed-outline" size={20} color={getThemedColor("iconAccent", isDark)} style={{ marginRight: 8 }} />
             <Text className="text-base font-bold text-sage-600 dark:text-sage-400">
               Protect Your Data
             </Text>

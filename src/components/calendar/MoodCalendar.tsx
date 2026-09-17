@@ -9,7 +9,7 @@ import Animated, {
   SlideOutLeft,
   SlideOutRight,
 } from "react-native-reanimated";
-import { useThemeColors } from "@/constants/colors";
+import { useThemeColors, getThemedColor } from "@/constants/colors";
 import { haptics } from "@/lib/haptics";
 import { useCalendarData, type CalendarDayData } from "./useCalendarData";
 import { CalendarHeader } from "./CalendarHeader";
@@ -257,7 +257,7 @@ export function MoodCalendar({
       className="rounded-3xl p-4"
       style={{
         backgroundColor: get("surface"),
-        shadowColor: isDark ? "#000" : "#9D8660",
+        shadowColor: getThemedColor("shadowSand", isDark),
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: isDark ? 0.25 : 0.08,
         shadowRadius: 12,

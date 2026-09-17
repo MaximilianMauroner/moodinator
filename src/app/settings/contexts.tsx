@@ -37,6 +37,7 @@ import {
   presetListStyles,
   type PresetTone,
 } from "@/features/settings/presets/PresetListPrimitives";
+import { getThemedColor } from "@/constants/colors";
 
 export default function ContextsSettingsScreen() {
   const isDark = useColorScheme() === "dark";
@@ -309,7 +310,7 @@ function contextTone(isDark: boolean): PresetTone {
 
 function customContextTone(isDark: boolean): PresetTone {
   return {
-    primary: isDark ? "#D9CCB0" : "#9D8660",
+    primary: getThemedColor("sandMuted", isDark),
     cardBg: isDark ? "rgba(46,40,32,0.64)" : "#FDFCFA",
     border: isDark ? "rgba(157,134,96,0.26)" : "rgba(189,167,125,0.24)",
     accentBg: isDark ? "rgba(157,134,96,0.20)" : "rgba(189,167,125,0.14)",
@@ -328,21 +329,21 @@ function ContextHeroStats({
   const builtInSegment = {
     count: counts.activeDefaults,
     label: "Built-in",
-    color: isDark ? "#C4BBCF" : "#695C78",
+    color: getThemedColor("duskText", isDark),
     bgColor: isDark ? "rgba(105,92,120,0.15)" : "rgba(105,92,120,0.08)",
-    progressColor: isDark ? "#A396B3" : "#695C78",
+    progressColor: getThemedColor("duskTextSoft", isDark),
   };
   const customSegment = {
     count: counts.customCount,
     label: "Custom",
-    color: isDark ? "#D9CCB0" : "#9D8660",
+    color: getThemedColor("sandMuted", isDark),
     bgColor: isDark ? "rgba(157,134,96,0.16)" : "rgba(157,134,96,0.10)",
     progressColor: isDark ? "#D4C4A0" : "#BDA77D",
   };
   const presetsSegment = {
     count: DEFAULT_CONTEXTS.length,
     label: "Presets",
-    color: isDark ? "#A8C5A8" : "#5B8A5B",
+    color: getThemedColor("iconAccent", isDark),
     bgColor: isDark ? "rgba(91,138,91,0.15)" : "rgba(91,138,91,0.10)",
     progressColor: isDark ? "rgba(255,255,255,0.09)" : "rgba(0,0,0,0.06)",
   };

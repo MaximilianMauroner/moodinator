@@ -33,6 +33,7 @@ import {
   type MoodRangePreset,
 } from "@/services/moodService";
 import { buildTherapyExportCsv } from "@/services/therapyExportService";
+import { getThemedColor } from "@/constants/colors";
 
 type RangeOption = MoodRangePreset | "custom";
 
@@ -274,7 +275,7 @@ export default function TherapyExportScreen() {
           <Ionicons
             name="chevron-back"
             size={24}
-            color={isDark ? "#A8C5A8" : "#5B8A5B"}
+            color={getThemedColor("iconAccent", isDark)}
           />
           <Text className="text-base font-medium ml-1 text-sage-600 dark:text-sage-300">
             Settings
@@ -284,7 +285,7 @@ export default function TherapyExportScreen() {
         {/* Title row with icon */}
         <View className="flex-row items-center">
           <View className="w-14 h-14 rounded-2xl items-center justify-center mr-4 bg-dusk-100 dark:bg-dusk-800">
-            <Ionicons name="medical-outline" size={28} color={isDark ? "#C4BBCF" : "#847596"} />
+            <Ionicons name="medical-outline" size={28} color={getThemedColor("iconDusk", isDark)} />
           </View>
           <View className="flex-1">
             <Text className="text-xs font-medium mb-0.5 text-dusk-600 dark:text-dusk-300">
@@ -305,7 +306,7 @@ export default function TherapyExportScreen() {
         {/* Info banner */}
         <View className="mx-4 mb-4 p-4 rounded-2xl bg-dusk-100 dark:bg-dusk-800">
           <View className="flex-row items-center mb-2">
-            <Ionicons name="clipboard-outline" size={20} color={isDark ? "#C4BBCF" : "#847596"} style={{ marginRight: 8 }} />
+            <Ionicons name="clipboard-outline" size={20} color={getThemedColor("iconDusk", isDark)} style={{ marginRight: 8 }} />
             <Text className="text-base font-bold text-dusk-600 dark:text-dusk-300">
               Share what matters
             </Text>
@@ -314,7 +315,7 @@ export default function TherapyExportScreen() {
             Customize the CSV your therapist receives. Pick the fields to include, choose a timeframe, and export a spreadsheet-ready file.
           </Text>
           <View className="flex-row items-center mt-1">
-            <Ionicons name="calendar-outline" size={14} color={isDark ? "#C4BBCF" : "#847596"} />
+            <Ionicons name="calendar-outline" size={14} color={getThemedColor("iconDusk", isDark)} />
             <Text className="text-xs font-medium ml-1 text-dusk-600 dark:text-dusk-300">
               {rangeSummary}
             </Text>
@@ -323,7 +324,7 @@ export default function TherapyExportScreen() {
 
         <View className="mx-4 mb-4 p-4 rounded-2xl border border-coral-200 dark:border-coral-700 bg-coral-50 dark:bg-coral-900/20">
           <View className="flex-row items-center mb-2">
-            <Ionicons name="lock-open-outline" size={18} color={isDark ? "#F5A899" : "#C75441"} />
+            <Ionicons name="lock-open-outline" size={18} color={getThemedColor("iconDanger", isDark)} />
             <Text className="ml-2 text-sm font-semibold text-coral-700 dark:text-coral-300">Before you share</Text>
           </View>
           <Text className="text-xs leading-5 text-paper-700 dark:text-sand-300">
@@ -352,7 +353,7 @@ export default function TherapyExportScreen() {
                     <Ionicons
                       name={field.icon}
                       size={18}
-                      color={isDark ? "#A8C5A8" : "#5B8A5B"}
+                      color={getThemedColor("iconAccent", isDark)}
                     />
                   </View>
                   <View className="flex-1 mr-4">
@@ -367,11 +368,11 @@ export default function TherapyExportScreen() {
                     value={enabled}
                     onValueChange={() => handleToggleField(field.key)}
                     trackColor={{
-                      false: isDark ? "#3D352A" : "#E5D9BF",
+                      false: getThemedColor("textOnSand", isDark),
                       true: "#5B8A5B",
                     }}
                     thumbColor={Platform.OS === "ios" ? undefined : "#fff"}
-                    ios_backgroundColor={isDark ? "#3D352A" : "#E5D9BF"}
+                    ios_backgroundColor={getThemedColor("textOnSand", isDark)}
                   />
                 </View>
               );
@@ -448,7 +449,7 @@ export default function TherapyExportScreen() {
                         className="rounded-2xl border border-paper-200 dark:border-paper-800 bg-paper-100 dark:bg-paper-900 p-4 flex-row items-center justify-between"
                       >
                         <View className="flex-row items-center">
-                          <Ionicons name="calendar-outline" size={20} color={isDark ? "#A8C5A8" : "#5B8A5B"} />
+                          <Ionicons name="calendar-outline" size={20} color={getThemedColor("iconAccent", isDark)} />
                           <Text className="text-base font-medium text-paper-800 dark:text-paper-200 ml-3">
                             {customStartDate.toLocaleDateString()}
                           </Text>
@@ -504,7 +505,7 @@ export default function TherapyExportScreen() {
                         className="rounded-2xl border border-paper-200 dark:border-paper-800 bg-paper-100 dark:bg-paper-900 p-4 flex-row items-center justify-between"
                       >
                         <View className="flex-row items-center">
-                          <Ionicons name="calendar-outline" size={20} color={isDark ? "#A8C5A8" : "#5B8A5B"} />
+                          <Ionicons name="calendar-outline" size={20} color={getThemedColor("iconAccent", isDark)} />
                           <Text className="text-base font-medium text-paper-800 dark:text-paper-200 ml-3">
                             {customEndDate.toLocaleDateString()}
                           </Text>

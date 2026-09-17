@@ -1,7 +1,7 @@
 import React from "react";
 import { Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useThemeColors } from "@/constants/colors";
+import { useThemeColors, getThemedColor } from "@/constants/colors";
 import { haptics } from "@/lib/haptics";
 
 type BiometricButtonProps = {
@@ -35,7 +35,7 @@ export function BiometricButton({ onPress, label, icon, disabled }: BiometricBut
           className="w-20 h-20 rounded-3xl items-center justify-center mb-4"
           style={{
             backgroundColor: isDark ? "rgba(91, 138, 91, 0.2)" : "rgba(91, 138, 91, 0.15)",
-            shadowColor: isDark ? "#000" : "#5B8A5B",
+            shadowColor: getThemedColor("shadowSage", isDark),
             shadowOffset: { width: 0, height: 8 },
             shadowOpacity: isDark ? 0.3 : 0.2,
             shadowRadius: 16,

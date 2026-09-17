@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { SettingRow } from "./SettingRow";
 import { SETTINGS_ACCESSIBILITY } from "@/constants/accessibility";
 import { haptics } from "@/lib/haptics";
+import { getThemedColor } from "@/constants/colors";
 
 export const ToggleRow = memo(function ToggleRow({
   title,
@@ -46,11 +47,11 @@ export const ToggleRow = memo(function ToggleRow({
           value={value}
           onValueChange={handleValueChange}
           trackColor={{
-            false: isDark ? "#3D352A" : "#E5D9BF",
+            false: getThemedColor("textOnSand", isDark),
             true: "#5B8A5B",
           }}
           thumbColor={Platform.OS === "ios" ? undefined : "#fff"}
-          ios_backgroundColor={isDark ? "#3D352A" : "#E5D9BF"}
+          ios_backgroundColor={getThemedColor("textOnSand", isDark)}
           accessibilityLabel={title}
           accessibilityHint={SETTINGS_ACCESSIBILITY.toggleHint(value)}
           accessibilityRole="switch"

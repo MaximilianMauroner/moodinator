@@ -11,6 +11,7 @@ import {
   PresetSectionCard,
   type PresetTone,
 } from "@/features/settings/presets/PresetListPrimitives";
+import { getThemedColor } from "@/constants/colors";
 
 function categoryTone(
   category: Emotion["category"],
@@ -41,34 +42,34 @@ function HeroStats({
       total={counts.total}
       isDark={isDark}
       tone={{
-        primary: isDark ? "#A8C5A8" : "#5B8A5B",
+        primary: getThemedColor("iconAccent", isDark),
         cardBg: isDark ? "rgba(30,45,38,0.60)" : "#FDFCFA",
         border: isDark ? "rgba(58,84,72,0.40)" : "rgba(221,212,196,0.80)",
         accentBg: isDark ? "rgba(91,138,91,0.20)" : "rgba(91,138,91,0.12)",
         chipActive: isDark ? "rgba(91,138,91,0.45)" : "#C8E0C8",
-        chipBorder: isDark ? "#7BA87B" : "#5B8A5B",
+        chipBorder: getThemedColor("sageSoft", isDark),
       }}
       segments={[
         {
           count: counts.positive,
           label: "Positive",
-          color: isDark ? "#A8C5A8" : "#5B8A5B",
+          color: getThemedColor("iconAccent", isDark),
           bgColor: isDark ? "rgba(91,138,91,0.15)" : "rgba(91,138,91,0.10)",
-          progressColor: isDark ? "#7BA87B" : "#5B8A5B",
+          progressColor: getThemedColor("sageSoft", isDark),
         },
         {
           count: counts.negative,
           label: "Negative",
-          color: isDark ? "#F5A899" : "#C75441",
+          color: getThemedColor("iconDanger", isDark),
           bgColor: isDark ? "rgba(199,84,65,0.15)" : "rgba(199,84,65,0.08)",
           progressColor: isDark ? "#E88070" : "#C75441",
         },
         {
           count: counts.neutral,
           label: "Neutral",
-          color: isDark ? "#C4BBCF" : "#695C78",
+          color: getThemedColor("duskText", isDark),
           bgColor: isDark ? "rgba(105,92,120,0.15)" : "rgba(105,92,120,0.08)",
-          progressColor: isDark ? "#A396B3" : "#695C78",
+          progressColor: getThemedColor("duskTextSoft", isDark),
         },
       ]}
     />

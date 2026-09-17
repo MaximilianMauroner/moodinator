@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { MoodEntry } from "@db/types";
 
-import { useThemeColors } from "@/constants/colors";
+import { useThemeColors, getThemedColor } from "@/constants/colors";
 import { getMoodRatingDisplay } from "@/constants/moodScaleInterpretation";
 import { fontFamilies, typography } from "@/constants/typography";
 
@@ -97,7 +97,7 @@ function MoodChangeToast({
                 styles.undoButton,
                 {
                   backgroundColor: get("primaryBgHover"),
-                  borderColor: isDark ? "#4A6653" : "#D1DFD1",
+                  borderColor: getThemedColor("sageBorder", isDark),
                 },
               ]}
               accessibilityRole="button"
@@ -108,7 +108,7 @@ function MoodChangeToast({
                   typography.bodySm,
                   styles.undoLabel,
                   {
-                    color: isDark ? "#C8EEC8" : "#476D47",
+                    color: getThemedColor("positiveText", isDark),
                     fontFamily: fontFamilies.bodyMedium,
                   },
                 ]}
@@ -145,7 +145,7 @@ export function RestoredMoodToast({ entry }: { entry: MoodEntry }) {
       entry={entry}
       title="Entry restored"
       icon="leaf"
-      iconColor={isDark ? "#A8C5A8" : "#5B8A5B"}
+      iconColor={getThemedColor("iconAccent", isDark)}
     />
   );
 }

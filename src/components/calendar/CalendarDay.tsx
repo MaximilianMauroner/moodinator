@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Text, Pressable } from "react-native";
-import { useThemeColors } from "@/constants/colors";
+import { useThemeColors, getThemedColor } from "@/constants/colors";
 import { haptics } from "@/lib/haptics";
 import { getMoodRatingLabel } from "@/constants/moodScaleInterpretation";
 import type { CalendarDayData } from "./useCalendarData";
@@ -81,9 +81,7 @@ export function CalendarDay({
           className="text-sm font-semibold"
           style={{
             color: hasMood
-              ? isDark
-                ? "#F5F1E8"
-                : "#3D352A"
+              ? getThemedColor("textOnSurfaceAlt", isDark)
               : isToday
               ? isDark
                 ? get("primary")

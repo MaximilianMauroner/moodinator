@@ -11,6 +11,7 @@ import {
   getAllMoodRatingDisplays,
   getNeutralMoodRating,
 } from "@/constants/moodScaleInterpretation";
+import { getThemedColor } from "@/constants/colors";
 
 interface CollapsedMoodSelectorProps {
   isDark: boolean;
@@ -72,7 +73,7 @@ export function CollapsedMoodSelector({
     <View
       onLayout={(event: LayoutChangeEvent) => setTrackWidth(event.nativeEvent.layout.width)}
       style={{
-        backgroundColor: isDark ? "#14251C" : "#FDFCFA",
+        backgroundColor: getThemedColor("surface", isDark),
         borderWidth: 1,
         borderColor: isDark ? "#2F513B" : "#E5D9BF",
         borderRadius: 18,

@@ -61,6 +61,7 @@ import { getHomeHeaderSnapTarget } from "@/lib/homeHeaderSnap";
 import { addHomeTabDoublePressListener } from "@/lib/homeTabEvents";
 
 import type { MoodEntry } from "@db/types";
+import { getThemedColor } from "@/constants/colors";
 
 const HomeErrorFallback = createScreenErrorFallback("Home");
 const COLLAPSED_SELECTOR_HEIGHT = 60;
@@ -587,7 +588,7 @@ function HomeScreenContent() {
   const jumpButtonStyle = useMemo(
     () => ({
       alignItems: "center" as const,
-      backgroundColor: isDark ? "#A6E39B" : "#5B8A5B",
+      backgroundColor: getThemedColor("primary", isDark),
       borderColor: isDark
         ? "rgba(8, 21, 15, 0.24)"
         : "rgba(253, 252, 250, 0.72)",
@@ -634,9 +635,9 @@ function HomeScreenContent() {
                   refreshing={refreshing}
                   onRefresh={handlePullToRefresh}
                   progressViewOffset={refreshIndicatorOffset}
-                  tintColor={isDark ? "#A6E39B" : "#5B8A5B"}
-                  colors={[isDark ? "#A6E39B" : "#5B8A5B"]}
-                  progressBackgroundColor={isDark ? "#14251C" : "#FDFCFA"}
+                  tintColor={getThemedColor("primary", isDark)}
+                  colors={[getThemedColor("primary", isDark)]}
+                  progressBackgroundColor={getThemedColor("surface", isDark)}
                 />
               }
               style={{ flex: 1 }}
@@ -657,7 +658,7 @@ function HomeScreenContent() {
               style={[
                 overlayAnimatedStyle,
                 {
-                  backgroundColor: isDark ? "#08150F" : "#FAF8F4",
+                  backgroundColor: getThemedColor("background", isDark),
                   left: 0,
                   paddingHorizontal: CONTENT_HORIZONTAL_PADDING,
                   position: "absolute",

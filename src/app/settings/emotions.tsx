@@ -38,6 +38,7 @@ import {
   PresetTipCard,
   presetListStyles,
 } from "@/features/settings/presets/PresetListPrimitives";
+import { getThemedColor } from "@/constants/colors";
 
 async function promptHistoricalUpdate(options: {
   affectedMoodEntryCount: number;
@@ -109,12 +110,12 @@ export default function EmotionsSettingsScreen() {
   }, [emotions]);
   const historySyncTone = useMemo(
     () => ({
-      primary: isDark ? "#A8C5A8" : "#5B8A5B",
+      primary: getThemedColor("iconAccent", isDark),
       cardBg: isDark ? "rgba(30,45,38,0.48)" : "#FDFCFA",
       border: isDark ? "rgba(58,84,72,0.36)" : "rgba(221,212,196,0.80)",
       accentBg: isDark ? "rgba(91,138,91,0.20)" : "rgba(91,138,91,0.12)",
       chipActive: isDark ? "rgba(91,138,91,0.45)" : "#C8E0C8",
-      chipBorder: isDark ? "#7BA87B" : "#5B8A5B",
+      chipBorder: getThemedColor("sageSoft", isDark),
     }),
     [isDark]
   );

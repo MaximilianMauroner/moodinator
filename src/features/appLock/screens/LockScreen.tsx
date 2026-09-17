@@ -11,7 +11,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { useThemeColors } from "@/constants/colors";
+import { useThemeColors, getThemedColor } from "@/constants/colors";
 import { haptics } from "@/lib/haptics";
 import { BiometricButton } from "../components/BiometricButton";
 import { PinDots } from "../components/PinDots";
@@ -200,14 +200,14 @@ export function LockScreen() {
                   className="w-24 h-24 rounded-3xl items-center justify-center mb-6"
                   style={{
                     backgroundColor: isDark ? "rgba(91, 138, 91, 0.15)" : "rgba(91, 138, 91, 0.1)",
-                    shadowColor: isDark ? "#000" : "#5B8A5B",
+                    shadowColor: getThemedColor("shadowSage", isDark),
                     shadowOffset: { width: 0, height: 12 },
                     shadowOpacity: isDark ? 0.4 : 0.2,
                     shadowRadius: 24,
                     elevation: 6,
                   }}
                 >
-                  <Ionicons name="leaf-outline" size={48} color={isDark ? "#A8C5A8" : "#5B8A5B"} />
+                  <Ionicons name="leaf-outline" size={48} color={getThemedColor("iconAccent", isDark)} />
                 </View>
               </View>
               <Text accessibilityRole="header" className="text-2xl font-bold mb-2" style={{ color: get("text") }}>
@@ -249,7 +249,7 @@ export function LockScreen() {
                     selectable
                     accessibilityLiveRegion="assertive"
                     className="text-sm text-center"
-                    style={{ color: isDark ? "#F2B4A6" : "#A53F30", fontVariant: ["tabular-nums"] }}
+                    style={{ color: getThemedColor("dangerText", isDark), fontVariant: ["tabular-nums"] }}
                   >
                     {lockoutMessage}
                   </Text>
@@ -258,7 +258,7 @@ export function LockScreen() {
                     selectable
                     accessibilityLiveRegion="assertive"
                     className="text-sm text-center"
-                    style={{ color: isDark ? "#F2B4A6" : "#A53F30" }}
+                    style={{ color: getThemedColor("dangerText", isDark) }}
                   >
                     {feedback}
                   </Text>

@@ -2,7 +2,7 @@ import React from "react";
 import { View, Text, Modal, Pressable, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { format } from "date-fns";
-import { useThemeColors, colors } from "@/constants/colors";
+import { useThemeColors, colors, getThemedColor } from "@/constants/colors";
 import { getMoodRatingDisplay } from "@/constants/moodScaleInterpretation";
 import { haptics } from "@/lib/haptics";
 import { getEntryLocalTimeLabel } from "@/lib/entryTimezone";
@@ -143,7 +143,7 @@ export function DayDetailModal({
                       className="rounded-2xl overflow-hidden"
                       style={{
                         backgroundColor: get("surface"),
-                        shadowColor: isDark ? "#000" : "#9D8660",
+                        shadowColor: getThemedColor("shadowSand", isDark),
                         shadowOffset: { width: 0, height: 4 },
                         shadowOpacity: isDark ? 0.25 : 0.08,
                         shadowRadius: 12,

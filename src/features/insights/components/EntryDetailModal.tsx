@@ -12,7 +12,7 @@ import { useColorScheme } from "nativewind";
 import { format } from "date-fns";
 import Animated, { FadeInUp } from "react-native-reanimated";
 import type { MoodEntry, MoodScaleSnapshot } from "@db/types";
-import { getEnergySegmentColor } from "@/constants/colors";
+import { getEnergySegmentColor, getThemedColor } from "@/constants/colors";
 import {
   getEntryLocalDayKey,
   getEntryLocalTimeLabel,
@@ -56,7 +56,7 @@ export function EntryDetailModal({
     >
       <View
         className="flex-1"
-        style={{ backgroundColor: isDark ? "#1E2D26" : "#FAF8F4" }}
+        style={{ backgroundColor: getThemedColor("backgroundRaised", isDark) }}
       >
         {/* Header */}
         <View
@@ -66,7 +66,7 @@ export function EntryDetailModal({
           <View className="w-10" />
           <Text
             className="text-lg font-semibold"
-            style={{ color: isDark ? "#F5F1E8" : "#3D352A" }}
+            style={{ color: getThemedColor("textOnSurfaceAlt", isDark) }}
           >
             Entry Details
           </Text>
@@ -80,7 +80,7 @@ export function EntryDetailModal({
             <Ionicons
               name="close"
               size={20}
-              color={isDark ? "#BDA77D" : "#9D8660"}
+              color={getThemedColor("iconSand", isDark)}
             />
           </TouchableOpacity>
         </View>
@@ -97,8 +97,8 @@ export function EntryDetailModal({
             entering={sectionReveal(0)}
             className="rounded-3xl p-6 mb-5"
             style={{
-              backgroundColor: isDark ? "#2C4038" : "#FDFCFA",
-              shadowColor: isDark ? "#000" : "#9D8660",
+              backgroundColor: getThemedColor("textOnAccent", isDark),
+              shadowColor: getThemedColor("shadowSand", isDark),
               shadowOffset: { width: 0, height: 4 },
               shadowOpacity: isDark ? 0.25 : 0.08,
               shadowRadius: 12,
@@ -123,13 +123,13 @@ export function EntryDetailModal({
               <View className="flex-1">
                 <Text
                   className="text-xl font-semibold"
-                  style={{ color: isDark ? "#F5F1E8" : "#3D352A" }}
+                  style={{ color: getThemedColor("textOnSurfaceAlt", isDark) }}
                 >
                   {getMoodLabel(entry.mood, entry.moodScale)}
                 </Text>
                 <Text
                   className="text-sm mt-1"
-                  style={{ color: isDark ? "#BDA77D" : "#9D8660" }}
+                  style={{ color: getThemedColor("iconSand", isDark) }}
                 >
                   {format(
                     new Date(`${getEntryLocalDayKey(entry)}T12:00:00`),
@@ -138,7 +138,7 @@ export function EntryDetailModal({
                 </Text>
                 <Text
                   className="text-sm"
-                  style={{ color: isDark ? "#BDA77D" : "#9D8660" }}
+                  style={{ color: getThemedColor("iconSand", isDark) }}
                 >
                   {getEntryLocalTimeLabel(entry)}
                 </Text>
@@ -152,8 +152,8 @@ export function EntryDetailModal({
               entering={sectionReveal(1)}
               className="rounded-3xl p-5 mb-5"
               style={{
-                backgroundColor: isDark ? "#2C4038" : "#FDFCFA",
-                shadowColor: isDark ? "#000" : "#9D8660",
+                backgroundColor: getThemedColor("textOnAccent", isDark),
+                shadowColor: getThemedColor("shadowSand", isDark),
                 shadowOffset: { width: 0, height: 4 },
                 shadowOpacity: isDark ? 0.25 : 0.08,
                 shadowRadius: 12,
@@ -163,17 +163,17 @@ export function EntryDetailModal({
               <View className="flex-row items-center mb-3">
                 <View
                   className="w-8 h-8 rounded-xl items-center justify-center mr-3"
-                  style={{ backgroundColor: isDark ? "#2D3D2D" : "#E8EFE8" }}
+                  style={{ backgroundColor: getThemedColor("positiveSurface", isDark) }}
                 >
                   <Ionicons
                     name="flash"
                     size={16}
-                    color={isDark ? "#A8C5A8" : "#5B8A5B"}
+                    color={getThemedColor("iconAccent", isDark)}
                   />
                 </View>
                 <Text
                   className="text-base font-medium"
-                  style={{ color: isDark ? "#F5F1E8" : "#3D352A" }}
+                  style={{ color: getThemedColor("textOnSurfaceAlt", isDark) }}
                 >
                   Energy Level
                 </Text>
@@ -196,7 +196,7 @@ export function EntryDetailModal({
                 </View>
                 <Text
                   className="text-lg font-semibold w-12 text-right"
-                  style={{ color: isDark ? "#F5F1E8" : "#3D352A" }}
+                  style={{ color: getThemedColor("textOnSurfaceAlt", isDark) }}
                 >
                   {entry.energy}/10
                 </Text>
@@ -210,8 +210,8 @@ export function EntryDetailModal({
               entering={sectionReveal(2)}
               className="rounded-3xl p-5 mb-5"
               style={{
-                backgroundColor: isDark ? "#2C4038" : "#FDFCFA",
-                shadowColor: isDark ? "#000" : "#9D8660",
+                backgroundColor: getThemedColor("textOnAccent", isDark),
+                shadowColor: getThemedColor("shadowSand", isDark),
                 shadowOffset: { width: 0, height: 4 },
                 shadowOpacity: isDark ? 0.25 : 0.08,
                 shadowRadius: 12,
@@ -231,7 +231,7 @@ export function EntryDetailModal({
                 </View>
                 <Text
                   className="text-base font-medium"
-                  style={{ color: isDark ? "#F5F1E8" : "#3D352A" }}
+                  style={{ color: getThemedColor("textOnSurfaceAlt", isDark) }}
                 >
                   Emotions
                 </Text>
@@ -240,8 +240,8 @@ export function EntryDetailModal({
                 {entry.emotions.map((emotion, index) => {
                   const categoryColors = {
                     positive: {
-                      bg: isDark ? "#2D3D2D" : "#E8EFE8",
-                      text: isDark ? "#A8C5A8" : "#5B8A5B",
+                      bg: getThemedColor("positiveSurface", isDark),
+                      text: getThemedColor("iconAccent", isDark),
                     },
                     negative: {
                       bg: isDark ? "#3C1A14" : "#F5E8E8",
@@ -279,8 +279,8 @@ export function EntryDetailModal({
               entering={sectionReveal(3)}
               className="rounded-3xl p-5 mb-5"
               style={{
-                backgroundColor: isDark ? "#2C4038" : "#FDFCFA",
-                shadowColor: isDark ? "#000" : "#9D8660",
+                backgroundColor: getThemedColor("textOnAccent", isDark),
+                shadowColor: getThemedColor("shadowSand", isDark),
                 shadowOffset: { width: 0, height: 4 },
                 shadowOpacity: isDark ? 0.25 : 0.08,
                 shadowRadius: 12,
@@ -300,7 +300,7 @@ export function EntryDetailModal({
                 </View>
                 <Text
                   className="text-base font-medium"
-                  style={{ color: isDark ? "#F5F1E8" : "#3D352A" }}
+                  style={{ color: getThemedColor("textOnSurfaceAlt", isDark) }}
                 >
                   Context
                 </Text>
@@ -314,7 +314,7 @@ export function EntryDetailModal({
                   >
                     <Text
                       className="text-sm font-medium"
-                      style={{ color: isDark ? "#BDA77D" : "#9D8660" }}
+                      style={{ color: getThemedColor("iconSand", isDark) }}
                     >
                       {tag}
                     </Text>
@@ -330,8 +330,8 @@ export function EntryDetailModal({
               entering={sectionReveal(4)}
               className="rounded-3xl p-5"
               style={{
-                backgroundColor: isDark ? "#2C4038" : "#FDFCFA",
-                shadowColor: isDark ? "#000" : "#9D8660",
+                backgroundColor: getThemedColor("textOnAccent", isDark),
+                shadowColor: getThemedColor("shadowSand", isDark),
                 shadowOffset: { width: 0, height: 4 },
                 shadowOpacity: isDark ? 0.25 : 0.08,
                 shadowRadius: 12,
@@ -346,12 +346,12 @@ export function EntryDetailModal({
                   <Ionicons
                     name="document-text"
                     size={16}
-                    color={isDark ? "#BDA77D" : "#9D8660"}
+                    color={getThemedColor("iconSand", isDark)}
                   />
                 </View>
                 <Text
                   className="text-base font-medium"
-                  style={{ color: isDark ? "#F5F1E8" : "#3D352A" }}
+                  style={{ color: getThemedColor("textOnSurfaceAlt", isDark) }}
                 >
                   Note
                 </Text>
@@ -371,8 +371,8 @@ export function EntryDetailModal({
               entering={sectionReveal(1)}
               className="rounded-3xl p-8 items-center"
               style={{
-                backgroundColor: isDark ? "#2C4038" : "#FDFCFA",
-                shadowColor: isDark ? "#000" : "#9D8660",
+                backgroundColor: getThemedColor("textOnAccent", isDark),
+                shadowColor: getThemedColor("shadowSand", isDark),
                 shadowOffset: { width: 0, height: 4 },
                 shadowOpacity: isDark ? 0.25 : 0.08,
                 shadowRadius: 12,
@@ -381,7 +381,7 @@ export function EntryDetailModal({
             >
               <Text
                 className="text-sm text-center"
-                style={{ color: isDark ? "#BDA77D" : "#9D8660" }}
+                style={{ color: getThemedColor("iconSand", isDark) }}
               >
                 No additional details for this entry.
               </Text>

@@ -2,7 +2,7 @@ import React from "react";
 import { ScrollView, Pressable, View, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useThemeColors } from "@/constants/colors";
+import { useThemeColors, getThemedColor } from "@/constants/colors";
 import { useSettingsStore } from "@/shared/state/settingsStore";
 import { SettingsPageHeader } from "@/features/settings/components/SettingsPageHeader";
 import { SettingsSection } from "@/features/settings/components/SettingsSection";
@@ -59,7 +59,7 @@ function CardStyleOption({
             <Ionicons
               name="checkmark"
               size={14}
-              color={isDark ? "#A8C5A8" : "#5B8A5B"}
+              color={getThemedColor("iconAccent", isDark)}
             />
           ) : null}
         </View>
