@@ -1,22 +1,11 @@
 import React, { useCallback, useMemo, useState } from "react";
-import {
-  Pressable,
-  ScrollView,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import Animated, {
-  FadeInDown,
-  FadeInUp,
-} from "react-native-reanimated";
+import Animated, { FadeInDown } from "react-native-reanimated";
 import { DEFAULT_CONTEXTS } from "@/lib/entrySettings";
-import { SettingsPageHeader } from "@/features/settings/components/SettingsPageHeader";
 import {
   createPresetListModel,
   normalizePresetKey,
 } from "@/features/settings/utils/defaultPresetSelection";
 import { useSettingsStore } from "@/shared/state/settingsStore";
-import { presetSyncService } from "@/services/presetSyncService";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { haptics } from "@/lib/haptics";
 import { Alert } from "@/components/ui/AppAlert";
@@ -25,6 +14,8 @@ import {
   RemoveContextDialog,
 } from "@/features/settings/contexts/ContextSettingsDialogs";
 import { CONTEXT_THEME } from "@/features/settings/contexts/contextSettingsConfig";
+import { PresetSettingsScreen } from "@/features/settings/presets/PresetSettingsScreen";
+import { usePresetHistorySync } from "@/features/settings/presets/usePresetHistorySync";
 import {
   PresetAddChip,
   PresetChip,
@@ -48,7 +39,7 @@ export default function ContextsSettingsScreen() {
   const [contextPendingRemoval, setContextPendingRemoval] = useState<string | null>(
     null
   );
-  const [historySyncLoading, setHistorySyncLoading] = useState(false);
+  const historySync = usePresetHistorySync("contexts");
 
   const presetModel = useMemo(
     () =>
@@ -102,58 +93,6 @@ export default function ContextsSettingsScreen() {
     setIsAddModalVisible(true);
   }, []);
 
-  const handleAddFromHistory = useCallback(async () => {
-    haptics.tap();
-
-    try {
-      setHistorySyncLoading(true);
-      const diff = await presetSyncService.previewMissingFromHistory("contexts");
-      setHistorySyncLoading(false);
-
-      if (diff.contexts.length === 0) {
-        Alert.alert(
-          "Nothing to Add",
-          "Every context tag in your Mood Entry history is already in your Context Tag List."
-        );
-        return;
-      }
-
-      Alert.alert(
-        "Add from History",
-        `Add ${diff.contexts.length} context tag${diff.contexts.length === 1 ? "" : "s"} from past Mood Entries to your Context Tag List?`,
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Add",
-            onPress: async () => {
-              try {
-                setHistorySyncLoading(true);
-                const result =
-                  await presetSyncService.addMissingFromHistory("contexts");
-                haptics.commit();
-                Alert.alert(
-                  "Added from History",
-                  result.addedContexts.length > 0
-                    ? `Added ${result.addedContexts.length} context tag${result.addedContexts.length === 1 ? "" : "s"}.`
-                    : "No new context tags were found."
-                );
-              } catch {
-                haptics.reject();
-                Alert.alert("Error", "Could not add context tags from history.");
-              } finally {
-                setHistorySyncLoading(false);
-              }
-            },
-          },
-        ]
-      );
-    } catch {
-      haptics.reject();
-      setHistorySyncLoading(false);
-      Alert.alert("Error", "Could not check your Mood Entry history.");
-    }
-  }, []);
-
   const handleCloseAddModal = useCallback(() => {
     setIsAddModalVisible(false);
   }, []);
@@ -195,23 +134,32 @@ export default function ContextsSettingsScreen() {
   }, [contextPendingRemoval, presetModel, setContexts]);
 
   return (
-    <SafeAreaView
-      className="flex-1 bg-paper-100 dark:bg-paper-900"
-      edges={["top"]}
+    <PresetSettingsScreen
+      title="Context Tags"
+      icon="pricetag-outline"
+      accentColor="dusk"
+      addButtonColor={CONTEXT_THEME.lightPrimary}
+      addButtonShadowColor={CONTEXT_THEME.lightPrimary}
+      addButtonLabel="Add custom context tag"
+      onAdd={handleOpenAddModal}
+      overlays={
+        <>
+          <AddContextModal
+            visible={isAddModalVisible}
+            isDark={isDark}
+            onClose={handleCloseAddModal}
+            onSave={handleAddContext}
+          />
+          <RemoveContextDialog
+            visible={contextPendingRemoval !== null}
+            contextName={contextPendingRemoval}
+            isDark={isDark}
+            onCancel={handleCancelRemoveContext}
+            onConfirm={handleConfirmRemoveContext}
+          />
+        </>
+      }
     >
-      <SettingsPageHeader
-        title="Context Tags"
-        subtitle="Customization"
-        icon="pricetag-outline"
-        accentColor="dusk"
-      />
-
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ paddingBottom: 100 }}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
         <Animated.View
           entering={FadeInDown.delay(100).duration(260)}
           style={presetListStyles.heroSection}
@@ -254,46 +202,11 @@ export default function ContextsSettingsScreen() {
             icon="time-outline"
             isDark={isDark}
             tone={contextTone(isDark)}
-            loading={historySyncLoading}
-            onPress={handleAddFromHistory}
+            loading={historySync.loading}
+            onPress={historySync.addFromHistory}
           />
         </Animated.View>
-      </ScrollView>
-
-      <Animated.View
-        entering={FadeInUp.delay(420).duration(260)}
-        style={presetListStyles.fabContainer}
-      >
-        <Pressable
-          onPress={handleOpenAddModal}
-          style={({ pressed }) => [
-            presetListStyles.fab,
-            {
-              backgroundColor: CONTEXT_THEME.lightPrimary,
-              transform: [{ scale: pressed ? 0.95 : 1 }],
-              shadowColor: CONTEXT_THEME.lightPrimary,
-            },
-          ]}
-        >
-          <Ionicons name="add" size={28} color="#FFFFFF" />
-        </Pressable>
-      </Animated.View>
-
-      <AddContextModal
-        visible={isAddModalVisible}
-        isDark={isDark}
-        onClose={handleCloseAddModal}
-        onSave={handleAddContext}
-      />
-
-      <RemoveContextDialog
-        visible={contextPendingRemoval !== null}
-        contextName={contextPendingRemoval}
-        isDark={isDark}
-        onCancel={handleCancelRemoveContext}
-        onConfirm={handleConfirmRemoveContext}
-      />
-    </SafeAreaView>
+    </PresetSettingsScreen>
   );
 }
 
