@@ -1,6 +1,5 @@
 import type * as SQLite from "expo-sqlite";
-import { getDb } from "../client";
-import { runInTransaction } from "../writeQueue";
+import { runInTransaction, runInTransactionOn } from "../writeQueue";
 import type { Emotion } from "../types";
 import type { MoodRow, RawEmotionItem } from "../types/rows";
 import { DEFAULT_EMOTIONS } from "../../domain/entrySettings";
@@ -88,11 +87,12 @@ export async function migrateEmotionsToCategories(): Promise<{
 export async function backfillMoodScaleJson(
   database?: SQLite.SQLiteDatabase
 ): Promise<{ backfilled: number }> {
-  const db = database ?? (await getDb());
-  const currentScaleJson = serializeMoodScale(CURRENT_MOOD_SCALE_SNAPSHOT);
-  const result = await db.runAsync(
-    "UPDATE moods SET mood_scale_json = ? WHERE mood_scale_json IS NULL OR mood_scale_json = '';",
-    currentScaleJson
-  );
-  return { backfilled: result.changes ?? 0 };
+  return runInTransactionOn(database, async (db) => {
+    const currentScaleJson = serializeMoodScale(CURRENT_MOOD_SCALE_SNAPSHOT);
+    const result = await db.runAsync(
+      "UPDATE moods SET mood_scale_json = ? WHERE mood_scale_json IS NULL OR mood_scale_json = '';",
+      currentScaleJson
+    );
+    return { backfilled: result.changes ?? 0 };
+  });
 }

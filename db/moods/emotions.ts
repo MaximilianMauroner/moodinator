@@ -7,8 +7,8 @@ import { DEFAULT_EMOTIONS } from "../../domain/entrySettings";
 import { parseEmotionItem } from "./emotionUtils";
 import { serializeEmotions } from "./serialization";
 
-export async function createEmotionsTable(database?: SQLite.SQLiteDatabase) {
-  const db = database ?? (await getDb());
+async function createEmotionsTableOn(database: SQLite.SQLiteDatabase) {
+  const db = database;
   await db.execAsync(`
         CREATE TABLE IF NOT EXISTS emotions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -18,8 +18,17 @@ export async function createEmotionsTable(database?: SQLite.SQLiteDatabase) {
     `);
 }
 
-export async function createMoodEmotionsTable(database?: SQLite.SQLiteDatabase) {
-  const db = database ?? (await getDb());
+export async function createEmotionsTable(database?: SQLite.SQLiteDatabase) {
+  // Database initialization passes its unpublished handle directly. A public
+  // no-argument call joins the normal write queue after initialization.
+  if (database) {
+    return createEmotionsTableOn(database);
+  }
+  return runInTransaction(createEmotionsTableOn);
+}
+
+async function createMoodEmotionsTableOn(database: SQLite.SQLiteDatabase) {
+  const db = database;
   await db.execAsync(`
         CREATE TABLE IF NOT EXISTS mood_emotions (
             mood_id INTEGER NOT NULL,
@@ -29,6 +38,15 @@ export async function createMoodEmotionsTable(database?: SQLite.SQLiteDatabase) 
             FOREIGN KEY (emotion_id) REFERENCES emotions(id) ON DELETE CASCADE
         );
     `);
+}
+
+export async function createMoodEmotionsTable(database?: SQLite.SQLiteDatabase) {
+  // See createEmotionsTable: the passed handle is used during initialization;
+  // calls without one are ordinary queued writes.
+  if (database) {
+    return createMoodEmotionsTableOn(database);
+  }
+  return runInTransaction(createMoodEmotionsTableOn);
 }
 
 export async function getAllEmotions(): Promise<Emotion[]> {
@@ -42,8 +60,10 @@ export async function getAllEmotions(): Promise<Emotion[]> {
   }));
 }
 
-export async function addEmotion(emotion: Emotion): Promise<void> {
-  const db = await getDb();
+async function addEmotionOn(
+  db: SQLite.SQLiteDatabase,
+  emotion: Emotion
+): Promise<void> {
   const result = await db.runAsync(
     "INSERT OR IGNORE INTO emotions (name, category) VALUES (?, ?);",
     emotion.name,
@@ -55,12 +75,15 @@ export async function addEmotion(emotion: Emotion): Promise<void> {
   }
 }
 
-export async function updateEmotion(
+export async function addEmotion(emotion: Emotion): Promise<void> {
+  return runInTransaction((db) => addEmotionOn(db, emotion));
+}
+
+async function updateEmotionOn(
+  db: SQLite.SQLiteDatabase,
   oldName: string,
   newEmotion: Emotion
 ): Promise<void> {
-  const db = await getDb();
-
   if (oldName !== newEmotion.name) {
     const existing = await db.getFirstAsync(
       "SELECT id FROM emotions WHERE name = ?;",
@@ -79,16 +102,29 @@ export async function updateEmotion(
   );
 }
 
-export async function deleteEmotion(name: string): Promise<void> {
-  const db = await getDb();
+export async function updateEmotion(
+  oldName: string,
+  newEmotion: Emotion
+): Promise<void> {
+  return runInTransaction((db) => updateEmotionOn(db, oldName, newEmotion));
+}
+
+async function deleteEmotionOn(
+  db: SQLite.SQLiteDatabase,
+  name: string
+): Promise<void> {
   await db.runAsync("DELETE FROM emotions WHERE name = ?;", name);
 }
 
-export async function upsertEmotionCategory(
+export async function deleteEmotion(name: string): Promise<void> {
+  return runInTransaction((db) => deleteEmotionOn(db, name));
+}
+
+async function upsertEmotionCategoryOn(
+  db: SQLite.SQLiteDatabase,
   name: string,
   category: Emotion["category"]
 ): Promise<void> {
-  const db = await getDb();
   const existing = await db.getFirstAsync(
     "SELECT id FROM emotions WHERE name = ?;",
     name
@@ -107,6 +143,15 @@ export async function upsertEmotionCategory(
     "INSERT INTO emotions (name, category) VALUES (?, ?);",
     name,
     category
+  );
+}
+
+export async function upsertEmotionCategory(
+  name: string,
+  category: Emotion["category"]
+): Promise<void> {
+  return runInTransaction((db) =>
+    upsertEmotionCategoryOn(db, name, category)
   );
 }
 
@@ -240,9 +285,9 @@ export async function hasEmotionTableMigrated(
   return hasEmotions || hasLinks;
 }
 
-export async function ensureDefaultEmotions(): Promise<void> {
-  const db = await getDb();
-
+async function ensureDefaultEmotionsOn(
+  db: SQLite.SQLiteDatabase
+): Promise<void> {
   if (!DEFAULT_EMOTIONS.length) {
     return;
   }
@@ -258,6 +303,13 @@ export async function ensureDefaultEmotions(): Promise<void> {
     `INSERT OR IGNORE INTO emotions (name, category) VALUES ${placeholders};`,
     ...values
   );
+}
+
+export async function ensureDefaultEmotions(): Promise<void> {
+  if (!DEFAULT_EMOTIONS.length) {
+    return;
+  }
+  return runInTransaction(ensureDefaultEmotionsOn);
 }
 
 /**
@@ -486,4 +538,3 @@ export async function applyEmotionHistoricalUpdate(
     return { updated };
   });
 }
-

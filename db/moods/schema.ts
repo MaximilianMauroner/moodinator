@@ -1,10 +1,9 @@
 import type * as SQLite from "expo-sqlite";
-import { getDb } from "../client";
+import { runInTransaction } from "../writeQueue";
 import type { ColumnInfo } from "../types/rows";
 import { createEmotionsTable, createMoodEmotionsTable } from "./emotions";
 
-export async function createMoodTable(database?: SQLite.SQLiteDatabase) {
-  const db = database ?? (await getDb());
+async function createMoodTableOn(db: SQLite.SQLiteDatabase) {
   await db.execAsync(`
         CREATE TABLE IF NOT EXISTS moods (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -21,6 +20,15 @@ export async function createMoodTable(database?: SQLite.SQLiteDatabase) {
   await createEmotionsTable(db);
   await createMoodEmotionsTable(db);
   await createIndexes(db);
+}
+
+export async function createMoodTable(database?: SQLite.SQLiteDatabase) {
+  // Database initialization passes its unpublished handle directly. A public
+  // no-argument call joins the normal write queue after initialization.
+  if (database) {
+    return createMoodTableOn(database);
+  }
+  return runInTransaction(createMoodTableOn);
 }
 
 /**
