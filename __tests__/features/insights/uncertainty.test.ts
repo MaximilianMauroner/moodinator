@@ -97,6 +97,20 @@ describe("comparison intervals", () => {
     expect(among.effect).toBe(alone.effect);
   });
 
+  /**
+   * The critical value has to stay accurate once the confidence level is
+   * divided, because that pushes p far into the tail. A series expansion around
+   * the normal quantile drifted there and flipped this decision.
+   */
+  it("stays accurate in the tail after a heavy correction", () => {
+    const result = compareGroups(group([0, 0, 0, 0, 4]), group([9, 9, 9, 9, 9]), 100);
+
+    // Welch degrees of freedom are 4 and the standard error is 0.8.
+    expect((result.ciHigh - result.effect) / 0.8).toBeCloseTo(10.3063, 3);
+    expect(result.ciHigh).toBeGreaterThan(0);
+    expect(result.separated).toBe(false);
+  });
+
   it("still separates a real difference measured across many entries", () => {
     const even = (value: number, other: number) =>
       group(Array.from({ length: 60 }, (_, i) => (i % 2 ? value : other)));
@@ -265,6 +279,29 @@ describe("analyzeMoods", () => {
     expect(result.inconclusiveDrivers).toEqual([]);
   });
 
+  /**
+   * One row at the epoch sentinel must not stretch a dated range back to 1970.
+   * Before this, "All history" started there and the trend chart drew every day
+   * since, squeezing the real history into its last pixels.
+   */
+  it("keeps an unreadable date out of the dated ranges", () => {
+    const data = [
+      ...tagged([4, 5, 4, 5, 4]),
+      createMockMoodEntry({ mood: 6, timestamp: 0 }),
+    ];
+
+    const result = analyzeMoods(data, start, end);
+
+    expect(result.dailySeries.length).toBeLessThan(400);
+    expect(result.dailySeries.some((point) => point.day.startsWith("1970"))).toBe(
+      false,
+    );
+    // The epoch is not a real Thursday night, so no slot counts it.
+    expect(
+      result.rhythm.reduce((total, cell) => total + cell.count, 0),
+    ).toBe(5);
+  });
+
   it("claims nothing from noise spread over many candidates", () => {
     // Ratings cycle independently of the tag, so no group differs from the
     // rest. Testing this many candidates at a flat 95% would be likely to
@@ -294,5 +331,17 @@ describe("rangeWords", () => {
 
   it("orders the bounds regardless of how they arrive", () => {
     expect(rangeWords(2.4, 0.6)).toBe(rangeWords(0.6, 2.4));
+  });
+
+  /**
+   * A range is only shown because the interval excludes zero, so rounding a
+   * bound to 0.0 would deny the evidence the claim rests on.
+   */
+  it("does not round a bound down to nothing", () => {
+    expect(rangeWords(-0.044, -0.016)).toBe("Less than 0.1 better.");
+    expect(rangeWords(-0.174, -0.026)).toBe(
+      "Somewhere between less than 0.1 and 0.2 better.",
+    );
+    expect(rangeWords(0.016, 0.044)).toBe("Less than 0.1 worse.");
   });
 });

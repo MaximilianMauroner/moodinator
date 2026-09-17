@@ -1,4 +1,8 @@
-import { getEntryLocalHour, getEntryLocalWeekday } from "@/lib/entryTimezone";
+import {
+  getEntryLocalHour,
+  getEntryLocalWeekday,
+  hasKnownDate,
+} from "@/lib/entryTimezone";
 import type { MoodEntry } from "@db/types";
 import { getInterpretedMoodRating } from "@/constants/moodScaleInterpretation";
 import { getMoodHex } from "@/lib/moodPresentation";
@@ -29,6 +33,11 @@ export function rhythm(entries: MoodEntry[]): RhythmCell[] {
     stats: emptyGroup(),
   }));
   for (const entry of entries) {
+    // The epoch sentinel is not a real Thursday night, so it is not counted as
+    // one. Drivers still use the row, because they compare labels, not dates.
+    if (!hasKnownDate(entry)) {
+      continue;
+    }
     const hour = getEntryLocalHour(entry);
     const part = hour < 12 ? 0 : hour < 17 ? 1 : hour < 22 ? 2 : 3;
     const cell = cells[part * 7 + ((getEntryLocalWeekday(entry) + 6) % 7)];

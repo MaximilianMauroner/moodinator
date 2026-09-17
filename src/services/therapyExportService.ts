@@ -5,7 +5,10 @@ import { getMoodRatingLabel } from "@/constants/moodScaleInterpretation";
 // Therapy exports are opened in a spreadsheet by someone other than the author,
 // so a cell that starts a formula would evaluate on their machine. Notes can
 // carry arbitrary text, including text that arrived through a JSON import.
-const FORMULA_LEAD = /^[=+@\t\r]/;
+// The control characters are here because a spreadsheet may trim them while
+// importing and evaluate what follows, so a line feed counts alongside tab and
+// carriage return.
+const FORMULA_LEAD = /^[=+@\t\r\n]/;
 // A leading "-" only starts a formula when a token follows it, so "- bullet"
 // and a bare "-" stay readable.
 const NEGATIVE_LEAD = /^-(?!\s|$)/;

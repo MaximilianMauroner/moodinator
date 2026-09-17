@@ -55,6 +55,22 @@ describe("therapyExportService", () => {
       expect(notesCsv(note)).toBe(`"'${note.replace(/"/g, '""')}"`);
     });
 
+    /**
+     * A spreadsheet may trim a leading line feed on import and evaluate what
+     * follows, so it is neutralized alongside tab and carriage return. The
+     * note itself spans lines, so this asserts on the whole file rather than
+     * on a split row.
+     */
+    it("prefixes a formula hidden behind a leading line feed", () => {
+      const note = '\n=HYPERLINK("http://example.invalid","click")';
+      const csv = buildTherapyExportCsv(
+        [createMockMoodEntry({ note })],
+        ["notes"]
+      );
+
+      expect(csv.endsWith(`"'${note.replace(/"/g, '""')}"`)).toBe(true);
+    });
+
     it("guards a formula lead in the emotions column too", () => {
       const csv = buildTherapyExportCsv(
         [createMockMoodEntry({ emotions: [{ name: "=cmd", category: "neutral" }] })],

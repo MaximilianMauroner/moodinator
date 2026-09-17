@@ -87,92 +87,127 @@ function welchDegreesOfFreedom(a: GroupStats, b: GroupStats): number {
   return denominator > 0 ? (varianceA + varianceB) ** 2 / denominator : 1;
 }
 
-// Acklam's rational approximation to the inverse normal CDF.
-const CENTRAL = [
-  -3.969683028665376e1, 2.209460984245205e2, -2.759285104469687e2,
-  1.38357751867269e2, -3.066479806614716e1, 2.506628277459239,
-];
-const CENTRAL_DIVISOR = [
-  -5.447609879822406e1, 1.615858368580409e2, -1.556989798598866e2,
-  6.680131188771972e1, -1.328068155288572e1,
-];
-const TAIL = [
-  -7.784894002430293e-3, -3.223964580411365e-1, -2.400758277161838,
-  -2.549732539343734, 4.374664141464968, 2.938163982698783,
-];
-const TAIL_DIVISOR = [
-  7.784695709041462e-3, 3.224671290700398e-1, 2.445134137142996,
-  3.754408661907416,
-];
-const TAIL_START = 1 - 0.02425;
-
-/**
- * Quantile of the standard normal. Only the upper half is needed here, so only
- * the two branches that cover p in [0.5, 1) are carried. Accurate to about
- * 1e-9, far past anything these intervals resolve.
- */
-function normalQuantile(p: number): number {
-  if (p <= TAIL_START) {
-    const q = p - 0.5;
-    const r = q * q;
-    return (
-      ((((((CENTRAL[0] * r + CENTRAL[1]) * r + CENTRAL[2]) * r + CENTRAL[3]) * r +
-        CENTRAL[4]) *
-        r +
-        CENTRAL[5]) *
-        q) /
-      (((((CENTRAL_DIVISOR[0] * r + CENTRAL_DIVISOR[1]) * r +
-        CENTRAL_DIVISOR[2]) *
-        r +
-        CENTRAL_DIVISOR[3]) *
-        r +
-        CENTRAL_DIVISOR[4]) *
-        r +
-        1)
-    );
+/** Log gamma, Lanczos approximation with g = 7. */
+function logGamma(value: number): number {
+  const LANCZOS = [
+    0.9999999999998099, 676.5203681218851, -1259.1392167224028,
+    771.3234287776531, -176.6150291621406, 12.507343278686905,
+    -0.13857109526572012, 9.984369578019572e-6, 1.5056327351493116e-7,
+  ];
+  const z = value - 1;
+  let series = LANCZOS[0];
+  for (let i = 1; i < LANCZOS.length; i += 1) {
+    series += LANCZOS[i] / (z + i);
   }
-  const q = Math.sqrt(-2 * Math.log(1 - p));
+  const t = z + 7.5;
   return (
-    -(((((TAIL[0] * q + TAIL[1]) * q + TAIL[2]) * q + TAIL[3]) * q + TAIL[4]) *
-      q +
-      TAIL[5]) /
-    ((((TAIL_DIVISOR[0] * q + TAIL_DIVISOR[1]) * q + TAIL_DIVISOR[2]) * q +
-      TAIL_DIVISOR[3]) *
-      q +
-      1)
+    0.5 * Math.log(2 * Math.PI) +
+    (z + 0.5) * Math.log(t) -
+    t +
+    Math.log(series)
   );
 }
 
+/** Continued fraction for the incomplete beta function, by Lentz's method. */
+function betaContinuedFraction(a: number, b: number, x: number): number {
+  const TINY = 1e-30;
+  const qab = a + b;
+  const qap = a + 1;
+  const qam = a - 1;
+  let c = 1;
+  let d = 1 - (qab * x) / qap;
+  if (Math.abs(d) < TINY) {
+    d = TINY;
+  }
+  d = 1 / d;
+  let result = d;
+
+  for (let m = 1; m <= 300; m += 1) {
+    const even = 2 * m;
+    let numerator = (m * (b - m) * x) / ((qam + even) * (a + even));
+    d = 1 + numerator * d;
+    if (Math.abs(d) < TINY) {
+      d = TINY;
+    }
+    c = 1 + numerator / c;
+    if (Math.abs(c) < TINY) {
+      c = TINY;
+    }
+    d = 1 / d;
+    result *= d * c;
+
+    numerator = (-(a + m) * (qab + m) * x) / ((a + even) * (qap + even));
+    d = 1 + numerator * d;
+    if (Math.abs(d) < TINY) {
+      d = TINY;
+    }
+    c = 1 + numerator / c;
+    if (Math.abs(c) < TINY) {
+      c = TINY;
+    }
+    d = 1 / d;
+    const step = d * c;
+    result *= step;
+    if (Math.abs(step - 1) < 1e-15) {
+      break;
+    }
+  }
+  return result;
+}
+
+/** Regularized incomplete beta, the CDF Student's t is expressed through. */
+function regularizedIncompleteBeta(a: number, b: number, x: number): number {
+  if (x <= 0) {
+    return 0;
+  }
+  if (x >= 1) {
+    return 1;
+  }
+  const front = Math.exp(
+    logGamma(a + b) -
+      logGamma(a) -
+      logGamma(b) +
+      a * Math.log(x) +
+      b * Math.log(1 - x)
+  );
+  return x < (a + 1) / (a + b + 2)
+    ? (front * betaContinuedFraction(a, b, x)) / a
+    : 1 - (front * betaContinuedFraction(b, a, 1 - x)) / b;
+}
+
+function studentCdf(t: number, degreesOfFreedom: number): number {
+  const x = degreesOfFreedom / (degreesOfFreedom + t * t);
+  const tail =
+    0.5 * regularizedIncompleteBeta(degreesOfFreedom / 2, 0.5, x);
+  return t > 0 ? 1 - tail : tail;
+}
+
 /**
- * Quantile of Student's t, a Cornish-Fisher expansion around the normal
- * quantile. The Welch degrees of freedom are a continuous value that the group
- * floor does not pin down, so a table would have to be interpolated anyway.
+ * Quantile of Student's t for p >= 0.5, inverted from the CDF by bisection.
  *
- * The error is under 0.001 at the five-entry floor with one comparison. It
- * grows to roughly 1% only where a small group meets a heavily divided
- * confidence level, which is small next to the correction itself: it more than
- * doubles the critical value there.
+ * A series expansion around the normal quantile was tried first and is not
+ * good enough. Dividing the confidence level across many comparisons pushes p
+ * far into the tail, where the expansion drifts: at four degrees of freedom
+ * and a hundred comparisons it returns 10.10 against a true 10.31, which is
+ * the difference between publishing a pattern and suppressing it. Bisecting an
+ * accurate CDF costs a few hundred evaluations per analysis and removes the
+ * question.
  */
 function studentQuantile(p: number, degreesOfFreedom: number): number {
-  const z = normalQuantile(p);
-  // Past this point t and the normal agree to well under the precision an
-  // insight card reports.
-  if (degreesOfFreedom >= 1000) {
-    return z;
+  let high = 2;
+  while (studentCdf(high, degreesOfFreedom) < p && high < 1e9) {
+    high *= 2;
   }
-  const df = degreesOfFreedom;
-  const z2 = z * z;
-  const z3 = z2 * z;
-  const z5 = z3 * z2;
-  const z7 = z5 * z2;
-  const z9 = z7 * z2;
-  return (
-    z +
-    (z3 + z) / (4 * df) +
-    (5 * z5 + 16 * z3 + 3 * z) / (96 * df ** 2) +
-    (3 * z7 + 19 * z5 + 17 * z3 - 15 * z) / (384 * df ** 3) +
-    (79 * z9 + 776 * z7 + 1482 * z5 - 1920 * z3 - 945 * z) / (92160 * df ** 4)
-  );
+  let low = 0;
+  for (let i = 0; i < 100; i += 1) {
+    const middle = (low + high) / 2;
+    if (studentCdf(middle, degreesOfFreedom) < p) {
+      low = middle;
+    } else {
+      high = middle;
+    }
+  }
+  return (low + high) / 2;
 }
 
 export interface Comparison {

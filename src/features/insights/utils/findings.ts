@@ -17,6 +17,16 @@ export function effectWords(effect: number): string {
     ? "about the same"
     : `${Math.abs(effect).toFixed(1)} ${effect < 0 ? "better" : "worse"}`;
 }
+/**
+ * A range is only shown for a claim whose interval excludes zero, so a bound
+ * that rounds to 0.0 has to read as small rather than as nothing. Printing
+ * [-0.044, -0.016] as "between 0.0 and 0.0 better" denies the very evidence
+ * the claim was shown for.
+ */
+const SMALLEST_SHOWN = 0.05;
+const size = (value: number) => Math.abs(value).toFixed(1);
+const tooSmallToShow = (value: number) => Math.abs(value) < SMALLEST_SHOWN;
+
 export function rangeWords(low: number, high: number): string {
   const direction = (value: number) => (value < 0 ? "better" : "worse");
   const [from, to] = low <= high ? [low, high] : [high, low];
@@ -26,10 +36,16 @@ export function rangeWords(low: number, high: number): string {
     // order. Sorting by signed value would read "between 2.4 and 0.6 better".
     const [near, far] =
       Math.abs(from) <= Math.abs(to) ? [from, to] : [to, from];
-    return `Somewhere between ${Math.abs(near).toFixed(1)} and ${Math.abs(far).toFixed(1)} ${direction(near)}.`;
+    if (tooSmallToShow(far)) {
+      return `Less than 0.1 ${direction(near)}.`;
+    }
+    if (tooSmallToShow(near)) {
+      return `Somewhere between less than 0.1 and ${size(far)} ${direction(near)}.`;
+    }
+    return `Somewhere between ${size(near)} and ${size(far)} ${direction(near)}.`;
   }
 
-  return `Somewhere between ${Math.abs(from).toFixed(1)} ${direction(from)} and ${Math.abs(to).toFixed(1)} ${direction(to)}.`;
+  return `Somewhere between ${size(from)} ${direction(from)} and ${size(to)} ${direction(to)}.`;
 }
 /**
  * Time slots holding enough entries to compare against the rest of the period.
