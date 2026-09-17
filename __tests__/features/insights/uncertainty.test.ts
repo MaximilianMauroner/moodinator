@@ -49,8 +49,9 @@ describe("comparison intervals", () => {
     const result = compareGroups(group([0, 10, 1, 9, 5]), group([5, 4, 6, 5, 5]));
 
     expect(result.separated).toBe(false);
-    expect(result.ciLow).toBeLessThan(0);
-    expect(result.ciHigh).toBeGreaterThan(0);
+    // A suppressed comparison shows no range, so none is computed for it.
+    expect(result.ciLow).toBeNull();
+    expect(result.ciHigh).toBeNull();
   });
 
   it("reports a point interval when neither group varies", () => {
@@ -78,11 +79,19 @@ describe("comparison intervals", () => {
   it("uses a small-sample critical value at the group floor", () => {
     const result = compareGroups(group([0, 0, 0, 0, 5]), group([3, 3, 3, 3, 8]));
 
+    // The standard error is sqrt(2), so a normal bound ends at -0.23 and claims
+    // a pattern, while t at 8 degrees of freedom ends at +0.26 and does not.
     expect(result.effect).toBe(-3);
     expect(result.separated).toBe(false);
-    expect(result.ciHigh).toBeGreaterThan(0);
-    // margin / standardError is the critical value. t(8, 0.975) = 2.306.
-    expect((result.ciHigh - result.effect) / Math.SQRT2).toBeCloseTo(2.306, 3);
+  });
+
+  it("draws the interval at the same critical value it decides on", () => {
+    // Same shape as above, far enough apart to survive. t(8, 0.975) = 2.306.
+    const result = compareGroups(group([0, 0, 0, 0, 5]), group([9, 9, 9, 9, 14]));
+
+    expect(result.separated).toBe(true);
+    expect(result.ciHigh).not.toBeNull();
+    expect((result.ciHigh! - result.effect) / Math.SQRT2).toBeCloseTo(2.306, 3);
   });
 
   it("widens the interval when the analysis runs many comparisons", () => {
@@ -103,12 +112,23 @@ describe("comparison intervals", () => {
    * the normal quantile drifted there and flipped this decision.
    */
   it("stays accurate in the tail after a heavy correction", () => {
-    const result = compareGroups(group([0, 0, 0, 0, 4]), group([9, 9, 9, 9, 9]), 100);
+    // Welch degrees of freedom are 4 and the standard error is 0.8. A series
+    // expansion returned 10.10 here and published the pattern; the true
+    // t(4, 0.99975) is 10.3063, which leaves the bound just above zero.
+    expect(
+      compareGroups(group([0, 0, 0, 0, 4]), group([9, 9, 9, 9, 9]), 100)
+        .separated,
+    ).toBe(false);
 
-    // Welch degrees of freedom are 4 and the standard error is 0.8.
-    expect((result.ciHigh - result.effect) / 0.8).toBeCloseTo(10.3063, 3);
-    expect(result.ciHigh).toBeGreaterThan(0);
-    expect(result.separated).toBe(false);
+    // Same degrees of freedom and standard error, far enough apart to survive,
+    // so the critical value the interval is drawn at can be read back.
+    const wider = compareGroups(
+      group([0, 0, 0, 0, 4]),
+      group([20, 20, 20, 20, 20]),
+      100,
+    );
+    expect(wider.separated).toBe(true);
+    expect((wider.ciHigh! - wider.effect) / 0.8).toBeCloseTo(10.3063, 3);
   });
 
   it("still separates a real difference measured across many entries", () => {
@@ -301,6 +321,34 @@ describe("analyzeMoods", () => {
       result.rhythm.reduce((total, cell) => total + cell.count, 0),
     ).toBe(5);
   });
+
+  /**
+   * An import can carry far more labels than a person types by hand: 50 context
+   * tags and 50 emotions per entry are allowed, so a thousand entries can reach
+   * twenty thousand comparable groups. The analysis runs synchronously from a
+   * render-time memo, so it has to stay cheap at that size. Separation is
+   * therefore decided from one CDF evaluation, and the CDF is only inverted for
+   * the comparisons that survive, which here is none.
+   */
+  it("handles a large imported history without claiming anything from it", () => {
+    const LABELS = 20_000;
+    const many = Array.from({ length: 1000 }, (_, i) =>
+      createMockMoodEntry({
+        mood: (i % 9) + 1,
+        contextTags: Array.from(
+          { length: 100 },
+          (_, j) => `Tag${(i * 100 + j) % LABELS}`,
+        ),
+        timestamp: new Date(2026, 8, 7 + (i % 20), 12).getTime(),
+      }),
+    );
+
+    const result = analyzeMoods(many, start, end);
+
+    expect(result.inconclusiveDrivers).toHaveLength(LABELS);
+    expect(result.drivers).toEqual([]);
+    expect(result.findings.every((f) => f.effect === null)).toBe(true);
+  }, 10_000);
 
   it("claims nothing from noise spread over many candidates", () => {
     // Ratings cycle independently of the tag, so no group differs from the

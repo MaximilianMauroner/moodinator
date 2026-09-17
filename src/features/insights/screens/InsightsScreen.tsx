@@ -96,14 +96,12 @@ export function InsightsScreen() {
   const dailyValues = analysis.dailySeries.filter(
     (point) => point.min !== null,
   );
-  const best = dailyValues.reduce(
-    (value, point) => Math.min(value, point.min!),
-    Infinity,
-  );
-  const worst = dailyValues.reduce(
-    (value, point) => Math.max(value, point.max!),
-    -Infinity,
-  );
+  // Entries can exist while no day in the range holds one, because a row with
+  // an unreadable date is counted but never placed on the calendar. Reducing
+  // an empty list would put "Infinity--Infinity" on the card.
+  const moodRange = dailyValues.length
+    ? `${dailyValues.reduce((value, point) => Math.min(value, point.min!), Infinity)}–${dailyValues.reduce((value, point) => Math.max(value, point.max!), -Infinity)}`
+    : "—";
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaView
@@ -259,7 +257,7 @@ export function InsightsScreen() {
                         <CompactInsightCard
                           icon="analytics"
                           title="Mood Range"
-                          metric={`${best}–${worst}`}
+                          metric={moodRange}
                           animateMetric={false}
                           interpretation="best to most difficult"
                         />

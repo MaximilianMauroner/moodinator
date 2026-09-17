@@ -210,13 +210,20 @@ function studentQuantile(p: number, degreesOfFreedom: number): number {
   return (low + high) / 2;
 }
 
-export interface Comparison {
-  effect: number;
-  ciLow: number;
-  ciHigh: number;
-  /** The interval stays on one side of zero. */
-  separated: boolean;
-}
+/**
+ * The interval bounds exist only when the comparison separates, so `separated`
+ * carries them rather than sitting beside them. A caller that has checked it
+ * gets the bounds as plain numbers.
+ *
+ * Deciding separation costs one CDF evaluation. Producing the bounds means
+ * inverting that CDF, which costs about a hundred. A suppressed comparison
+ * never shows a range, and an analysis of a large imported history can run tens
+ * of thousands of comparisons of which almost none survive, so the bounds are
+ * only produced for the ones that do.
+ */
+export type Comparison =
+  | { effect: number; separated: false; ciLow: null; ciHigh: null }
+  | { effect: number; separated: true; ciLow: number; ciHigh: number };
 
 export function compareGroups(
   group: GroupStats,
@@ -238,13 +245,33 @@ export function compareGroups(
       sampleVariance(rest) / Math.max(rest.count, 1)
   );
   const alpha = (1 - CONFIDENCE) / Math.max(comparisons, 1);
-  const critical = studentQuantile(
-    1 - alpha / 2,
-    welchDegreesOfFreedom(group, rest)
-  );
-  const margin = critical * standardError;
-  const ciLow = effect - margin;
-  const ciHigh = effect + margin;
+  const degreesOfFreedom = welchDegreesOfFreedom(group, rest);
 
-  return { effect, ciLow, ciHigh, separated: ciLow > 0 || ciHigh < 0 };
+  // Two groups with no spread at all leave nothing to divide by. They differ
+  // or they do not, and the interval has no width either way.
+  if (standardError === 0) {
+    return effect === 0
+      ? { effect, separated: false, ciLow: null, ciHigh: null }
+      : { effect, separated: true, ciLow: effect, ciHigh: effect };
+  }
+
+  // Comparing the observed statistic against the threshold is the same
+  // decision as asking whether the interval excludes zero, and it reads the
+  // CDF once instead of inverting it.
+  const observed = Math.abs(effect) / standardError;
+  const separated =
+    2 * (1 - studentCdf(observed, degreesOfFreedom)) < alpha;
+
+  if (!separated) {
+    return { effect, separated: false, ciLow: null, ciHigh: null };
+  }
+
+  const margin =
+    studentQuantile(1 - alpha / 2, degreesOfFreedom) * standardError;
+  return {
+    effect,
+    separated: true,
+    ciLow: effect - margin,
+    ciHigh: effect + margin,
+  };
 }
