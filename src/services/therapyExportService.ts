@@ -2,15 +2,26 @@ import type { MoodEntry } from "@db/types";
 import type { TherapyExportField } from "@/lib/entrySettings";
 import { getMoodRatingLabel } from "@/constants/moodScaleInterpretation";
 
+// Therapy exports are opened in a spreadsheet by someone other than the author,
+// so a cell that starts a formula would evaluate on their machine. Notes can
+// carry arbitrary text, including text that arrived through a JSON import.
+const FORMULA_LEAD = /^[=+@\t\r]/;
+// A leading "-" only starts a formula when a token follows it, so "- bullet"
+// and a bare "-" stay readable.
+const NEGATIVE_LEAD = /^-(?!\s|$)/;
+
 function csvEscape(value: string | number | null | undefined) {
   if (value === null || value === undefined) {
     return "";
   }
   const str = String(value);
-  if (/[",\n]/.test(str)) {
-    return `"${str.replace(/"/g, '""')}"`;
+  const startsFormula = FORMULA_LEAD.test(str) || NEGATIVE_LEAD.test(str);
+  // The apostrophe forces text in Excel and Sheets and stays hidden in the cell.
+  const body = startsFormula ? `'${str}` : str;
+  if (startsFormula || /[",\n\r]/.test(body)) {
+    return `"${body.replace(/"/g, '""')}"`;
   }
-  return str;
+  return body;
 }
 
 function formatTimestamp(value: number) {

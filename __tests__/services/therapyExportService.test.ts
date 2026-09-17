@@ -39,4 +39,44 @@ describe("therapyExportService", () => {
 
     expect(csv).toContain('"Joy, ""big""","Line 1\nLine 2"');
   });
+
+  describe("spreadsheet formula neutralization", () => {
+    const notesCsv = (note: string) =>
+      buildTherapyExportCsv([createMockMoodEntry({ note })], ["notes"]).split("\n")[1];
+
+    it.each([
+      ["=HYPERLINK(\"http://example.invalid\",\"click\")"],
+      ["+1+1"],
+      ["@SUM(A1)"],
+      ["-2+3"],
+      ["\tleading tab"],
+      ["\rleading carriage return"],
+    ])("quotes and prefixes a note starting with a formula lead: %j", (note) => {
+      expect(notesCsv(note)).toBe(`"'${note.replace(/"/g, '""')}"`);
+    });
+
+    it("guards a formula lead in the emotions column too", () => {
+      const csv = buildTherapyExportCsv(
+        [createMockMoodEntry({ emotions: [{ name: "=cmd", category: "neutral" }] })],
+        ["emotions"]
+      );
+
+      expect(csv.split("\n")[1]).toBe(`"'=cmd"`);
+    });
+
+    it("leaves ordinary text and dashed list items untouched", () => {
+      expect(notesCsv("- bullet point")).toBe("- bullet point");
+      expect(notesCsv("-")).toBe("-");
+      expect(notesCsv("Felt okay today")).toBe("Felt okay today");
+    });
+
+    it("does not guard numeric columns", () => {
+      const csv = buildTherapyExportCsv(
+        [createMockMoodEntry({ mood: 3, energy: 7 })],
+        ["energy"]
+      );
+
+      expect(csv.split("\n")[1]).toBe("7");
+    });
+  });
 });
