@@ -256,6 +256,69 @@ describe("DateTimePickerModal timestamp round trips", () => {
     expect(onSave).toHaveBeenCalledWith(7, Date.parse("2026-01-15T17:00:00.000Z"), 300);
   });
 
+  it("persists the normalized visible time when a legacy date edit crosses a spring DST gap", async () => {
+    process.env.TZ = "America/New_York";
+    const original = entry(Date.parse("2026-03-07T07:30:12.345Z"), null);
+    const { onSave } = await renderModal(original);
+
+    await act(async () => button("Change entry date").props.onPress());
+    await act(async () => {
+      picker("date").props.onChange({}, new Date(2026, 2, 8, 3, 30, 12, 345));
+    });
+    await act(async () => button("Save date and time changes").props.onPress());
+
+    expect(onSave).toHaveBeenCalledWith(
+      7,
+      Date.parse("2026-03-08T07:30:12.345Z"),
+      240,
+    );
+  });
+
+  it("follows JS/native normalization for a legacy fall-back ambiguity", async () => {
+    process.env.TZ = "America/New_York";
+    const original = entry(Date.parse("2026-10-31T05:30:12.345Z"), null);
+    const selected = new Date(2026, 10, 1, 1, 30, 12, 345);
+    const { onSave } = await renderModal(original);
+
+    await act(async () => button("Change entry date").props.onPress());
+    await act(async () => picker("date").props.onChange({}, selected));
+    await act(async () => button("Save date and time changes").props.onPress());
+
+    expect(onSave).toHaveBeenCalledWith(
+      7,
+      selected.getTime(),
+      selected.getTimezoneOffset(),
+    );
+  });
+
+  it("does not report a committed date write as failed when close throws", async () => {
+    process.env.TZ = "UTC";
+    const onClose = vi.fn(() => {
+      throw new Error("close unavailable");
+    });
+    const onSave = vi.fn(async () => {});
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      await renderModal(entry(Date.parse("2026-04-01T12:00:00.000Z"), 0), onSave, onClose);
+      await act(async () => button("Change entry date").props.onPress());
+      await act(async () => {
+        picker("date").props.onChange({}, new Date("2026-04-02T12:00:00.000Z"));
+      });
+      await act(async () => button("Save date and time changes").props.onPress());
+
+      expect(onSave).toHaveBeenCalledTimes(1);
+      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(dateFeedback.commit).toHaveBeenCalledTimes(1);
+      expect(alertMock).not.toHaveBeenCalledWith(
+        "Error",
+        "Could not update this entry's date and time.",
+      );
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
   it("follows device normalization for a legacy DST-gap selection", async () => {
     process.env.TZ = "America/New_York";
     vi.useFakeTimers();

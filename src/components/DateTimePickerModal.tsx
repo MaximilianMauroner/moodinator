@@ -10,6 +10,7 @@ import { getMoodRatingDisplay } from "@/constants/moodScaleInterpretation";
 import { useThemeColors, colors } from "@/constants/colors";
 import { haptics } from "@/lib/haptics";
 import { Alert } from "@/components/ui/AppAlert";
+import { commitThenRunPostCommitEffects } from "@/lib/moodEntryPersistence";
 import {
   getEntryLocalDateParts,
   getTimestampFromEntryLocalDateParts,
@@ -62,14 +63,23 @@ function sameWallClock(
   );
 }
 
-function getEditableOffset(
+function getEditableDate(
   mood: MoodEntry,
   wallClockParts: EntryLocalDateParts,
-): number {
+): { timestamp: number; utcOffsetMinutes: number } {
   const offset = mood.utcOffsetMinutes;
-  return typeof offset === "number" && Number.isInteger(offset) && Math.abs(offset) <= 840
-    ? offset
-    : getPickerDate(wallClockParts).getTimezoneOffset();
+  if (typeof offset === "number" && Number.isInteger(offset) && Math.abs(offset) <= 840) {
+    return {
+      timestamp: getTimestampFromEntryLocalDateParts(wallClockParts, offset),
+      utcOffsetMinutes: offset,
+    };
+  }
+
+  const deviceDate = getPickerDate(wallClockParts);
+  return {
+    timestamp: deviceDate.getTime(),
+    utcOffsetMinutes: deviceDate.getTimezoneOffset(),
+  };
 }
 
 export const DateTimePickerModal: React.FC<Props> = ({
@@ -159,17 +169,19 @@ export const DateTimePickerModal: React.FC<Props> = ({
     const hasChanged = !originalParts || !sameWallClock(wallClockParts, originalParts);
     if (!hasChanged) return;
 
-    const editableOffset = getEditableOffset(mood, wallClockParts);
-    const newTimestamp = getTimestampFromEntryLocalDateParts(wallClockParts, editableOffset);
-    const newOffset = editableOffset;
+    const { timestamp: newTimestamp, utcOffsetMinutes: newOffset } =
+      getEditableDate(mood, wallClockParts);
 
     try {
       setSaving(true);
       setShowDatePicker(false);
       setShowTimePicker(false);
-      await onSave(mood.id, newTimestamp, newOffset);
-      haptics.commit();
-      onClose();
+      await commitThenRunPostCommitEffects(
+        async () => {
+          await onSave(mood.id, newTimestamp, newOffset);
+        },
+        [() => haptics.commit(), onClose],
+      );
     } catch {
       haptics.reject();
       Alert.alert("Error", "Could not update this entry's date and time.");
