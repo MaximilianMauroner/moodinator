@@ -23,7 +23,7 @@
     "qa:fixtures": "node scripts/generate-qa-fixtures.js",
     "release:internal": "node scripts/nightly-release.mjs run",
     "release:status": "node scripts/nightly-release.mjs status",
-    "test:nightly": "node --test tests/*.node-test.mjs && python3 tests/nightly-ledger.test.py",
+    "test:nightly": "node --test tests/release-environment.test.mjs tests/*.node-test.mjs && python3 tests/nightly-ledger.test.py",
     "verify:color-tokens": "node scripts/check-color-tokens.mjs"
   },
   "dependencies": {
