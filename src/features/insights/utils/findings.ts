@@ -161,7 +161,7 @@ function explainSilence(
 ): Finding {
   const shortfall = analysis.shortfalls[0];
   const overlapping = analysis.inconclusive.length + inconclusiveSlots;
-  const sample = `${entryCount} entries in this period`;
+  const sample = `${entryCount} entr${entryCount === 1 ? "y" : "ies"} in this period`;
 
   if (shortfall) {
     return {
