@@ -58,7 +58,11 @@ export interface MoodServiceInterface {
 
   // Note & timestamp updates
   updateNote: (id: number, note: string) => Promise<MoodEntry | undefined>;
-  updateTimestamp: (id: number, timestamp: number) => Promise<MoodEntry | undefined>;
+  updateTimestamp: (
+    id: number,
+    timestamp: number,
+    utcOffsetMinutes?: number | null,
+  ) => Promise<MoodEntry | undefined>;
 
   // Emotion management in moods
   updateEmotionCategory: (
@@ -156,9 +160,10 @@ export const moodService: MoodServiceInterface = {
 
   async updateTimestamp(
     id: number,
-    timestamp: number
+    timestamp: number,
+    utcOffsetMinutes?: number | null,
   ): Promise<MoodEntry | undefined> {
-    return updateMoodTimestamp(id, timestamp);
+    return updateMoodTimestamp(id, timestamp, utcOffsetMinutes);
   },
 
   async updateEmotionCategory(

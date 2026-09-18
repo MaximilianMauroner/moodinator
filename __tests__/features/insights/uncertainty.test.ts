@@ -249,6 +249,18 @@ describe("findings copy", () => {
     expect(result).toHaveLength(1);
     expect(result[0].text).toContain("5 entries in each group");
   });
+
+  it("uses singular wording for one entry and plural wording otherwise", () => {
+    expect(findings(drivers([]), rhythm([]), 0)[0].sample).toBe(
+      "0 entries in this period",
+    );
+    expect(findings(drivers([]), rhythm([]), 1)[0].sample).toBe(
+      "1 entry in this period",
+    );
+    expect(findings(drivers([]), rhythm([]), 2)[0].sample).toBe(
+      "2 entries in this period",
+    );
+  });
 });
 
 /**

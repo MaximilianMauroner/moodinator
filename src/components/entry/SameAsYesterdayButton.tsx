@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   Pressable,
   Text,
@@ -53,8 +53,10 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
   const { width: windowWidth } = useWindowDimensions();
   const [loading, setLoading] = useState(false);
   const [noEntry, setNoEntry] = useState(false);
+  const [readError, setReadError] = useState(false);
   const [previewEntry, setPreviewEntry] = useState<MoodEntry | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const longPressTriggeredRef = useRef(false);
 
   // Reanimated shared values for preview modal
   const overlayOpacity = useSharedValue(0);
@@ -79,17 +81,26 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
     [windowWidth]
   );
 
-  const fetchLastEntry = async (): Promise<MoodEntry | null> => {
-    try {
-      return await moodService.getLastEntry();
-    } catch {
-      return null;
-    }
+  const fetchLastEntry = async (): Promise<MoodEntry | null> => moodService.getLastEntry();
+
+  const showNoPreviousEntry = () => {
+    setNoEntry(true);
+    haptics.reject();
+    setTimeout(() => {
+      setNoEntry(false);
+      longPressTriggeredRef.current = false;
+    }, 3000);
   };
 
   const handlePress = async () => {
+    if (longPressTriggeredRef.current) {
+      longPressTriggeredRef.current = false;
+      return;
+    }
+
     setLoading(true);
     setNoEntry(false);
+    setReadError(false);
 
     try {
       const lastEntry = await fetchLastEntry();
@@ -98,11 +109,10 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
         onCopy(lastEntry);
         haptics.commit();
       } else {
-        setNoEntry(true);
-        haptics.reject();
-        setTimeout(() => setNoEntry(false), 3000);
+        showNoPreviousEntry();
       }
     } catch {
+      setReadError(true);
       haptics.reject();
     } finally {
       setLoading(false);
@@ -110,8 +120,11 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
   };
 
   const handleLongPress = async () => {
+    longPressTriggeredRef.current = true;
     haptics.tap();
     setLoading(true);
+    setNoEntry(false);
+    setReadError(false);
 
     try {
       const lastEntry = await fetchLastEntry();
@@ -123,18 +136,23 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
         cardScale.value = withSpring(1, { damping: 18, stiffness: 300 });
         cardOpacity.value = withTiming(1, { duration: 220, easing: Easing.out(Easing.cubic) });
       } else {
-        setNoEntry(true);
-        haptics.reject();
-        setTimeout(() => setNoEntry(false), 3000);
+        showNoPreviousEntry();
       }
     } catch {
+      setReadError(true);
       haptics.reject();
     } finally {
       setLoading(false);
     }
   };
 
+  const handleRetry = () => {
+    longPressTriggeredRef.current = false;
+    void handlePress();
+  };
+
   const handleClosePreview = () => {
+    longPressTriggeredRef.current = false;
     overlayOpacity.value = withTiming(0, { duration: 160, easing: Easing.in(Easing.cubic) });
     cardScale.value = withTiming(0.93, { duration: 150, easing: Easing.in(Easing.cubic) });
     cardOpacity.value = withTiming(0, { duration: 150, easing: Easing.in(Easing.cubic) });
@@ -161,6 +179,37 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
     return getMoodRatingDisplay(moodValue, isDark, sourceScale);
   };
 
+  if (readError) {
+    return (
+      <Pressable
+        onPress={handleRetry}
+        disabled={loading}
+        className="flex-row items-center px-3 py-2 rounded-xl"
+        style={{
+          backgroundColor: isDark ? colors.sand.bgHover.dark : colors.sand.bg.light,
+          opacity: loading ? 0.6 : 1,
+        }}
+        accessibilityRole="button"
+        accessibilityLabel="Retry copying last entry"
+        accessibilityHint="The previous entry could not be loaded. Tap to try again."
+        accessibilityState={{ disabled: loading }}
+      >
+        <Ionicons
+          name="refresh-outline"
+          size={14}
+          color={get("textMuted")}
+          style={{ marginRight: 5 }}
+        />
+        <Text
+          className="text-[11px] font-medium"
+          style={{ color: get("textMuted") }}
+        >
+          Could not load last entry · Retry
+        </Text>
+      </Pressable>
+    );
+  }
+
   if (noEntry) {
     return (
       <Pressable
@@ -170,6 +219,10 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
           backgroundColor: isDark ? colors.sand.bgHover.dark : colors.sand.bg.light,
           opacity: 0.5,
         }}
+        accessibilityRole="button"
+        accessibilityLabel="Copy last entry"
+        accessibilityHint="No previous entry is available"
+        accessibilityState={{ disabled: true }}
       >
         <Ionicons
           name="document-outline"
@@ -206,6 +259,10 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
           shadowRadius: 4,
           elevation: 2,
         }}
+        accessibilityRole="button"
+        accessibilityLabel="Copy last entry"
+        accessibilityHint="Tap to copy the previous entry into this draft. Long press to preview it."
+        accessibilityState={{ disabled: loading }}
       >
         {loading ? (
           <ActivityIndicator size="small" color={get("primary")} />
@@ -221,7 +278,7 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
               className="text-[11px] font-bold tracking-wide"
               style={{ color: isDark ? get("primary") : colors.positive.textDark.light }}
             >
-              LAST ENTRY
+              Copy last entry
             </Text>
           </>
         )}
@@ -304,6 +361,8 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
                         onPress={handleClosePreview}
                         className="w-8 h-8 rounded-full items-center justify-center"
                         style={{ backgroundColor: isDark ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.5)" }}
+                        accessibilityRole="button"
+                        accessibilityLabel="Close preview"
                       >
                         <Ionicons
                           name="close"
@@ -452,6 +511,8 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
                         borderWidth: 1,
                         borderColor: isDark ? "rgba(61, 53, 42, 0.5)" : "rgba(229, 217, 191, 0.6)",
                       }}
+                      accessibilityRole="button"
+                      accessibilityLabel="Cancel preview"
                     >
                       <Text
                         className="text-sm font-semibold"
@@ -471,6 +532,9 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
                         shadowRadius: 4,
                         elevation: 3,
                       }}
+                      accessibilityRole="button"
+                      accessibilityLabel="Use this entry"
+                      accessibilityHint="Copy this entry into the current draft"
                     >
                       <Ionicons name="copy" size={14} color={get("onPrimary")} style={{ marginRight: 6 }} />
                       <Text className="text-sm font-semibold" style={{ color: get("onPrimary") }}>

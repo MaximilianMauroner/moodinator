@@ -23,6 +23,14 @@ fabricated data only.
 ## Declaration reference
 
 - Health apps: Mental and behavioral health; personal wellness only.
+- Policy scope for the current product: personal mood journaling and
+  descriptive self-reflection. The app does not diagnose, treat, cure, or
+  prevent a medical condition and must not be presented as a medical device.
+  Recheck the current Health apps declaration against the shipped candidate;
+  this repository text does not establish current Play Console state. See
+  [Google Play health-related functionality](https://support.google.com/googleplay/android-developer/answer/16679511?hl=en-GB),
+  [health declarations](https://support.google.com/googleplay/android-developer/answer/14738291?hl=en),
+  and [health app policy](https://support.google.com/googleplay/android-developer/answer/13996367?hl=en).
 - Ads, Advertising ID, government, and financial features: None.
 - IARC: ESRB E10+ (Violent References), PEGI 3, and USK 6+. Bundled
   self-harm/crisis-support text was disclosed in the questionnaire.
@@ -104,8 +112,8 @@ and backups.
 
 - `assets/store/google-play/icon-512.png`: 512×512 32-bit RGBA PNG store icon.
 - `assets/store/google-play/feature-graphic-1024x500.png`: 1024×500 PNG feature graphic draft; human visual approval required.
-- `assets/store/google-play/screenshots/01-home.png` through `04-quick-entry.png`: 1080×2160 24-bit RGB portrait phone screenshots from a release QA build with fabricated data. Recapture from the final audited release candidate if its UI differs.
-- `assets/store/google-play/screenshots/05-history-insights.png`: 1080×2160 24-bit RGB populated Findings screenshot captured on the `moodqa` Android 35 AVD from a locally signed universal APK generated from the audited production AAB version code 34. Its 100 entries came from the repository's synthetic QA fixture generator.
+- Historical screenshot inventory (not a current candidate): `assets/store/google-play/screenshots/01-home.png` through `04-quick-entry.png` are 1080×2160 24-bit RGB portrait phone screenshots from an older release QA build with fabricated data.
+- Historical screenshot inventory (not a current candidate): `assets/store/google-play/screenshots/05-history-insights.png` was captured on the `moodqa` Android 35 AVD from a locally signed universal APK generated from production AAB version code 34. Its 100 entries came from the repository's synthetic QA fixture generator. Recapture all screenshots from the exact audited candidate before submission.
 
 ## Screenshot order and captions
 

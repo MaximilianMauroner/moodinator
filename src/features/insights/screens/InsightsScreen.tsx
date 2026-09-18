@@ -152,7 +152,7 @@ export function InsightsScreen() {
               {analysisRange === "all"
                 ? "All history"
                 : `Last ${analysisRange} days`}{" "}
-              · {analysisMoods.length} entries
+              · {analysisMoods.length} {analysisMoods.length === 1 ? "entry" : "entries"}
             </Text>
           </>
         )}

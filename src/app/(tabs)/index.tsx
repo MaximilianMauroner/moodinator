@@ -50,6 +50,12 @@ import {
 } from "@/hooks/useHomeHeaderCollapse";
 import { haptics } from "@/lib/haptics";
 import { addHomeTabDoublePressListener } from "@/lib/homeTabEvents";
+import {
+  commitThenRunPostCommitEffects,
+  getMoodEntryPersistenceValues,
+  updateMoodEntryOrThrow,
+  updateMoodTimestampOrThrow,
+} from "@/lib/moodEntryPersistence";
 
 import type { MoodEntry } from "@db/types";
 import { getThemedColor } from "@/constants/colors";
@@ -105,23 +111,25 @@ function HomeScreenContent() {
   const handleEditEntrySave = useCallback(
     async (values: MoodEntryFormValues) => {
       if (!modals.editingEntry) return;
-      await updateMood(modals.editingEntry.id, {
-        mood: values.mood,
-        note: values.note ? values.note : null,
-        emotions: values.emotions,
-        contextTags: values.contextTags,
-        energy: values.energy,
-      });
+      await updateMoodEntryOrThrow(
+        updateMood,
+        modals.editingEntry.id,
+        values,
+      );
     },
     [modals.editingEntry, updateMood]
   );
 
   const handleDateTimeSave = useCallback(
-    async (moodId: number, newTimestamp: number) => {
-      await updateMoodTimestamp(moodId, newTimestamp);
-      modals.closeDateModal();
+    async (moodId: number, newTimestamp: number, utcOffsetMinutes?: number | null) => {
+      await updateMoodTimestampOrThrow(
+        updateMoodTimestamp,
+        moodId,
+        newTimestamp,
+        utcOffsetMinutes,
+      );
     },
-    [modals, updateMoodTimestamp]
+    [updateMoodTimestamp]
   );
 
   const handleMoodItemLongPress = useCallback(
@@ -190,16 +198,10 @@ function HomeScreenContent() {
   );
 
   const handleEntrySave = useCallback(async (values: MoodEntryFormValues) => {
-    await createMood({
-      mood: values.mood,
-      note: values.note || null,
-      emotions: values.emotions,
-      contextTags: values.contextTags,
-      energy: values.energy,
-    });
-
-    scrollHomeListToTop();
-    schedulePostSaveTopResets();
+    await commitThenRunPostCommitEffects(
+      () => createMood(getMoodEntryPersistenceValues(values)),
+      [scrollHomeListToTop, schedulePostSaveTopResets],
+    );
   }, [createMood, schedulePostSaveTopResets, scrollHomeListToTop]);
 
   const handleJumpToTopPress = useCallback(() => {

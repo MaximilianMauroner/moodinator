@@ -4,6 +4,73 @@ Run the Maestro flow on a disposable Android emulator and record the result in
 the task tracker. Passing unit tests or parsing YAML does not verify native
 layout, gestures, haptic strength, or frame timing.
 
+## Historical smoke record (old head only)
+
+On Android 15 / API 35 emulator `emulator-5554` (QA emulator record `491382`),
+the provisional QA APK built from old head
+`6dbb79465e6e2cdaceb6d13b3631a1d4d4f8f5d5` passed the synthetic-data smoke
+journey without a crash: all four onboarding pages, quick save, edit note,
+relaunch with persistence, delete, and empty plus filled Insights. APK
+SHA-256: `2c84c16dcebe1d7e61f4182c6f9979c325ea7aa0ec84b69864370bd05c18b3e6`.
+Evidence folder: `/tmp/moodinator-native-smoke-20260917T184657Z`. The emulator
+was safely stopped. This is historical evidence and is not verification of the
+current PR head.
+
+Two observations remain unconfirmed on the current head and need bounded
+scroll/touch/layout checks: possible lower-energy-chip/footer overlap, and
+transient empty-card text not visible in the first screenshot. No screenshot
+URL is asserted here.
+
+## Recording-trust acceptance matrix
+
+This matrix separates source and test evidence from native proof. A passing
+static check does not establish that a new user understood the action or that a
+native control remained reachable.
+
+| First-use journey | Source/test expectation | Native candidate evidence still required |
+| --- | --- | --- |
+| Clean install and purpose | Onboarding explains private mood journaling, the 0–10 scale (0 best, 10 worst), quick versus detailed entry, local-only limits, and the next action. | Fresh install reaches Home after onboarding; a newcomer can identify the first mood action without developer terminology. |
+| First quick entry | One mood is sufficient; the awaited create callback is the persistence boundary; success acknowledgement appears only after commit. | Tap one mood, save, observe one neutral acknowledgement and one history row; cancel and rejected writes produce no false success. |
+| Detailed entry | Emotions, context, energy, and notes remain optional/configurable; keyboard and draft-discard behavior are covered by source/tests. | Long-press opens the detailed form; notes remain reachable with the keyboard; save/reject/cancel preserve the correct draft. |
+| Recorded time | History, accessibility, detail, calendar, and related toasts use the recorded offset; original timestamps are not rewritten. | Verify cross-midnight positive, negative, and half-hour offsets, change device timezone, and confirm the displayed day/time stays stable. |
+| Read/edit/delete | History actions edit, change date/time, delete, and undo through the mood service/store. | Edit persists after restart; date/time changes are intentional; delete removes one row and Undo restores the same data. |
+| Insights | Zero, one, and multiple records have no-data/insufficient-sample states; findings describe associations, not causes. | Check Findings, Charts, Calendar, ranges, refresh, and populated fixtures on a clean QA install. |
+| Settings and portability | Presets affect the next entry; JSON import replacement is confirmed; export, backup, deletion, and external-copy limits are disclosed. | Verify preset application, malformed import recovery, selected Android backup folder, manual backup, deletion scope, restart, and offline use. |
+| Protection and reminders | Optional app lock, biometrics, and local reminders are separate existing functionality. | Verify PIN/biometric recovery and reminder delivery after restart on the exact candidate; physical-device notification behavior remains separate. |
+
+## Evidence boundary and remaining runtime inventory
+
+Current source/test evidence covers the service/store persistence workflow,
+canonical timezone calculations, entry draft behavior, filters, Insights
+analysis, and error paths. Native proof must still cover the complete matrix
+above plus narrow screens, large system text, light/dark themes, reduced motion,
+accessibility labels, touch-target edges, and rapid repeated taps. In
+particular, verify the Home mood selector, Last Entry copy/preview gesture,
+history swipe actions, action menus, date/time editor, calendar day details,
+app-lock recovery, notifications after process restart, JSON/CSV sharing,
+Android folder permissions, backup retention, delete-data boundaries, and
+offline/restart recovery. Maestro is optional; if unavailable, retain adb
+hierarchy and screenshot evidence instead.
+
+## Exact current-candidate requirements
+
+The candidate must identify the exact source SHA and build configuration. It
+must use the isolated QA package `com.lab4code.moodinator.qa` for destructive
+fixtures, and the release package `com.lab4code.moodinator` only for a separate
+owner-approved release check. Confirm version name/code, target API 36, merged
+release manifest, generated permissions, and the absence of debug-only paths.
+Run `bun run verify:android-release-manifest` against the generated candidate,
+retain the package checksum and screenshots beside the candidate evidence, and
+never call historical APKs or screenshots current. Use fabricated data only;
+do not install into a device containing personal Moodinator data.
+
+The Android database remains unencrypted by Moodinator and JSON/CSV
+exports/backups remain plaintext. This slice does not redesign encryption,
+backup, or deletion semantics. Play-facing copy must continue to describe
+personal wellness journaling and descriptive self-reflection only: no
+diagnosis, treatment, medical-device, causal-insight, monitoring, guaranteed
+backup, or emergency-response claims.
+
 ## Isolated Android setup
 
 Use the separate `com.lab4code.moodinator.qa` app on a disposable emulator. The

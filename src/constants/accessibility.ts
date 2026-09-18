@@ -50,18 +50,10 @@ export const TAB_ACCESSIBILITY_LABELS = {
 export function getMoodItemLabel(
   moodValue: number,
   moodLabel: string,
-  timestamp: Date
+  dateLabel: string,
+  timeLabel: string,
 ): string {
-  const timeStr = timestamp.toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-  const dateStr = timestamp.toLocaleDateString([], {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
-  return `Mood entry: ${moodLabel} (${moodValue}), logged on ${dateStr} at ${timeStr}`;
+  return `Mood entry: ${moodLabel} (${moodValue}), logged on ${dateLabel} at ${timeLabel}`;
 }
 
 /**

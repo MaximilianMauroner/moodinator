@@ -56,6 +56,7 @@ export function useMoodModals() {
             contextTags: editingEntry.contextTags,
             energy: editingEntry.energy,
             note: editingEntry.note ?? "",
+            basedOnEntryId: editingEntry.basedOnEntryId,
           }
         : undefined,
     [editingEntry]

@@ -18,6 +18,7 @@ export function dailySeries(
   const buckets = new Map<string, number[]>();
   for (const entry of entries) {
     const key = getEntryLocalDayKey(entry);
+    if (!key) continue;
     const values = buckets.get(key) ?? [];
     values.push(getInterpretedMoodRating(entry));
     buckets.set(key, values);

@@ -4,8 +4,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Emotion } from "@db/types";
 import { EmotionPicker } from "@/components/entry/EmotionPicker";
 import { EnergySlider } from "@/components/entry/EnergySlider";
-import { QuickMoodEntryModal } from "@/components/MoodEntryModal";
+import {
+  DetailedMoodEntryModal,
+  EditMoodEntryModal,
+  QuickMoodEntryModal,
+  type MoodEntryFormValues,
+} from "@/components/MoodEntryModal";
 import { setHapticsEnabled } from "@/lib/haptics";
+import { updateMoodEntryOrThrow } from "@/lib/moodEntryPersistence";
+import { createMoodEntryWorkflow } from "@/services/moodEntryWorkflow";
 
 const nativePlatform = vi.hoisted(() => ({ OS: "ios", Version: 18 }));
 const nativeFeedback = vi.hoisted(() => ({
@@ -13,11 +20,23 @@ const nativeFeedback = vi.hoisted(() => ({
   performAndroidHapticsAsync: vi.fn(async () => {}),
   impactAsync: vi.fn(async () => {}),
 }));
+const entryFeedback = vi.hoisted(() => ({
+  alert: vi.fn(),
+  crisisSupport: vi.fn(),
+  toastSuccess: vi.fn(),
+}));
 
 vi.mock("expo-haptics", () => ({
   ...nativeFeedback,
   ImpactFeedbackStyle: { Light: "light" },
-  AndroidHaptics: { Gesture_End: "gesture-end", Context_Click: "context-click" },
+  NotificationFeedbackType: { Success: "success", Warning: "warning" },
+  AndroidHaptics: {
+    Gesture_End: "gesture-end",
+    Context_Click: "context-click",
+    Confirm: "confirm",
+    Reject: "reject",
+    Long_Press: "long-press",
+  },
 }));
 vi.mock("react-native", () => ({
   Modal: "Modal",
@@ -39,8 +58,11 @@ vi.mock("react-native", () => ({
 vi.mock("react-native-pager-view", () => ({ default: "PagerView" }));
 vi.mock("@react-navigation/elements", () => ({ PlatformPressable: "Pressable" }));
 vi.mock("@/components/entry", () => ({ SameAsYesterdayButton: () => null }));
-vi.mock("@/components/ui/AppAlert", () => ({ Alert: { alert: vi.fn() } }));
-vi.mock("@/lib/showCrisisSupportAlert", () => ({ showCrisisSupportAlert: vi.fn() }));
+vi.mock("@/components/ui/AppAlert", () => ({ Alert: { alert: entryFeedback.alert } }));
+vi.mock("@/lib/showCrisisSupportAlert", () => ({ showCrisisSupportAlert: entryFeedback.crisisSupport }));
+vi.mock("@/services/toastService", () => ({
+  toastService: { success: entryFeedback.toastSuccess },
+}));
 vi.mock("@expo/vector-icons", () => ({ Ionicons: "Ionicons" }));
 vi.mock("react-native-reanimated", async () => {
   const { useRef } = await import("react");
@@ -176,6 +198,41 @@ function EntryModal() {
   );
 }
 
+type SaveVariant = "quick" | "detailed" | "edit";
+
+function SaveEntryModal({
+  variant,
+  mood = 4,
+  fieldConfig = { emotions: false, context: false, energy: false, notes: false },
+  onClose,
+  onSubmit,
+}: {
+  variant: SaveVariant;
+  mood?: number;
+  fieldConfig?: { emotions: boolean; context: boolean; energy: boolean; notes: boolean };
+  onClose: () => void;
+  onSubmit: (values: MoodEntryFormValues) => Promise<void>;
+}) {
+  const Modal = variant === "edit"
+    ? EditMoodEntryModal
+    : variant === "detailed"
+      ? DetailedMoodEntryModal
+      : QuickMoodEntryModal;
+
+  return (
+    <Modal
+      visible
+      initialMood={mood}
+      emotionOptions={options}
+      contextOptions={["Work", "Family"]}
+      fieldConfig={fieldConfig}
+      onClose={onClose}
+      onSubmit={onSubmit}
+      onCreateEmotion={() => null}
+    />
+  );
+}
+
 function labeledButton(accessibilityLabel: string) {
   return renderer.root.findByProps({ accessibilityLabel });
 }
@@ -219,5 +276,215 @@ describe.each(["android", "ios"])("entry modal feedback on %s", (platform) => {
     await pressLabel("Neutral emotion category");
     expect(labeledButton("Neutral emotion category").props.accessibilityState.selected).toBe(true);
     expect(nativeFeedback.selectionAsync).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("entry save acknowledgement", () => {
+  it.each([
+    ["quick", "Entry saved"],
+    ["detailed", "Entry saved"],
+    ["edit", "Entry updated"],
+  ] as const)("announces one committed %s result", async (variant, expectedTitle) => {
+    const onClose = vi.fn();
+    const onSubmit = vi.fn(async () => {});
+    await render(
+      <SaveEntryModal
+        variant={variant}
+        onClose={onClose}
+        onSubmit={onSubmit}
+      />,
+    );
+
+    await act(async () => {
+      renderer.root.findByProps({ accessibilityLabel: "Save entry" }).props.onPress();
+      await Promise.resolve();
+    });
+
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(entryFeedback.toastSuccess).toHaveBeenCalledTimes(1);
+    expect(entryFeedback.toastSuccess).toHaveBeenCalledWith(expectedTitle);
+  });
+
+  it("does not duplicate a pending write on rapid taps", async () => {
+    let resolveSubmit!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      resolveSubmit = resolve;
+    });
+    const onSubmit = vi.fn(() => pending);
+    const onClose = vi.fn();
+    await render(
+      <SaveEntryModal variant="quick" onClose={onClose} onSubmit={onSubmit} />,
+    );
+
+    await act(async () => {
+      const save = renderer.root.findByProps({ accessibilityLabel: "Save entry" });
+      save.props.onPress();
+      save.props.onPress();
+      await Promise.resolve();
+    });
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(entryFeedback.toastSuccess).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveSubmit();
+      await pending;
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(entryFeedback.toastSuccess).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the draft and reports a rejected persistence callback", async () => {
+    const onClose = vi.fn();
+    const onSubmit = vi.fn(async () => {
+      throw new Error("storage rejected");
+    });
+    await render(
+      <SaveEntryModal
+        variant="quick"
+        fieldConfig={{ emotions: false, context: false, energy: false, notes: true }}
+        onClose={onClose}
+        onSubmit={onSubmit}
+      />,
+    );
+
+    const notes = renderer.root.findByProps({ testID: "entry-notes" });
+    await act(async () => notes.props.onChangeText("private draft"));
+    await act(async () => {
+      renderer.root.findByProps({ accessibilityLabel: "Save entry" }).props.onPress();
+      await Promise.resolve();
+    });
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(entryFeedback.toastSuccess).not.toHaveBeenCalled();
+    expect(entryFeedback.alert).toHaveBeenCalledWith(
+      "Save failed",
+      "Unable to save your entry. Please try again.",
+    );
+    expect(renderer.root.findByProps({ testID: "entry-notes" }).props.value).toBe("private draft");
+  });
+
+  it("does not turn a throwing success toast into a retryable save", async () => {
+    const onClose = vi.fn();
+    const onSubmit = vi.fn(async () => {});
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    entryFeedback.toastSuccess.mockImplementationOnce(() => {
+      throw new Error("toast unavailable");
+    });
+
+    try {
+      await render(<SaveEntryModal variant="quick" onClose={onClose} onSubmit={onSubmit} />);
+      await act(async () => {
+        renderer.root.findByProps({ accessibilityLabel: "Save entry" }).props.onPress();
+        await Promise.resolve();
+      });
+      await act(async () => {
+        renderer.root.findByProps({ accessibilityLabel: "Saving" }).props.onPress();
+        await Promise.resolve();
+      });
+
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(entryFeedback.toastSuccess).toHaveBeenCalledTimes(1);
+      expect(entryFeedback.alert).not.toHaveBeenCalledWith(
+        "Save failed",
+        "Unable to save your entry. Please try again.",
+      );
+    } finally {
+      consoleSpy.mockRestore();
+    }
+  });
+
+  it("does not retry a committed write when closing the modal throws", async () => {
+    const onClose = vi.fn(() => {
+      throw new Error("close unavailable");
+    });
+    const onSubmit = vi.fn(async () => {});
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      await render(<SaveEntryModal variant="quick" onClose={onClose} onSubmit={onSubmit} />);
+      await act(async () => {
+        renderer.root.findByProps({ accessibilityLabel: "Save entry" }).props.onPress();
+        await Promise.resolve();
+      });
+      await act(async () => {
+        renderer.root.findByProps({ accessibilityLabel: "Saving" }).props.onPress();
+        await Promise.resolve();
+      });
+
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(entryFeedback.toastSuccess).toHaveBeenCalledTimes(1);
+      expect(entryFeedback.alert).not.toHaveBeenCalledWith(
+        "Save failed",
+        "Unable to save your entry. Please try again.",
+      );
+    } finally {
+      consoleSpy.mockRestore();
+    }
+  });
+
+  it("keeps a disappeared edit open through the real workflow callback", async () => {
+    const update = vi.fn(async () => undefined);
+    const workflow = createMoodEntryWorkflow(
+      {
+        create: vi.fn(),
+        update,
+        delete: vi.fn(),
+        updateTimestamp: vi.fn(),
+      },
+      {
+        getMoods: () => [],
+        applyMutation: vi.fn(),
+      },
+    );
+    const onClose = vi.fn();
+    await render(
+      <SaveEntryModal
+        variant="edit"
+        onClose={onClose}
+        onSubmit={(values) => updateMoodEntryOrThrow(workflow.update, 42, values)}
+      />,
+    );
+
+    await act(async () => {
+      renderer.root.findByProps({ accessibilityLabel: "Save entry" }).props.onPress();
+      await Promise.resolve();
+    });
+
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(entryFeedback.toastSuccess).not.toHaveBeenCalled();
+    expect(entryFeedback.alert).toHaveBeenCalledWith(
+      "Save failed",
+      "Unable to save your entry. Please try again.",
+    );
+  });
+
+  it("keeps crisis support primary after a successful high-distress write", async () => {
+    vi.useFakeTimers();
+    try {
+      const onClose = vi.fn();
+      const onSubmit = vi.fn(async () => {});
+      await render(
+        <SaveEntryModal variant="quick" mood={9} onClose={onClose} onSubmit={onSubmit} />,
+      );
+
+      await act(async () => {
+        renderer.root.findByProps({ accessibilityLabel: "Save entry" }).props.onPress();
+        await Promise.resolve();
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(250);
+      });
+
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(entryFeedback.toastSuccess).not.toHaveBeenCalled();
+      expect(entryFeedback.crisisSupport).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -39,8 +39,10 @@ export function rhythm(entries: MoodEntry[]): RhythmCell[] {
       continue;
     }
     const hour = getEntryLocalHour(entry);
+    const weekday = getEntryLocalWeekday(entry);
+    if (hour === null || weekday === null) continue;
     const part = hour < 12 ? 0 : hour < 17 ? 1 : hour < 22 ? 2 : 3;
-    const cell = cells[part * 7 + ((getEntryLocalWeekday(entry) + 6) % 7)];
+    const cell = cells[part * 7 + ((weekday + 6) % 7)];
     addToGroup(cell.stats, getInterpretedMoodRating(entry));
   }
   return cells.map((cell) => ({

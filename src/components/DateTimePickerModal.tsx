@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import { View, Text, Modal, Pressable, Platform, ScrollView } from "react-native";
 import DateTimePicker, {
   type DateTimePickerEvent,
@@ -10,13 +10,76 @@ import { getMoodRatingDisplay } from "@/constants/moodScaleInterpretation";
 import { useThemeColors, colors } from "@/constants/colors";
 import { haptics } from "@/lib/haptics";
 import { Alert } from "@/components/ui/AppAlert";
+import { commitThenRunPostCommitEffects } from "@/lib/moodEntryPersistence";
+import {
+  getEntryLocalDateParts,
+  getTimestampFromEntryLocalDateParts,
+  type EntryLocalDateParts,
+} from "@/lib/entryTimezone";
 
 interface Props {
   visible: boolean;
   mood: MoodEntry | null;
   onClose: () => void;
-  onSave: (moodId: number, newTimestamp: number) => Promise<void> | void;
+  onSave: (
+    moodId: number,
+    newTimestamp: number,
+    utcOffsetMinutes?: number | null,
+  ) => Promise<void> | void;
   onEdit?: (mood: MoodEntry) => void;
+}
+
+function getPickerDate(parts: EntryLocalDateParts): Date {
+  const date = new Date(0);
+  date.setFullYear(parts.year, parts.month, parts.day);
+  date.setHours(parts.hour, parts.minute, parts.second, parts.millisecond);
+  return date;
+}
+
+function getDeviceDateParts(date: Date): EntryLocalDateParts {
+  return {
+    year: date.getFullYear(),
+    month: date.getMonth(),
+    day: date.getDate(),
+    hour: date.getHours(),
+    minute: date.getMinutes(),
+    second: date.getSeconds(),
+    millisecond: date.getMilliseconds(),
+  };
+}
+
+function sameWallClock(
+  left: EntryLocalDateParts,
+  right: EntryLocalDateParts,
+): boolean {
+  return (
+    left.year === right.year &&
+    left.month === right.month &&
+    left.day === right.day &&
+    left.hour === right.hour &&
+    left.minute === right.minute &&
+    left.second === right.second &&
+    left.millisecond === right.millisecond
+  );
+}
+
+function getEditableDate(
+  mood: MoodEntry,
+  wallClockParts: EntryLocalDateParts,
+): { timestamp: number; utcOffsetMinutes: number } {
+  const offset = mood.utcOffsetMinutes;
+  if (typeof offset === "number" && Number.isInteger(offset) && Math.abs(offset) <= 840) {
+    return {
+      timestamp: getTimestampFromEntryLocalDateParts(wallClockParts, offset),
+      utcOffsetMinutes: offset,
+    };
+  }
+
+  const deviceDate = getPickerDate(wallClockParts);
+  return {
+    timestamp: deviceDate.getTime(),
+    utcOffsetMinutes: deviceDate.getTimezoneOffset(),
+  };
 }
 
 export const DateTimePickerModal: React.FC<Props> = ({
@@ -27,16 +90,40 @@ export const DateTimePickerModal: React.FC<Props> = ({
   onEdit,
 }) => {
   const { isDark, get, getCategoryColors } = useThemeColors();
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [wallClockParts, setWallClockParts] = useState<EntryLocalDateParts | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveConsumed, setSaveConsumed] = useState(false);
+  const saveStateRef = useRef<"idle" | "saving" | "committed">("idle");
+  const dateModalSessionRef = useRef<{ active: boolean; moodId: number | null }>({
+    active: false,
+    moodId: null,
+  });
 
   React.useEffect(() => {
-    if (mood) {
-      setSelectedDate(new Date(mood.timestamp));
+    if (!visible) {
+      dateModalSessionRef.current = { active: false, moodId: null };
+      return;
     }
-  }, [mood]);
+
+    if (!mood) return;
+
+    const session = dateModalSessionRef.current;
+    if (session.active && session.moodId === mood.id) return;
+
+    dateModalSessionRef.current = { active: true, moodId: mood.id };
+    saveStateRef.current = "idle";
+    setSaveConsumed(false);
+    setSaving(false);
+    setShowDatePicker(false);
+    setShowTimePicker(false);
+
+    const parts = getEntryLocalDateParts(mood);
+    setWallClockParts(parts);
+    setSelectedDate(parts ? getPickerDate(parts) : null);
+  }, [mood, visible]);
 
   const moodData = useMemo(() => {
     if (!mood) return null;
@@ -55,40 +142,72 @@ export const DateTimePickerModal: React.FC<Props> = ({
       : [];
   }, [mood?.emotions]);
 
-  const handleDateChange = (_event: DateTimePickerEvent, date?: Date) => {
+  const handleDateChange = (event: DateTimePickerEvent, date?: Date) => {
     if (saving) return;
     if (Platform.OS === "android") {
       setShowDatePicker(false);
     }
-    if (date) {
-      setSelectedDate(date);
+    if (event.type === "set" && date) {
+      const current = wallClockParts ?? getDeviceDateParts(date);
+      const next = {
+        ...current,
+        year: date.getFullYear(),
+        month: date.getMonth(),
+        day: date.getDate(),
+      };
+      setWallClockParts(next);
+      setSelectedDate(getPickerDate(next));
     }
   };
 
-  const handleTimeChange = (_event: DateTimePickerEvent, time?: Date) => {
+  const handleTimeChange = (event: DateTimePickerEvent, time?: Date) => {
     if (saving) return;
     if (Platform.OS === "android") {
       setShowTimePicker(false);
     }
-    if (time) {
-      const newDateTime = new Date(selectedDate);
-      newDateTime.setHours(time.getHours());
-      newDateTime.setMinutes(time.getMinutes());
-      setSelectedDate(newDateTime);
+    if (event.type === "set" && time) {
+      const current = wallClockParts ?? getDeviceDateParts(time);
+      const next = {
+        ...current,
+        hour: time.getHours(),
+        minute: time.getMinutes(),
+        second: current.second,
+        millisecond: current.millisecond,
+      };
+      setWallClockParts(next);
+      setSelectedDate(getPickerDate(next));
     }
   };
 
   const handleSave = async () => {
-    if (!mood || saving) return;
+    if (!mood || saving || saveStateRef.current !== "idle") return;
+    if (!wallClockParts) {
+      Alert.alert("Date and time needed", "Choose a date and time before saving this entry.");
+      return;
+    }
 
+    const originalParts = getEntryLocalDateParts(mood);
+    const hasChanged = !originalParts || !sameWallClock(wallClockParts, originalParts);
+    if (!hasChanged) return;
+
+    const { timestamp: newTimestamp, utcOffsetMinutes: newOffset } =
+      getEditableDate(mood, wallClockParts);
+
+    saveStateRef.current = "saving";
     try {
       setSaving(true);
       setShowDatePicker(false);
       setShowTimePicker(false);
-      await onSave(mood.id, selectedDate.getTime());
-      haptics.commit();
-      onClose();
+      await commitThenRunPostCommitEffects(
+        async () => {
+          await onSave(mood.id, newTimestamp, newOffset);
+        },
+        [() => haptics.commit(), onClose],
+      );
+      saveStateRef.current = "committed";
+      setSaveConsumed(true);
     } catch {
+      saveStateRef.current = "idle";
       haptics.reject();
       Alert.alert("Error", "Could not update this entry's date and time.");
     } finally {
@@ -104,7 +223,11 @@ export const DateTimePickerModal: React.FC<Props> = ({
 
   if (!visible || !mood || !moodData) return null;
 
-  const hasChanged = selectedDate.getTime() !== mood.timestamp;
+  const originalParts = getEntryLocalDateParts(mood);
+  const hasChanged = Boolean(
+    wallClockParts && (!originalParts || !sameWallClock(wallClockParts, originalParts)),
+  );
+  const canSave = hasChanged && !saving && !saveConsumed;
 
   return (
     <SafeAreaView>
@@ -361,11 +484,13 @@ export const DateTimePickerModal: React.FC<Props> = ({
                       className="text-sm font-medium ml-2 flex-1"
                       style={{ color: get("text") }}
                     >
-                      {selectedDate.toLocaleDateString([], {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })}
+                      {selectedDate
+                        ? selectedDate.toLocaleDateString([], {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })
+                        : "Unknown date"}
                     </Text>
                     <Ionicons
                       name="chevron-down"
@@ -398,10 +523,12 @@ export const DateTimePickerModal: React.FC<Props> = ({
                       className="text-sm font-medium ml-2 flex-1"
                       style={{ color: get("text") }}
                     >
-                      {selectedDate.toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      {selectedDate
+                        ? selectedDate.toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
+                        : "Unknown time"}
                     </Text>
                     <Ionicons
                       name="chevron-down"
@@ -460,22 +587,22 @@ export const DateTimePickerModal: React.FC<Props> = ({
 
               <Pressable
                 onPress={handleSave}
-                disabled={!hasChanged || saving}
+                disabled={!canSave}
                 className="flex-1 py-3.5 rounded-xl items-center"
                 style={{
-                  backgroundColor: hasChanged
+                  backgroundColor: canSave
                     ? (isDark ? colors.primary.dark : colors.primary.light)
                     : get("surfaceAlt"),
-                  opacity: hasChanged && !saving ? 1 : 0.5,
+                  opacity: canSave ? 1 : 0.5,
                 }}
                 accessibilityRole="button"
                 accessibilityLabel="Save date and time changes"
-                accessibilityState={{ disabled: !hasChanged || saving }}
+                accessibilityState={{ disabled: !canSave }}
               >
                 <Text
                   className="font-semibold text-sm"
                   style={{
-                    color: hasChanged ? get("onPrimary") : get("textMuted"),
+                    color: canSave ? get("onPrimary") : get("textMuted"),
                   }}
                 >
                   Save Changes
@@ -487,7 +614,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
             {showDatePicker && (
               <DateTimePicker
                 disabled={saving}
-                value={selectedDate}
+                value={selectedDate ?? new Date()}
                 mode="date"
                 display={Platform.OS === "ios" ? "spinner" : "default"}
                 onChange={handleDateChange}
@@ -498,7 +625,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
             {showTimePicker && (
               <DateTimePicker
                 disabled={saving}
-                value={selectedDate}
+                value={selectedDate ?? new Date()}
                 mode="time"
                 display={Platform.OS === "ios" ? "spinner" : "default"}
                 onChange={handleTimeChange}

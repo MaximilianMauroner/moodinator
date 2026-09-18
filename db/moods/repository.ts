@@ -94,10 +94,17 @@ export async function updateMoodNote(
 
 export async function updateMoodTimestamp(
   id: number,
-  timestamp: number
+  timestamp: number,
+  utcOffsetMinutes?: number | null,
 ): Promise<MoodEntry | undefined> {
   return runInTransaction(async (db) => {
-    await db.runAsync("UPDATE moods SET utc_offset_minutes = CASE WHEN timestamp = ? THEN utc_offset_minutes ELSE ? END, timestamp = ? WHERE id = ?;", timestamp, new Date(timestamp).getTimezoneOffset(), timestamp, id);
+    await db.runAsync(
+      "UPDATE moods SET utc_offset_minutes = CASE WHEN timestamp = ? THEN utc_offset_minutes ELSE ? END, timestamp = ? WHERE id = ?;",
+      timestamp,
+      utcOffsetMinutes ?? new Date(timestamp).getTimezoneOffset(),
+      timestamp,
+      id,
+    );
     const updated = await db.getFirstAsync<MoodRow>(
       "SELECT * FROM moods WHERE id = ?;",
       id
@@ -511,7 +518,7 @@ export async function getMoodsByMonth(
   for (const row of rows) {
     const entry = toMoodEntry(row);
     const key = getEntryLocalDayKey(entry);
-    if (!key.startsWith(`${monthKey}-`)) {
+    if (!key || !key.startsWith(`${monthKey}-`)) {
       continue;
     }
     const day = Number(key.slice(-2));

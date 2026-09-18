@@ -42,6 +42,7 @@ export function getMoodsInPeriod(
 
   return moods.filter((mood) => {
     const day = getEntryLocalDayKey(mood);
+    if (!day) return false;
     return (
       day >= format(start, "yyyy-MM-dd") && day <= format(end, "yyyy-MM-dd")
     );
