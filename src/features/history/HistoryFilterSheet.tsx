@@ -355,6 +355,7 @@ export function HistoryFilterSheet() {
                 >
                   <Ionicons name="search" size={16} color={palette.subtle} />
                   <TextInput
+                    testID="history-filter-note"
                     accessibilityLabel="Note contains"
                     value={text}
                     onChangeText={setText}

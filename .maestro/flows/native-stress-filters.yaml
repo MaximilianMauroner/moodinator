@@ -1,0 +1,45 @@
+appId: com.lab4code.moodinator.qa
+name: Combined history filters and refresh
+---
+- launchApp:
+    clearState: false
+- tapOn: "Home tab, log your mood"
+- tapOn: "Filter history"
+- tapOn: "Last 90 days"
+- tapOn:
+    id: "history-filter-mood-6"
+- scrollUntilVisible:
+    element:
+      id: "history-filter-expand-emotions"
+    direction: DOWN
+- tapOn:
+    id: "history-filter-expand-emotions"
+- scrollUntilVisible:
+    element:
+      id: "history-filter-emotion-Tired"
+    direction: DOWN
+- tapOn:
+    id: "history-filter-emotion-Tired"
+- scrollUntilVisible:
+    element:
+      id: "history-filter-context-Home"
+    direction: DOWN
+- tapOn:
+    id: "history-filter-context-Home"
+- scrollUntilVisible:
+    element:
+      id: "history-filter-note"
+    direction: DOWN
+- tapOn:
+    id: "history-filter-note"
+- inputText: "QA fixture"
+- hideKeyboard
+- tapOn: "Show results"
+- assertVisible: "QA fixture"
+# A double tap on the selected Home tab is the existing refresh route.
+- tapOn: "Home tab, log your mood"
+- tapOn: "Home tab, log your mood"
+- assertVisible: "QA fixture"
+- tapOn: "Filter history"
+- tapOn: "Clear filters"
+- tapOn: "Show results"

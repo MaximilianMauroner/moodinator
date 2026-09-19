@@ -45,7 +45,10 @@ function MoodChangeToast({
   );
 
   return (
-    <View style={styles.frame}>
+    <View
+      style={styles.frame}
+      testID={action ? "deleted-mood-toast" : "restored-mood-toast"}
+    >
       <View
         style={[
           styles.card,
@@ -97,6 +100,7 @@ function MoodChangeToast({
               ]}
               accessibilityRole="button"
               accessibilityLabel={action.accessibilityLabel}
+              testID="undo-delete"
             >
               <Text
                 style={[

@@ -104,8 +104,11 @@ flow does not dismiss unexpected screens or skip failed steps.
 The flow checks all four onboarding pages, creates a detailed neutral mood with
 an emotion, energy, and note, restarts the process, and reads the saved fields in
 the edit form. It then updates the note, reopens the form to check it, opens
-and refreshes Insights, and deletes the entry. Undo is verified separately
-through the manual gesture journey below.
+and refreshes Insights, and deletes the entry. The smoke runner then inspects
+Android's live accessibility hierarchy, finds the `undo-delete` test ID, and
+activates the control at the bounds returned by that inspection. It verifies
+that an entry action row is present again. The production five-second toast
+duration is not changed.
 
 The flow expects fresh QA data, the default entry fields, and English app text.
 It uses accessibility labels for actions and test IDs for repeated controls.
@@ -145,6 +148,28 @@ Generate synthetic exports with `bun run qa:fixtures -- 1000 /tmp/moodinator-fix
 file to the QA emulator, then import it through the normal Settings import flow.
 Use a fresh QA dataset between sizes. Do not load fixtures into the normal app.
 
+The repeatable stress runner performs that import through Android's document
+picker, then scrolls to the 51st, 501st, and 951st entries for a 1,000-entry
+fixture, or the 51st, 5,001st, and 9,951st entries for a 10,000-entry fixture.
+Each route edits, deletes, and restores the recycled row. It then applies a
+combined 90-day, mood, emotion, context, and note filter and refreshes through
+the existing Home-tab double-tap route. The runner uses only fabricated data
+and writes evidence outside the repository:
+
+```bash
+bun run qa:stress -- emulator-5554 --size 1000 --label baseline --runs 2 --out /tmp/moodinator-native-stress-baseline-1000
+bun run qa:stress -- emulator-5554 --size 1000 --label current --runs 2 --out /tmp/moodinator-native-stress-current-1000
+bun run qa:stress -- emulator-5554 --size 10000 --label baseline --runs 2 --out /tmp/moodinator-native-stress-baseline-10000
+bun run qa:stress -- emulator-5554 --size 10000 --label current --runs 2 --out /tmp/moodinator-native-stress-current-10000
+```
+
+Use new empty output directories for each command. Each run records the source
+SHA and device, `dumpsys gfxinfo` frame counters, repeated `dumpsys meminfo`
+captures, and an `atrace` scroll trace when the emulator permits it. Compare
+the baseline/current `summary.json` files only when device profile, refresh
+rate, thermal state, fixture size, and run count match. The runner deliberately
+does not calculate or claim a performance improvement.
+
 Use an Android profile or release build for measurements. Record the device,
 build, dataset size, refresh rate, thermal state, and measurement tool. Keep
 these conditions the same when comparing runs.
@@ -180,6 +205,29 @@ On a narrow device and with large text, verify Findings/Charts/Calendar and all
 four ranges remain reachable without overlapping labels. Check both themes and
 reduced motion; capture 30 idle seconds on Charts after transitions settle.
 
+The reproducible visual matrix sets Android font scale to 1.3 and covers light,
+dark, normal-motion, and reduced-motion states. It restores the emulator's
+font scale, theme, and animation settings in a `finally` path. Run it after the
+QA app has completed onboarding and contains only fabricated data:
+
+```bash
+bun run qa:matrix -- emulator-5554 --out /tmp/moodinator-native-matrix-current
+```
+
+The matrix retains one screenshot per state. Android timezone travel should be
+run on a fresh fabricated fixture with its recorded `utcOffsetMinutes` and
+verified at UTC plus a second zone. The dedicated journey imports 100 entries,
+travels through UTC and Pacific/Auckland, and compares the row's accessibility
+date/time label:
+
+```bash
+bun run qa:timezone -- emulator-5554 --out /tmp/moodinator-native-timezone-current
+```
+
+It restores the emulator's timezone settings in a `finally` path. If the
+emulator refuses a timezone or animation setting, retain the exact `adb shell
+settings` command and mark that state not tested.
+
 On Home, open Filter history and apply note text, mood 7 or worse, an emotion,
 a context and a date range separately, then combine them. Verify empty results,
 Clear filters and a failed refresh after deleting a filtered row. Scroll past two
@@ -202,10 +250,10 @@ checks the insufficient-sample message and the empty driver comparison, and
 returns to Findings. It does not establish populated chart correctness or
 large-history performance; use the fabricated comparisons above for those.
 
-Maestro 2.3.0 on the shared Android emulator can spend longer obtaining an
-accessibility hierarchy than the five-second Undo toast stays visible. Shorter
-settle waits and disabling system animations did not resolve this. The automated
-smoke checks persistent entry state and deletion; verify Undo separately by
-promptly tapping the visible button and checking the restored record. Do not
-extend the production toast lifetime or use fixed screen coordinates in the
-reusable smoke merely to accommodate this driver limitation.
+The Undo probe starts concurrently with the final Maestro flow, so it can act
+during Maestro's settle window. It uses `adb shell uiautomator dump --compressed
+/dev/tty`, matches the stable resource ID (with the existing accessibility label
+as a fallback), and derives the tap point from the node's current bounds. It
+never uses a fixed screen coordinate. If hierarchy inspection is unavailable or
+slower than the toast lifetime, the command fails with the last ADB error and
+the result is a blocker, not a longer production toast.

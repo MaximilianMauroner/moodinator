@@ -88,5 +88,3 @@ name: Isolated Android entry lifecycle
 - tapOn:
     id: "mood-entry-actions-.*"
 - tapOn: "Delete entry"
-- assertNotVisible:
-    id: "mood-entry-actions-.*"

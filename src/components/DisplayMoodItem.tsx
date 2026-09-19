@@ -311,6 +311,7 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
 
     return (
       <Animated.View
+        testID={`mood-entry-stable-${mood.timestamp}`}
         onLayout={handleContainerLayout}
         style={[{ borderRadius: 16, overflow: "hidden" }, containerAnimatedStyle]}
       >
