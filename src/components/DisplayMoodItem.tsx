@@ -61,10 +61,12 @@ function MoodTag({
 
 function CommentBlock({
   note,
+  timestamp,
   get,
   variant,
 }: {
   note: string | null;
+  timestamp: number;
   get: ReturnType<typeof useThemeColors>["get"];
   variant: "minimal" | "compact";
 }) {
@@ -86,6 +88,7 @@ function CommentBlock({
         Notes
       </Text>
       <Text
+        testID={`mood-entry-note-${timestamp}`}
         className="text-sm leading-5"
         style={{ color: get("textSubtle") }}
         numberOfLines={variant === "compact" ? 3 : 4}
@@ -358,7 +361,7 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
                 onLongPress?.(mood);
               }}
               accessibilityRole="button"
-              testID={`mood-entry-${mood.id}`}
+              testID={`mood-entry-${mood.timestamp}`}
               accessibilityLabel={accessibilityLabel}
               accessibilityHint={getMoodItemHint()}
               accessibilityActions={[
@@ -400,6 +403,7 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
                         }}
                       >
                         <Text
+                          testID={`mood-entry-rating-${mood.timestamp}`}
                           className="text-sm font-bold"
                           style={{ color: moodData.textHex, fontVariant: ["tabular-nums"] }}
                         >
@@ -444,7 +448,7 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
                         }}
                         className="h-11 w-11 items-center justify-center rounded-full"
                         accessibilityRole="button"
-                        testID={`mood-entry-actions-${mood.id}`}
+                        testID={`mood-entry-actions-${mood.timestamp}`}
                         accessibilityLabel={`Actions for ${moodData.label} entry`}
                         accessibilityHint="Edit, change date and time, or delete this entry"
                       >
@@ -452,13 +456,19 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
                       </Pressable>
                     </View>
 
-                    <CommentBlock note={mood.note} get={get} variant="compact" />
+                    <CommentBlock
+                      note={mood.note}
+                      timestamp={mood.timestamp}
+                      get={get}
+                      variant="compact"
+                    />
                   </View>
                 ) : (
                   <View className="p-4">
                     <View className="mb-2 flex-row items-center justify-between">
                       <View className="flex-row items-baseline gap-2">
                         <Text
+                          testID={`mood-entry-rating-${mood.timestamp}`}
                           style={{
                             fontSize: 36,
                             fontWeight: "900",
@@ -487,7 +497,7 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
                           }}
                           className="ml-1 h-11 w-11 items-center justify-center rounded-full"
                           accessibilityRole="button"
-                          testID={`mood-entry-actions-${mood.id}`}
+                          testID={`mood-entry-actions-${mood.timestamp}`}
                           accessibilityLabel={`Actions for ${moodData.label} entry`}
                           accessibilityHint="Edit, change date and time, or delete this entry"
                         >
@@ -501,7 +511,12 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
                       {typeof mood.energy === "number" ? ` · Energy ${mood.energy}/10` : ""}
                     </Text>
 
-                    <CommentBlock note={mood.note} get={get} variant="minimal" />
+                    <CommentBlock
+                      note={mood.note}
+                      timestamp={mood.timestamp}
+                      get={get}
+                      variant="minimal"
+                    />
 
                     {(sortedEmotions.length > 0 || (mood.contextTags?.length ?? 0) > 0) && (
                       <View className="flex-row flex-wrap gap-2">

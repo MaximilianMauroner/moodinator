@@ -6,6 +6,13 @@ const path = require("node:path");
 // Copy the working tree, including current edits, without native build folders,
 // credentials, personal scratch files, or a dependency tree shared with another run.
 const root = path.resolve(__dirname, "..");
+const sourceSha = execFileSync("git", ["rev-parse", "HEAD"], {
+  cwd: root,
+  encoding: "utf8",
+}).trim();
+if (!/^[0-9a-f]{40}$/.test(sourceSha)) {
+  throw new Error(`Originating checkout did not provide a full source SHA: ${sourceSha}`);
+}
 const destination = mkdtempSync(path.join(tmpdir(), "moodinator-qa-"));
 const tracked = execFileSync("git", ["ls-files", "-z"], { cwd: root }).toString().split("\0");
 const untracked = execFileSync("git", ["ls-files", "--others", "--exclude-standard", "-z"], { cwd: root })
@@ -21,6 +28,7 @@ for (const file of new Set([...tracked, ...untracked])) {
   copyFileSync(source, target);
 }
 console.log(`QA workspace: ${destination}`);
+console.log(`export MOODINATOR_SOURCE_SHA=${sourceSha}`);
 console.log("In that directory: bun install --frozen-lockfile");
 console.log("Then: MOODINATOR_VARIANT=qa bunx expo run:android --variant release --device");
 console.log("Select a disposable emulator. The QA package has separate local storage.");

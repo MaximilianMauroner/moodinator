@@ -80,36 +80,52 @@ function normalizeResourceId(resourceId) {
   return markerIndex >= 0 ? resourceId.slice(markerIndex + marker.length) : resourceId;
 }
 
+function nodeMatches(node, matcher, { visibleOnly = true } = {}) {
+  if (typeof matcher === "function") return matcher(node);
+  if (!matcher || typeof matcher !== "object") return false;
+  if (visibleOnly && !isVisibleAndEnabled(node)) return false;
+  if (matcher.anyOf) return matcher.anyOf.some((alternative) => nodeMatches(node, alternative, { visibleOnly }));
+  if (matcher.allOf) return matcher.allOf.every((alternative) => nodeMatches(node, alternative, { visibleOnly }));
+
+  const testId = normalizeResourceId(node["resource-id"]);
+  const text = node.text ?? "";
+  const contentDescription = node["content-desc"] ?? "";
+  const hasSelector = Boolean(
+    matcher.testId || matcher.testIdPrefix || matcher.text !== undefined || matcher.contentDescription !== undefined,
+  );
+
+  if (matcher.testId && testId !== matcher.testId) return false;
+  if (matcher.testIdPrefix && !testId.startsWith(matcher.testIdPrefix)) return false;
+  if (matcher.text !== undefined) {
+    if (matcher.contains ? !text.includes(matcher.text) : text !== matcher.text) return false;
+  }
+  if (matcher.contentDescription !== undefined) {
+    if (matcher.contains
+      ? !contentDescription.includes(matcher.contentDescription)
+      : contentDescription !== matcher.contentDescription) return false;
+  }
+
+  return hasSelector;
+}
+
+function findNodes(nodes, matcher, { includeHidden = false } = {}) {
+  return nodes.filter((node) => nodeMatches(node, matcher, { visibleOnly: !includeHidden }));
+}
+
 function findNodeByTestId(nodes, testId) {
-  return nodes.find(
-    (node) =>
-      isVisibleAndEnabled(node) &&
-      normalizeResourceId(node["resource-id"]) === testId
-  ) ?? null;
+  return findNodes(nodes, { testId })[0] ?? null;
 }
 
 function findNodeByTestIdPrefix(nodes, prefix) {
-  return nodes.find(
-    (node) =>
-      isVisibleAndEnabled(node) &&
-      normalizeResourceId(node["resource-id"]).startsWith(prefix)
-  ) ?? null;
+  return findNodes(nodes, { testIdPrefix: prefix })[0] ?? null;
 }
 
 function findNodeByText(nodes, text, { contains = false } = {}) {
-  return nodes.find((node) => {
-    if (!isVisibleAndEnabled(node)) return false;
-    const value = node.text ?? "";
-    return contains ? value.includes(text) : value === text;
-  }) ?? null;
+  return findNodes(nodes, { text, contains })[0] ?? null;
 }
 
 function findNodeByContentDescription(nodes, contentDescription, { contains = false } = {}) {
-  return nodes.find((node) => {
-    if (!isVisibleAndEnabled(node)) return false;
-    const value = node["content-desc"] ?? "";
-    return contains ? value.includes(contentDescription) : value === contentDescription;
-  }) ?? null;
+  return findNodes(nodes, { contentDescription, contains })[0] ?? null;
 }
 
 function describeMatcher(matcher) {
@@ -118,21 +134,7 @@ function describeMatcher(matcher) {
 }
 
 function matchNode(nodes, matcher) {
-  if (typeof matcher === "function") return nodes.find(matcher) ?? null;
-  if (matcher.anyOf) {
-    for (const alternative of matcher.anyOf) {
-      const node = matchNode(nodes, alternative);
-      if (node) return node;
-    }
-    return null;
-  }
-  if (matcher.testId) return findNodeByTestId(nodes, matcher.testId);
-  if (matcher.testIdPrefix) return findNodeByTestIdPrefix(nodes, matcher.testIdPrefix);
-  if (matcher.text) return findNodeByText(nodes, matcher.text, matcher);
-  if (matcher.contentDescription) {
-    return findNodeByContentDescription(nodes, matcher.contentDescription, matcher);
-  }
-  return null;
+  return findNodes(nodes, matcher)[0] ?? null;
 }
 
 function runAdb(serial, args, {
@@ -199,12 +201,15 @@ async function waitForNode(serial, matcher, {
 } = {}) {
   const deadline = Date.now() + timeoutMs;
   let lastError = null;
+  let unavailable = false;
 
   while (Date.now() <= deadline) {
     try {
       const xml = dumpUiHierarchy(serial, { adbPath, timeoutMs: dumpTimeoutMs });
-      const node = matchNode(parseUiHierarchy(xml), matcher);
+      const nodes = parseUiHierarchy(xml);
+      const node = matchNode(nodes, matcher);
       if (node) return node;
+      unavailable ||= findNodes(nodes, matcher, { includeHidden: true }).length > 0;
     } catch (error) {
       lastError = error;
     }
@@ -213,22 +218,69 @@ async function waitForNode(serial, matcher, {
   }
 
   const detail = lastError ? ` Last inspection error: ${lastError.message}` : "";
+  if (unavailable) {
+    throw new Error(`${describeMatcher(matcher)} was present but disabled or invisible before the deadline.${detail}`);
+  }
   throw new Error(`Timed out waiting for ${describeMatcher(matcher)}.${detail}`);
+}
+
+async function waitForNodeCount(serial, matcher, expectedCount, {
+  adbPath = "adb",
+  timeoutMs = DEFAULT_WAIT_TIMEOUT_MS,
+  pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
+  dumpTimeoutMs = DEFAULT_DUMP_TIMEOUT_MS,
+  includeHidden = false,
+} = {}) {
+  if (!Number.isInteger(expectedCount) || expectedCount < 0) {
+    throw new Error("Expected native node count must be a non-negative integer.");
+  }
+
+  const deadline = Date.now() + timeoutMs;
+  let lastError = null;
+  let lastCount = null;
+  while (Date.now() <= deadline) {
+    try {
+      const nodes = parseUiHierarchy(dumpUiHierarchy(serial, { adbPath, timeoutMs: dumpTimeoutMs }));
+      const matches = findNodes(nodes, matcher, { includeHidden });
+      lastCount = matches.length;
+      if (lastCount === expectedCount) return matches;
+    } catch (error) {
+      lastError = error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+  }
+
+  const count = lastCount === null ? "unknown" : lastCount;
+  const detail = lastError ? ` Last inspection error: ${lastError.message}` : "";
+  throw new Error(
+    `Timed out waiting for ${describeMatcher(matcher)} to have ${expectedCount} node(s); last count was ${count}.${detail}`,
+  );
+}
+
+async function waitForNodeAbsent(serial, matcher, options = {}) {
+  await waitForNodeCount(serial, matcher, 0, { includeHidden: true, ...options });
+}
+
+function tapNode(serial, node, {
+  adbPath = "adb",
+  tapTimeoutMs = 3000,
+} = {}) {
+  const point = nodeCenter(node);
+  if (!point) throw new Error("Native control did not expose usable bounds.");
+  runAdb(serial, ["shell", "input", "tap", String(point.x), String(point.y)], {
+    adbPath,
+    timeoutMs: tapTimeoutMs,
+  });
+  return { node, point };
 }
 
 async function waitForNodeAndTap(serial, matcher, options = {}) {
   const node = await waitForNode(serial, matcher, options);
-  const point = nodeCenter(node);
-  if (!point) {
-    throw new Error(`Native control ${describeMatcher(matcher)} did not expose usable bounds.`);
+  try {
+    return tapNode(serial, node, options);
+  } catch (error) {
+    throw new Error(`Unable to activate ${describeMatcher(matcher)}: ${error.message}`);
   }
-
-  runAdb(serial, ["shell", "input", "tap", String(point.x), String(point.y)], {
-    adbPath: options.adbPath,
-    timeoutMs: options.tapTimeoutMs ?? 3000,
-  });
-
-  return { node, point };
 }
 
 function parseGfxInfo(output) {
@@ -273,6 +325,8 @@ module.exports = {
   findNodeByTestId,
   findNodeByTestIdPrefix,
   findNodeByText,
+  findNodes,
+  nodeMatches,
   nodeCenter,
   normalizeResourceId,
   parseBounds,
@@ -280,6 +334,9 @@ module.exports = {
   parseMemInfo,
   parseUiHierarchy,
   runAdb,
+  tapNode,
   waitForNode,
+  waitForNodeAbsent,
+  waitForNodeCount,
   waitForNodeAndTap,
 };

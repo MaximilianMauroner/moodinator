@@ -6,11 +6,11 @@ name: Recycled-row stress cycle
 - tapOn: "Home tab, log your mood"
 - scrollUntilVisible:
     element:
-      id: "mood-entry-${ENTRY_ID}"
+      id: "mood-entry-stable-${ENTRY_TIMESTAMP}"
     direction: DOWN
     timeout: 30000
 - tapOn:
-    id: "mood-entry-actions-${ENTRY_ID}"
+    id: "mood-entry-actions-${ENTRY_TIMESTAMP}"
 - tapOn: "Edit entry"
 - assertVisible: "(?i)How are you feeling[?]"
 - tapOn: "Next step"
@@ -19,6 +19,9 @@ name: Recycled-row stress cycle
     element:
       id: "entry-notes"
     direction: DOWN
+- assertVisible:
+    id: "entry-notes"
+    text: "${ORIGINAL_NOTE}"
 - tapOn:
     id: "entry-notes"
 - eraseText
@@ -27,8 +30,8 @@ name: Recycled-row stress cycle
 - tapOn: "Save entry"
 - scrollUntilVisible:
     element:
-      id: "mood-entry-actions-${ENTRY_ID}"
+      id: "mood-entry-actions-${ENTRY_TIMESTAMP}"
     direction: DOWN
 - tapOn:
-    id: "mood-entry-actions-${ENTRY_ID}"
-- tapOn: "Delete entry"
+    id: "mood-entry-actions-${ENTRY_TIMESTAMP}"
+- assertVisible: "Delete entry"

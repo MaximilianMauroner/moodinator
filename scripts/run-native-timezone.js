@@ -4,26 +4,28 @@ const { tmpdir } = require("node:os");
 const path = require("node:path");
 
 const { createQaFixture } = require("./generate-qa-fixtures");
+const {
+  evidenceAcceptance,
+  isToolUnavailable,
+  requireSourceSha,
+} = require("./native-qa-common");
 const { runAdb, waitForNode, waitForNodeAndTap } = require("./native-ui");
 
 const appId = "com.lab4code.moodinator.qa";
 const root = path.resolve(__dirname, "..");
 const importFlow = path.join(root, ".maestro/flows/native-stress-import.yaml");
-
-function usage(message) {
-  if (message) console.error(message);
-  console.error("Usage: bun run qa:timezone -- emulator-5554 [--out /tmp/evidence]");
-  process.exit(1);
-}
+const MAESTRO_TIMEOUT_MS = 120000;
 
 function parseOptions(argv) {
   const serial = argv.shift();
-  if (!serial || !/^emulator-\d+$/.test(serial)) usage("Use a disposable emulator serial such as emulator-5554.");
+  if (!serial || !/^emulator-\d+$/.test(serial)) {
+    throw new Error("Use a disposable emulator serial such as emulator-5554.");
+  }
   let output = null;
   while (argv.length) {
-    if (argv.shift() !== "--out") usage("Only --out is supported.");
+    if (argv.shift() !== "--out") throw new Error("Only --out is supported.");
     output = argv.shift();
-    if (!output) usage("Missing value for --out.");
+    if (!output) throw new Error("Missing value for --out.");
   }
   return { serial, output };
 }
@@ -44,10 +46,60 @@ function restoreSetting(serial, namespace, key, value) {
   setSetting(serial, namespace, key, value);
 }
 
+function restoreTimeZoneSettings(serial, original) {
+  let firstError = null;
+  for (const [namespace, key, value] of [
+    ["global", "time_zone", original.timeZone],
+    ["global", "auto_time_zone", original.autoTimeZone],
+  ]) {
+    try {
+      restoreSetting(serial, namespace, key, value);
+    } catch (error) {
+      firstError ??= error;
+    }
+  }
+  if (firstError) throw firstError;
+}
+
+function readDeviceTimeZone(serial) {
+  const settingsValue = setting(serial, "global", "time_zone");
+  const propertyValue = runAdb(serial, ["shell", "getprop", "persist.sys.timezone"]).trim();
+  return {
+    settings: settingsValue && settingsValue !== "null" ? settingsValue : null,
+    property: propertyValue || null,
+    value: settingsValue && settingsValue !== "null" ? settingsValue : propertyValue || null,
+  };
+}
+
+function verifyRequestedTimeZone(requested, actual) {
+  return Boolean(requested && actual && requested === actual);
+}
+
+function evaluateTimezoneObservations(observations) {
+  const accepted = observations.length === 2 && observations.every((observation) => (
+    observation.accepted
+    && observation.actualTimeZone === observation.requestedTimeZone
+    && observation.tested
+  ));
+  const distinctStates = new Set(observations.map((observation) => observation.actualTimeZone).filter(Boolean)).size === 2;
+  const sameRecordedLabel = observations.length === 2
+    && observations.every((observation) => observation.contentDescription)
+    && observations[0].contentDescription === observations[1].contentDescription;
+  const stableRecordedLabel = accepted && distinctStates && sameRecordedLabel;
+  return {
+    stableRecordedLabel,
+    status: stableRecordedLabel ? "passed" : observations.some((observation) => !observation.accepted) ? "blocked" : "failed",
+    accepted,
+    distinctStates,
+    sameRecordedLabel,
+  };
+}
+
 function runMaestro(serial) {
   execFileSync("maestro", ["--device", serial, "test", importFlow], {
     cwd: root,
     stdio: "inherit",
+    timeout: MAESTRO_TIMEOUT_MS,
   });
 }
 
@@ -60,7 +112,7 @@ async function importFixture(serial, fixtureName) {
   runMaestro(serial);
   try {
     await waitForNodeAndTap(serial, { text: fixtureName }, { timeoutMs: 3500 });
-  } catch {
+  } catch (error) {
     await waitForNodeAndTap(serial, { text: "Downloads", contains: true }, { timeoutMs: 2500 });
     await waitForNodeAndTap(serial, { text: fixtureName }, { timeoutMs: 5000 });
   }
@@ -70,14 +122,21 @@ async function importFixture(serial, fixtureName) {
 }
 
 function installGuard(serial) {
-  execFileSync("maestro", ["--version"], { stdio: "pipe" });
-  const installed = execFileSync("adb", ["-s", serial, "shell", "pm", "path", appId], { encoding: "utf8" });
+  execFileSync("maestro", ["--version"], { stdio: "pipe", timeout: 15000 });
+  const installed = execFileSync("adb", ["-s", serial, "shell", "pm", "path", appId], {
+    encoding: "utf8",
+    timeout: 15000,
+  });
   if (!installed.trim().startsWith("package:")) throw new Error(`The QA package ${appId} is not installed on ${serial}.`);
 }
 
-async function main() {
-  const options = parseOptions(process.argv.slice(2));
-  installGuard(options.serial);
+function writeEvidence(outputDirectory, evidence) {
+  writeFileSync(path.join(outputDirectory, "timezone.json"), `${JSON.stringify(evidence, null, 2)}\n`);
+}
+
+async function main(argv = process.argv.slice(2)) {
+  const options = parseOptions(argv);
+  const sourceSha = requireSourceSha();
   const outputDirectory = options.output
     ? path.resolve(options.output)
     : mkdtempSync(path.join(tmpdir(), "moodinator-native-timezone-"));
@@ -86,45 +145,108 @@ async function main() {
   const entries = createQaFixture(100);
   const fixtureName = "moodinator-qa-timezone.json";
   const fixturePath = path.join(outputDirectory, fixtureName);
-  writeFileSync(fixturePath, JSON.stringify(entries), { flag: "wx" });
-  runAdb(options.serial, ["push", fixturePath, `/sdcard/Download/${fixtureName}`], { timeoutMs: 30000 });
-
-  const original = {
-    autoTimeZone: setting(options.serial, "global", "auto_time_zone"),
-    timeZone: setting(options.serial, "global", "time_zone"),
-  };
-  const observations = [];
-
-  try {
-    await importFixture(options.serial, fixtureName);
-    for (const timeZone of ["UTC", "Pacific/Auckland"]) {
-      setSetting(options.serial, "global", "auto_time_zone", "0");
-      setSetting(options.serial, "global", "time_zone", timeZone);
-      restartApp(options.serial);
-      const node = await waitForNode(options.serial, { testId: "mood-entry-1" }, { timeoutMs: 10000 });
-      observations.push({ timeZone, contentDescription: node["content-desc"] ?? null });
-    }
-  } finally {
-    restoreSetting(options.serial, "global", "time_zone", original.timeZone);
-    restoreSetting(options.serial, "global", "auto_time_zone", original.autoTimeZone);
-  }
-
-  const stable = observations.length === 2 && observations[0].contentDescription === observations[1].contentDescription;
-  const evidence = {
+  const baseEvidence = {
     appId,
     serial: options.serial,
-    sourceSha: execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim(),
+    sourceSha,
     fixture: fixturePath,
-    recordedOffsetMinutes: entries[0].utcOffsetMinutes,
-    observations,
-    stableRecordedLabel: stable,
+    fabricatedDataOnly: true,
+    fixtureProof: {
+      entryCount: entries.length,
+      firstNote: entries[0].note,
+      recordedOffsetMinutes: entries[0].utcOffsetMinutes,
+    },
   };
-  writeFileSync(path.join(outputDirectory, "timezone.json"), `${JSON.stringify(evidence, null, 2)}\n`);
-  if (!stable) throw new Error(`Recorded date/time label changed during timezone travel. Evidence: ${path.join(outputDirectory, "timezone.json")}`);
+  const observations = [];
+  let original = null;
+  let operationalError = null;
+  let restoreError = null;
+
+  try {
+    installGuard(options.serial);
+    writeFileSync(fixturePath, JSON.stringify(entries), { flag: "wx" });
+    runAdb(options.serial, ["push", fixturePath, `/sdcard/Download/${fixtureName}`], { timeoutMs: 30000 });
+    original = {
+      autoTimeZone: setting(options.serial, "global", "auto_time_zone"),
+      timeZone: setting(options.serial, "global", "time_zone"),
+    };
+
+    await importFixture(options.serial, fixtureName);
+    for (const requestedTimeZone of ["UTC", "Pacific/Auckland"]) {
+      setSetting(options.serial, "global", "auto_time_zone", "0");
+      setSetting(options.serial, "global", "time_zone", requestedTimeZone);
+      const actual = readDeviceTimeZone(options.serial);
+      const accepted = verifyRequestedTimeZone(requestedTimeZone, actual.value);
+      const observation = {
+        requestedTimeZone,
+        actualTimeZone: actual.value,
+        actualReadback: actual,
+        accepted,
+        tested: false,
+      };
+      if (!accepted) {
+        observation.blockedReason = `The device kept ${actual.value ?? "no timezone"} after requesting ${requestedTimeZone}.`;
+        observations.push(observation);
+        continue;
+      }
+
+      restartApp(options.serial);
+      const node = await waitForNode(
+        options.serial,
+        { testId: `mood-entry-stable-${entries[0].timestamp}` },
+        { timeoutMs: 10000 },
+      );
+      observation.tested = true;
+      observation.contentDescription = node["content-desc"] ?? null;
+      observations.push(observation);
+    }
+  } catch (error) {
+    operationalError = error;
+  } finally {
+    if (original) {
+      try {
+        restoreTimeZoneSettings(options.serial, original);
+      } catch (error) {
+        restoreError = error;
+      }
+    }
+  }
+
+  if (restoreError) operationalError ??= restoreError;
+  const evaluation = operationalError
+    ? null
+    : evaluateTimezoneObservations(observations);
+  const status = operationalError
+    ? isToolUnavailable(operationalError) ? "blocked" : "failed"
+    : evaluation.status;
+  const evidence = {
+    ...baseEvidence,
+    status,
+    acceptance: evidenceAcceptance(status),
+    observations,
+    original,
+    ...(evaluation ?? { stableRecordedLabel: false }),
+    ...(operationalError ? { blocker: operationalError.message } : {}),
+  };
+  writeEvidence(outputDirectory, evidence);
+
+  if (operationalError) throw operationalError;
+  if (status !== "passed") {
+    throw new Error(`Timezone journey was ${status}; requested device states were not both verified.`);
+  }
   console.log(`Native timezone evidence: ${outputDirectory}`);
 }
 
-main().catch((error) => {
-  console.error(error.message);
-  process.exitCode = 1;
-});
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(error.message);
+    process.exitCode = 1;
+  });
+}
+
+module.exports = {
+  evaluateTimezoneObservations,
+  parseOptions,
+  readDeviceTimeZone,
+  verifyRequestedTimeZone,
+};

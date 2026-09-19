@@ -78,7 +78,8 @@ name: Isolated Android entry lifecycle
     id: "entry-notes"
     text: "QA smoke edited note"
 - tapOn: "Save entry"
-# Check Insights before deletion; Undo has a separate native timing check.
+# Check Insights before deletion; the runner owns the synchronized native
+# delete/absence/Undo/restoration phase below.
 - tapOn: "Insights tab, view mood history and summaries"
 - assertVisible: "Your history · 1 entry"
 - tapOn: "Refresh insights"
@@ -87,4 +88,4 @@ name: Isolated Android entry lifecycle
 - tapOn: "Home tab, log your mood"
 - tapOn:
     id: "mood-entry-actions-.*"
-- tapOn: "Delete entry"
+- assertVisible: "Delete entry"
