@@ -9,9 +9,12 @@ const { tmpdir } = require("node:os");
 const path = require("node:path");
 
 const {
+  applyFixtureNoteEdits,
+  applyNativeStressEditMutations,
   combinedFilterExpectation,
   createQaFixture,
   fixtureIdentity,
+  nativeStressEditNote,
 } = require("./generate-qa-fixtures");
 const {
   evidenceAcceptance,
@@ -126,21 +129,46 @@ function materializeCycle(outputDirectory, identity, runNumber) {
 }
 
 function materializeFilter(outputDirectory, entries, size, referenceNow) {
-  const expectation = combinedFilterExpectation(entries, { now: referenceNow });
-  const firstMatch = fixtureIdentity(entries, 1);
-  const firstNonMatch = fixtureIdentity(entries, 2);
+  const editedEntries = applyNativeStressEditMutations(entries, pageBoundaryIds(size));
+  const expectation = combinedFilterExpectation(editedEntries, { now: referenceNow });
+  const firstMatchIndex = expectation.matchingEntryIndexes[0];
+  const secondMatchIndex = expectation.matchingEntryIndexes[1];
+  if (!firstMatchIndex || !secondMatchIndex) {
+    throw new Error("The stress fixture must provide at least two matching identities after edit cycles.");
+  }
+  const firstMatch = fixtureIdentity(editedEntries, firstMatchIndex);
+  const secondMatch = fixtureIdentity(editedEntries, secondMatchIndex);
+  const firstNonMatch = fixtureIdentity(editedEntries, 2);
+  const refreshNote = `QA refresh edit ${String(firstMatchIndex).padStart(4, "0")}`;
+  const refreshedEntries = applyFixtureNoteEdits(editedEntries, [
+    { entryIndex: firstMatchIndex, note: refreshNote },
+  ]);
+  const refreshedExpectation = combinedFilterExpectation(refreshedEntries, { now: referenceNow });
   const template = readFileSync(filterTemplatePath, "utf8");
   const flow = template
     .replaceAll("${FILTER_NOTE}", expectation.text)
     .replaceAll("${FILTER_COUNT}", String(expectation.count))
+    .replaceAll("${REFRESH_FILTER_COUNT}", String(refreshedExpectation.count))
     .replaceAll("${TOTAL_COUNT}", String(size))
     .replaceAll("${FIRST_MATCH_TIMESTAMP}", String(firstMatch.timestamp))
     .replaceAll("${FIRST_MATCH_NOTE}", firstMatch.note)
+    .replaceAll("${SECOND_MATCH_TIMESTAMP}", String(secondMatch.timestamp))
+    .replaceAll("${SECOND_MATCH_NOTE}", secondMatch.note)
     .replaceAll("${FIRST_NON_MATCH_TIMESTAMP}", String(firstNonMatch.timestamp))
-    .replaceAll("${FIRST_NON_MATCH_NOTE}", firstNonMatch.note);
+    .replaceAll("${FIRST_NON_MATCH_NOTE}", firstNonMatch.note)
+    .replaceAll("${REFRESH_EDIT_NOTE}", refreshNote);
   const flowPath = path.join(outputDirectory, "native-stress-filters-materialized.yaml");
   writeFileSync(flowPath, flow);
-  return { flowPath, expectation, firstMatch, firstNonMatch };
+  return {
+    flowPath,
+    expectation,
+    refreshedExpectation,
+    editedEntries,
+    firstMatch,
+    secondMatch,
+    firstNonMatch,
+    refreshMutation: { entryIndex: firstMatchIndex, note: refreshNote },
+  };
 }
 
 async function importFixture(serial, fixtureName) {
@@ -286,7 +314,9 @@ function summarizeRunEvidence({
 }
 
 function baseMetadata(options, sourceSha, entries, fixturePath, outputDirectory, referenceNow) {
-  const filter = combinedFilterExpectation(entries, { now: referenceNow });
+  const editIndexes = pageBoundaryIds(options.size);
+  const editedEntries = applyNativeStressEditMutations(entries, editIndexes);
+  const filter = combinedFilterExpectation(editedEntries, { now: referenceNow });
   return {
     appId,
     label: options.label,
@@ -301,8 +331,12 @@ function baseMetadata(options, sourceSha, entries, fixturePath, outputDirectory,
     fabricatedDataProof: {
       entryCount: entries.length,
       combinedFilter: filter,
-      firstMatchNote: entries[0].note,
-      firstNonMatchNote: entries[1].note,
+      editMutations: editIndexes.map((entryIndex) => ({
+        entryIndex,
+        note: nativeStressEditNote(entryIndex),
+      })),
+      firstMatchNote: editedEntries[filter.matchingEntryIndexes[0] - 1]?.note ?? null,
+      firstNonMatchNote: editedEntries[1]?.note ?? null,
     },
     measurementPolicy: "Comparable evidence only; no performance improvement is inferred by this runner.",
   };
@@ -406,7 +440,7 @@ async function main(argv = process.argv.slice(2)) {
               note: result.identity.note,
               mood: result.identity.mood,
             },
-            afterDelete: { exactIdentityAbsent: true },
+            afterDelete: { visibleActionableExactIdentityAbsent: true },
             undo: {
               observedResourceId: result.undo.node["resource-id"] ?? null,
               tapPoint: result.undo.point,

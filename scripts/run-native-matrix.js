@@ -56,14 +56,37 @@ function readBackSetting(serial, namespace, key, expected) {
   return actual;
 }
 
+function isAbsentSettingValue(value) {
+  return !value || value === "null";
+}
+
+function readBackAbsentSetting(serial, namespace, key) {
+  const actual = setting(serial, namespace, key);
+  if (!isAbsentSettingValue(actual)) {
+    throw new Error(`Android setting ${namespace}.${key} remained ${JSON.stringify(actual)} after deletion.`);
+  }
+  return actual;
+}
+
+function themeValueForState(night) {
+  if (night === "yes") return "2";
+  if (night === "no") return "1";
+  throw new Error(`Unknown Android night mode: ${night}.`);
+}
+
+function setAndReadTheme(serial, night) {
+  runAdb(serial, ["shell", "cmd", "uimode", "night", night], { timeoutMs: SETTING_TIMEOUT_MS });
+  return readBackSetting(serial, "secure", "ui_night_mode", themeValueForState(night));
+}
+
 function animationValueForState(reducedMotion) {
   return reducedMotion ? "0" : "1";
 }
 
 function restoreSetting(serial, namespace, key, value, fallback) {
-  if (!value || value === "null") {
+  if (isAbsentSettingValue(value)) {
     runAdb(serial, ["shell", "settings", "delete", namespace, key], { timeoutMs: SETTING_TIMEOUT_MS });
-    return;
+    return readBackAbsentSetting(serial, namespace, key);
   }
   setSetting(serial, namespace, key, value || fallback);
   readBackSetting(serial, namespace, key, value || fallback);
@@ -178,7 +201,7 @@ async function main(argv = process.argv.slice(2)) {
     for (const state of states) {
       setSetting(options.serial, "system", "font_scale", "1.3");
       readBackSetting(options.serial, "system", "font_scale", "1.3");
-      runAdb(options.serial, ["shell", "cmd", "uimode", "night", state.night], { timeoutMs: SETTING_TIMEOUT_MS });
+      const themeReadback = setAndReadTheme(options.serial, state.night);
 
       // Normal motion is explicit and nonzero. It never inherits an unknown
       // prior value such as 0 from a reduced-motion run.
@@ -197,6 +220,7 @@ async function main(argv = process.argv.slice(2)) {
       observations.push({
         name: state.name,
         reducedMotion: state.reducedMotion,
+        theme: themeReadback,
         animationScale: animationReadback,
         fabricatedFixtureProof,
         screenshot: screenshotPath,
@@ -247,7 +271,9 @@ if (require.main === module) {
 
 module.exports = {
   animationValueForState,
+  isAbsentSettingValue,
   parseOptions,
   readBackSetting,
+  themeValueForState,
   verifyFabricatedFixture,
 };

@@ -151,20 +151,24 @@ Do not substitute disabling networking: the app stores its data locally.
 
 The stress runner generates relative-time fabricated exports itself, pushes each
 one to the disposable emulator, and imports it through the normal Settings flow.
-The fixture has positive `QA match` records and negative `QA other` records; 60
-records match the combined 90-day/mood/emotion/context/note filter for both
-1,000 and 10,000 entries. The standalone generator remains available for
-manual setup: `bun run qa:fixtures -- 1000 /tmp/moodinator-fixtures-1000.json`
-and repeat with 10,000 entries. Use a fresh QA dataset between sizes. Do not
-load fixtures into the normal app.
+The pristine fixture has positive `QA match` records and negative `QA other`
+records; 60 records match the combined 90-day/mood/emotion/context/note filter
+before the boundary edit cycles. The exact edit mutations remove two matching
+notes in the 1,000-entry route and one in the 10,000-entry route, leaving 58
+and 59 expected matches respectively. The standalone generator remains
+available for manual setup: `bun run qa:fixtures -- 1000 /tmp/moodinator-fixtures-1000.json` and repeat with 10,000 entries. Use a fresh
+QA dataset between sizes. Do not load fixtures into the normal app.
 
 The repeatable stress runner performs that import through Android's document
 picker, then scrolls to the 51st, 501st, and 951st entries for a 1,000-entry
 fixture, or the 51st, 5,001st, and 9,951st entries for a 10,000-entry fixture.
-Each route edits, deletes, and restores the recycled row. It then applies a
-combined 90-day, mood, emotion, context, and note filter and refreshes through
-the existing Home-tab double-tap route. The runner uses only fabricated data
-and writes evidence outside the repository:
+Each route edits, deletes, and restores the recycled row. It then derives the
+combined 90-day, mood, emotion, context, and note filter from the post-edit
+fixture (58 matching identities for 1,000 entries and 59 for 10,000 entries)
+and refreshes through the existing Home-tab double-tap route. While the filter
+is active it edits the first matching note so refresh must remove that exact
+identity and decrement the count; a cached result fails the flow. The runner
+uses only fabricated data and writes evidence outside the repository:
 
 ```bash
 export MOODINATOR_SOURCE_SHA=<40-character-sha-from-originating-checkout>

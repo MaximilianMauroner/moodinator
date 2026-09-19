@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
 const require = createRequire(import.meta.url);
 const {
+  applyNativeStressEditMutations,
   combinedFilterExpectation,
   createQaFixture,
   fixtureIdentity,
@@ -18,6 +19,11 @@ const {
   transitionUndoCoordination,
 } = require("../scripts/native-qa-coordination.js");
 const { requireSourceSha } = require("../scripts/native-qa-common.js");
+const {
+  entryIdentityCounts,
+  entrySelectors,
+  isExactlyOneRestoredEntry,
+} = require("../scripts/native-qa-runner.js");
 const {
   findNodes,
   findNodeByContentDescription,
@@ -31,14 +37,22 @@ const {
 } = require("../scripts/native-ui.js");
 const {
   captureText,
+  materializeFilter,
   pageBoundaryIds,
   startTrace,
   stopTrace,
   summarizeRunEvidence,
 } = require("../scripts/run-native-stress.js");
-const { animationValueForState } = require("../scripts/run-native-matrix.js");
+const {
+  animationValueForState,
+  isAbsentSettingValue,
+  themeValueForState,
+} = require("../scripts/run-native-matrix.js");
 const {
   evaluateTimezoneObservations,
+  recordedLabelFromNode,
+  timezoneEntryMatcher,
+  timezoneEntryTestId,
   verifyRequestedTimeZone,
 } = require("../scripts/run-native-timezone.js");
 
@@ -57,6 +71,28 @@ const hierarchy = `
       content-desc="Actions for Neutral entry" enabled="true" visible-to-user="true"
       bounds="[100,200][200,300]" />
   </hierarchy>`;
+
+const timezoneHierarchy = `
+  <hierarchy rotation="0">
+    <node index="0" resource-id="com.lab4code.moodinator.qa:id/mood-entry-stable-1700000000000"
+      class="android.view.View" enabled="true" visible-to-user="true" bounds="[0,0][400,240]" />
+    <node index="1" text="6" resource-id="com.lab4code.moodinator.qa:id/mood-entry-1700000000000"
+      content-desc="Mood 6, November 14, 2023 at 10:13 PM" class="android.widget.Button"
+      clickable="true" enabled="true" visible-to-user="true" bounds="[10,20][390,220]" />
+  </hierarchy>`;
+
+function exactEntryHierarchy({ hiddenDuplicate = false, visible = true } = {}) {
+  const nodes = [];
+  const append = (visibility, enabled = true) => {
+    const attributes = `enabled="${enabled}" visible-to-user="${visibility}"`;
+    nodes.push(`<node index="${nodes.length}" resource-id="com.lab4code.moodinator.qa:id/mood-entry-stable-123" ${attributes} bounds="[0,0][400,240]" />`);
+    nodes.push(`<node index="${nodes.length}" text="QA exact" resource-id="com.lab4code.moodinator.qa:id/mood-entry-note-123" ${attributes} bounds="[0,0][300,80]" />`);
+    nodes.push(`<node index="${nodes.length}" text="6" resource-id="com.lab4code.moodinator.qa:id/mood-entry-rating-123" ${attributes} bounds="[0,0][80,80]" />`);
+  };
+  if (visible) append("true");
+  if (hiddenDuplicate) append("false");
+  return `<hierarchy>${nodes.join("")}</hierarchy>`;
+}
 
 const diagnosticMemory = `
  Dalvik Heap:                   12,288       8,000
@@ -97,6 +133,37 @@ test("derives the tap point from the inspected bounds", () => {
   const node = parseUiHierarchy(hierarchy)[0];
   assert.deepEqual(nodeCenter(node), { x: 60, y: 50 });
   assert.equal(nodeCenter({ bounds: "[0,0][0,10]" }), null);
+});
+
+test("restoration rejects hidden duplicates and hidden-only stale rows", () => {
+  const identity = {
+    timestamp: 123,
+    note: "QA exact",
+    mood: 6,
+    selectors: entrySelectors({ timestamp: 123, note: "QA exact", mood: 6 }),
+  };
+  const visiblePlusHidden = parseUiHierarchy(exactEntryHierarchy({ hiddenDuplicate: true }));
+  assert.deepEqual(entryIdentityCounts(visiblePlusHidden, identity), {
+    visible: [1, 1, 1],
+    hierarchy: [2, 2, 2],
+  });
+  assert.equal(isExactlyOneRestoredEntry(visiblePlusHidden, identity), false);
+
+  const hiddenOnly = parseUiHierarchy(exactEntryHierarchy({ hiddenDuplicate: true, visible: false }));
+  assert.deepEqual(entryIdentityCounts(hiddenOnly, identity), {
+    visible: [0, 0, 0],
+    hierarchy: [1, 1, 1],
+  });
+  assert.equal(isExactlyOneRestoredEntry(hiddenOnly, identity), false);
+});
+
+test("timezone observation targets the labeled nested entry Pressable", () => {
+  const timestamp = 1700000000000;
+  const nodes = parseUiHierarchy(timezoneHierarchy);
+  const node = findNodeByTestId(nodes, timezoneEntryTestId(timestamp));
+  assert.deepEqual(timezoneEntryMatcher(timestamp), { testId: "mood-entry-1700000000000" });
+  assert.equal(recordedLabelFromNode(node), "Mood 6, November 14, 2023 at 10:13 PM");
+  assert.equal(findNodeByTestId(nodes, "mood-entry-stable-1700000000000")?.["content-desc"], undefined);
 });
 
 test("coordination starts the Undo deadline at delete, not at Maestro launch", () => {
@@ -171,6 +238,36 @@ test("fixture generation covers 1k/10k boundaries with relative positive and neg
   assert.deepEqual(pageBoundaryIds(10000), [51, 5001, 9951]);
 });
 
+test("filter expectations derive positive membership after the exact 1k/10k edit cycles", () => {
+  const now = Date.UTC(2031, 4, 1, 12);
+  for (const count of [1000, 10000]) {
+    const entries = createQaFixture(count, { now });
+    const boundaries = pageBoundaryIds(count);
+    const pristine = combinedFilterExpectation(entries, { now });
+    const edited = applyNativeStressEditMutations(entries, boundaries);
+    const expectation = combinedFilterExpectation(edited, { now });
+    const expectedIndexes = pristine.matchingEntryIndexes.filter((entryIndex) => !boundaries.includes(entryIndex));
+
+    assert.deepEqual(expectation.matchingEntryIndexes, expectedIndexes);
+    assert.equal(expectation.count, count === 1000 ? 58 : 59);
+    assert.equal(expectation.matchingEntryIndexes.includes(1), true);
+    assert.equal(expectation.matchingEntryIndexes.includes(51), false);
+    assert.equal(edited[50].note, "QA stress edit 51");
+    assert.equal(edited[1].note.startsWith("QA other"), true);
+
+    const directory = mkdtempSync(join(tmpdir(), "moodinator-filter-materialize-test-"));
+    try {
+      const materialized = materializeFilter(directory, entries, count, now);
+      assert.equal(materialized.expectation.count, expectation.count);
+      assert.equal(materialized.refreshedExpectation.count, expectation.count - 1);
+      assert.equal(materialized.refreshMutation.entryIndex, 1);
+      assert.match(readFileSync(materialized.flowPath, "utf8"), new RegExp(`${materialized.refreshedExpectation.count} total`));
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  }
+});
+
 test("fixture identities preserve exact original and edited values", () => {
   const entries = createQaFixture(100, { now: Date.UTC(2031, 4, 1) });
   assert.deepEqual(fixtureIdentity(entries, 51, { editedNote: "QA stress edit 51" }), {
@@ -180,6 +277,19 @@ test("fixture identities preserve exact original and edited values", () => {
     note: "QA stress edit 51",
     originalNote: entries[50].note,
   });
+});
+
+test("stress filter flow applies cleared drafts before asserting the full list", () => {
+  const flow = readFileSync(new URL("../.maestro/flows/native-stress-filters.yaml", import.meta.url), "utf8");
+  const clearPositions = [...flow.matchAll(/- tapOn: "Clear filters"/g)].map((match) => match.index);
+  assert.equal(clearPositions.length, 2);
+  for (const [index, clearPosition] of clearPositions.entries()) {
+    const nextClear = clearPositions[index + 1] ?? flow.length;
+    const showResults = flow.indexOf('- tapOn: "Show results"', clearPosition);
+    const nextAssertion = flow.indexOf("- assert", clearPosition);
+    assert.ok(showResults > clearPosition && showResults < nextClear);
+    assert.ok(nextAssertion > showResults);
+  }
 });
 
 test("required ADB captures and trace finalization cannot produce accepted evidence on failure", () => {
@@ -250,6 +360,11 @@ test("trace evidence is captured only after a successful non-empty stop", () => 
 test("normal-motion matrix values are explicit and nonzero", () => {
   assert.equal(animationValueForState(false), "1");
   assert.equal(animationValueForState(true), "0");
+  assert.equal(themeValueForState("no"), "1");
+  assert.equal(themeValueForState("yes"), "2");
+  assert.equal(isAbsentSettingValue("null"), true);
+  assert.equal(isAbsentSettingValue(""), true);
+  assert.equal(isAbsentSettingValue("1"), false);
 });
 
 test("isolated evidence requires the originating full source SHA", () => {

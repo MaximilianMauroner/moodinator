@@ -257,8 +257,19 @@ async function waitForNodeCount(serial, matcher, expectedCount, {
   );
 }
 
-async function waitForNodeAbsent(serial, matcher, options = {}) {
+async function waitForNodeVisibleAbsent(serial, matcher, options = {}) {
+  await waitForNodeCount(serial, matcher, 0, { includeHidden: false, ...options });
+}
+
+async function waitForNodeHierarchyGone(serial, matcher, options = {}) {
   await waitForNodeCount(serial, matcher, 0, { includeHidden: true, ...options });
+}
+
+// Preserve the strong historical meaning for callers that need the node gone
+// from the hierarchy. Callers that only need it to be no longer actionable
+// should use waitForNodeVisibleAbsent explicitly.
+async function waitForNodeAbsent(serial, matcher, options = {}) {
+  await waitForNodeHierarchyGone(serial, matcher, options);
 }
 
 function tapNode(serial, node, {
@@ -337,6 +348,8 @@ module.exports = {
   tapNode,
   waitForNode,
   waitForNodeAbsent,
+  waitForNodeHierarchyGone,
   waitForNodeCount,
   waitForNodeAndTap,
+  waitForNodeVisibleAbsent,
 };

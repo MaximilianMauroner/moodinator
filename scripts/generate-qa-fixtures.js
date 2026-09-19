@@ -19,6 +19,10 @@ function fixtureNote(index, positive) {
   return `${positive ? "QA match" : "QA other"} ${String(index + 1).padStart(4, "0")}: fabricated native stress record.`;
 }
 
+function nativeStressEditNote(entryIndex) {
+  return `QA stress edit ${entryIndex}`;
+}
+
 /**
  * Generate only fabricated records. The reference time is intentionally
  * relative to execution so Last 90 days remains a meaningful native filter for
@@ -47,8 +51,25 @@ function createQaFixture(count, options) {
   });
 }
 
+function matchesCombinedFilter(entry, { start, end }) {
+  return (
+    entry.timestamp >= start
+    && entry.timestamp <= end
+    && entry.mood === 6
+    && entry.note?.startsWith("QA match ")
+    && entry.emotions?.some((emotion) => emotion.name === "Tired")
+    && entry.contextTags?.includes("Home")
+  );
+}
+
 function combinedFilterExpectation(entries, { now = Date.now() } = {}) {
   const start = now - 90 * 24 * HOUR_MS;
+  const end = now;
+  const matchingEntryIndexes = entries.reduce((indexes, entry, index) => {
+    if (matchesCombinedFilter(entry, { start, end })) indexes.push(index + 1);
+    return indexes;
+  }, []);
+
   return {
     text: "QA match",
     minMood: 6,
@@ -56,15 +77,41 @@ function combinedFilterExpectation(entries, { now = Date.now() } = {}) {
     emotion: "Tired",
     context: "Home",
     datePreset: "Last 90 days",
-    count: entries.filter((entry) => (
-      entry.timestamp >= start
-      && entry.timestamp <= now
-      && entry.mood === 6
-      && entry.note.startsWith("QA match ")
-      && entry.emotions?.some((emotion) => emotion.name === "Tired")
-      && entry.contextTags?.includes("Home")
-    )).length,
+    count: matchingEntryIndexes.length,
+    matchingEntryIndexes,
   };
+}
+
+function applyFixtureNoteEdits(entries, edits) {
+  const notesByEntryIndex = new Map();
+  for (const edit of edits) {
+    if (!Number.isInteger(edit?.entryIndex) || edit.entryIndex < 1 || edit.entryIndex > entries.length) {
+      throw new Error(`Fixture edit index is outside the generated dataset: ${edit?.entryIndex}.`);
+    }
+    if (typeof edit.note !== "string" || !edit.note) {
+      throw new Error(`Fixture edit ${edit.entryIndex} must provide a non-empty note.`);
+    }
+    if (notesByEntryIndex.has(edit.entryIndex)) {
+      throw new Error(`Fixture entry ${edit.entryIndex} has more than one note edit.`);
+    }
+    notesByEntryIndex.set(edit.entryIndex, edit.note);
+  }
+
+  return entries.map((entry, index) => {
+    const note = notesByEntryIndex.get(index + 1);
+    return note === undefined ? entry : { ...entry, note };
+  });
+}
+
+function applyNativeStressEditMutations(entries, entryIndexes) {
+  if (!Array.isArray(entryIndexes)) throw new Error("Native stress edit indexes must be an array.");
+  return applyFixtureNoteEdits(
+    entries,
+    entryIndexes.map((entryIndex) => ({
+      entryIndex,
+      note: nativeStressEditNote(entryIndex),
+    })),
+  );
 }
 
 function fixtureIdentity(entries, index, { editedNote = null } = {}) {
@@ -105,11 +152,15 @@ if (require.main === module) {
 module.exports = {
   HOUR_MS,
   MATCH_STRIDE,
+  applyFixtureNoteEdits,
+  applyNativeStressEditMutations,
   MATCH_WINDOW_ENTRIES,
   combinedFilterExpectation,
   createQaFixture,
   fixtureIdentity,
   fixtureNote,
   isPositiveFixtureEntry,
+  matchesCombinedFilter,
+  nativeStressEditNote,
   writeQaFixture,
 };

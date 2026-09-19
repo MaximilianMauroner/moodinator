@@ -73,7 +73,7 @@ async function main(argv = process.argv.slice(2)) {
       status: "passed",
       acceptance: "accepted",
       beforeDelete: result.identity,
-      afterDelete: { exactIdentityAbsent: true },
+      afterDelete: { visibleActionableExactIdentityAbsent: true },
       restored: { exactIdentity: result.identity, exactlyOne: true },
       deleteTap: result.delete.point,
       undoTap: result.undo.point,

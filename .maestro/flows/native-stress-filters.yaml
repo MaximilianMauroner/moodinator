@@ -42,16 +42,47 @@ name: Discriminating combined history filters and refresh
     id: "mood-entry-note-${FIRST_MATCH_TIMESTAMP}"
     text: "${FIRST_MATCH_NOTE}"
 - assertNotVisible: "${FIRST_NON_MATCH_NOTE}"
+# Edit a matching row through the supported app journey while the filter is
+# active. The current in-memory list keeps the edited identity until the
+# refresh query runs; the changed note makes a cached result observable.
+- tapOn:
+    id: "mood-entry-actions-${FIRST_MATCH_TIMESTAMP}"
+- tapOn: "Edit entry"
+- assertVisible: "(?i)How are you feeling[?]"
+- tapOn: "Next step"
+- tapOn: "Next step"
+- scrollUntilVisible:
+    element:
+      id: "entry-notes"
+    direction: DOWN
+- assertVisible:
+    id: "entry-notes"
+    text: "${FIRST_MATCH_NOTE}"
+- tapOn:
+    id: "entry-notes"
+- eraseText
+- inputText: "${REFRESH_EDIT_NOTE}"
+- hideKeyboard
+- tapOn: "Save entry"
+- assertVisible:
+    id: "mood-entry-note-${FIRST_MATCH_TIMESTAMP}"
+    text: "${REFRESH_EDIT_NOTE}"
+- assertVisible:
+    id: "history-count"
+    text: "${FILTER_COUNT} total"
 # A double tap on the selected Home tab is the existing refresh route. The
-# filtered count and exact positive identity must survive the completed reload.
+# changed row must disappear and the exact next positive identity/count must
+# reflect a new query, so a cached list fails this flow.
 - tapOn: "Home tab, log your mood"
 - tapOn: "Home tab, log your mood"
 - assertVisible:
     id: "history-count"
-    text: "${FILTER_COUNT} total"
-- assertVisible:
+    text: "${REFRESH_FILTER_COUNT} total"
+- assertNotVisible:
     id: "mood-entry-note-${FIRST_MATCH_TIMESTAMP}"
-    text: "${FIRST_MATCH_NOTE}"
+- assertVisible:
+    id: "mood-entry-note-${SECOND_MATCH_TIMESTAMP}"
+    text: "${SECOND_MATCH_NOTE}"
 # Clear returns the full fabricated dataset, proving the filter did not merely
 # leave the previous generic note visible.
 - tapOn: "Filter history"
@@ -72,6 +103,7 @@ name: Discriminating combined history filters and refresh
 - tapOn: "Show results"
 - assertVisible: "No matching entries"
 - tapOn: "Clear filters"
+- tapOn: "Show results"
 - assertVisible:
     id: "history-count"
     text: "${TOTAL_COUNT} total"

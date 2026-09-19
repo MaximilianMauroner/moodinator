@@ -75,6 +75,22 @@ function verifyRequestedTimeZone(requested, actual) {
   return Boolean(requested && actual && requested === actual);
 }
 
+function timezoneEntryTestId(timestamp) {
+  return `mood-entry-${timestamp}`;
+}
+
+function timezoneEntryMatcher(timestamp) {
+  // DisplayMoodItem places the accessibility label on this nested Pressable;
+  // mood-entry-stable-* belongs to its non-interactive animated wrapper.
+  return { testId: timezoneEntryTestId(timestamp) };
+}
+
+function recordedLabelFromNode(node) {
+  const label = node?.["content-desc"]?.trim();
+  if (!label) throw new Error("The timezone entry Pressable did not expose a stable recorded label.");
+  return label;
+}
+
 function evaluateTimezoneObservations(observations) {
   const accepted = observations.length === 2 && observations.every((observation) => (
     observation.accepted
@@ -193,11 +209,11 @@ async function main(argv = process.argv.slice(2)) {
       restartApp(options.serial);
       const node = await waitForNode(
         options.serial,
-        { testId: `mood-entry-stable-${entries[0].timestamp}` },
+        timezoneEntryMatcher(entries[0].timestamp),
         { timeoutMs: 10000 },
       );
       observation.tested = true;
-      observation.contentDescription = node["content-desc"] ?? null;
+      observation.contentDescription = recordedLabelFromNode(node);
       observations.push(observation);
     }
   } catch (error) {
@@ -248,5 +264,8 @@ module.exports = {
   evaluateTimezoneObservations,
   parseOptions,
   readDeviceTimeZone,
+  recordedLabelFromNode,
+  timezoneEntryMatcher,
+  timezoneEntryTestId,
   verifyRequestedTimeZone,
 };

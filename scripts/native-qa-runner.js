@@ -7,7 +7,7 @@ const {
   parseUiHierarchy,
   tapNode,
   waitForNode,
-  waitForNodeAbsent,
+  waitForNodeHierarchyGone,
   waitForNodeCount,
 } = require("./native-ui");
 const {
@@ -145,30 +145,77 @@ function captureEntryIdentity(serial, {
   return { ...identity, selectors };
 }
 
+function entryIdentityCounts(nodes, identity) {
+  return {
+    visible: identity.selectors.map((matcher) => findNodes(nodes, matcher).length),
+    hierarchy: identity.selectors.map((matcher) => findNodes(nodes, matcher, { includeHidden: true }).length),
+  };
+}
+
+/**
+ * Restoration is accepted only when one actionable row is present and the
+ * hierarchy contains no second stale copy of any exact identity selector.
+ * Keeping these scopes separate prevents a hidden recycled row from being
+ * mistaken for the restored entry while still making the absence semantics
+ * explicit for callers that only need visible removal.
+ */
+function isExactlyOneRestoredEntry(nodes, identity) {
+  const counts = entryIdentityCounts(nodes, identity);
+  return counts.visible.every((count) => count === 1)
+    && counts.hierarchy.every((count) => count === 1);
+}
+
 async function waitForEntryState(serial, identity, expectedCount, {
-  timeoutMs,
+  timeoutMs = DEFAULT_RESTORATION_TIMEOUT_MS,
+  scope = "visible",
   ...options
 } = {}) {
+  if (scope !== "visible" && scope !== "hierarchy") {
+    throw new Error(`Unknown entry hierarchy scope: ${scope}.`);
+  }
+  const includeHidden = scope === "hierarchy";
   const deadline = Date.now() + timeoutMs;
   for (const matcher of identity.selectors) {
     const remaining = Math.max(0, deadline - Date.now());
     await waitForNodeCount(serial, matcher, expectedCount, {
       ...options,
       timeoutMs: remaining,
-      // Count hidden/disabled stale nodes as well. A recycled row that has
-      // not fully left the hierarchy must not satisfy either absence or the
-      // exactly-one restoration assertion.
-      includeHidden: true,
+      includeHidden,
     });
   }
 }
 
 async function waitForExactEntry(serial, identity, options = {}) {
-  await waitForEntryState(serial, identity, 1, options);
+  const timeoutMs = options.timeoutMs ?? DEFAULT_RESTORATION_TIMEOUT_MS;
+  const deadline = Date.now() + timeoutMs;
+  await waitForEntryState(serial, identity, 1, {
+    ...options,
+    scope: "visible",
+    timeoutMs: Math.max(0, deadline - Date.now()),
+  });
+  await waitForEntryState(serial, identity, 1, {
+    ...options,
+    scope: "hierarchy",
+    timeoutMs: Math.max(0, deadline - Date.now()),
+  });
+}
+
+async function waitForEntryVisibleAbsent(serial, identity, options = {}) {
+  await waitForEntryState(serial, identity, 0, {
+    ...options,
+    scope: "visible",
+  });
+}
+
+async function waitForEntryHierarchyGone(serial, identity, options = {}) {
+  await waitForEntryState(serial, identity, 0, {
+    ...options,
+    scope: "hierarchy",
+  });
 }
 
 async function waitForEntryAbsent(serial, identity, options = {}) {
-  await waitForEntryState(serial, identity, 0, options);
+  await waitForEntryVisibleAbsent(serial, identity, options);
 }
 
 function transition(state, event) {
@@ -207,7 +254,7 @@ async function runDeleteUndoAcceptance(serial, flowPath, {
 
   // A prior toast would make an early hierarchy match a false positive. It must
   // be absent before this deletion begins.
-  await waitForNodeAbsent(serial, undoMatcher, {
+  await waitForNodeHierarchyGone(serial, undoMatcher, {
     ...waitOptions,
     timeoutMs: Math.min(waitOptions.preDeleteUndoTimeoutMs ?? 1000, 1000),
   });
@@ -219,7 +266,7 @@ async function runDeleteUndoAcceptance(serial, flowPath, {
   const deleteTap = tapNode(serial, deleteNode, waitOptions);
   coordination = transition(coordination, "delete-requested");
 
-  await waitForEntryAbsent(serial, identity, {
+  await waitForEntryVisibleAbsent(serial, identity, {
     ...waitOptions,
     timeoutMs: coordinationRemainingMs(coordination),
   });
@@ -253,12 +300,16 @@ module.exports = {
   DEFAULT_MAESTRO_TIMEOUT_MS,
   captureEntryIdentity,
   deleteMatcher,
+  entryIdentityCounts,
   entrySelectors,
+  isExactlyOneRestoredEntry,
   readHierarchy,
   runDeleteUndoAcceptance,
   runMaestro,
   timestampFromNode,
   undoMatcher,
   waitForEntryAbsent,
+  waitForEntryHierarchyGone,
   waitForExactEntry,
+  waitForEntryVisibleAbsent,
 };
