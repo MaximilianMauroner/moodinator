@@ -23,6 +23,7 @@ if (worktreeStatus) {
 }
 const destination = mkdtempSync(path.join(tmpdir(), "moodinator-qa-"));
 const tracked = execFileSync("git", ["ls-files", "-z"], { cwd: root }).toString().split("\0");
+const copiedTracked = [];
 for (const file of tracked) {
   if (!file || /^(android|ios|node_modules|\.git|\.agents|credentials)\//.test(file)
     || /(^|\/)\.env|credentials|\.(jks|p12|key|pem)$/.test(file)) continue;
@@ -31,8 +32,9 @@ for (const file of tracked) {
   const target = path.join(destination, file);
   mkdirSync(path.dirname(target), { recursive: true });
   copyFileSync(source, target);
+  copiedTracked.push(file);
 }
-const sourceMetadata = writePreparedSourceMetadata(destination, sourceSha);
+const sourceMetadata = writePreparedSourceMetadata(destination, sourceSha, copiedTracked);
 console.log(`QA workspace: ${destination}`);
 console.log(`QA source metadata: ${sourceMetadata}`);
 console.log(`export MOODINATOR_SOURCE_SHA=${sourceSha}`);

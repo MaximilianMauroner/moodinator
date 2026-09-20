@@ -1,6 +1,7 @@
 const { spawn } = require("node:child_process");
 
 const {
+  DEFAULT_DUMP_TIMEOUT_MS,
   dumpUiHierarchy,
   findNodes,
   normalizeResourceId,
@@ -226,12 +227,17 @@ async function waitForEntryState(serial, identity, expectedCount, {
 
 async function waitForExactEntry(serial, identity, options = {}) {
   const timeoutMs = options.timeoutMs ?? DEFAULT_RESTORATION_TIMEOUT_MS;
+  const dumpTimeoutMs = options.dumpTimeoutMs ?? DEFAULT_DUMP_TIMEOUT_MS;
   const deadline = Date.now() + timeoutMs;
   let lastCounts = null;
   let lastInspectionError = null;
   while (Date.now() <= deadline) {
     try {
-      const nodes = (options.readHierarchyImpl ?? readHierarchy)(serial, options);
+      const remainingMs = Math.max(1, deadline - Date.now());
+      const nodes = (options.readHierarchyImpl ?? readHierarchy)(serial, {
+        ...options,
+        timeoutMs: Math.min(dumpTimeoutMs, remainingMs),
+      });
       lastCounts = entryIdentityCounts(nodes, identity);
       lastInspectionError = null;
       if (isExactlyOneRestoredEntry(nodes, identity)) return;

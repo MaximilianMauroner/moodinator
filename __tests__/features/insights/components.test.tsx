@@ -8,6 +8,7 @@ import { InsightsScreen } from "../../../src/features/insights/screens/InsightsS
 
 const insightsScreenState = vi.hoisted(() => ({
   analysisMoods: [] as Array<Record<string, unknown>>,
+  error: null as string | null,
 }));
 
 vi.mock("react-native", () => ({
@@ -28,7 +29,7 @@ vi.mock("../../../src/features/insights/hooks/useInsightsData", () => ({
     recentMoods: [],
     totalCount: insightsScreenState.analysisMoods.length,
     loading: false,
-    error: null,
+    error: insightsScreenState.error,
     streak: { current: 0, longest: 0 },
     getMoodLabel: () => "Neutral",
     getMoodColor: () => "#000",
@@ -119,6 +120,7 @@ describe("insight presentation", () => {
   });
 
   it.each([0, 1, 2])("renders the correct visible entry plural for %i records", async (count) => {
+    insightsScreenState.error = null;
     insightsScreenState.analysisMoods = Array.from({ length: count }, (_, index) => ({
       id: index + 1,
       mood: 4,
@@ -142,5 +144,32 @@ describe("insight presentation", () => {
     expect(rendered).toContain(expected);
     expect(rendered).not.toContain(`${count} ${count === 1 ? "entries" : "entry"}`);
     await act(async () => renderer.unmount());
+  });
+
+  it("does not expose matrix readiness while saved insights have a refresh error", async () => {
+    insightsScreenState.analysisMoods = [{
+      id: 1,
+      mood: 4,
+      timestamp: Date.parse("2026-09-06T12:00:00Z"),
+      utcOffsetMinutes: 0,
+      emotions: [],
+      contextTags: [],
+      energy: null,
+      moodScale: { version: 1, min: 0, max: 10, lowerIsBetter: true },
+    }];
+    insightsScreenState.error = "refresh failed";
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(<InsightsScreen />);
+    });
+
+    expect(renderer.root.findAllByProps({ testID: "insights-loaded-summary" })).toHaveLength(0);
+    const rendered = renderer.root
+      .findAllByType("Text")
+      .map((node) => node.children.filter((child) => typeof child === "string").join(""))
+      .join(" ");
+    expect(rendered).toContain("Showing saved insights. Refresh failed.");
+    await act(async () => renderer.unmount());
+    insightsScreenState.error = null;
   });
 });

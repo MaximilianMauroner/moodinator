@@ -94,9 +94,11 @@ Moodinator package or a device that holds personal mood data.
 On hosts with limited RAM, check available memory before builds, dependency installs
 and emulator launches. Compile before starting the emulator; do not overlap native
 compilation, the emulator and broad test runs. In the disposable checkout, cap Metro
-workers with `config.maxWorkers = 1` and Gradle with `--max-workers=1`; bound JVM and
-Node heaps to fit the available memory. Keep these machine-specific limits out of
-the production app configuration. Stop or reduce an owned workload if memory
+workers with `MOODINATOR_METRO_MAX_WORKERS=1` and Gradle with `--max-workers=1`; bound
+JVM and Node heaps to fit the available memory. Do not edit `metro.config.js` or any
+other tracked file after `qa:prepare`: QA configuration verifies every copied tracked
+file against the prepared manifest and fails if its bytes changed. Run `qa:prepare`
+again for a different source tree. Stop or reduce an owned workload if memory
 pressure keeps rising.
 
 Use an installed build that starts directly into the app. If a debug build opens

@@ -206,7 +206,11 @@ async function waitForNode(serial, matcher, {
 
   while (Date.now() <= deadline) {
     try {
-      const xml = dumpUiHierarchy(serial, { adbPath, timeoutMs: dumpTimeoutMs });
+      const remainingMs = Math.max(1, deadline - Date.now());
+      const xml = dumpUiHierarchy(serial, {
+        adbPath,
+        timeoutMs: Math.min(dumpTimeoutMs, remainingMs),
+      });
       const nodes = parseUiHierarchy(xml);
       const node = matchNode(nodes, matcher);
       if (node) return node;
@@ -241,7 +245,11 @@ async function waitForNodeCount(serial, matcher, expectedCount, {
   let lastCount = null;
   while (Date.now() <= deadline) {
     try {
-      const nodes = parseUiHierarchy(dumpUiHierarchy(serial, { adbPath, timeoutMs: dumpTimeoutMs }));
+      const remainingMs = Math.max(1, deadline - Date.now());
+      const nodes = parseUiHierarchy(dumpUiHierarchy(serial, {
+        adbPath,
+        timeoutMs: Math.min(dumpTimeoutMs, remainingMs),
+      }));
       const matches = findNodes(nodes, matcher, { includeHidden });
       lastCount = matches.length;
       if (lastCount === expectedCount) return matches;

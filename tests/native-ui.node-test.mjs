@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -56,6 +56,7 @@ const {
   materializeCycle,
   materializeFilter,
   pageBoundaryIds,
+  prepareEvidenceDirectory: prepareStressEvidenceDirectory,
   settleImportedHistory,
   startTrace,
   stopTrace,
@@ -65,6 +66,7 @@ const {
 const {
   animationValueForState,
   isAbsentSettingValue,
+  prepareEvidenceDirectory: prepareMatrixEvidenceDirectory,
   themeValueForState,
 } = require("../scripts/run-native-matrix.js");
 const {
@@ -256,6 +258,39 @@ test("exact restoration retries transient hierarchy failures", async () => {
     },
   });
   assert.equal(attempts, 2);
+});
+
+test("exact restoration bounds every hierarchy dump by its cap and remaining deadline", async () => {
+  const identity = {
+    timestamp: 123,
+    note: "QA exact",
+    mood: 6,
+    selectors: entrySelectors({ timestamp: 123, note: "QA exact", mood: 6 }),
+  };
+  const originalNow = Date.now;
+  const observedTimeouts = [];
+  let now = 100;
+
+  Date.now = () => now;
+  try {
+    await waitForExactEntry("emulator-5554", identity, {
+      timeoutMs: 25,
+      dumpTimeoutMs: 20,
+      pollIntervalMs: 0,
+      readHierarchyImpl: (_serial, options) => {
+        observedTimeouts.push(options.timeoutMs);
+        if (observedTimeouts.length === 1) {
+          now = 120;
+          throw new Error("transient hierarchy dump failure");
+        }
+        return parseUiHierarchy(exactEntryHierarchy());
+      },
+    });
+  } finally {
+    Date.now = originalNow;
+  }
+
+  assert.deepEqual(observedTimeouts, [20, 5]);
 });
 
 test("entry identity capture retries with its own bounded hierarchy budget", async () => {
@@ -458,9 +493,31 @@ test("visual matrix retains each screen before the next navigation", () => {
   assert.doesNotMatch(source, /waitForNodeAndTap\(serial, \{ text: "(?:Charts|Calendar) view" \}\)/);
   assert.match(source, /testId: "insights-loaded-summary"/);
   assert.match(source, /text: `\$\{fixtureCount\} entries`/);
-  assert.match(insightsSource, /testID=\{!loading \? "insights-loaded-summary" : undefined\}/);
+  assert.match(insightsSource, /testID=\{!loading && !error \? "insights-loaded-summary" : undefined\}/);
   assert.match(source, /Calendar legend: a dot marks a day with multiple entries/);
   assert.match(source, /Local privacy/);
+});
+
+test("native evidence runners reject nonempty output before overwriting artifacts", () => {
+  const directory = mkdtempSync(join(tmpdir(), "moodinator-existing-evidence-"));
+  const marker = join(directory, "metadata.json");
+  const original = "existing evidence\n";
+  try {
+    writeFileSync(marker, original);
+    assert.throws(() => prepareStressEvidenceDirectory(directory), /must be empty/);
+    assert.equal(readFileSync(marker, "utf8"), original);
+    assert.throws(() => prepareMatrixEvidenceDirectory(directory), /must be empty/);
+    assert.equal(readFileSync(marker, "utf8"), original);
+
+    const newDirectory = join(directory, "new-output");
+    prepareStressEvidenceDirectory(newDirectory);
+    assert.equal(statSync(newDirectory).isDirectory(), true);
+    const emptyDirectory = join(directory, "empty-output");
+    mkdirSync(emptyDirectory);
+    prepareMatrixEvidenceDirectory(emptyDirectory);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("stress imports use size-aware completion deadlines", () => {
@@ -686,7 +743,8 @@ test("prepared QA provenance is authoritative and rejects stale environment SHAs
   const directory = mkdtempSync(join(tmpdir(), "moodinator-provenance-test-"));
   const preparedSha = "c".repeat(40);
   try {
-    const filePath = writePreparedSourceMetadata(directory, preparedSha);
+    writeFileSync(join(directory, "tracked.js"), "original\n");
+    const filePath = writePreparedSourceMetadata(directory, preparedSha, ["tracked.js"]);
     assert.equal(filePath, join(directory, QA_SOURCE_METADATA));
     assert.equal(statSync(filePath).mode & 0o777, 0o444);
     assert.equal(readPreparedSourceSha(directory, {}), preparedSha);
@@ -699,6 +757,11 @@ test("prepared QA provenance is authoritative and rejects stale environment SHAs
       () => readPreparedSourceSha(directory, { MOODINATOR_SOURCE_SHA: "mistyped" }),
       /does not match prepared source/,
     );
+    writeFileSync(join(directory, "tracked.js"), "edited after prepare\n");
+    assert.throws(
+      () => readPreparedSourceSha(directory, { MOODINATOR_SOURCE_SHA: preparedSha }),
+      /tracked\.js differs from source/,
+    );
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -706,9 +769,13 @@ test("prepared QA provenance is authoritative and rejects stale environment SHAs
 
 test("QA config derives its embedded SHA from prepared provenance", () => {
   const configSource = readFileSync(new URL("../app.config.js", import.meta.url), "utf8");
+  const metroSource = readFileSync(new URL("../metro.config.js", import.meta.url), "utf8");
   const prepareSource = readFileSync(new URL("../scripts/prepare-native-qa.js", import.meta.url), "utf8");
   assert.match(configSource, /readPreparedSourceSha\(__dirname, process\.env\)/);
-  assert.match(prepareSource, /writePreparedSourceMetadata\(destination, sourceSha\)/);
+  assert.match(metroSource, /MOODINATOR_VARIANT === "qa"/);
+  assert.match(metroSource, /readPreparedSourceSha\(__dirname, process\.env\)/);
+  assert.match(metroSource, /MOODINATOR_METRO_MAX_WORKERS/);
+  assert.match(prepareSource, /writePreparedSourceMetadata\(destination, sourceSha, copiedTracked\)/);
   assert.doesNotMatch(configSource, /const sourceSha = process\.env\.MOODINATOR_SOURCE_SHA/);
 });
 
