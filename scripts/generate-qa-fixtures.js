@@ -19,8 +19,9 @@ function fixtureNote(index, positive) {
   return `${positive ? "QA match" : "QA other"} ${String(index + 1).padStart(4, "0")}: fabricated native stress record.`;
 }
 
-function nativeStressEditNote(entryIndex) {
-  return `QA stress edit ${entryIndex}`;
+function nativeStressEditNote(entryIndex, originalNote) {
+  if (!originalNote) throw new Error(`Native stress edit ${entryIndex} requires its original note.`);
+  return `${originalNote} Edited for QA cycle ${entryIndex}.`;
 }
 
 /**
@@ -109,7 +110,7 @@ function applyNativeStressEditMutations(entries, entryIndexes) {
     entries,
     entryIndexes.map((entryIndex) => ({
       entryIndex,
-      note: nativeStressEditNote(entryIndex),
+      note: nativeStressEditNote(entryIndex, entries[entryIndex - 1]?.note),
     })),
   );
 }

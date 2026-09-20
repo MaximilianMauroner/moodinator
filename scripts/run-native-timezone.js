@@ -5,7 +5,10 @@ const path = require("node:path");
 
 const { createQaFixture } = require("./generate-qa-fixtures");
 const {
+  assertInstalledQaBuild,
+  combineOperationalErrors,
   evidenceAcceptance,
+  evidenceStatus,
   isToolUnavailable,
   requireSourceSha,
 } = require("./native-qa-common");
@@ -143,15 +146,6 @@ async function importFixture(serial, fixtureName) {
   await waitForNodeAndTap(serial, { text: "OK" }, { timeoutMs: 5000 });
 }
 
-function installGuard(serial) {
-  execFileSync("maestro", ["--version"], { stdio: "pipe", timeout: 15000 });
-  const installed = execFileSync("adb", ["-s", serial, "shell", "pm", "path", appId], {
-    encoding: "utf8",
-    timeout: 15000,
-  });
-  if (!installed.trim().startsWith("package:")) throw new Error(`The QA package ${appId} is not installed on ${serial}.`);
-}
-
 function writeEvidence(outputDirectory, evidence) {
   writeFileSync(path.join(outputDirectory, "timezone.json"), `${JSON.stringify(evidence, null, 2)}\n`);
 }
@@ -185,7 +179,7 @@ async function main(argv = process.argv.slice(2)) {
   let restoreError = null;
 
   try {
-    installGuard(options.serial);
+    await assertInstalledQaBuild(options.serial, sourceSha);
     writeFileSync(fixturePath, JSON.stringify(entries), { flag: "wx" });
     runAdb(options.serial, ["push", fixturePath, `/sdcard/Download/${fixtureName}`], { timeoutMs: 30000 });
     original = {
@@ -234,12 +228,17 @@ async function main(argv = process.argv.slice(2)) {
     }
   }
 
-  if (restoreError) operationalError ??= restoreError;
-  const evaluation = operationalError
+  const finalError = combineOperationalErrors(operationalError, restoreError);
+  const evaluation = finalError
     ? null
     : evaluateTimezoneObservations(observations);
-  const status = operationalError
-    ? isToolUnavailable(operationalError) ? "blocked" : "failed"
+  const status = finalError
+    ? evidenceStatus({
+      routeError: operationalError,
+      requiredFailures: restoreError ? [{
+        status: isToolUnavailable(restoreError) ? "blocked" : "failed",
+      }] : [],
+    })
     : evaluation.status;
   const evidence = {
     ...baseEvidence,
@@ -248,11 +247,12 @@ async function main(argv = process.argv.slice(2)) {
     observations,
     original,
     ...(evaluation ?? { stableRecordedLabel: false }),
-    ...(operationalError ? { blocker: operationalError.message } : {}),
+    ...(finalError ? { blocker: finalError.message } : {}),
+    restorationError: restoreError?.message ?? null,
   };
   writeEvidence(outputDirectory, evidence);
 
-  if (operationalError) throw operationalError;
+  if (finalError) throw finalError;
   if (status !== "passed") {
     throw new Error(`Timezone journey was ${status}; requested device states were not both verified.`);
   }

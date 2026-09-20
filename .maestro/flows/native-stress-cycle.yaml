@@ -4,6 +4,7 @@ name: Recycled-row stress cycle
 - launchApp:
     clearState: false
 - tapOn: "Home tab, log your mood"
+${TARGET_SETUP}
 - scrollUntilVisible:
     element:
       id: "mood-entry-stable-${ENTRY_TIMESTAMP}"
@@ -25,7 +26,7 @@ name: Recycled-row stress cycle
 - tapOn:
     id: "entry-notes"
 - eraseText
-- inputText: "QA stress edit ${ENTRY_ID}"
+- inputText: "${EDITED_NOTE}"
 - hideKeyboard
 - tapOn: "Save entry"
 - scrollUntilVisible:

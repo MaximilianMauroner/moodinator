@@ -1,4 +1,7 @@
+const { execFileSync } = require("node:child_process");
+
 const SOURCE_SHA_ENV = "MOODINATOR_SOURCE_SHA";
+const QA_APP_ID = "com.lab4code.moodinator.qa";
 
 function requireSourceSha(env = process.env) {
   const value = env[SOURCE_SHA_ENV];
@@ -17,10 +20,41 @@ function isToolUnavailable(error) {
 }
 
 function evidenceStatus({ routeError = null, requiredFailures = [] } = {}) {
-  if (routeError && isToolUnavailable(routeError)) return "blocked";
-  if (requiredFailures.some((failure) => failure.status === "blocked")) return "blocked";
-  if (routeError || requiredFailures.length > 0) return "failed";
+  if (routeError && !isToolUnavailable(routeError)) return "failed";
+  if (requiredFailures.some((failure) => failure.status !== "blocked")) return "failed";
+  if (routeError || requiredFailures.length > 0) return "blocked";
   return "passed";
+}
+
+function combineOperationalErrors(operationalError, restorationError) {
+  if (!restorationError) return operationalError;
+  if (!operationalError) return restorationError;
+  return new AggregateError(
+    [operationalError, restorationError],
+    `${operationalError.message} Restoration also failed: ${restorationError.message}`,
+  );
+}
+
+async function assertInstalledQaBuild(serial, sourceSha, {
+  appId = QA_APP_ID,
+  execFile = execFileSync,
+  waitForNodeImpl,
+} = {}) {
+  const installed = execFile("adb", ["-s", serial, "shell", "pm", "path", appId], {
+    encoding: "utf8",
+    timeout: 15000,
+  });
+  if (!installed.trim().startsWith("package:")) {
+    throw new Error(`The QA package ${appId} is not installed on ${serial}.`);
+  }
+  execFile("adb", ["-s", serial, "shell", "am", "force-stop", appId], { timeout: 15000 });
+  execFile("adb", ["-s", serial, "shell", "monkey", "-p", appId, "1"], {
+    stdio: "ignore",
+    timeout: 15000,
+  });
+  const waitForSource = waitForNodeImpl ?? require("./native-ui").waitForNode;
+  await waitForSource(serial, { testId: `qa-source-sha-${sourceSha}` }, { timeoutMs: 10000 });
+  return { appId, sourceSha };
 }
 
 function evidenceAcceptance(status) {
@@ -29,6 +63,8 @@ function evidenceAcceptance(status) {
 
 module.exports = {
   SOURCE_SHA_ENV,
+  assertInstalledQaBuild,
+  combineOperationalErrors,
   evidenceAcceptance,
   evidenceStatus,
   isToolUnavailable,

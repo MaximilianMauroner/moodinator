@@ -1,9 +1,8 @@
-const { execFileSync } = require("node:child_process");
 const { mkdirSync, mkdtempSync, writeFileSync } = require("node:fs");
 const { tmpdir } = require("node:os");
 const path = require("node:path");
 
-const { evidenceAcceptance, evidenceStatus, isToolUnavailable, requireSourceSha } = require("./native-qa-common");
+const { assertInstalledQaBuild, evidenceAcceptance, evidenceStatus, isToolUnavailable, requireSourceSha } = require("./native-qa-common");
 const { runDeleteUndoAcceptance } = require("./native-qa-runner");
 
 const appId = "com.lab4code.moodinator.qa";
@@ -22,15 +21,6 @@ function parseOptions(argv) {
     if (!output) throw new Error("Missing value for --out.");
   }
   return { serial, output };
-}
-
-function installGuard(serial) {
-  execFileSync("maestro", ["--version"], { stdio: "pipe", timeout: 15000 });
-  const installed = execFileSync("adb", ["-s", serial, "shell", "pm", "path", appId], {
-    encoding: "utf8",
-    timeout: 15000,
-  });
-  if (!installed.trim().startsWith("package:")) throw new Error("Moodinator QA is not installed on this emulator.");
 }
 
 function writeEvidence(outputDirectory, evidence) {
@@ -54,7 +44,7 @@ async function main(argv = process.argv.slice(2)) {
   };
 
   try {
-    installGuard(options.serial);
+    await assertInstalledQaBuild(options.serial, sourceSha);
     const result = await runDeleteUndoAcceptance(
       options.serial,
       ".maestro/smoke.yaml",

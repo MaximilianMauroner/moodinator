@@ -18,8 +18,14 @@ const {
   createUndoCoordination,
   transitionUndoCoordination,
 } = require("../scripts/native-qa-coordination.js");
-const { requireSourceSha } = require("../scripts/native-qa-common.js");
 const {
+  assertInstalledQaBuild,
+  combineOperationalErrors,
+  evidenceStatus,
+  requireSourceSha,
+} = require("../scripts/native-qa-common.js");
+const {
+  assertCoordinationPassed,
   entryIdentityCounts,
   entrySelectors,
   isExactlyOneRestoredEntry,
@@ -36,7 +42,9 @@ const {
   parseUiHierarchy,
 } = require("../scripts/native-ui.js");
 const {
+  assertInstalledQaBuild: stressInstalledBuildGuard,
   captureText,
+  materializeCycle,
   materializeFilter,
   pageBoundaryIds,
   startTrace,
@@ -247,13 +255,13 @@ test("filter expectations derive positive membership after the exact 1k/10k edit
     const pristine = combinedFilterExpectation(entries, { now });
     const edited = applyNativeStressEditMutations(entries, boundaries);
     const expectation = combinedFilterExpectation(edited, { now });
-    const expectedIndexes = pristine.matchingEntryIndexes.filter((entryIndex) => !boundaries.includes(entryIndex));
+    const expectedIndexes = pristine.matchingEntryIndexes;
 
     assert.deepEqual(expectation.matchingEntryIndexes, expectedIndexes);
-    assert.equal(expectation.count, count === 1000 ? 58 : 59);
+    assert.equal(expectation.count, 60);
     assert.equal(expectation.matchingEntryIndexes.includes(1), true);
-    assert.equal(expectation.matchingEntryIndexes.includes(51), false);
-    assert.equal(edited[50].note, "QA stress edit 51");
+    assert.equal(expectation.matchingEntryIndexes.includes(51), true);
+    assert.match(edited[50].note, /Edited for QA cycle 51/);
     assert.equal(edited[1].note.startsWith("QA other"), true);
 
     const directory = mkdtempSync(join(tmpdir(), "moodinator-filter-materialize-test-"));
@@ -266,6 +274,27 @@ test("filter expectations derive positive membership after the exact 1k/10k edit
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }
+  }
+});
+
+test("10k deep identities use a bounded exact-note indexed lookup", () => {
+  const directory = mkdtempSync(join(tmpdir(), "moodinator-indexed-cycle-test-"));
+  try {
+    const entries = createQaFixture(10000, { now: Date.UTC(2031, 4, 1) });
+    const entryIndex = 9951;
+    const identity = fixtureIdentity(entries, entryIndex, {
+      editedNote: `${entries[entryIndex - 1].note} Edited for QA cycle ${entryIndex}.`,
+    });
+    const flowPath = materializeCycle(directory, identity, 1, { indexedLookup: true });
+    const flow = readFileSync(flowPath, "utf8");
+    assert.match(flow, /Filter history/);
+    assert.match(flow, /Clear filters/);
+    assert.match(flow, new RegExp(String(identity.timestamp)));
+    assert.match(flow, /QA other 9951: fabricated native stress record\./);
+    assert.equal(flow.includes("${TARGET_SETUP}"), false);
+    assert.equal(flow.includes("${EDITED_NOTE}"), false);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
   }
 });
 
@@ -284,13 +313,58 @@ test("stress filter flow applies cleared drafts before asserting the full list",
   const flow = readFileSync(new URL("../.maestro/flows/native-stress-filters.yaml", import.meta.url), "utf8");
   const clearPositions = [...flow.matchAll(/- tapOn: "Clear filters"/g)].map((match) => match.index);
   assert.equal(clearPositions.length, 2);
-  for (const [index, clearPosition] of clearPositions.entries()) {
-    const nextClear = clearPositions[index + 1] ?? flow.length;
-    const showResults = flow.indexOf('- tapOn: "Show results"', clearPosition);
-    const nextAssertion = flow.indexOf("- assert", clearPosition);
-    assert.ok(showResults > clearPosition && showResults < nextClear);
-    assert.ok(nextAssertion > showResults);
-  }
+  const firstShowResults = flow.indexOf('- tapOn: "Show results"', clearPositions[0]);
+  assert.ok(firstShowResults > clearPositions[0] && firstShowResults < clearPositions[1]);
+  const finalAssertion = flow.indexOf("- assertVisible:", clearPositions[1]);
+  assert.ok(finalAssertion > clearPositions[1]);
+  assert.equal(flow.indexOf('- tapOn: "Show results"', clearPositions[1]), -1);
+  const postSave = flow.slice(flow.indexOf('- tapOn: "Save entry"'));
+  assert.equal(postSave.includes('${FILTER_COUNT} total'), false);
+});
+
+test("functional evidence failures outrank unavailable diagnostics", () => {
+  assert.equal(evidenceStatus({
+    routeError: new Error("Maestro assertion failed"),
+    requiredFailures: [{ status: "blocked" }],
+  }), "failed");
+  assert.equal(evidenceStatus({
+    routeError: new Error("adb not installed"),
+    requiredFailures: [{ status: "failed" }],
+  }), "failed");
+  assert.equal(evidenceStatus({
+    routeError: new Error("adb not installed"),
+    requiredFailures: [{ status: "blocked" }],
+  }), "blocked");
+});
+
+test("installed QA build must expose the requested source SHA", async () => {
+  assert.equal(stressInstalledBuildGuard, assertInstalledQaBuild);
+  const sourceSha = "b".repeat(40);
+  const calls = [];
+  const result = await assertInstalledQaBuild("emulator-5554", sourceSha, {
+    execFile: (_command, args) => {
+      calls.push(args);
+      return args.includes("path") ? "package:/data/app/base.apk\n" : "";
+    },
+    waitForNodeImpl: async (_serial, matcher) => {
+      assert.deepEqual(matcher, { testId: `qa-source-sha-${sourceSha}` });
+    },
+  });
+  assert.deepEqual(result, { appId: "com.lab4code.moodinator.qa", sourceSha });
+  assert.equal(calls.length, 3);
+});
+
+test("late restoration and cleanup failures fail closed", () => {
+  assert.throws(
+    () => assertCoordinationPassed({ phase: COORDINATION_PHASES.FAILED, failure: "restored too late" }),
+    /restored too late/,
+  );
+  const journeyError = new Error("journey failed");
+  const restorationError = new Error("restore failed");
+  const combined = combineOperationalErrors(journeyError, restorationError);
+  assert.match(combined.message, /journey failed/);
+  assert.match(combined.message, /Restoration also failed: restore failed/);
+  assert.deepEqual(combined.errors, [journeyError, restorationError]);
 });
 
 test("required ADB captures and trace finalization cannot produce accepted evidence on failure", () => {

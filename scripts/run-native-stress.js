@@ -17,6 +17,7 @@ const {
   nativeStressEditNote,
 } = require("./generate-qa-fixtures");
 const {
+  assertInstalledQaBuild,
   evidenceAcceptance,
   evidenceStatus,
   isToolUnavailable,
@@ -106,23 +107,25 @@ function captureJson(outputDirectory, name, value) {
   writeFileSync(path.join(outputDirectory, name), `${JSON.stringify(value, null, 2)}\n`);
 }
 
-function installGuard(serial) {
-  execFileSync("maestro", ["--version"], { stdio: "pipe", timeout: 15000 });
-  const installed = execFileSync("adb", ["-s", serial, "shell", "pm", "path", appId], {
-    encoding: "utf8",
-    timeout: 15000,
-  });
-  if (!installed.trim().startsWith("package:")) {
-    throw new Error(`The QA package ${appId} is not installed on ${serial}.`);
-  }
-}
-
-function materializeCycle(outputDirectory, identity, runNumber) {
+function materializeCycle(outputDirectory, identity, runNumber, { indexedLookup = false } = {}) {
   const template = readFileSync(cycleTemplatePath, "utf8");
+  const targetSetup = indexedLookup ? `- tapOn: "Filter history"
+- tapOn: "Clear filters"
+- scrollUntilVisible:
+    element:
+      id: "history-filter-note"
+    direction: DOWN
+- tapOn:
+    id: "history-filter-note"
+- inputText: "${identity.originalNote}"
+- hideKeyboard
+- tapOn: "Show results"` : "";
   const flow = template
+    .replaceAll("${TARGET_SETUP}", targetSetup)
     .replaceAll("${ENTRY_ID}", String(identity.entryIndex))
     .replaceAll("${ENTRY_TIMESTAMP}", String(identity.timestamp))
-    .replaceAll("${ORIGINAL_NOTE}", identity.originalNote);
+    .replaceAll("${ORIGINAL_NOTE}", identity.originalNote)
+    .replaceAll("${EDITED_NOTE}", identity.note);
   const flowPath = path.join(outputDirectory, `run-${runNumber}-cycle-${identity.entryIndex}.yaml`);
   writeFileSync(flowPath, flow);
   return flowPath;
@@ -333,7 +336,7 @@ function baseMetadata(options, sourceSha, entries, fixturePath, outputDirectory,
       combinedFilter: filter,
       editMutations: editIndexes.map((entryIndex) => ({
         entryIndex,
-        note: nativeStressEditNote(entryIndex),
+        note: nativeStressEditNote(entryIndex, entries[entryIndex - 1].note),
       })),
       firstMatchNote: editedEntries[filter.matchingEntryIndexes[0] - 1]?.note ?? null,
       firstNonMatchNote: editedEntries[1]?.note ?? null,
@@ -343,7 +346,9 @@ function baseMetadata(options, sourceSha, entries, fixturePath, outputDirectory,
 }
 
 function pageBoundaryIds(size) {
-  return size === 1000 ? [51, 501, 951] : [51, 5001, 9951];
+  if (size === 1000) return [51, 501, 951];
+  if (size === 10000) return [51, 5001, 9951];
+  throw new Error(`Unsupported stress fixture size: ${size}.`);
 }
 
 async function main(argv = process.argv.slice(2)) {
@@ -364,7 +369,7 @@ async function main(argv = process.argv.slice(2)) {
   let finalStatus = null;
 
   try {
-    installGuard(options.serial);
+    await assertInstalledQaBuild(options.serial, sourceSha);
     writeFileSync(fixturePath, JSON.stringify(entries), { flag: "wx" });
     runAdb(options.serial, ["push", fixturePath, `/sdcard/Download/${fixtureName}`], { timeoutMs: 120000 });
 
@@ -417,12 +422,14 @@ async function main(argv = process.argv.slice(2)) {
       try {
         for (const entryId of pageBoundaryIds(options.size)) {
           const identity = fixtureIdentity(entries, entryId, {
-            editedNote: `QA stress edit ${entryId}`,
+            editedNote: nativeStressEditNote(entryId, entries[entryId - 1].note),
           });
           console.log(`Stress route ${runNumber}: scrolling to recycled entry ${entryId}.`);
           const result = await runDeleteUndoAcceptance(
             options.serial,
-            materializeCycle(outputDirectory, identity, runNumber),
+            materializeCycle(outputDirectory, identity, runNumber, {
+              indexedLookup: options.size === 10000 && entryId > 51,
+            }),
             {
               cwd: root,
               target: identity,
@@ -496,7 +503,7 @@ async function main(argv = process.argv.slice(2)) {
 
     const status = runSummaries.every((summary) => summary.status === "passed")
       ? "passed"
-      : runSummaries.some((summary) => summary.status === "blocked") ? "blocked" : "failed";
+      : runSummaries.some((summary) => summary.status === "failed") ? "failed" : "blocked";
     finalStatus = status;
     const evidence = {
       ...metadata,
@@ -511,9 +518,9 @@ async function main(argv = process.argv.slice(2)) {
     console.log("Compare baseline and current summaries under identical device, refresh-rate, thermal, and run conditions; this command makes no improvement claim.");
   } catch (error) {
     const status = finalStatus
-      ?? (runSummaries.some((summary) => summary.status === "blocked") || isToolUnavailable(error)
-        ? "blocked"
-        : "failed");
+      ?? (runSummaries.some((summary) => summary.status === "failed") || !isToolUnavailable(error)
+        ? "failed"
+        : "blocked");
     captureJson(outputDirectory, "summary.json", {
       ...metadata,
       status,
@@ -534,6 +541,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  assertInstalledQaBuild,
   captureText,
   materializeCycle,
   materializeFilter,

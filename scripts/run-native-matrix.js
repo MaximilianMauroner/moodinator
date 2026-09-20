@@ -4,7 +4,10 @@ const { tmpdir } = require("node:os");
 const path = require("node:path");
 
 const {
+  assertInstalledQaBuild,
+  combineOperationalErrors,
   evidenceAcceptance,
+  evidenceStatus,
   isToolUnavailable,
   requireSourceSha,
 } = require("./native-qa-common");
@@ -128,17 +131,6 @@ function screenshot(serial, filePath) {
   writeFileSync(filePath, image);
 }
 
-function installGuard(serial) {
-  execFileSync("maestro", ["--version"], { stdio: "pipe", timeout: 15000 });
-  const installed = execFileSync("adb", ["-s", serial, "shell", "pm", "path", appId], {
-    encoding: "utf8",
-    timeout: 15000,
-  });
-  if (!installed.trim().startsWith("package:")) {
-    throw new Error(`The QA package ${appId} is not installed on ${serial}.`);
-  }
-}
-
 async function verifyFabricatedFixture(serial, { fixtureNote, fixtureCount }) {
   await waitForNode(serial, {
     allOf: [
@@ -187,7 +179,7 @@ async function main(argv = process.argv.slice(2)) {
   let operationalError = null;
   let restoreError = null;
   try {
-    installGuard(options.serial);
+    await assertInstalledQaBuild(options.serial, sourceSha);
     original = {
       fontScale: setting(options.serial, "system", "font_scale"),
       nightMode: setting(options.serial, "secure", "ui_night_mode"),
@@ -238,18 +230,24 @@ async function main(argv = process.argv.slice(2)) {
     }
   }
 
-  if (restoreError) operationalError ??= restoreError;
-  if (operationalError) {
-    const status = isToolUnavailable(operationalError) ? "blocked" : "failed";
+  const finalError = combineOperationalErrors(operationalError, restoreError);
+  if (finalError) {
+    const status = evidenceStatus({
+      routeError: operationalError,
+      requiredFailures: restoreError ? [{
+        status: isToolUnavailable(restoreError) ? "blocked" : "failed",
+      }] : [],
+    });
     writeEvidence(outputDirectory, {
       ...baseEvidence,
       status,
       acceptance: evidenceAcceptance(status),
       observations,
       original,
-      blocker: operationalError.message,
+      blocker: finalError.message,
+      restorationError: restoreError?.message ?? null,
     });
-    throw operationalError;
+    throw finalError;
   }
 
   writeEvidence(outputDirectory, {

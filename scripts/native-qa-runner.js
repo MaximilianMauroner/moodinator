@@ -32,6 +32,13 @@ const deleteMatcher = {
 const DEFAULT_MAESTRO_TIMEOUT_MS = 120000;
 const DEFAULT_RESTORATION_TIMEOUT_MS = 4000;
 
+function assertCoordinationPassed(coordination) {
+  if (coordination.phase !== "passed") {
+    throw new Error(coordination.failure || `Undo coordination ended in ${coordination.phase}.`);
+  }
+  return coordination;
+}
+
 function runMaestro(serial, flowPath, {
   cwd,
   timeoutMs = DEFAULT_MAESTRO_TIMEOUT_MS,
@@ -287,6 +294,7 @@ async function runDeleteUndoAcceptance(serial, flowPath, {
     timeoutMs: coordinationRemainingMs(coordination),
   });
   coordination = transition(coordination, "target-restored");
+  assertCoordinationPassed(coordination);
 
   return {
     coordination,
@@ -298,6 +306,7 @@ async function runDeleteUndoAcceptance(serial, flowPath, {
 
 module.exports = {
   DEFAULT_MAESTRO_TIMEOUT_MS,
+  assertCoordinationPassed,
   captureEntryIdentity,
   deleteMatcher,
   entryIdentityCounts,
