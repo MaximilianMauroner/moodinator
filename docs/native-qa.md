@@ -235,7 +235,10 @@ export MOODINATOR_SOURCE_SHA=<40-character-sha-from-originating-checkout>
 bun run qa:matrix -- emulator-5554 --fixture-note 'QA match 0001: fabricated native stress record.' --fixture-count 1000 --out /tmp/moodinator-native-matrix-current
 ```
 
-The matrix retains one screenshot per state. Android timezone travel should be
+The matrix retains one screenshot per state. A successful command proves state
+setup, fixture identity, and capture only; its evidence remains pending visual
+review for clipping/readability, and reduced-motion behavior still needs a live
+manual check. Android timezone travel should be
 run on a fresh fabricated fixture with its recorded `utcOffsetMinutes` and
 verified at UTC plus a second zone. The dedicated journey imports 100 entries,
 travels through UTC and Pacific/Auckland, and compares the row's accessibility

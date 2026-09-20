@@ -64,10 +64,16 @@ function restoreTimeZoneSettings(serial, original) {
 function readDeviceTimeZone(serial) {
   const settingsValue = setting(serial, "global", "time_zone");
   const propertyValue = runAdb(serial, ["shell", "getprop", "persist.sys.timezone"]).trim();
+  return selectRuntimeTimeZone(settingsValue, propertyValue);
+}
+
+function selectRuntimeTimeZone(settingsValue, propertyValue) {
   return {
     settings: settingsValue && settingsValue !== "null" ? settingsValue : null,
     property: propertyValue || null,
-    value: settingsValue && settingsValue !== "null" ? settingsValue : propertyValue || null,
+    // persist.sys.timezone is the runtime timezone used by Android. The global
+    // setting can echo a requested value even when the runtime rejected it.
+    value: propertyValue || null,
   };
 }
 
@@ -264,6 +270,7 @@ module.exports = {
   evaluateTimezoneObservations,
   parseOptions,
   readDeviceTimeZone,
+  selectRuntimeTimeZone,
   recordedLabelFromNode,
   timezoneEntryMatcher,
   timezoneEntryTestId,

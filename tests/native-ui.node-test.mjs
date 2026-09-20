@@ -51,6 +51,7 @@ const {
 const {
   evaluateTimezoneObservations,
   recordedLabelFromNode,
+  selectRuntimeTimeZone,
   timezoneEntryMatcher,
   timezoneEntryTestId,
   verifyRequestedTimeZone,
@@ -381,6 +382,16 @@ test("isolated evidence requires the originating full source SHA", () => {
 });
 
 test("timezone evidence requires accepted, distinct device states", () => {
+  assert.deepEqual(selectRuntimeTimeZone("Pacific/Auckland", "UTC"), {
+    settings: "Pacific/Auckland",
+    property: "UTC",
+    value: "UTC",
+  });
+  assert.deepEqual(selectRuntimeTimeZone("UTC", ""), {
+    settings: "UTC",
+    property: null,
+    value: null,
+  });
   assert.equal(verifyRequestedTimeZone("UTC", "UTC"), true);
   assert.equal(verifyRequestedTimeZone("Pacific/Auckland", "UTC"), false);
   const accepted = evaluateTimezoneObservations([

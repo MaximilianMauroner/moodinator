@@ -3,8 +3,8 @@ const { copyFileSync, existsSync, mkdirSync, mkdtempSync } = require("node:fs");
 const { tmpdir } = require("node:os");
 const path = require("node:path");
 
-// Copy the working tree, including current edits, without native build folders,
-// credentials, personal scratch files, or a dependency tree shared with another run.
+// Exact-SHA native evidence must come from a clean checkout. Otherwise the
+// copied bytes could differ from the SHA printed below.
 const root = path.resolve(__dirname, "..");
 const sourceSha = execFileSync("git", ["rev-parse", "HEAD"], {
   cwd: root,
@@ -13,12 +13,16 @@ const sourceSha = execFileSync("git", ["rev-parse", "HEAD"], {
 if (!/^[0-9a-f]{40}$/.test(sourceSha)) {
   throw new Error(`Originating checkout did not provide a full source SHA: ${sourceSha}`);
 }
+const worktreeStatus = execFileSync("git", ["status", "--porcelain", "--untracked-files=all"], {
+  cwd: root,
+  encoding: "utf8",
+}).trim();
+if (worktreeStatus) {
+  throw new Error("Native QA preparation requires a clean checkout so evidence matches the printed source SHA.");
+}
 const destination = mkdtempSync(path.join(tmpdir(), "moodinator-qa-"));
 const tracked = execFileSync("git", ["ls-files", "-z"], { cwd: root }).toString().split("\0");
-const untracked = execFileSync("git", ["ls-files", "--others", "--exclude-standard", "-z"], { cwd: root })
-  .toString().split("\0")
-  .filter((file) => /^(src\/|db\/|domain\/|assets\/|scripts\/|__tests__\/|docs\/|\.maestro\/|app\.config\.js$|\.node-version$)/.test(file));
-for (const file of new Set([...tracked, ...untracked])) {
+for (const file of tracked) {
   if (!file || /^(android|ios|node_modules|\.git|\.agents|credentials)\//.test(file)
     || /(^|\/)\.env|credentials|\.(jks|p12|key|pem)$/.test(file)) continue;
   const source = path.join(root, file);

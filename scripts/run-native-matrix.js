@@ -255,7 +255,10 @@ async function main(argv = process.argv.slice(2)) {
   writeEvidence(outputDirectory, {
     ...baseEvidence,
     status: "passed",
-    acceptance: "accepted",
+    // Automation proves the requested states and captures screenshots. A still
+    // image cannot prove reduced-motion behavior, and layout/readability still
+    // require visual review.
+    acceptance: "pending-visual-review",
     observations,
     original,
   });
