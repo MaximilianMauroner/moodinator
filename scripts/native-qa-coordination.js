@@ -104,6 +104,9 @@ function transitionUndoCoordination(state, event, at = Date.now()) {
       }
       return record(COORDINATION_PHASES.UNDO_VISIBLE);
     case `${COORDINATION_PHASES.UNDO_VISIBLE}:undo-tapped`:
+      if (at > state.undoDeadline) {
+        return failCoordination(state, "Undo was tapped after its deadline.", at);
+      }
       return record(COORDINATION_PHASES.AWAITING_RESTORATION, {
         restorationDeadline: at + state.restorationTimeoutMs,
       });

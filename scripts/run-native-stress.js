@@ -458,6 +458,9 @@ async function main(argv = process.argv.slice(2)) {
               exactlyOne: true,
             },
           });
+          await waitForNode(options.serial, { testId: "restored-mood-toast" }, {
+            timeoutMs: 2000,
+          });
           await waitForNodeHierarchyGone(options.serial, { testId: "restored-mood-toast" }, {
             timeoutMs: 5000,
           });

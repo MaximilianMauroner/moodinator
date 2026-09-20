@@ -204,13 +204,20 @@ async function waitForExactEntry(serial, identity, options = {}) {
   const timeoutMs = options.timeoutMs ?? DEFAULT_RESTORATION_TIMEOUT_MS;
   const deadline = Date.now() + timeoutMs;
   let lastCounts = null;
+  let lastInspectionError = null;
   while (Date.now() <= deadline) {
-    const nodes = readHierarchy(serial, options);
-    lastCounts = entryIdentityCounts(nodes, identity);
-    if (isExactlyOneRestoredEntry(nodes, identity)) return;
+    try {
+      const nodes = (options.readHierarchyImpl ?? readHierarchy)(serial, options);
+      lastCounts = entryIdentityCounts(nodes, identity);
+      lastInspectionError = null;
+      if (isExactlyOneRestoredEntry(nodes, identity)) return;
+    } catch (error) {
+      lastInspectionError = error;
+    }
     await new Promise((resolve) => setTimeout(resolve, options.pollIntervalMs ?? 80));
   }
-  throw new Error(`Exact restored entry was not present in one hierarchy snapshot: ${JSON.stringify(lastCounts)}.`);
+  const inspection = lastInspectionError ? ` Last inspection failed: ${lastInspectionError.message}.` : "";
+  throw new Error(`Exact restored entry was not present in one hierarchy snapshot: ${JSON.stringify(lastCounts)}.${inspection}`);
 }
 
 async function waitForEntryVisibleAbsent(serial, identity, options = {}) {

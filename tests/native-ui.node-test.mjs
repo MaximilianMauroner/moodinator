@@ -29,6 +29,7 @@ const {
   entryIdentityCounts,
   entrySelectors,
   isExactlyOneRestoredEntry,
+  waitForExactEntry,
 } = require("../scripts/native-qa-runner.js");
 const {
   findNodes,
@@ -211,6 +212,36 @@ test("late or out-of-order transient Undo observations fail closed", () => {
   state = transitionUndoCoordination(state, "undo-visible", 5003);
   assert.equal(state.phase, COORDINATION_PHASES.FAILED);
   assert.match(state.failure, /deadline/);
+
+  let lateTap = createUndoCoordination({ now: 0, undoWindowMs: 5000 });
+  lateTap = transitionUndoCoordination(lateTap, "maestro-complete", 0);
+  lateTap = transitionUndoCoordination(lateTap, "target-captured", 1);
+  lateTap = transitionUndoCoordination(lateTap, "delete-requested", 2);
+  lateTap = transitionUndoCoordination(lateTap, "target-absent", 3);
+  lateTap = transitionUndoCoordination(lateTap, "undo-visible", 4999);
+  lateTap = transitionUndoCoordination(lateTap, "undo-tapped", 5003);
+  assert.equal(lateTap.phase, COORDINATION_PHASES.FAILED);
+  assert.match(lateTap.failure, /tapped after/);
+});
+
+test("exact restoration retries transient hierarchy failures", async () => {
+  const identity = {
+    timestamp: 123,
+    note: "QA exact",
+    mood: 6,
+    selectors: entrySelectors({ timestamp: 123, note: "QA exact", mood: 6 }),
+  };
+  let attempts = 0;
+  await waitForExactEntry("emulator-5554", identity, {
+    timeoutMs: 100,
+    pollIntervalMs: 0,
+    readHierarchyImpl: () => {
+      attempts += 1;
+      if (attempts === 1) throw new Error("transient malformed dump");
+      return parseUiHierarchy(exactEntryHierarchy());
+    },
+  });
+  assert.equal(attempts, 2);
 });
 
 test("extracts comparable frame and memory counters from Android diagnostics", () => {
@@ -322,6 +353,23 @@ test("stress filter flow applies cleared drafts before asserting the full list",
   assert.equal(flow.indexOf('- tapOn: "Show results"', emptyStateClear), -1);
   const postSave = flow.slice(flow.indexOf('- tapOn: "Save entry"'));
   assert.equal(postSave.includes('${FILTER_COUNT} total'), false);
+});
+
+test("stress waits for the restored toast to appear before removal", () => {
+  const source = readFileSync(new URL("../scripts/run-native-stress.js", import.meta.url), "utf8");
+  const appeared = source.indexOf('waitForNode(options.serial, { testId: "restored-mood-toast" }');
+  const removed = source.indexOf('waitForNodeHierarchyGone(options.serial, { testId: "restored-mood-toast" }');
+  const memory = source.indexOf("const memory = captureText", appeared);
+  assert.ok(appeared >= 0 && removed > appeared && memory > removed);
+});
+
+test("visual matrix retains each screen before the next navigation", () => {
+  const source = readFileSync(new URL("../scripts/run-native-matrix.js", import.meta.url), "utf8");
+  for (const screen of ["home", "findings", "charts", "calendar", "settings"]) {
+    assert.match(source, new RegExp(`capture\\(\"${screen}\"\\)`));
+  }
+  const flow = readFileSync(new URL("../.maestro/flows/native-visual-matrix.yaml", import.meta.url), "utf8");
+  assert.equal(flow.includes("Insights tab"), false);
 });
 
 test("functional evidence failures outrank unavailable diagnostics", () => {

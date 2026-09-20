@@ -83,6 +83,11 @@ function setRuntimeTimeZone(serial, timeZone) {
   return actual;
 }
 
+function requestRuntimeTimeZone(serial, timeZone) {
+  runAdb(serial, ["shell", "cmd", "alarm", "set-timezone", timeZone]);
+  return readDeviceTimeZone(serial);
+}
+
 function readDeviceTimeZone(serial) {
   const settingsValue = setting(serial, "global", "time_zone");
   const propertyValue = runAdb(serial, ["shell", "getprop", "persist.sys.timezone"]).trim();
@@ -211,8 +216,7 @@ async function main(argv = process.argv.slice(2)) {
     for (const requestedTimeZone of ["UTC", "Pacific/Auckland"]) {
       setSetting(options.serial, "global", "auto_time_zone", "0");
       setSetting(options.serial, "global", "time_zone", requestedTimeZone);
-      setRuntimeTimeZone(options.serial, requestedTimeZone);
-      const actual = readDeviceTimeZone(options.serial);
+      const actual = requestRuntimeTimeZone(options.serial, requestedTimeZone);
       const accepted = verifyRequestedTimeZone(requestedTimeZone, actual.value);
       const observation = {
         requestedTimeZone,
@@ -294,6 +298,7 @@ module.exports = {
   selectRuntimeTimeZone,
   setRuntimeTimeZone,
   recordedLabelFromNode,
+  requestRuntimeTimeZone,
   timezoneEntryMatcher,
   timezoneEntryTestId,
   verifyRequestedTimeZone,

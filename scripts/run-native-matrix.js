@@ -11,7 +11,7 @@ const {
   isToolUnavailable,
   requireSourceSha,
 } = require("./native-qa-common");
-const { runAdb, waitForNode } = require("./native-ui");
+const { runAdb, waitForNode, waitForNodeAndTap } = require("./native-ui");
 
 const appId = "com.lab4code.moodinator.qa";
 const root = path.resolve(__dirname, "..");
@@ -131,6 +131,28 @@ function screenshot(serial, filePath) {
   writeFileSync(filePath, image);
 }
 
+async function captureMatrixScreens(serial, outputDirectory, stateName) {
+  const captures = [];
+  const capture = (screen) => {
+    const filePath = path.join(outputDirectory, `${stateName}-${screen}.png`);
+    screenshot(serial, filePath);
+    captures.push({ screen, screenshot: filePath });
+  };
+  capture("home");
+  await waitForNodeAndTap(serial, { contentDescription: "Insights tab, view mood history and summaries" });
+  await waitForNode(serial, { text: "Findings view" });
+  capture("findings");
+  await waitForNodeAndTap(serial, { text: "Charts view" });
+  await waitForNode(serial, { text: "Trend" });
+  capture("charts");
+  await waitForNodeAndTap(serial, { text: "Calendar view" });
+  capture("calendar");
+  await waitForNodeAndTap(serial, { contentDescription: "Settings tab, customize app preferences" });
+  await waitForNode(serial, { text: "Settings" }, { timeoutMs: 10000 });
+  capture("settings");
+  return captures;
+}
+
 async function verifyFabricatedFixture(serial, { fixtureNote, fixtureCount }) {
   await waitForNode(serial, {
     allOf: [
@@ -207,15 +229,14 @@ async function main(argv = process.argv.slice(2)) {
       console.log(`Native matrix state: ${state.name}`);
       runMaestro(options.serial);
       const fabricatedFixtureProof = await verifyFabricatedFixture(options.serial, options);
-      const screenshotPath = path.join(outputDirectory, `${state.name}.png`);
-      screenshot(options.serial, screenshotPath);
+      const screenshots = await captureMatrixScreens(options.serial, outputDirectory, state.name);
       observations.push({
         name: state.name,
         reducedMotion: state.reducedMotion,
         theme: themeReadback,
         animationScale: animationReadback,
         fabricatedFixtureProof,
-        screenshot: screenshotPath,
+        screenshots,
       });
     }
   } catch (error) {
@@ -272,6 +293,7 @@ if (require.main === module) {
 
 module.exports = {
   animationValueForState,
+  captureMatrixScreens,
   isAbsentSettingValue,
   parseOptions,
   readBackSetting,
