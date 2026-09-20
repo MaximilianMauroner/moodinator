@@ -2,6 +2,7 @@ const { execFileSync } = require("node:child_process");
 const { copyFileSync, existsSync, mkdirSync, mkdtempSync } = require("node:fs");
 const { tmpdir } = require("node:os");
 const path = require("node:path");
+const { writePreparedSourceMetadata } = require("./qa-source-provenance");
 
 // Exact-SHA native evidence must come from a clean checkout. Otherwise the
 // copied bytes could differ from the SHA printed below.
@@ -31,7 +32,9 @@ for (const file of tracked) {
   mkdirSync(path.dirname(target), { recursive: true });
   copyFileSync(source, target);
 }
+const sourceMetadata = writePreparedSourceMetadata(destination, sourceSha);
 console.log(`QA workspace: ${destination}`);
+console.log(`QA source metadata: ${sourceMetadata}`);
 console.log(`export MOODINATOR_SOURCE_SHA=${sourceSha}`);
 console.log("In that directory: bun install --frozen-lockfile");
 console.log("Then: MOODINATOR_VARIANT=qa bunx expo run:android --variant release --device");

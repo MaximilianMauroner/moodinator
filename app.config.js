@@ -1,10 +1,9 @@
+const { readPreparedSourceSha } = require("./scripts/qa-source-provenance");
+
 module.exports = ({ config }) => {
   if (process.env.MOODINATOR_VARIANT !== "qa") return config;
 
-  const sourceSha = process.env.MOODINATOR_SOURCE_SHA;
-  if (!sourceSha || !/^[0-9a-f]{40}$/.test(sourceSha)) {
-    throw new Error("QA builds require MOODINATOR_SOURCE_SHA as a full lowercase Git SHA.");
-  }
+  const sourceSha = readPreparedSourceSha(__dirname, process.env);
 
   return {
     ...config,

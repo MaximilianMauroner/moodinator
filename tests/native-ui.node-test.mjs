@@ -1,11 +1,16 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
 const require = createRequire(import.meta.url);
+const {
+  QA_SOURCE_METADATA,
+  readPreparedSourceSha,
+  writePreparedSourceMetadata,
+} = require("../scripts/qa-source-provenance.js");
 const {
   applyNativeStressEditMutations,
   combinedFilterExpectation,
@@ -559,6 +564,36 @@ test("isolated evidence requires the originating full source SHA", () => {
     () => requireSourceSha({}),
     /MOODINATOR_SOURCE_SHA is required/,
   );
+});
+
+test("prepared QA provenance is authoritative and rejects stale environment SHAs", () => {
+  const directory = mkdtempSync(join(tmpdir(), "moodinator-provenance-test-"));
+  const preparedSha = "c".repeat(40);
+  try {
+    const filePath = writePreparedSourceMetadata(directory, preparedSha);
+    assert.equal(filePath, join(directory, QA_SOURCE_METADATA));
+    assert.equal(statSync(filePath).mode & 0o777, 0o444);
+    assert.equal(readPreparedSourceSha(directory, {}), preparedSha);
+    assert.equal(readPreparedSourceSha(directory, { MOODINATOR_SOURCE_SHA: preparedSha }), preparedSha);
+    assert.throws(
+      () => readPreparedSourceSha(directory, { MOODINATOR_SOURCE_SHA: "d".repeat(40) }),
+      /does not match prepared source/,
+    );
+    assert.throws(
+      () => readPreparedSourceSha(directory, { MOODINATOR_SOURCE_SHA: "mistyped" }),
+      /does not match prepared source/,
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("QA config derives its embedded SHA from prepared provenance", () => {
+  const configSource = readFileSync(new URL("../app.config.js", import.meta.url), "utf8");
+  const prepareSource = readFileSync(new URL("../scripts/prepare-native-qa.js", import.meta.url), "utf8");
+  assert.match(configSource, /readPreparedSourceSha\(__dirname, process\.env\)/);
+  assert.match(prepareSource, /writePreparedSourceMetadata\(destination, sourceSha\)/);
+  assert.doesNotMatch(configSource, /const sourceSha = process\.env\.MOODINATOR_SOURCE_SHA/);
 });
 
 test("timezone evidence requires accepted, distinct device states", () => {
