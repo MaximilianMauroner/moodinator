@@ -53,7 +53,6 @@ function restoreTimeZoneSettings(serial, original) {
   let firstError = null;
   for (const [namespace, key, value] of [
     ["global", "time_zone", original.timeZone],
-    ["global", "auto_time_zone", original.autoTimeZone],
   ]) {
     try {
       restoreSetting(serial, namespace, key, value);
@@ -61,7 +60,27 @@ function restoreTimeZoneSettings(serial, original) {
       firstError ??= error;
     }
   }
+  try {
+    setRuntimeTimeZone(serial, original.runtimeTimeZone);
+  } catch (error) {
+    firstError ??= error;
+  }
+  try {
+    restoreSetting(serial, "global", "auto_time_zone", original.autoTimeZone);
+  } catch (error) {
+    firstError ??= error;
+  }
   if (firstError) throw firstError;
+}
+
+function setRuntimeTimeZone(serial, timeZone) {
+  if (!timeZone) throw new Error("The original runtime timezone was unavailable and cannot be restored safely.");
+  runAdb(serial, ["shell", "cmd", "alarm", "set-timezone", timeZone]);
+  const actual = readDeviceTimeZone(serial).value;
+  if (actual !== timeZone) {
+    throw new Error(`Android runtime timezone was ${actual ?? "unavailable"}, expected ${timeZone}.`);
+  }
+  return actual;
 }
 
 function readDeviceTimeZone(serial) {
@@ -185,12 +204,14 @@ async function main(argv = process.argv.slice(2)) {
     original = {
       autoTimeZone: setting(options.serial, "global", "auto_time_zone"),
       timeZone: setting(options.serial, "global", "time_zone"),
+      runtimeTimeZone: readDeviceTimeZone(options.serial).value,
     };
 
     await importFixture(options.serial, fixtureName);
     for (const requestedTimeZone of ["UTC", "Pacific/Auckland"]) {
       setSetting(options.serial, "global", "auto_time_zone", "0");
       setSetting(options.serial, "global", "time_zone", requestedTimeZone);
+      setRuntimeTimeZone(options.serial, requestedTimeZone);
       const actual = readDeviceTimeZone(options.serial);
       const accepted = verifyRequestedTimeZone(requestedTimeZone, actual.value);
       const observation = {
@@ -271,6 +292,7 @@ module.exports = {
   parseOptions,
   readDeviceTimeZone,
   selectRuntimeTimeZone,
+  setRuntimeTimeZone,
   recordedLabelFromNode,
   timezoneEntryMatcher,
   timezoneEntryTestId,

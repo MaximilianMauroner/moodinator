@@ -5,6 +5,7 @@ name: Discriminating combined history filters and refresh
     clearState: false
 - tapOn: "Home tab, log your mood"
 - tapOn: "Filter history"
+- tapOn: "Clear filters"
 - tapOn: "Last 90 days"
 - tapOn:
     id: "history-filter-mood-6"

@@ -312,12 +312,14 @@ test("fixture identities preserve exact original and edited values", () => {
 test("stress filter flow applies cleared drafts before asserting the full list", () => {
   const flow = readFileSync(new URL("../.maestro/flows/native-stress-filters.yaml", import.meta.url), "utf8");
   const clearPositions = [...flow.matchAll(/- tapOn: "Clear filters"/g)].map((match) => match.index);
-  assert.equal(clearPositions.length, 2);
-  const firstShowResults = flow.indexOf('- tapOn: "Show results"', clearPositions[0]);
-  assert.ok(firstShowResults > clearPositions[0] && firstShowResults < clearPositions[1]);
-  const finalAssertion = flow.indexOf("- assertVisible:", clearPositions[1]);
-  assert.ok(finalAssertion > clearPositions[1]);
-  assert.equal(flow.indexOf('- tapOn: "Show results"', clearPositions[1]), -1);
+  assert.equal(clearPositions.length, 3);
+  const appliedClear = clearPositions[1];
+  const emptyStateClear = clearPositions[2];
+  const firstShowResults = flow.indexOf('- tapOn: "Show results"', appliedClear);
+  assert.ok(firstShowResults > appliedClear && firstShowResults < emptyStateClear);
+  const finalAssertion = flow.indexOf("- assertVisible:", emptyStateClear);
+  assert.ok(finalAssertion > emptyStateClear);
+  assert.equal(flow.indexOf('- tapOn: "Show results"', emptyStateClear), -1);
   const postSave = flow.slice(flow.indexOf('- tapOn: "Save entry"'));
   assert.equal(postSave.includes('${FILTER_COUNT} total'), false);
 });

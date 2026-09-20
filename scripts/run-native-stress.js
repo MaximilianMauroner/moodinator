@@ -29,6 +29,7 @@ const {
   runAdb,
   waitForNode,
   waitForNodeAndTap,
+  waitForNodeHierarchyGone,
 } = require("./native-ui");
 const { runDeleteUndoAcceptance, runMaestro } = require("./native-qa-runner");
 
@@ -456,6 +457,9 @@ async function main(argv = process.argv.slice(2)) {
               exactIdentity: result.identity,
               exactlyOne: true,
             },
+          });
+          await waitForNodeHierarchyGone(options.serial, { testId: "restored-mood-toast" }, {
+            timeoutMs: 5000,
           });
           const memory = captureText(
             options.serial,

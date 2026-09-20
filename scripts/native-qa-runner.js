@@ -50,23 +50,31 @@ function runMaestro(serial, flowPath, {
       stdio: "inherit",
     });
     let settled = false;
+    let timedOut = false;
+    let killTimer = null;
     const timer = setTimeout(() => {
       if (settled) return;
-      settled = true;
+      timedOut = true;
       child.kill("SIGTERM");
-      reject(new Error(`Maestro exceeded its ${timeoutMs}ms timeout.`));
+      killTimer = setTimeout(() => child.kill("SIGKILL"), 2000);
     }, timeoutMs);
 
     child.once("error", (error) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      if (killTimer) clearTimeout(killTimer);
       reject(error);
     });
     child.once("exit", (code, signal) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      if (killTimer) clearTimeout(killTimer);
+      if (timedOut) {
+        reject(new Error(`Maestro exceeded its ${timeoutMs}ms timeout and exited ${code ?? `from ${signal}`}.`));
+        return;
+      }
       if (code !== 0) {
         reject(new Error(`Maestro exited ${code ?? `from ${signal}`}.`));
         return;
@@ -195,16 +203,14 @@ async function waitForEntryState(serial, identity, expectedCount, {
 async function waitForExactEntry(serial, identity, options = {}) {
   const timeoutMs = options.timeoutMs ?? DEFAULT_RESTORATION_TIMEOUT_MS;
   const deadline = Date.now() + timeoutMs;
-  await waitForEntryState(serial, identity, 1, {
-    ...options,
-    scope: "visible",
-    timeoutMs: Math.max(0, deadline - Date.now()),
-  });
-  await waitForEntryState(serial, identity, 1, {
-    ...options,
-    scope: "hierarchy",
-    timeoutMs: Math.max(0, deadline - Date.now()),
-  });
+  let lastCounts = null;
+  while (Date.now() <= deadline) {
+    const nodes = readHierarchy(serial, options);
+    lastCounts = entryIdentityCounts(nodes, identity);
+    if (isExactlyOneRestoredEntry(nodes, identity)) return;
+    await new Promise((resolve) => setTimeout(resolve, options.pollIntervalMs ?? 80));
+  }
+  throw new Error(`Exact restored entry was not present in one hierarchy snapshot: ${JSON.stringify(lastCounts)}.`);
 }
 
 async function waitForEntryVisibleAbsent(serial, identity, options = {}) {
