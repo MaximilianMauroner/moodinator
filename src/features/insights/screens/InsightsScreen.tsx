@@ -148,7 +148,10 @@ export function InsightsScreen() {
                 </Pressable>
               ))}
             </View>
-            <Text className="px-4 mb-3 text-sm text-paper-700 dark:text-sand-300">
+            <Text
+              testID={!loading ? "insights-loaded-summary" : undefined}
+              className="px-4 mb-3 text-sm text-paper-700 dark:text-sand-300"
+            >
               {analysisRange === "all"
                 ? "All history"
                 : `Last ${analysisRange} days`}{" "}

@@ -146,7 +146,7 @@ function screenshot(serial, filePath) {
   writeFileSync(filePath, image);
 }
 
-async function captureMatrixScreens(serial, outputDirectory, stateName) {
+async function captureMatrixScreens(serial, outputDirectory, stateName, fixtureCount) {
   const captures = [];
   const capture = (screen) => {
     const filePath = path.join(outputDirectory, `${stateName}-${screen}.png`);
@@ -155,7 +155,12 @@ async function captureMatrixScreens(serial, outputDirectory, stateName) {
   };
   capture("home");
   await waitForNodeAndTap(serial, { contentDescription: "Insights tab, view mood history and summaries" });
-  await waitForNode(serial, { text: "These are associations in your entries, not explanations.", contains: true }, { timeoutMs: 15000 });
+  await waitForNode(serial, {
+    allOf: [
+      { testId: "insights-loaded-summary" },
+      { text: `${fixtureCount} entries`, contains: true },
+    ],
+  }, { timeoutMs: 15000 });
   capture("findings");
   await waitForNodeAndTap(serial, { text: "Charts view" });
   await waitForNode(serial, { text: "Trend" });
@@ -246,7 +251,12 @@ async function main(argv = process.argv.slice(2)) {
       console.log(`Native matrix state: ${state.name}`);
       runMaestro(options.serial);
       const fabricatedFixtureProof = await verifyFabricatedFixture(options.serial, options);
-      const screenshots = await captureMatrixScreens(options.serial, outputDirectory, state.name);
+      const screenshots = await captureMatrixScreens(
+        options.serial,
+        outputDirectory,
+        state.name,
+        options.fixtureCount,
+      );
       observations.push({
         name: state.name,
         reducedMotion: state.reducedMotion,

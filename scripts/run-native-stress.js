@@ -176,7 +176,13 @@ function materializeFilter(outputDirectory, entries, size, referenceNow) {
   };
 }
 
-async function importFixture(serial, fixtureName) {
+function importCompletionTimeoutMs(size) {
+  if (size === 1000) return 120000;
+  if (size === 10000) return 600000;
+  throw new Error(`Unsupported stress fixture size: ${size}.`);
+}
+
+async function importFixture(serial, fixtureName, size) {
   await runMaestro(serial, importFlow, { cwd: root });
 
   try {
@@ -187,7 +193,9 @@ async function importFixture(serial, fixtureName) {
   }
 
   await waitForNodeAndTap(serial, { text: "Replace Data" }, { timeoutMs: 5000 });
-  await waitForNode(serial, { text: "Import Successful", contains: true }, { timeoutMs: 15000 });
+  await waitForNode(serial, { text: "Import Successful", contains: true }, {
+    timeoutMs: importCompletionTimeoutMs(size),
+  });
   await waitForNodeAndTap(serial, { text: "OK" }, { timeoutMs: 5000 });
 }
 
@@ -298,7 +306,16 @@ function summarizeRunEvidence({
       error: gfxReset?.error ?? "capture did not run",
     });
   }
-  checkCapture("gfxinfo", gfx, parseGfxInfo(gfx?.output ?? ""), ["totalFrames", "jankyFrames"]);
+  const parsedGfx = parseGfxInfo(gfx?.output ?? "");
+  checkCapture("gfxinfo", gfx, parsedGfx, ["totalFrames", "jankyFrames"]);
+  if (gfx?.ok && !missingMetricFields(parsedGfx, ["totalFrames", "jankyFrames"]).length
+      && parsedGfx.totalFrames <= 0) {
+    requiredFailures.push({
+      label: "gfxinfo",
+      status: "failed",
+      error: "Total frames rendered must be greater than zero.",
+    });
+  }
   if (!trace?.ok) requiredFailures.push({
     label: "scroll trace",
     status: trace?.status === "blocked" ? "blocked" : "failed",
@@ -425,7 +442,7 @@ async function main(argv = process.argv.slice(2)) {
 
     for (let runNumber = 1; runNumber <= options.runs; runNumber++) {
       console.log(`Importing ${options.size} fabricated entries for route ${runNumber}/${options.runs}.`);
-      await importFixture(options.serial, fixtureName);
+      await importFixture(options.serial, fixtureName, options.size);
       await settleImportedHistory(options.serial, options.size);
 
       const runPrefix = `run-${runNumber}`;
@@ -582,6 +599,7 @@ if (require.main === module) {
 module.exports = {
   assertInstalledQaBuild,
   captureText,
+  importCompletionTimeoutMs,
   materializeCycle,
   materializeFilter,
   pageBoundaryIds,

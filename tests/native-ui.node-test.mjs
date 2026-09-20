@@ -50,6 +50,7 @@ const {
 const {
   assertInstalledQaBuild: stressInstalledBuildGuard,
   captureText,
+  importCompletionTimeoutMs,
   materializeCycle,
   materializeFilter,
   pageBoundaryIds,
@@ -410,14 +411,26 @@ test("stress waits for the restored toast to appear before removal", () => {
 
 test("visual matrix retains each screen before the next navigation", () => {
   const source = readFileSync(new URL("../scripts/run-native-matrix.js", import.meta.url), "utf8");
+  const insightsSource = readFileSync(
+    new URL("../src/features/insights/screens/InsightsScreen.tsx", import.meta.url),
+    "utf8",
+  );
   for (const screen of ["home", "findings", "charts", "calendar", "settings"]) {
     assert.match(source, new RegExp(`capture\\(\"${screen}\"\\)`));
   }
   const flow = readFileSync(new URL("../.maestro/flows/native-visual-matrix.yaml", import.meta.url), "utf8");
   assert.equal(flow.includes("Insights tab"), false);
-  assert.match(source, /associations in your entries, not explanations/);
+  assert.match(source, /testId: "insights-loaded-summary"/);
+  assert.match(source, /text: `\$\{fixtureCount\} entries`/);
+  assert.match(insightsSource, /testID=\{!loading \? "insights-loaded-summary" : undefined\}/);
   assert.match(source, /Calendar legend: a dot marks a day with multiple entries/);
   assert.match(source, /Local privacy/);
+});
+
+test("stress imports use size-aware completion deadlines", () => {
+  assert.equal(importCompletionTimeoutMs(1000), 120000);
+  assert.equal(importCompletionTimeoutMs(10000), 600000);
+  assert.throws(() => importCompletionTimeoutMs(100), /Unsupported stress fixture size/);
 });
 
 test("Undo runner captures the row before opening its actions modal", () => {
@@ -435,7 +448,7 @@ test("Undo runner captures the row before opening its actions modal", () => {
 test("stress settles imported Home history before performance reset", () => {
   assert.equal(typeof settleImportedHistory, "function");
   const source = readFileSync(new URL("../scripts/run-native-stress.js", import.meta.url), "utf8");
-  const imported = source.indexOf("await importFixture(options.serial, fixtureName)");
+  const imported = source.indexOf("await importFixture(options.serial, fixtureName, options.size)");
   const settled = source.indexOf("await settleImportedHistory(options.serial, options.size)", imported);
   const reset = source.indexOf("const gfxReset = captureText", settled);
   const baseline = source.indexOf("const beforeMemory = captureText", settled);
@@ -535,6 +548,21 @@ test("required ADB captures and trace finalization cannot produce accepted evide
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test("zero-frame gfx captures fail required stress evidence", () => {
+  const successfulCapture = { ok: true, output: diagnosticMemory };
+  const summary = summarizeRunEvidence({
+    run: 1,
+    beforeMemory: successfulCapture,
+    boundaryMemory: [],
+    afterMemory: successfulCapture,
+    gfxReset: { ok: true, output: "reset" },
+    gfx: { ok: true, output: "Total frames rendered: 0\nJanky frames: 0 (0.00%)\n" },
+    trace: { ok: true, status: "captured" },
+  });
+  assert.equal(summary.status, "failed");
+  assert.match(summary.requiredEvidenceFailures[0].error, /greater than zero/);
 });
 
 test("trace evidence is captured only after a successful non-empty stop", () => {
