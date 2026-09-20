@@ -83,9 +83,17 @@ function setRuntimeTimeZone(serial, timeZone) {
   return actual;
 }
 
-function requestRuntimeTimeZone(serial, timeZone) {
-  runAdb(serial, ["shell", "cmd", "alarm", "set-timezone", timeZone]);
-  return readDeviceTimeZone(serial);
+function requestRuntimeTimeZone(serial, timeZone, {
+  runAdbImpl = runAdb,
+  readDeviceTimeZoneImpl = readDeviceTimeZone,
+} = {}) {
+  let requestError = null;
+  try {
+    runAdbImpl(serial, ["shell", "cmd", "alarm", "set-timezone", timeZone]);
+  } catch (error) {
+    requestError = error.message;
+  }
+  return { ...readDeviceTimeZoneImpl(serial), requestError };
 }
 
 function readDeviceTimeZone(serial) {
@@ -217,7 +225,7 @@ async function main(argv = process.argv.slice(2)) {
       setSetting(options.serial, "global", "auto_time_zone", "0");
       setSetting(options.serial, "global", "time_zone", requestedTimeZone);
       const actual = requestRuntimeTimeZone(options.serial, requestedTimeZone);
-      const accepted = verifyRequestedTimeZone(requestedTimeZone, actual.value);
+      const accepted = !actual.requestError && verifyRequestedTimeZone(requestedTimeZone, actual.value);
       const observation = {
         requestedTimeZone,
         actualTimeZone: actual.value,
@@ -226,7 +234,9 @@ async function main(argv = process.argv.slice(2)) {
         tested: false,
       };
       if (!accepted) {
-        observation.blockedReason = `The device kept ${actual.value ?? "no timezone"} after requesting ${requestedTimeZone}.`;
+        observation.blockedReason = actual.requestError
+          ? `The device rejected ${requestedTimeZone}: ${actual.requestError}`
+          : `The device kept ${actual.value ?? "no timezone"} after requesting ${requestedTimeZone}.`;
         observations.push(observation);
         continue;
       }

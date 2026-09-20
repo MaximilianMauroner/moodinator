@@ -66,6 +66,7 @@ const {
 const {
   evaluateTimezoneObservations,
   recordedLabelFromNode,
+  requestRuntimeTimeZone,
   selectRuntimeTimeZone,
   timezoneEntryMatcher,
   timezoneEntryTestId,
@@ -597,6 +598,12 @@ test("QA config derives its embedded SHA from prepared provenance", () => {
 });
 
 test("timezone evidence requires accepted, distinct device states", () => {
+  const rejected = requestRuntimeTimeZone("emulator-5554", "UTC", {
+    runAdbImpl: () => { throw new Error("permission denied"); },
+    readDeviceTimeZoneImpl: () => ({ settings: "UTC", property: "UTC", value: "UTC" }),
+  });
+  assert.equal(rejected.requestError, "permission denied");
+  assert.equal(Boolean(!rejected.requestError && verifyRequestedTimeZone("UTC", rejected.value)), false);
   assert.deepEqual(selectRuntimeTimeZone("Pacific/Auckland", "UTC"), {
     settings: "Pacific/Auckland",
     property: "UTC",
