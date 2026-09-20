@@ -48,6 +48,7 @@ const {
   materializeCycle,
   materializeFilter,
   pageBoundaryIds,
+  settleImportedHistory,
   startTrace,
   stopTrace,
   summarizeRunEvidence,
@@ -385,6 +386,31 @@ test("visual matrix retains each screen before the next navigation", () => {
   assert.equal(flow.includes("Insights tab"), false);
   assert.match(source, /associations in your entries, not explanations/);
   assert.match(source, /Calendar legend: a dot marks a day with multiple entries/);
+  assert.match(source, /Local privacy/);
+});
+
+test("Undo runner captures the row before opening its actions modal", () => {
+  const smoke = readFileSync(new URL("../.maestro/smoke.yaml", import.meta.url), "utf8");
+  const cycle = readFileSync(new URL("../.maestro/flows/native-stress-cycle.yaml", import.meta.url), "utf8");
+  assert.equal(smoke.includes('assertVisible: "Delete entry"'), false);
+  assert.equal(cycle.includes('assertVisible: "Delete entry"'), false);
+  const source = readFileSync(new URL("../scripts/native-qa-runner.js", import.meta.url), "utf8");
+  const capture = source.indexOf("const identity = captureEntryIdentity");
+  const openActions = source.indexOf("const actionsNode = await waitForNode", capture);
+  const deleteAction = source.indexOf("const deleteNode = await waitForNode", openActions);
+  assert.ok(capture >= 0 && openActions > capture && deleteAction > openActions);
+});
+
+test("stress settles imported Home history before performance reset", () => {
+  assert.equal(typeof settleImportedHistory, "function");
+  const source = readFileSync(new URL("../scripts/run-native-stress.js", import.meta.url), "utf8");
+  const imported = source.indexOf("await importFixture(options.serial, fixtureName)");
+  const settled = source.indexOf("await settleImportedHistory(options.serial, options.size)", imported);
+  const reset = source.indexOf("const gfxReset = captureText", settled);
+  const baseline = source.indexOf("const beforeMemory = captureText", settled);
+  assert.ok(imported >= 0 && settled > imported && reset > settled && baseline > settled);
+  assert.match(source, /testId: "history-count"/);
+  assert.match(source, /text: `\$\{expectedCount\} total`/);
 });
 
 test("delete timing starts before the synchronous ADB tap", () => {

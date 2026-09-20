@@ -149,7 +149,7 @@ async function captureMatrixScreens(serial, outputDirectory, stateName) {
   await waitForNode(serial, { contentDescription: "Calendar legend: a dot marks a day with multiple entries." }, { timeoutMs: 15000 });
   capture("calendar");
   await waitForNodeAndTap(serial, { contentDescription: "Settings tab, customize app preferences" });
-  await waitForNode(serial, { text: "Settings" }, { timeoutMs: 10000 });
+  await waitForNode(serial, { text: "Local privacy" }, { timeoutMs: 10000 });
   capture("settings");
   return captures;
 }

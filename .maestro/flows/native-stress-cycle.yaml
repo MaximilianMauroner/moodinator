@@ -33,6 +33,3 @@ ${TARGET_SETUP}
     element:
       id: "mood-entry-actions-${ENTRY_TIMESTAMP}"
     direction: DOWN
-- tapOn:
-    id: "mood-entry-actions-${ENTRY_TIMESTAMP}"
-- assertVisible: "Delete entry"

@@ -272,6 +272,14 @@ async function runDeleteUndoAcceptance(serial, flowPath, {
   });
   coordination = transition(coordination, "target-captured");
 
+  const actionsNode = await waitForNode(serial, {
+    testId: `mood-entry-actions-${identity.timestamp}`,
+  }, {
+    ...waitOptions,
+    timeoutMs: waitOptions.actionsTimeoutMs ?? 3000,
+  });
+  tapNode(serial, actionsNode, waitOptions);
+
   // A prior toast would make an early hierarchy match a false positive. It must
   // be absent before this deletion begins.
   await waitForNodeHierarchyGone(serial, undoMatcher, {

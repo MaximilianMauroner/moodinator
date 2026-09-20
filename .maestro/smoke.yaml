@@ -86,6 +86,3 @@ name: Isolated Android entry lifecycle
 - assertVisible: "Your history · 1 entry"
 - runFlow: flows/insights.yaml
 - tapOn: "Home tab, log your mood"
-- tapOn:
-    id: "mood-entry-actions-.*"
-- assertVisible: "Delete entry"

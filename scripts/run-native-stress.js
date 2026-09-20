@@ -191,6 +191,16 @@ async function importFixture(serial, fixtureName) {
   await waitForNodeAndTap(serial, { text: "OK" }, { timeoutMs: 5000 });
 }
 
+async function settleImportedHistory(serial, expectedCount) {
+  await waitForNodeAndTap(serial, { contentDescription: "Home tab, log your mood" }, { timeoutMs: 5000 });
+  await waitForNode(serial, {
+    allOf: [
+      { testId: "history-count" },
+      { text: `${expectedCount} total` },
+    ],
+  }, { timeoutMs: 30000 });
+}
+
 function startTrace(serial, {
   runAdbImpl = runAdb,
   timeoutMs = 5000,
@@ -397,6 +407,7 @@ async function main(argv = process.argv.slice(2)) {
     for (let runNumber = 1; runNumber <= options.runs; runNumber++) {
       console.log(`Importing ${options.size} fabricated entries for route ${runNumber}/${options.runs}.`);
       await importFixture(options.serial, fixtureName);
+      await settleImportedHistory(options.serial, options.size);
 
       const runPrefix = `run-${runNumber}`;
       const beforeMemoryPath = path.join(outputDirectory, `${runPrefix}-memory-before.txt`);
@@ -556,6 +567,7 @@ module.exports = {
   materializeFilter,
   pageBoundaryIds,
   parseOptions,
+  settleImportedHistory,
   startTrace,
   stopTrace,
   summarizeRunEvidence,
