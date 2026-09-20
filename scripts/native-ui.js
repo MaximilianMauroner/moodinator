@@ -141,10 +141,11 @@ function runAdb(serial, args, {
   adbPath = "adb",
   timeoutMs = 5000,
   encoding = "utf8",
+  maxBuffer = 8 * 1024 * 1024,
 } = {}) {
   const result = spawnSync(adbPath, ["-s", serial, ...args], {
     encoding,
-    maxBuffer: 8 * 1024 * 1024,
+    maxBuffer,
     timeout: timeoutMs,
   });
 

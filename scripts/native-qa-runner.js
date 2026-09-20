@@ -283,8 +283,8 @@ async function runDeleteUndoAcceptance(serial, flowPath, {
     ...waitOptions,
     timeoutMs: waitOptions.deleteTimeoutMs ?? 3000,
   });
-  const deleteTap = tapNode(serial, deleteNode, waitOptions);
   coordination = transition(coordination, "delete-requested");
+  const deleteTap = tapNode(serial, deleteNode, waitOptions);
 
   await waitForEntryVisibleAbsent(serial, identity, {
     ...waitOptions,

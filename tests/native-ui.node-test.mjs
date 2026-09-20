@@ -271,8 +271,21 @@ test("fixture generation covers 1k/10k boundaries with relative positive and neg
     assert.equal(entries.every((entry) => entry.timestamp < now), true);
     assert.equal(combinedFilterExpectation(entries, { now }).count, 60);
     assert.equal(entries[0].note.startsWith("QA match"), true);
-    assert.equal(entries[1].note.startsWith("QA other"), true);
+    assert.equal(entries[5].note.startsWith("QA other"), true);
     assert.equal(entries[0].timestamp - entries[1].timestamp, 2 * 60 * 60 * 1000);
+    const [moodMiss, emotionMiss, contextMiss, noteMiss] = entries.slice(1, 5);
+    assert.equal(moodMiss.mood, 5);
+    assert.equal(moodMiss.emotions[0].name, "Tired");
+    assert.equal(emotionMiss.mood, 6);
+    assert.equal(emotionMiss.emotions[0].name, "Calm");
+    assert.deepEqual(contextMiss.contextTags, ["Work"]);
+    assert.match(noteMiss.note, /^QA other /);
+    const dateMiss = entries[count > 1081 ? 1081 : count - 1];
+    assert.ok(dateMiss.timestamp < now - 90 * 24 * 60 * 60 * 1000);
+    assert.equal(dateMiss.mood, 6);
+    assert.match(dateMiss.note, /^QA match /);
+    assert.equal(dateMiss.emotions[0].name, "Tired");
+    assert.deepEqual(dateMiss.contextTags, ["Home"]);
   }
   assert.deepEqual(pageBoundaryIds(1000), [51, 501, 951]);
   assert.deepEqual(pageBoundaryIds(10000), [51, 5001, 9951]);
@@ -293,7 +306,7 @@ test("filter expectations derive positive membership after the exact 1k/10k edit
     assert.equal(expectation.matchingEntryIndexes.includes(1), true);
     assert.equal(expectation.matchingEntryIndexes.includes(51), true);
     assert.match(edited[50].note, /Edited for QA cycle 51/);
-    assert.equal(edited[1].note.startsWith("QA other"), true);
+    assert.equal(edited[5].note.startsWith("QA other"), true);
 
     const directory = mkdtempSync(join(tmpdir(), "moodinator-filter-materialize-test-"));
     try {
@@ -370,6 +383,15 @@ test("visual matrix retains each screen before the next navigation", () => {
   }
   const flow = readFileSync(new URL("../.maestro/flows/native-visual-matrix.yaml", import.meta.url), "utf8");
   assert.equal(flow.includes("Insights tab"), false);
+  assert.match(source, /associations in your entries, not explanations/);
+  assert.match(source, /Calendar legend: a dot marks a day with multiple entries/);
+});
+
+test("delete timing starts before the synchronous ADB tap", () => {
+  const source = readFileSync(new URL("../scripts/native-qa-runner.js", import.meta.url), "utf8");
+  const transition = source.indexOf('transition(coordination, "delete-requested")');
+  const tap = source.indexOf("tapNode(serial, deleteNode", transition);
+  assert.ok(transition >= 0 && tap > transition);
 });
 
 test("functional evidence failures outrank unavailable diagnostics", () => {
@@ -477,6 +499,14 @@ test("trace evidence is captured only after a successful non-empty stop", () => 
     );
     assert.equal(captured.status, "captured");
     assert.equal(captured.ok, true);
+    let traceOptions = null;
+    stopTrace("emulator-5554", join(directory, "large.trace"), { status: "started" }, {
+      capture: (_serial, _args, _path, options) => {
+        traceOptions = options;
+        return { ok: true, output: "TRACE DATA" };
+      },
+    });
+    assert.equal(traceOptions.maxBuffer, 32 * 1024 * 1024);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

@@ -33,22 +33,33 @@ function createQaFixture(count, options) {
   const { now } = normalizeFixtureOptions(options);
   const latest = Math.floor(now / HOUR_MS) * HOUR_MS - HOUR_MS;
 
+  const dateNearMissIndex = count > 1081 ? 1081 : count - 1;
   return Array.from({ length: count }, (_, index) => {
     const positive = isPositiveFixtureEntry(index);
-    return {
+    const nearMiss = index >= 1 && index <= 4
+      ? ["mood", "emotion", "context", "note"][index - 1]
+      : index === dateNearMissIndex ? "date" : null;
+    const otherwiseMatching = positive || nearMiss !== null;
+    const entry = {
       timestamp: latest - index * 2 * HOUR_MS,
       utcOffsetMinutes: 0,
-      mood: positive ? 6 : index % 11,
-      note: fixtureNote(index, positive),
+      mood: otherwiseMatching ? 6 : index % 11,
+      note: fixtureNote(index, otherwiseMatching),
       emotions: [{
-        name: positive ? "Tired" : "Calm",
-        category: positive ? "negative" : "positive",
+        name: otherwiseMatching ? "Tired" : "Calm",
+        category: otherwiseMatching ? "negative" : "positive",
       }],
-      contextTags: [positive ? "Home" : "Work"],
-      energy: positive ? 6 : index % 11,
+      contextTags: [otherwiseMatching ? "Home" : "Work"],
+      energy: otherwiseMatching ? 6 : index % 11,
       moodScale: { version: 1, min: 0, max: 10, lowerIsBetter: true },
       basedOnEntryId: null,
     };
+    if (nearMiss === "mood") entry.mood = 5;
+    if (nearMiss === "emotion") entry.emotions = [{ name: "Calm", category: "positive" }];
+    if (nearMiss === "context") entry.contextTags = ["Work"];
+    if (nearMiss === "note") entry.note = fixtureNote(index, false);
+    if (nearMiss === "date") entry.timestamp = latest - 91 * 24 * HOUR_MS;
+    return entry;
   });
 }
 

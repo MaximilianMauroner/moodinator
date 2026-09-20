@@ -89,12 +89,13 @@ function parseOptions(argv) {
 
 function captureText(serial, args, outputPath, {
   timeoutMs = 30000,
+  maxBuffer,
   required = false,
   runAdbImpl = runAdb,
   label = args.join(" "),
 } = {}) {
   try {
-    const output = runAdbImpl(serial, args, { timeoutMs });
+    const output = runAdbImpl(serial, args, { timeoutMs, maxBuffer });
     writeFileSync(outputPath, output);
     return { output, ok: true, required, label };
   } catch (error) {
@@ -225,6 +226,7 @@ function stopTrace(serial, outputPath, traceState, {
   const result = capture(serial, ["shell", "atrace", "--async_stop"], outputPath, {
     required: true,
     label: "atrace finalization",
+    maxBuffer: 32 * 1024 * 1024,
   });
   if (!result.ok) {
     return {
