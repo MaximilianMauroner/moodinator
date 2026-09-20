@@ -1,4 +1,4 @@
-const { mkdirSync, mkdtempSync, writeFileSync } = require("node:fs");
+const { existsSync, mkdirSync, mkdtempSync, readdirSync, statSync, writeFileSync } = require("node:fs");
 const { tmpdir } = require("node:os");
 const path = require("node:path");
 
@@ -27,13 +27,26 @@ function writeEvidence(outputDirectory, evidence) {
   writeFileSync(path.join(outputDirectory, "smoke.json"), `${JSON.stringify(evidence, null, 2)}\n`);
 }
 
+function prepareEvidenceDirectory(outputDirectory) {
+  if (existsSync(outputDirectory)) {
+    if (!statSync(outputDirectory).isDirectory()) {
+      throw new Error(`Native smoke evidence output already exists and is not a directory: ${outputDirectory}`);
+    }
+    if (readdirSync(outputDirectory).length > 0) {
+      throw new Error(`Native smoke evidence output must be empty: ${outputDirectory}`);
+    }
+    return;
+  }
+  mkdirSync(outputDirectory, { recursive: true });
+}
+
 async function main(argv = process.argv.slice(2)) {
   const options = parseOptions(argv);
   const sourceSha = requireSourceSha();
   const outputDirectory = options.output
     ? path.resolve(options.output)
     : mkdtempSync(path.join(tmpdir(), "moodinator-native-smoke-"));
-  mkdirSync(outputDirectory, { recursive: true });
+  prepareEvidenceDirectory(outputDirectory);
 
   const baseEvidence = {
     appId,
@@ -91,4 +104,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { parseOptions, main };
+module.exports = { parseOptions, prepareEvidenceDirectory, main };

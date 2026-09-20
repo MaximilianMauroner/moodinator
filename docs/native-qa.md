@@ -83,7 +83,8 @@ Moodinator package or a device that holds personal mood data.
    Use the isolated checkout path printed by that command for the QA build.
 2. Install dependencies, run a clean Android prebuild with
    `MOODINATOR_VARIANT=qa MOODINATOR_QA_PREPARE_NATIVE=1`, then run
-   `bun run qa:seal-native`. Build and install with `MOODINATOR_VARIANT=qa`. Confirm that
+   `bun run qa:seal-native`. Unset `MOODINATOR_QA_PREPARE_NATIVE`; sealed builds reject
+   that prebuild-only flag. Build and install with `MOODINATOR_VARIANT=qa`. Confirm that
    the installed package is `com.lab4code.moodinator.qa` before continuing.
 3. Install Maestro and Android SDK platform tools. Start one disposable emulator.
 4. Run `bun run qa:smoke -- emulator-5554 --out /tmp/moodinator-native-smoke-current`

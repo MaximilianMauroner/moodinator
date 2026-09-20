@@ -24,6 +24,7 @@ export interface InsightsData {
   recentMoods: MoodEntry[];
   totalCount: number;
   loading: boolean;
+  ready: boolean;
   error: string | null;
   streak: { current: number; longest: number };
   getMoodLabel: (value: number, sourceScale?: MoodScaleSnapshot) => string;
@@ -70,6 +71,7 @@ export function useInsightsData(): InsightsData {
   >({ totalCount: 0, oldestTimestamp: null, days: [] });
   const [analysisMoods, setAnalysisMoods] = useState<MoodEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [summaryLoading, setSummaryLoading] = useState(true);
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const loadedSelection = useRef<string | null>(null);
@@ -83,6 +85,7 @@ export function useInsightsData(): InsightsData {
   }, []);
   const loadSummary = useCallback(async () => {
     const request = ++summaryGeneration.current;
+    setSummaryLoading(true);
     try {
       const [value, recent] = await Promise.all([
         moodService.getHistorySummary(),
@@ -100,6 +103,8 @@ export function useInsightsData(): InsightsData {
             : "Could not load history summary",
         );
       }
+    } finally {
+      if (request === summaryGeneration.current) setSummaryLoading(false);
     }
   }, []);
   useEffect(() => {
@@ -186,6 +191,7 @@ export function useInsightsData(): InsightsData {
     recentMoods,
     totalCount: summary.totalCount,
     loading,
+    ready: !loading && !summaryLoading && !error && !summaryError,
     error: error ?? summaryError,
     streak,
     getMoodLabel,

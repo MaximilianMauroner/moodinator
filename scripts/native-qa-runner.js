@@ -252,7 +252,6 @@ async function waitForExactEntry(serial, identity, options = {}) {
 
 async function waitForRestorationEvidence(serial, identity, {
   observeRestoredToast = false,
-  restoredToastTimeoutMs = 2000,
   waitForExactEntryImpl = waitForExactEntry,
   waitForNodeImpl = waitForNode,
   ...options
@@ -261,7 +260,7 @@ async function waitForRestorationEvidence(serial, identity, {
   const restoredToast = observeRestoredToast
     ? waitForNodeImpl(serial, { testId: "restored-mood-toast" }, {
       ...options,
-      timeoutMs: Math.min(restoredToastTimeoutMs, options.timeoutMs ?? restoredToastTimeoutMs),
+      timeoutMs: options.timeoutMs ?? DEFAULT_RESTORATION_TIMEOUT_MS,
     })
     : Promise.resolve(null);
   const [, toastNode] = await Promise.all([exactEntry, restoredToast]);

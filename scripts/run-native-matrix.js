@@ -106,6 +106,32 @@ function restoreSetting(serial, namespace, key, value, fallback) {
   readBackSetting(serial, namespace, key, value || fallback);
 }
 
+function restoreTheme(
+  serial,
+  original,
+  operations = {
+    setAndReadTheme,
+    restoreSetting,
+    readRuntimeTheme,
+  },
+) {
+  // `cmd uimode night` also writes secure.ui_night_mode. Restore the runtime
+  // behavior first, then put the independently captured backing value back.
+  operations.setAndReadTheme(serial, original.runtimeNightMode);
+  operations.restoreSetting(
+    serial,
+    "secure",
+    "ui_night_mode",
+    original.nightMode,
+  );
+  const runtime = operations.readRuntimeTheme(serial);
+  if (runtime !== original.runtimeNightMode) {
+    throw new Error(
+      `Android runtime night mode was ${runtime} after backing-value restoration, expected ${original.runtimeNightMode}.`,
+    );
+  }
+}
+
 function restoreSettings(serial, original) {
   const operations = [
     ["system", "font_scale", original.fontScale, "1.0"],
@@ -115,7 +141,7 @@ function restoreSettings(serial, original) {
   ];
   let firstError = null;
   try {
-    setAndReadTheme(serial, original.runtimeNightMode);
+    restoreTheme(serial, original);
   } catch (error) {
     firstError ??= error;
   }
@@ -340,6 +366,7 @@ module.exports = {
   prepareEvidenceDirectory,
   readBackSetting,
   readRuntimeTheme,
+  restoreTheme,
   themeValueForState,
   verifyFabricatedFixture,
 };

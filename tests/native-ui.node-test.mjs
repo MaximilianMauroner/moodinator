@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -12,6 +13,7 @@ const {
   sealPreparedNativeSource,
   writePreparedSourceMetadata,
 } = require("../scripts/qa-source-provenance.js");
+const { prepareNativeQa } = require("../scripts/prepare-native-qa.js");
 const {
   applyNativeStressEditMutations,
   combinedFilterExpectation,
@@ -69,6 +71,7 @@ const {
   animationValueForState,
   isAbsentSettingValue,
   prepareEvidenceDirectory: prepareMatrixEvidenceDirectory,
+  restoreTheme,
   themeValueForState,
 } = require("../scripts/run-native-matrix.js");
 const {
@@ -84,6 +87,9 @@ const {
   timezoneEntryTestId,
   verifyRequestedTimeZone,
 } = require("../scripts/run-native-timezone.js");
+const {
+  prepareEvidenceDirectory: prepareSmokeEvidenceDirectory,
+} = require("../scripts/run-native-smoke.js");
 
 const hierarchy = `
   <hierarchy rotation="0">
@@ -263,7 +269,7 @@ test("exact restoration retries transient hierarchy failures", async () => {
   assert.equal(attempts, 2);
 });
 
-test("restored toast observation starts concurrently with exact-row restoration", async () => {
+test("restored toast observation starts concurrently and uses the full restoration deadline", async () => {
   const events = [];
   let finishExactEntry;
   const exactEntry = new Promise((resolve) => {
@@ -273,7 +279,6 @@ test("restored toast observation starts concurrently with exact-row restoration"
   const observation = waitForRestorationEvidence("emulator-5554", { timestamp: 123 }, {
     observeRestoredToast: true,
     timeoutMs: 5000,
-    restoredToastTimeoutMs: 2000,
     waitForExactEntryImpl: () => {
       events.push("exact-started");
       return exactEntry.then(() => events.push("exact-finished"));
@@ -281,7 +286,7 @@ test("restored toast observation starts concurrently with exact-row restoration"
     waitForNodeImpl: async (_serial, matcher, options) => {
       events.push("toast-observed");
       assert.deepEqual(matcher, { testId: "restored-mood-toast" });
-      assert.equal(options.timeoutMs, 2000);
+        assert.equal(options.timeoutMs, 5000);
       return { text: "Mood restored" };
     },
   });
@@ -526,9 +531,57 @@ test("visual matrix retains each screen before the next navigation", () => {
   assert.doesNotMatch(source, /waitForNodeAndTap\(serial, \{ text: "(?:Charts|Calendar) view" \}\)/);
   assert.match(source, /testId: "insights-loaded-summary"/);
   assert.match(source, /text: `\$\{fixtureCount\} entries`/);
-  assert.match(insightsSource, /testID=\{!loading && !error \? "insights-loaded-summary" : undefined\}/);
+  assert.match(insightsSource, /testID=\{ready \? "insights-loaded-summary" : undefined\}/);
+  const hookSource = readFileSync(
+    new URL("../src/features/insights/hooks/useInsightsData.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(
+    hookSource,
+    /ready: !loading && !summaryLoading && !error && !summaryError/,
+  );
   assert.match(source, /Calendar legend: a dot marks a day with multiple entries/);
   assert.match(source, /Local privacy/);
+});
+
+test("matrix theme cleanup restores runtime and its independent secure backing value", () => {
+  const calls = [];
+  restoreTheme(
+    "emulator-5554",
+    {
+      runtimeNightMode: "no",
+      nightMode: "null",
+    },
+    {
+      setAndReadTheme: (_serial, value) => calls.push(["runtime", value]),
+      restoreSetting: (_serial, namespace, key, value) =>
+        calls.push(["setting", namespace, key, value]),
+      readRuntimeTheme: () => "no",
+    },
+  );
+  assert.deepEqual(calls, [
+    ["runtime", "no"],
+    ["setting", "secure", "ui_night_mode", "null"],
+  ]);
+});
+
+test("matrix theme cleanup rejects backing restoration that changes runtime behavior", () => {
+  assert.throws(
+    () =>
+      restoreTheme(
+        "emulator-5554",
+        {
+          runtimeNightMode: "yes",
+          nightMode: "1",
+        },
+        {
+          setAndReadTheme() {},
+          restoreSetting() {},
+          readRuntimeTheme: () => "no",
+        },
+      ),
+    /runtime night mode was no after backing-value restoration, expected yes/,
+  );
 });
 
 test("native evidence runners reject nonempty output before overwriting artifacts", () => {
@@ -543,6 +596,11 @@ test("native evidence runners reject nonempty output before overwriting artifact
     assert.equal(readFileSync(marker, "utf8"), original);
     assert.throws(() => prepareTimezoneEvidenceDirectory(directory), /must be empty/);
     assert.equal(readFileSync(marker, "utf8"), original);
+    assert.throws(
+      () => prepareSmokeEvidenceDirectory(directory),
+      /must be empty/,
+    );
+    assert.equal(readFileSync(marker, "utf8"), original);
 
     const newDirectory = join(directory, "new-output");
     prepareStressEvidenceDirectory(newDirectory);
@@ -553,6 +611,9 @@ test("native evidence runners reject nonempty output before overwriting artifact
     const timezoneDirectory = join(directory, "timezone-output");
     prepareTimezoneEvidenceDirectory(timezoneDirectory);
     assert.equal(statSync(timezoneDirectory).isDirectory(), true);
+    const smokeDirectory = join(directory, "smoke-output");
+    prepareSmokeEvidenceDirectory(smokeDirectory);
+    assert.equal(statSync(smokeDirectory).isDirectory(), true);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -790,6 +851,10 @@ test("prepared QA provenance is authoritative and rejects stale environment SHAs
     mkdirSync(join(directory, "android", "app", "src", "main"), { recursive: true });
     writeFileSync(join(directory, "android", "app", "src", "main", "AndroidManifest.xml"), "<manifest />\n");
     sealPreparedNativeSource(directory);
+    assert.throws(
+      () => readPreparedSourceSha(directory, { MOODINATOR_QA_PREPARE_NATIVE: "1" }),
+      /may only be used before Android source is sealed/,
+    );
     assert.equal(readPreparedSourceSha(directory, { MOODINATOR_SOURCE_SHA: preparedSha }), preparedSha);
     assert.throws(
       () => readPreparedSourceSha(directory, { MOODINATOR_SOURCE_SHA: "d".repeat(40) }),
@@ -831,11 +896,52 @@ test("prepared QA provenance rejects unmanifested Metro and changed native input
     sealPreparedNativeSource(directory);
     mkdirSync(join(directory, "android", "app", "build", "generated"), { recursive: true });
     writeFileSync(join(directory, "android", "app", "build", "generated", "output"), "build output\n");
+    mkdirSync(join(directory, "android", "app", ".cxx", "Release", "arm64-v8a"), { recursive: true });
+    writeFileSync(join(directory, "android", "app", ".cxx", "Release", "arm64-v8a", "build.ninja"), "build output\n");
     assert.equal(readPreparedSourceSha(directory, {}), preparedSha);
     writeFileSync(nativeFile, "// edited after sealing\n");
     assert.throws(() => readPreparedSourceSha(directory, {}), /MainApplication\.kt differs from source/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("QA preparation copies committed HEAD blobs despite assume-unchanged worktree edits", () => {
+  const directory = mkdtempSync(
+    join(tmpdir(), "moodinator-prepare-source-test-"),
+  );
+  const outputs = mkdtempSync(
+    join(tmpdir(), "moodinator-prepare-output-test-"),
+  );
+  try {
+    execFileSync("git", ["init", "-q"], { cwd: directory });
+    execFileSync("git", ["config", "user.email", "qa@example.invalid"], {
+      cwd: directory,
+    });
+    execFileSync("git", ["config", "user.name", "QA Test"], { cwd: directory });
+    writeFileSync(join(directory, "tracked.txt"), "committed bytes\n");
+    execFileSync("git", ["add", "tracked.txt"], { cwd: directory });
+    execFileSync("git", ["commit", "-q", "-m", "fixture"], { cwd: directory });
+    execFileSync("git", ["update-index", "--assume-unchanged", "tracked.txt"], {
+      cwd: directory,
+    });
+    writeFileSync(join(directory, "tracked.txt"), "hidden worktree edit\n");
+    assert.equal(
+      execFileSync("git", ["status", "--porcelain"], {
+        cwd: directory,
+        encoding: "utf8",
+      }),
+      "",
+    );
+
+    const { destination } = prepareNativeQa(directory, outputs);
+    assert.equal(
+      readFileSync(join(destination, "tracked.txt"), "utf8"),
+      "committed bytes\n",
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+    rmSync(outputs, { recursive: true, force: true });
   }
 });
 

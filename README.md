@@ -114,12 +114,13 @@ MOODINATOR_VARIANT=qa bunx expo run:android --variant release --device
 bun run qa:smoke -- emulator-5554 --out /tmp/moodinator-native-smoke-current
 ```
 
-`qa:prepare` requires a clean checkout, then copies the tracked files for the
+`qa:prepare` requires a clean checkout, then materializes committed `HEAD` files for the
 printed source SHA into a temporary directory. It excludes native
 build folders, dependencies, credentials and personal scratch files. It does
 not install or launch anything. The clean prebuild and `qa:seal-native` steps bind
 generated Android inputs to that SHA; later source additions or native-source edits
 fail closed, while dependency directories and native build outputs remain excluded.
+Unset `MOODINATOR_QA_PREPARE_NATIVE` after sealing; sealed builds reject the prebuild-only flag.
 Use one disposable emulator per concurrent run.
 The release QA build embeds its bundle and does not need a shared Metro port.
 After collecting evidence, remove that temporary workspace and disposable AVD.

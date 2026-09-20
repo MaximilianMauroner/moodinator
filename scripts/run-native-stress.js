@@ -504,7 +504,6 @@ async function main(argv = process.argv.slice(2)) {
                 undoDumpTimeoutMs: 300,
                 undoPollIntervalMs: 35,
                 observeRestoredToast: true,
-                restoredToastTimeoutMs: 2000,
               },
             },
           );

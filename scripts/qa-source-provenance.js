@@ -12,6 +12,7 @@ const GENERATED_PREFIXES = [
   "android/.kotlin/",
   "android/build/",
   "android/app/build/",
+  "android/app/.cxx/",
 ];
 
 function isGeneratedPath(relativePath) {
@@ -96,6 +97,9 @@ function readPreparedSourceSha(workspace, env = process.env) {
   }
   validateMetadata(filePath, metadata);
   const prebuilding = env.MOODINATOR_QA_PREPARE_NATIVE === "1";
+  if (metadata.nativeSealed && prebuilding) {
+    throw new Error("MOODINATOR_QA_PREPARE_NATIVE may only be used before Android source is sealed.");
+  }
   if (!metadata.nativeSealed && !prebuilding) {
     throw new Error("Prepared Android source is not sealed; run the documented clean prebuild and qa:seal-native first.");
   }
@@ -116,7 +120,7 @@ function readPreparedSourceSha(workspace, env = process.env) {
     }
   }
   const unexpected = workspaceFiles(workspace).find((relativePath) => !Object.hasOwn(metadata.files, relativePath)
-    && !(prebuilding && relativePath.startsWith("android/")));
+    && !(!metadata.nativeSealed && prebuilding && relativePath.startsWith("android/")));
   if (unexpected) throw new Error(`Prepared QA workspace contains unexpected input ${unexpected}.`);
   const requestedSha = env.MOODINATOR_SOURCE_SHA;
   if (requestedSha !== undefined && requestedSha !== metadata.sourceSha) {
