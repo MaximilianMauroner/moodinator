@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Platform,
   View,
   Pressable,
   RefreshControl,
@@ -7,10 +8,11 @@ import {
   type LayoutChangeEvent,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useFocusEffect } from "expo-router";
 import { FlashList, type FlashListRef } from "@shopify/flash-list";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated from "react-native-reanimated";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -50,6 +52,7 @@ import {
 } from "@/hooks/useHomeHeaderCollapse";
 import { haptics } from "@/lib/haptics";
 import { addHomeTabDoublePressListener } from "@/lib/homeTabEvents";
+import { getHomeJumpButtonBottomOffset } from "@/lib/homeOverlayLayout";
 import {
   commitThenRunPostCommitEffects,
   getMoodEntryPersistenceValues,
@@ -68,11 +71,12 @@ const CONTENT_HORIZONTAL_PADDING = 16;
 const ESTIMATED_HOME_CHROME_HEIGHT = 72;
 const ESTIMATED_HISTORY_CHROME_HEIGHT = 56;
 const HOME_LIST_DRAW_DISTANCE = 900;
-const JUMP_BUTTON_SCENE_EDGE_GAP = 12;
 
 function HomeScreenContent() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
+  const insets = useSafeAreaInsets();
+  const tabBarHeight = useBottomTabBarHeight();
 
   const filters = useMoodsStore((state) => state.filters);
   const clearFilters = useMoodsStore((state) => state.clearFilters);
@@ -289,6 +293,11 @@ function HomeScreenContent() {
   const refreshIndicatorOffset = selectorCollapsed
     ? totalCollapsedHeaderHeight
     : totalExpandedHeaderHeight;
+  const jumpButtonBottomOffset = getHomeJumpButtonBottomOffset({
+    platform: Platform.OS,
+    safeAreaBottom: insets.bottom,
+    tabBarHeight,
+  });
   const jumpButtonStyle = useMemo(
     () => ({
       alignItems: "center" as const,
@@ -438,10 +447,7 @@ function HomeScreenContent() {
               <View
                 style={{
                   alignItems: "center",
-                  // The tab scene already ends above the persistent tab bar,
-                  // while SafeAreaView owns the device inset. Keep only the
-                  // visual gap from that protected scene edge here.
-                  bottom: JUMP_BUTTON_SCENE_EDGE_GAP,
+                  bottom: jumpButtonBottomOffset,
                   elevation: 8,
                   height: 56,
                   justifyContent: "center",
