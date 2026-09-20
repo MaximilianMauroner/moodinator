@@ -452,6 +452,10 @@ test("visual matrix retains each screen before the next navigation", () => {
   const selectAll = source.indexOf('contentDescription: "All history"', openInsights);
   const loadedSummary = source.indexOf('testId: "insights-loaded-summary"', selectAll);
   assert.ok(openInsights >= 0 && selectAll > openInsights && loadedSummary > selectAll);
+  const chartsView = source.indexOf('contentDescription: "Charts view"', loadedSummary);
+  const calendarView = source.indexOf('contentDescription: "Calendar view"', chartsView);
+  assert.ok(chartsView > loadedSummary && calendarView > chartsView);
+  assert.doesNotMatch(source, /waitForNodeAndTap\(serial, \{ text: "(?:Charts|Calendar) view" \}\)/);
   assert.match(source, /testId: "insights-loaded-summary"/);
   assert.match(source, /text: `\$\{fixtureCount\} entries`/);
   assert.match(insightsSource, /testID=\{!loading \? "insights-loaded-summary" : undefined\}/);
@@ -788,6 +792,25 @@ test("timezone evidence requires accepted, distinct device states", () => {
   ]);
   assert.equal(refused.status, "blocked");
   assert.equal(refused.stableRecordedLabel, false);
+
+  const failureBeforeRefusal = evaluateTimezoneObservations([
+    {
+      requestedTimeZone: "UTC",
+      actualTimeZone: "UTC",
+      accepted: true,
+      tested: true,
+      contentDescription: "Mood entry: Uncomfortable (6), logged at the wrong time",
+      matchesExpectedRecordedDateTime: false,
+    },
+    {
+      requestedTimeZone: "Pacific/Auckland",
+      actualTimeZone: "UTC",
+      accepted: false,
+      tested: false,
+    },
+  ]);
+  assert.equal(failureBeforeRefusal.status, "failed");
+  assert.equal(failureBeforeRefusal.stableRecordedLabel, false);
 });
 
 test("timezone fixture expectation uses its nonzero half-hour recorded offset", () => {
@@ -816,5 +839,17 @@ test("timezone fixture expectation uses its nonzero half-hour recorded offset", 
       expected,
     ),
     false,
+  );
+
+  assert.deepEqual(recordedDateTimeExpectation(entry, "en-GB", false), {
+    dateLabel: "Fri 2 Jan",
+    timeLabel: "9:45",
+  });
+  assert.equal(
+    labelContainsRecordedDateTime(
+      "Mood entry: Uncomfortable (6), logged on Fri 2 Jan at 9:45",
+      recordedDateTimeExpectation(entry, "en-GB", false),
+    ),
+    true,
   );
 });

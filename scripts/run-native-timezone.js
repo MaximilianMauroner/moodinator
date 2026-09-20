@@ -133,7 +133,7 @@ function recordedLabelFromNode(node) {
   return label;
 }
 
-function recordedDateTimeExpectation(entry, locale = "en-US") {
+function recordedDateTimeExpectation(entry, locale, hour12) {
   if (!Number.isFinite(entry?.timestamp) || !Number.isInteger(entry?.utcOffsetMinutes)) {
     throw new Error("The timezone fixture entry must have a timestamp and recorded offset.");
   }
@@ -148,8 +148,19 @@ function recordedDateTimeExpectation(entry, locale = "en-US") {
     timeLabel: new Intl.DateTimeFormat(locale, {
       hour: "numeric",
       minute: "2-digit",
+      ...(typeof hour12 === "boolean" ? { hour12 } : {}),
       timeZone: "UTC",
     }).format(recordedDate),
+  };
+}
+
+function readDeviceFormattingPreferences(serial) {
+  const locale = runAdb(serial, ["shell", "getprop", "persist.sys.locale"]).trim()
+    || runAdb(serial, ["shell", "getprop", "ro.product.locale"]).trim();
+  const clockSetting = setting(serial, "system", "time_12_24");
+  return {
+    locale: locale || undefined,
+    hour12: clockSetting === "12" ? true : clockSetting === "24" ? false : undefined,
   };
 }
 
@@ -183,9 +194,18 @@ function evaluateTimezoneObservations(observations) {
     && distinctStates
     && sameRecordedLabel
     && expectedRecordedDateTime;
+  const functionalFailure = observations.some((observation) => (
+    observation.accepted
+    && observation.tested
+    && observation.matchesExpectedRecordedDateTime === false
+  ));
   return {
     stableRecordedLabel,
-    status: stableRecordedLabel ? "passed" : observations.some((observation) => !observation.accepted) ? "blocked" : "failed",
+    status: stableRecordedLabel
+      ? "passed"
+      : functionalFailure
+        ? "failed"
+        : observations.some((observation) => !observation.accepted) ? "blocked" : "failed",
     accepted,
     distinctStates,
     sameRecordedLabel,
@@ -232,7 +252,8 @@ async function main(argv = process.argv.slice(2)) {
   mkdirSync(outputDirectory, { recursive: true });
 
   const entries = createTimezoneFixture();
-  const expectedRecordedDateTime = recordedDateTimeExpectation(entries[0]);
+  let deviceFormatting = null;
+  let expectedRecordedDateTime = null;
   const fixtureName = "moodinator-qa-timezone.json";
   const fixturePath = path.join(outputDirectory, fixtureName);
   const baseEvidence = {
@@ -245,7 +266,6 @@ async function main(argv = process.argv.slice(2)) {
       entryCount: entries.length,
       firstNote: entries[0].note,
       recordedOffsetMinutes: entries[0].utcOffsetMinutes,
-      expectedRecordedDateTime,
     },
   };
   const observations = [];
@@ -255,6 +275,14 @@ async function main(argv = process.argv.slice(2)) {
 
   try {
     await assertInstalledQaBuild(options.serial, sourceSha);
+    deviceFormatting = readDeviceFormattingPreferences(options.serial);
+    expectedRecordedDateTime = recordedDateTimeExpectation(
+      entries[0],
+      deviceFormatting.locale,
+      deviceFormatting.hour12,
+    );
+    baseEvidence.fixtureProof.deviceFormatting = deviceFormatting;
+    baseEvidence.fixtureProof.expectedRecordedDateTime = expectedRecordedDateTime;
     writeFileSync(fixturePath, JSON.stringify(entries), { flag: "wx" });
     runAdb(options.serial, ["push", fixturePath, `/sdcard/Download/${fixtureName}`], { timeoutMs: 30000 });
     original = {
