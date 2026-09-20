@@ -503,6 +503,8 @@ async function main(argv = process.argv.slice(2)) {
                 dumpTimeoutMs: 300,
                 undoDumpTimeoutMs: 300,
                 undoPollIntervalMs: 35,
+                observeRestoredToast: true,
+                restoredToastTimeoutMs: 2000,
               },
             },
           );
@@ -522,9 +524,6 @@ async function main(argv = process.argv.slice(2)) {
               exactIdentity: result.identity,
               exactlyOne: true,
             },
-          });
-          await waitForNode(options.serial, { testId: "restored-mood-toast" }, {
-            timeoutMs: 2000,
           });
           await waitForNodeHierarchyGone(options.serial, { testId: "restored-mood-toast" }, {
             timeoutMs: 5000,

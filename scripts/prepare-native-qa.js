@@ -39,5 +39,7 @@ console.log(`QA workspace: ${destination}`);
 console.log(`QA source metadata: ${sourceMetadata}`);
 console.log(`export MOODINATOR_SOURCE_SHA=${sourceSha}`);
 console.log("In that directory: bun install --frozen-lockfile");
+console.log("Then: MOODINATOR_VARIANT=qa MOODINATOR_QA_PREPARE_NATIVE=1 bunx expo prebuild --platform android --clean");
+console.log("Then: bun run qa:seal-native");
 console.log("Then: MOODINATOR_VARIANT=qa bunx expo run:android --variant release --device");
 console.log("Select a disposable emulator. The QA package has separate local storage.");

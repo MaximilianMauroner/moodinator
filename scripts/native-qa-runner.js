@@ -250,6 +250,24 @@ async function waitForExactEntry(serial, identity, options = {}) {
   throw new Error(`Exact restored entry was not present in one hierarchy snapshot: ${JSON.stringify(lastCounts)}.${inspection}`);
 }
 
+async function waitForRestorationEvidence(serial, identity, {
+  observeRestoredToast = false,
+  restoredToastTimeoutMs = 2000,
+  waitForExactEntryImpl = waitForExactEntry,
+  waitForNodeImpl = waitForNode,
+  ...options
+} = {}) {
+  const exactEntry = waitForExactEntryImpl(serial, identity, options);
+  const restoredToast = observeRestoredToast
+    ? waitForNodeImpl(serial, { testId: "restored-mood-toast" }, {
+      ...options,
+      timeoutMs: Math.min(restoredToastTimeoutMs, options.timeoutMs ?? restoredToastTimeoutMs),
+    })
+    : Promise.resolve(null);
+  const [, toastNode] = await Promise.all([exactEntry, restoredToast]);
+  return { restoredToast: toastNode };
+}
+
 async function waitForEntryVisibleAbsent(serial, identity, options = {}) {
   await waitForEntryState(serial, identity, 0, {
     ...options,
@@ -343,7 +361,7 @@ async function runDeleteUndoAcceptance(serial, flowPath, {
   const undoTap = tapNode(serial, undoNode, waitOptions);
   coordination = transition(coordination, "undo-tapped");
 
-  await waitForExactEntry(serial, identity, {
+  const restoration = await waitForRestorationEvidence(serial, identity, {
     ...waitOptions,
     timeoutMs: coordinationRemainingMs(coordination),
   });
@@ -355,6 +373,7 @@ async function runDeleteUndoAcceptance(serial, flowPath, {
     identity,
     delete: { node: deleteNode, ...deleteTap },
     undo: { node: undoNode, ...undoTap },
+    restoration,
   };
 }
 
@@ -375,5 +394,6 @@ module.exports = {
   waitForEntryHierarchyGone,
   waitForEntryIdentity,
   waitForExactEntry,
+  waitForRestorationEvidence,
   waitForEntryVisibleAbsent,
 };

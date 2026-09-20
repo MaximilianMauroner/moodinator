@@ -81,7 +81,9 @@ Moodinator package or a device that holds personal mood data.
    `export MOODINATOR_SOURCE_SHA=<40-character-sha>` command into the isolated
    workspace shell; that workspace intentionally has no `.git` directory.
    Use the isolated checkout path printed by that command for the QA build.
-2. Build and install its Android app with `MOODINATOR_VARIANT=qa`. Confirm that
+2. Install dependencies, run a clean Android prebuild with
+   `MOODINATOR_VARIANT=qa MOODINATOR_QA_PREPARE_NATIVE=1`, then run
+   `bun run qa:seal-native`. Build and install with `MOODINATOR_VARIANT=qa`. Confirm that
    the installed package is `com.lab4code.moodinator.qa` before continuing.
 3. Install Maestro and Android SDK platform tools. Start one disposable emulator.
 4. Run `bun run qa:smoke -- emulator-5554 --out /tmp/moodinator-native-smoke-current`
@@ -97,8 +99,9 @@ compilation, the emulator and broad test runs. In the disposable checkout, cap M
 workers with `MOODINATOR_METRO_MAX_WORKERS=1` and Gradle with `--max-workers=1`; bound
 JVM and Node heaps to fit the available memory. Do not edit `metro.config.js` or any
 other tracked file after `qa:prepare`: QA configuration verifies every copied tracked
-file against the prepared manifest and fails if its bytes changed. Run `qa:prepare`
-again for a different source tree. Stop or reduce an owned workload if memory
+file and every sealed generated Android input against the prepared manifest and
+rejects unlisted project inputs. Only dependency, Expo-state, and native build-output
+directories are excluded. Run `qa:prepare` again for a different source tree. Stop or reduce an owned workload if memory
 pressure keeps rising.
 
 Use an installed build that starts directly into the app. If a debug build opens

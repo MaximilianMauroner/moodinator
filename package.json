@@ -19,6 +19,7 @@
     "build:preview": "node scripts/nightly-release.mjs run",
     "build:production": "node scripts/nightly-release.mjs run",
     "qa:prepare": "node scripts/prepare-native-qa.js",
+    "qa:seal-native": "node scripts/seal-native-qa.js",
     "qa:smoke": "node scripts/run-native-smoke.js",
     "qa:stress": "node scripts/run-native-stress.js",
     "qa:matrix": "node scripts/run-native-matrix.js",

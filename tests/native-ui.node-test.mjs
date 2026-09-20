@@ -9,6 +9,7 @@ const require = createRequire(import.meta.url);
 const {
   QA_SOURCE_METADATA,
   readPreparedSourceSha,
+  sealPreparedNativeSource,
   writePreparedSourceMetadata,
 } = require("../scripts/qa-source-provenance.js");
 const {
@@ -37,6 +38,7 @@ const {
   isExactlyOneRestoredEntry,
   waitForEntryIdentity,
   waitForExactEntry,
+  waitForRestorationEvidence,
 } = require("../scripts/native-qa-runner.js");
 const {
   findNodes,
@@ -73,6 +75,7 @@ const {
   createTimezoneFixture,
   evaluateTimezoneObservations,
   labelContainsRecordedDateTime,
+  prepareEvidenceDirectory: prepareTimezoneEvidenceDirectory,
   recordedLabelFromNode,
   recordedDateTimeExpectation,
   requestRuntimeTimeZone,
@@ -258,6 +261,36 @@ test("exact restoration retries transient hierarchy failures", async () => {
     },
   });
   assert.equal(attempts, 2);
+});
+
+test("restored toast observation starts concurrently with exact-row restoration", async () => {
+  const events = [];
+  let finishExactEntry;
+  const exactEntry = new Promise((resolve) => {
+    finishExactEntry = resolve;
+  });
+
+  const observation = waitForRestorationEvidence("emulator-5554", { timestamp: 123 }, {
+    observeRestoredToast: true,
+    timeoutMs: 5000,
+    restoredToastTimeoutMs: 2000,
+    waitForExactEntryImpl: () => {
+      events.push("exact-started");
+      return exactEntry.then(() => events.push("exact-finished"));
+    },
+    waitForNodeImpl: async (_serial, matcher, options) => {
+      events.push("toast-observed");
+      assert.deepEqual(matcher, { testId: "restored-mood-toast" });
+      assert.equal(options.timeoutMs, 2000);
+      return { text: "Mood restored" };
+    },
+  });
+
+  await Promise.resolve();
+  assert.deepEqual(events, ["exact-started", "toast-observed"]);
+  finishExactEntry();
+  assert.deepEqual(await observation, { restoredToast: { text: "Mood restored" } });
+  assert.deepEqual(events, ["exact-started", "toast-observed", "exact-finished"]);
 });
 
 test("exact restoration bounds every hierarchy dump by its cap and remaining deadline", async () => {
@@ -464,9 +497,9 @@ test("stress filter flow applies cleared drafts before asserting the full list",
   assert.equal(postSave.includes('${FILTER_COUNT} total'), false);
 });
 
-test("stress waits for the restored toast to appear before removal", () => {
+test("stress observes the restored toast concurrently before waiting for removal", () => {
   const source = readFileSync(new URL("../scripts/run-native-stress.js", import.meta.url), "utf8");
-  const appeared = source.indexOf('waitForNode(options.serial, { testId: "restored-mood-toast" }');
+  const appeared = source.indexOf("observeRestoredToast: true");
   const removed = source.indexOf('waitForNodeHierarchyGone(options.serial, { testId: "restored-mood-toast" }');
   const memory = source.indexOf("const memory = captureText", appeared);
   assert.ok(appeared >= 0 && removed > appeared && memory > removed);
@@ -508,6 +541,8 @@ test("native evidence runners reject nonempty output before overwriting artifact
     assert.equal(readFileSync(marker, "utf8"), original);
     assert.throws(() => prepareMatrixEvidenceDirectory(directory), /must be empty/);
     assert.equal(readFileSync(marker, "utf8"), original);
+    assert.throws(() => prepareTimezoneEvidenceDirectory(directory), /must be empty/);
+    assert.equal(readFileSync(marker, "utf8"), original);
 
     const newDirectory = join(directory, "new-output");
     prepareStressEvidenceDirectory(newDirectory);
@@ -515,6 +550,9 @@ test("native evidence runners reject nonempty output before overwriting artifact
     const emptyDirectory = join(directory, "empty-output");
     mkdirSync(emptyDirectory);
     prepareMatrixEvidenceDirectory(emptyDirectory);
+    const timezoneDirectory = join(directory, "timezone-output");
+    prepareTimezoneEvidenceDirectory(timezoneDirectory);
+    assert.equal(statSync(timezoneDirectory).isDirectory(), true);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -747,7 +785,11 @@ test("prepared QA provenance is authoritative and rejects stale environment SHAs
     const filePath = writePreparedSourceMetadata(directory, preparedSha, ["tracked.js"]);
     assert.equal(filePath, join(directory, QA_SOURCE_METADATA));
     assert.equal(statSync(filePath).mode & 0o777, 0o444);
-    assert.equal(readPreparedSourceSha(directory, {}), preparedSha);
+    assert.throws(() => readPreparedSourceSha(directory, {}), /Android source is not sealed/);
+    assert.equal(readPreparedSourceSha(directory, { MOODINATOR_QA_PREPARE_NATIVE: "1" }), preparedSha);
+    mkdirSync(join(directory, "android", "app", "src", "main"), { recursive: true });
+    writeFileSync(join(directory, "android", "app", "src", "main", "AndroidManifest.xml"), "<manifest />\n");
+    sealPreparedNativeSource(directory);
     assert.equal(readPreparedSourceSha(directory, { MOODINATOR_SOURCE_SHA: preparedSha }), preparedSha);
     assert.throws(
       () => readPreparedSourceSha(directory, { MOODINATOR_SOURCE_SHA: "d".repeat(40) }),
@@ -762,6 +804,36 @@ test("prepared QA provenance is authoritative and rejects stale environment SHAs
       () => readPreparedSourceSha(directory, { MOODINATOR_SOURCE_SHA: preparedSha }),
       /tracked\.js differs from source/,
     );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("prepared QA provenance rejects unmanifested Metro and changed native inputs", () => {
+  const directory = mkdtempSync(join(tmpdir(), "moodinator-provenance-input-test-"));
+  const preparedSha = "e".repeat(40);
+  try {
+    mkdirSync(join(directory, "src", "services"), { recursive: true });
+    writeFileSync(join(directory, "src", "services", "bootstrapService.ts"), "export default 1;\n");
+    writePreparedSourceMetadata(directory, preparedSha, ["src/services/bootstrapService.ts"]);
+    writeFileSync(join(directory, "src", "services", "bootstrapService.android.ts"), "export default 2;\n");
+    assert.throws(
+      () => readPreparedSourceSha(directory, { MOODINATOR_QA_PREPARE_NATIVE: "1" }),
+      /unexpected input src\/services\/bootstrapService\.android\.ts/,
+    );
+    rmSync(join(directory, "src", "services", "bootstrapService.android.ts"));
+    mkdirSync(join(directory, "node_modules", "dependency"), { recursive: true });
+    writeFileSync(join(directory, "node_modules", "dependency", "index.js"), "generated dependency\n");
+    writeFileSync(join(directory, "expo-env.d.ts"), "/// generated Expo types\n");
+    mkdirSync(join(directory, "android", "app", "src", "main", "java"), { recursive: true });
+    const nativeFile = join(directory, "android", "app", "src", "main", "java", "MainApplication.kt");
+    writeFileSync(nativeFile, "// generated\n");
+    sealPreparedNativeSource(directory);
+    mkdirSync(join(directory, "android", "app", "build", "generated"), { recursive: true });
+    writeFileSync(join(directory, "android", "app", "build", "generated", "output"), "build output\n");
+    assert.equal(readPreparedSourceSha(directory, {}), preparedSha);
+    writeFileSync(nativeFile, "// edited after sealing\n");
+    assert.throws(() => readPreparedSourceSha(directory, {}), /MainApplication\.kt differs from source/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
