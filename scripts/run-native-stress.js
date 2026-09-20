@@ -39,6 +39,7 @@ const { runDeleteUndoAcceptance, runMaestro } = require("./native-qa-runner");
 const appId = "com.lab4code.moodinator.qa";
 const root = path.resolve(__dirname, "..");
 const importFlow = path.join(root, ".maestro/flows/native-stress-import.yaml");
+const measuredStartFlow = path.join(root, ".maestro/flows/native-stress-start.yaml");
 const cycleTemplatePath = path.join(root, ".maestro/flows/native-stress-cycle.yaml");
 const filterTemplatePath = path.join(root, ".maestro/flows/native-stress-filters.yaml");
 
@@ -268,12 +269,16 @@ function stopTrace(serial, outputPath, traceState, {
       status: isToolUnavailable(result.error) ? "blocked" : "failed",
     };
   }
-  if (!result.output.trim()) {
+  const entriesMatch = result.output.match(/entries-in-buffer\/entries-written:\s*(\d+)\s*\/\s*(\d+)/i);
+  const hasEvents = entriesMatch
+    ? Number(entriesMatch[1]) > 0
+    : result.output.split("\n").some((line) => /^\s*\S.+?\s+\(\s*\d+\)\s+\[\d+\].*?:\s+\S/.test(line));
+  if (!hasEvents) {
     return {
       ...result,
       ok: false,
       status: "failed",
-      error: "atrace --async_stop returned no trace data.",
+      error: "atrace --async_stop returned no trace events.",
     };
   }
   return { ...result, status: "captured" };
@@ -295,6 +300,8 @@ function summarizeRunEvidence({
   gfxReset,
   gfx,
   trace,
+  thermalBefore,
+  thermalAfter,
 }) {
   const requiredFailures = [];
   const checkCapture = (label, capture, parsed, fields) => {
@@ -348,6 +355,10 @@ function summarizeRunEvidence({
       status: trace?.status ?? "not-run",
       captured: trace?.status === "captured",
       error: trace?.error ?? null,
+    },
+    thermal: {
+      before: { ok: Boolean(thermalBefore?.ok), error: thermalBefore?.error ?? null, snapshot: thermalBefore?.output?.trim() ?? "" },
+      after: { ok: Boolean(thermalAfter?.ok), error: thermalAfter?.error ?? null, snapshot: thermalAfter?.output?.trim() ?? "" },
     },
     memoryBefore: parseMemInfo(beforeMemory?.output ?? ""),
     memoryAfter: parseMemInfo(afterMemory?.output ?? ""),
@@ -410,8 +421,15 @@ function validateStressComparison(baseline, current) {
   for (const field of ["serial", "api", "model", "refreshRate"]) {
     if (baseline.device?.[field] !== current.device?.[field]) throw new Error(`Stress comparison requires equal device ${field}.`);
   }
-  if (baseline.optionalDiagnostics?.thermal?.snapshot !== current.optionalDiagnostics?.thermal?.snapshot) {
-    throw new Error("Stress comparison requires equal thermal conditions.");
+  for (let index = 0; index < baseline.runCount; index++) {
+    const baselineThermal = baseline.runs?.[index]?.thermal;
+    const currentThermal = current.runs?.[index]?.thermal;
+    if (!baselineThermal?.before?.ok || !baselineThermal?.after?.ok
+        || !currentThermal?.before?.ok || !currentThermal?.after?.ok
+        || baselineThermal.before?.snapshot !== currentThermal.before?.snapshot
+        || baselineThermal.after?.snapshot !== currentThermal.after?.snapshot) {
+      throw new Error(`Stress comparison requires equal per-run thermal conditions for run ${index + 1}.`);
+    }
   }
   return { baselineSourceSha: baseline.sourceSha, currentSourceSha: current.sourceSha };
 }
@@ -444,21 +462,13 @@ async function main(argv = process.argv.slice(2)) {
       model: runAdb(options.serial, ["shell", "getprop", "ro.product.model"]).trim(),
       refreshRate: runAdb(options.serial, ["shell", "settings", "get", "system", "peak_refresh_rate"]).trim(),
     };
-    const thermal = captureText(
-      options.serial,
-      ["shell", "dumpsys", "thermalservice"],
-      path.join(outputDirectory, "device-thermalservice.txt"),
-      { label: "optional thermal diagnostic" },
-    );
     metadata.device = device;
-    metadata.optionalDiagnostics = {
-      thermal: { ok: thermal.ok, error: thermal.error ?? null, snapshot: thermal.output.trim() },
-    };
     captureJson(outputDirectory, "metadata.json", metadata);
 
     for (let runNumber = 1; runNumber <= options.runs; runNumber++) {
       console.log(`Importing ${options.size} fabricated entries for route ${runNumber}/${options.runs}.`);
       await importFixture(options.serial, fixtureName, options.size);
+      await runMaestro(options.serial, measuredStartFlow, { cwd: root });
       await settleImportedHistory(options.serial, options.size);
 
       const runPrefix = `run-${runNumber}`;
@@ -466,6 +476,12 @@ async function main(argv = process.argv.slice(2)) {
       const afterMemoryPath = path.join(outputDirectory, `${runPrefix}-memory-after.txt`);
       const gfxPath = path.join(outputDirectory, `${runPrefix}-gfxinfo.txt`);
       const tracePath = path.join(outputDirectory, `${runPrefix}-scroll-trace.txt`);
+      const thermalBefore = captureText(
+        options.serial,
+        ["shell", "dumpsys", "thermalservice"],
+        path.join(outputDirectory, `${runPrefix}-thermal-before.txt`),
+        { label: "optional thermal diagnostic before measured run" },
+      );
       const gfxReset = captureText(
         options.serial,
         ["shell", "dumpsys", "gfxinfo", appId, "reset"],
@@ -484,6 +500,7 @@ async function main(argv = process.argv.slice(2)) {
       let afterMemory;
       let gfx;
       let trace;
+      let thermalAfter;
 
       try {
         for (const entryId of pageBoundaryIds(options.size)) {
@@ -554,6 +571,12 @@ async function main(argv = process.argv.slice(2)) {
           gfxPath,
           { required: true, label: "required gfxinfo" },
         );
+        thermalAfter = captureText(
+          options.serial,
+          ["shell", "dumpsys", "thermalservice"],
+          path.join(outputDirectory, `${runPrefix}-thermal-after.txt`),
+          { label: "optional thermal diagnostic after measured run" },
+        );
       }
 
       const summary = summarizeRunEvidence({
@@ -565,6 +588,8 @@ async function main(argv = process.argv.slice(2)) {
         gfxReset,
         gfx,
         trace,
+        thermalBefore,
+        thermalAfter,
       });
       runSummaries.push(summary);
       captureJson(outputDirectory, `${runPrefix}-summary.json`, summary);

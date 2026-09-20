@@ -30,6 +30,7 @@ const {
   assertInstalledQaBuild,
   combineOperationalErrors,
   evidenceStatus,
+  isToolUnavailable,
   packageIsDebuggable,
   requireSourceSha,
 } = require("../scripts/native-qa-common.js");
@@ -83,6 +84,7 @@ const {
   recordedDateTimeExpectation,
   requestRuntimeTimeZone,
   selectRuntimeTimeZone,
+  setRuntimeTimeZone,
   timezoneEntryMatcher,
   timezoneEntryTestId,
   verifyRequestedTimeZone,
@@ -464,7 +466,10 @@ test("stress comparison allows different revisions with per-build provenance", (
     datasetSize: 1000,
     runCount: 2,
     device: { serial: "emulator-5554", api: "35", model: "Pixel", refreshRate: "60" },
-    optionalDiagnostics: { thermal: { snapshot: "nominal" } },
+    runs: [
+      { thermal: { before: { ok: true, snapshot: "nominal" }, after: { ok: true, snapshot: "nominal" } } },
+      { thermal: { before: { ok: true, snapshot: "nominal" }, after: { ok: true, snapshot: "nominal" } } },
+    ],
   });
   const result = validateStressComparison(make("a".repeat(40)), make("b".repeat(40)));
   assert.notEqual(result.baselineSourceSha, result.currentSourceSha);
@@ -474,6 +479,22 @@ test("stress comparison allows different revisions with per-build provenance", (
   assert.throws(() => validateStressComparison(make("a".repeat(40)), {
     ...make("b".repeat(40)), device: { ...make("b".repeat(40)).device, refreshRate: "120" },
   }), /refreshRate/);
+  const changedThermal = make("b".repeat(40));
+  changedThermal.runs[1].thermal.after.snapshot = "throttled";
+  assert.throws(() => validateStressComparison(make("a".repeat(40)), changedThermal), /run 2/);
+});
+
+test("measured stress flows do not relaunch the app process", () => {
+  for (const flowPath of [
+    "../.maestro/flows/native-stress-cycle.yaml",
+    "../.maestro/flows/native-stress-filters.yaml",
+  ]) {
+    const flow = readFileSync(new URL(flowPath, import.meta.url), "utf8");
+    assert.equal(flow.includes("launchApp"), false);
+  }
+  const start = readFileSync(new URL("../.maestro/flows/native-stress-start.yaml", import.meta.url), "utf8");
+  assert.match(start, /launchApp:/);
+  assert.match(start, /stopApp: false/);
 });
 
 test("fixture identities preserve exact original and edited values", () => {
@@ -643,10 +664,11 @@ test("stress settles imported Home history before performance reset", () => {
   assert.equal(typeof settleImportedHistory, "function");
   const source = readFileSync(new URL("../scripts/run-native-stress.js", import.meta.url), "utf8");
   const imported = source.indexOf("await importFixture(options.serial, fixtureName, options.size)");
-  const settled = source.indexOf("await settleImportedHistory(options.serial, options.size)", imported);
+  const launched = source.indexOf("await runMaestro(options.serial, measuredStartFlow", imported);
+  const settled = source.indexOf("await settleImportedHistory(options.serial, options.size)", launched);
   const reset = source.indexOf("const gfxReset = captureText", settled);
   const baseline = source.indexOf("const beforeMemory = captureText", settled);
-  assert.ok(imported >= 0 && settled > imported && reset > settled && baseline > settled);
+  assert.ok(imported >= 0 && launched > imported && settled > launched && reset > settled && baseline > settled);
   assert.match(source, /testId: "history-count"/);
   assert.match(source, /text: `\$\{expectedCount\} total`/);
 });
@@ -671,6 +693,39 @@ test("functional evidence failures outrank unavailable diagnostics", () => {
     routeError: new Error("adb not installed"),
     requiredFailures: [{ status: "blocked" }],
   }), "blocked");
+});
+
+test("canonical ADB connectivity failures block native evidence", () => {
+  const unavailable = [
+    "error: device offline",
+    "error: device unauthorized. Please check the confirmation dialog on your device.",
+    "error: no devices/emulators found",
+    "spawnSync adb ETIMEDOUT",
+    "adb -s emulator-5554 shell pm path timed out after 15000ms",
+  ];
+  for (const message of unavailable) {
+    assert.equal(isToolUnavailable(new Error(message)), true, message);
+    assert.equal(evidenceStatus({ routeError: new Error(message) }), "blocked", message);
+  }
+
+  const stderrError = new Error("Command failed: adb -s emulator-5554 shell pm path app");
+  stderrError.stderr = Buffer.from("error: device offline\n");
+  assert.equal(isToolUnavailable(stderrError), true);
+  assert.equal(evidenceStatus({ routeError: stderrError }), "blocked");
+});
+
+test("ADB command and app assertion failures remain failed evidence", () => {
+  const failures = [
+    "adb shell atrace exited 1: atrace denied",
+    "adb shell dumpsys returned malformed output",
+    "Expected node not found in the UI hierarchy",
+    "Timed out waiting for the source SHA node",
+    "Maestro assertion failed",
+  ];
+  for (const message of failures) {
+    assert.equal(isToolUnavailable(new Error(message)), false, message);
+    assert.equal(evidenceStatus({ routeError: new Error(message) }), "failed", message);
+  }
 });
 
 test("installed QA build must expose the requested source SHA", async () => {
@@ -793,11 +848,27 @@ test("trace evidence is captured only after a successful non-empty stop", () => 
     );
     assert.equal(empty.status, "failed");
     assert.equal(empty.ok, false);
+    const boilerplate = stopTrace(
+      "emulator-5554",
+      join(directory, "zero.trace"),
+      { status: "started" },
+      { capture: () => ({ ok: true, output: "# tracer: nop\n# entries-in-buffer/entries-written: 0/0   #P:8\n" }) },
+    );
+    assert.equal(boilerplate.status, "failed");
+    assert.equal(boilerplate.ok, false);
+    const overwritten = stopTrace(
+      "emulator-5554",
+      join(directory, "overwritten.trace"),
+      { status: "started" },
+      { capture: () => ({ ok: true, output: "# entries-in-buffer/entries-written: 0/2   #P:8\n" }) },
+    );
+    assert.equal(overwritten.status, "failed");
+    assert.equal(overwritten.ok, false);
     const captured = stopTrace(
       "emulator-5554",
       join(directory, "captured.trace"),
       { status: "started" },
-      { capture: () => ({ ok: true, output: "TRACE DATA" }) },
+      { capture: () => ({ ok: true, output: "# entries-in-buffer/entries-written: 2/2   #P:8\n" }) },
     );
     assert.equal(captured.status, "captured");
     assert.equal(captured.ok, true);
@@ -805,7 +876,7 @@ test("trace evidence is captured only after a successful non-empty stop", () => 
     stopTrace("emulator-5554", join(directory, "large.trace"), { status: "started" }, {
       capture: (_serial, _args, _path, options) => {
         traceOptions = options;
-        return { ok: true, output: "TRACE DATA" };
+        return { ok: true, output: "# entries-in-buffer/entries-written: 1/1   #P:8\n" };
       },
     });
     assert.equal(traceOptions.maxBuffer, 32 * 1024 * 1024);
@@ -1056,6 +1127,26 @@ test("timezone evidence requires accepted, distinct device states", () => {
   ]);
   assert.equal(failureBeforeRefusal.status, "failed");
   assert.equal(failureBeforeRefusal.stableRecordedLabel, false);
+});
+
+test("timezone restoration accepts an unsupported command when runtime is already original", () => {
+  assert.equal(
+    setRuntimeTimeZone("emulator-5554", "UTC", {
+      runAdbImpl: () => { throw new Error("cmd: Can't find service: alarm"); },
+      readDeviceTimeZoneImpl: () => ({ value: "UTC" }),
+    }),
+    "UTC",
+  );
+});
+
+test("timezone restoration fails when an unsupported command leaves runtime unrestored", () => {
+  assert.throws(
+    () => setRuntimeTimeZone("emulator-5554", "UTC", {
+      runAdbImpl: () => { throw new Error("cmd: Can't find service: alarm"); },
+      readDeviceTimeZoneImpl: () => ({ value: "Pacific/Auckland" }),
+    }),
+    /Android runtime timezone was Pacific\/Auckland, expected UTC.*Can't find service: alarm/,
+  );
 });
 
 test("timezone fixture expectation uses its nonzero half-hour recorded offset", () => {

@@ -1,8 +1,6 @@
 appId: com.lab4code.moodinator.qa
 name: Discriminating combined history filters and refresh
 ---
-- launchApp:
-    clearState: false
 - tapOn: "Home tab, log your mood"
 - tapOn: "Filter history"
 - tapOn: "Clear filters"

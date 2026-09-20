@@ -188,9 +188,12 @@ bun run qa:stress -- emulator-5554 --size 10000 --label current --runs 2 --out /
 
 Use new empty output directories for each command. Each run records the source
 SHA and device, `dumpsys gfxinfo` frame counters, repeated `dumpsys meminfo`
-captures, and an `atrace` scroll trace when the emulator permits it. Compare
+captures, an `atrace` scroll trace when the emulator permits it, and thermal
+snapshots immediately before and after every measured run. The imported app
+process stays alive across all measured cycle and filter flows. Compare
 the baseline/current `summary.json` files only when device profile, refresh
-rate, thermal state, fixture size, and run count match. Their `sourceSha`
+rate, each corresponding run's before/after thermal snapshots, fixture size,
+and run count match. Their `sourceSha`
 values may differ across revisions, but each summary must match its own
 provenance-bound installed QA binary. A
 failed required memory, gfx, or trace capture produces `status: failed` or

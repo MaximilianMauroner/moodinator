@@ -1,8 +1,6 @@
 appId: com.lab4code.moodinator.qa
 name: Recycled-row stress cycle
 ---
-- launchApp:
-    clearState: false
 - tapOn: "Home tab, log your mood"
 ${TARGET_SETUP}
 - scrollUntilVisible:

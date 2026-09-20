@@ -74,12 +74,23 @@ function restoreTimeZoneSettings(serial, original) {
   if (firstError) throw firstError;
 }
 
-function setRuntimeTimeZone(serial, timeZone) {
+function setRuntimeTimeZone(serial, timeZone, {
+  runAdbImpl = runAdb,
+  readDeviceTimeZoneImpl = readDeviceTimeZone,
+} = {}) {
   if (!timeZone) throw new Error("The original runtime timezone was unavailable and cannot be restored safely.");
-  runAdb(serial, ["shell", "cmd", "alarm", "set-timezone", timeZone]);
-  const actual = readDeviceTimeZone(serial).value;
+  let requestError = null;
+  try {
+    runAdbImpl(serial, ["shell", "cmd", "alarm", "set-timezone", timeZone]);
+  } catch (error) {
+    requestError = error;
+  }
+  const actual = readDeviceTimeZoneImpl(serial).value;
   if (actual !== timeZone) {
-    throw new Error(`Android runtime timezone was ${actual ?? "unavailable"}, expected ${timeZone}.`);
+    const requestFailure = requestError ? ` The timezone command also failed: ${requestError.message}` : "";
+    throw new Error(
+      `Android runtime timezone was ${actual ?? "unavailable"}, expected ${timeZone}.${requestFailure}`,
+    );
   }
   return actual;
 }

@@ -16,7 +16,19 @@ function requireSourceSha(env = process.env) {
 
 function isToolUnavailable(error) {
   const message = error instanceof Error ? error.message : String(error);
-  return /ENOENT|not found|cannot find|no such file|not installed/i.test(message);
+  const adbOutput = error && typeof error === "object"
+    ? [error.stderr, error.stdout]
+      .filter((value) => typeof value === "string" || Buffer.isBuffer(value))
+      .map(String)
+      .join("\n")
+    : "";
+  const diagnostic = `${message}\n${adbOutput}`;
+  return /\bENOENT\b|\bcommand not found\b|\bexecutable not found\b|\bno such file\b|\b(?:adb|maestro) (?:is )?not installed\b/i.test(diagnostic)
+    || /\bdevice(?: [^\r\n]*)? offline\b/i.test(diagnostic)
+    || /\bdevice unauthorized\b/i.test(diagnostic)
+    || /\bno devices\/emulators found\b/i.test(diagnostic)
+    || /\bdevice ['"][^'"\r\n]+['"] not found\b/i.test(diagnostic)
+    || /\b(?:adb|spawn(?:Sync)? adb)\b[^\r\n]*(?:ETIMEDOUT|timed out|timeout)/i.test(diagnostic);
 }
 
 function evidenceStatus({ routeError = null, requiredFailures = [] } = {}) {
