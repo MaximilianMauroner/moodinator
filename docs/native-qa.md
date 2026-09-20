@@ -184,7 +184,9 @@ Use new empty output directories for each command. Each run records the source
 SHA and device, `dumpsys gfxinfo` frame counters, repeated `dumpsys meminfo`
 captures, and an `atrace` scroll trace when the emulator permits it. Compare
 the baseline/current `summary.json` files only when device profile, refresh
-rate, thermal state, fixture size, run count, and exact `sourceSha` match. A
+rate, thermal state, fixture size, and run count match. Their `sourceSha`
+values may differ across revisions, but each summary must match its own
+provenance-bound installed QA binary. A
 failed required memory, gfx, or trace capture produces `status: failed` or
 `blocked` with `acceptance: not-accepted`; optional thermal diagnostics are
 labelled separately. The runner deliberately does not calculate or claim a

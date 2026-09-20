@@ -74,12 +74,23 @@ function readBackAbsentSetting(serial, namespace, key) {
 function themeValueForState(night) {
   if (night === "yes") return "2";
   if (night === "no") return "1";
+  if (night === "auto") return "0";
   throw new Error(`Unknown Android night mode: ${night}.`);
 }
 
 function setAndReadTheme(serial, night) {
   runAdb(serial, ["shell", "cmd", "uimode", "night", night], { timeoutMs: SETTING_TIMEOUT_MS });
-  return readBackSetting(serial, "secure", "ui_night_mode", themeValueForState(night));
+  const settingValue = readBackSetting(serial, "secure", "ui_night_mode", themeValueForState(night));
+  const runtime = readRuntimeTheme(serial);
+  if (runtime !== night) throw new Error(`Android runtime night mode was ${runtime}, expected ${night}.`);
+  return { setting: settingValue, runtime };
+}
+
+function readRuntimeTheme(serial) {
+  const output = runAdb(serial, ["shell", "cmd", "uimode", "night"], { timeoutMs: SETTING_TIMEOUT_MS }).trim();
+  const match = /(?:Night mode:\s*)?(no|yes|auto)\b/i.exec(output);
+  if (!match) throw new Error(`Could not read Android runtime night mode: ${JSON.stringify(output)}.`);
+  return match[1].toLowerCase();
 }
 
 function animationValueForState(reducedMotion) {
@@ -98,12 +109,16 @@ function restoreSetting(serial, namespace, key, value, fallback) {
 function restoreSettings(serial, original) {
   const operations = [
     ["system", "font_scale", original.fontScale, "1.0"],
-    ["secure", "ui_night_mode", original.nightMode, "0"],
     ["global", "window_animation_scale", original.animation.window, "1.0"],
     ["global", "transition_animation_scale", original.animation.transition, "1.0"],
     ["global", "animator_duration_scale", original.animation.animator, "1.0"],
   ];
   let firstError = null;
+  try {
+    setAndReadTheme(serial, original.runtimeNightMode);
+  } catch (error) {
+    firstError ??= error;
+  }
   for (const [namespace, key, value, fallback] of operations) {
     try {
       restoreSetting(serial, namespace, key, value, fallback);
@@ -206,6 +221,7 @@ async function main(argv = process.argv.slice(2)) {
     original = {
       fontScale: setting(options.serial, "system", "font_scale"),
       nightMode: setting(options.serial, "secure", "ui_night_mode"),
+      runtimeNightMode: readRuntimeTheme(options.serial),
       animation: {
         window: setting(options.serial, "global", "window_animation_scale"),
         transition: setting(options.serial, "global", "transition_animation_scale"),
@@ -298,6 +314,7 @@ module.exports = {
   isAbsentSettingValue,
   parseOptions,
   readBackSetting,
+  readRuntimeTheme,
   themeValueForState,
   verifyFabricatedFixture,
 };

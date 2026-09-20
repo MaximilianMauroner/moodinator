@@ -57,6 +57,7 @@ const {
   startTrace,
   stopTrace,
   summarizeRunEvidence,
+  validateStressComparison,
 } = require("../scripts/run-native-stress.js");
 const {
   animationValueForState,
@@ -349,6 +350,30 @@ test("10k deep identities use a bounded exact-note indexed lookup", () => {
   }
 });
 
+test("all deep stress targets use bounded indexed lookup", () => {
+  const source = readFileSync(new URL("../scripts/run-native-stress.js", import.meta.url), "utf8");
+  assert.match(source, /indexedLookup: entryId > 51/);
+});
+
+test("stress comparison allows different revisions with per-build provenance", () => {
+  const make = (sourceSha) => ({
+    sourceSha,
+    installedSourceSha: sourceSha,
+    datasetSize: 1000,
+    runCount: 2,
+    device: { serial: "emulator-5554", api: "35", model: "Pixel", refreshRate: "60" },
+    optionalDiagnostics: { thermal: { snapshot: "nominal" } },
+  });
+  const result = validateStressComparison(make("a".repeat(40)), make("b".repeat(40)));
+  assert.notEqual(result.baselineSourceSha, result.currentSourceSha);
+  assert.throws(() => validateStressComparison(make("a".repeat(40)), {
+    ...make("b".repeat(40)), installedSourceSha: "c".repeat(40),
+  }), /installed QA binary/);
+  assert.throws(() => validateStressComparison(make("a".repeat(40)), {
+    ...make("b".repeat(40)), device: { ...make("b".repeat(40)).device, refreshRate: "120" },
+  }), /refreshRate/);
+});
+
 test("fixture identities preserve exact original and edited values", () => {
   const entries = createQaFixture(100, { now: Date.UTC(2031, 4, 1) });
   assert.deepEqual(fixtureIdentity(entries, 51, { editedNote: "QA stress edit 51" }), {
@@ -549,6 +574,7 @@ test("normal-motion matrix values are explicit and nonzero", () => {
   assert.equal(animationValueForState(true), "0");
   assert.equal(themeValueForState("no"), "1");
   assert.equal(themeValueForState("yes"), "2");
+  assert.equal(themeValueForState("auto"), "0");
   assert.equal(isAbsentSettingValue("null"), true);
   assert.equal(isAbsentSettingValue(""), true);
   assert.equal(isAbsentSettingValue("1"), false);

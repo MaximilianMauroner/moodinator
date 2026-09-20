@@ -340,6 +340,7 @@ function baseMetadata(options, sourceSha, entries, fixturePath, outputDirectory,
     runCount: options.runs,
     pageBoundaryIds: pageBoundaryIds(options.size),
     sourceSha,
+    installedSourceSha: sourceSha,
     fixtureReferenceNow: referenceNow,
     command: `bun run qa:stress -- ${options.serial} --size ${options.size} --label ${options.label} --runs ${options.runs} --out ${outputDirectory}`,
     fabricatedFixture: fixturePath,
@@ -362,6 +363,24 @@ function pageBoundaryIds(size) {
   if (size === 1000) return [51, 501, 951];
   if (size === 10000) return [51, 5001, 9951];
   throw new Error(`Unsupported stress fixture size: ${size}.`);
+}
+
+function validateStressComparison(baseline, current) {
+  for (const [label, summary] of [["baseline", baseline], ["current", current]]) {
+    if (!summary?.sourceSha || summary.sourceSha !== summary.installedSourceSha) {
+      throw new Error(`${label} source SHA does not match its installed QA binary.`);
+    }
+  }
+  for (const field of ["datasetSize", "runCount"]) {
+    if (baseline[field] !== current[field]) throw new Error(`Stress comparison requires equal ${field}.`);
+  }
+  for (const field of ["serial", "api", "model", "refreshRate"]) {
+    if (baseline.device?.[field] !== current.device?.[field]) throw new Error(`Stress comparison requires equal device ${field}.`);
+  }
+  if (baseline.optionalDiagnostics?.thermal?.snapshot !== current.optionalDiagnostics?.thermal?.snapshot) {
+    throw new Error("Stress comparison requires equal thermal conditions.");
+  }
+  return { baselineSourceSha: baseline.sourceSha, currentSourceSha: current.sourceSha };
 }
 
 async function main(argv = process.argv.slice(2)) {
@@ -400,7 +419,7 @@ async function main(argv = process.argv.slice(2)) {
     );
     metadata.device = device;
     metadata.optionalDiagnostics = {
-      thermal: { ok: thermal.ok, error: thermal.error ?? null },
+      thermal: { ok: thermal.ok, error: thermal.error ?? null, snapshot: thermal.output.trim() },
     };
     captureJson(outputDirectory, "metadata.json", metadata);
 
@@ -442,7 +461,7 @@ async function main(argv = process.argv.slice(2)) {
           const result = await runDeleteUndoAcceptance(
             options.serial,
             materializeCycle(outputDirectory, identity, runNumber, {
-              indexedLookup: options.size === 10000 && entryId > 51,
+              indexedLookup: entryId > 51,
             }),
             {
               cwd: root,
@@ -571,4 +590,5 @@ module.exports = {
   startTrace,
   stopTrace,
   summarizeRunEvidence,
+  validateStressComparison,
 };
