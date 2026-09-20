@@ -120,12 +120,13 @@ function captureEntryIdentity(serial, {
   entryIndex = null,
   adbPath = "adb",
   dumpTimeoutMs,
+  readHierarchyImpl = readHierarchy,
 } = {}) {
   if (!note || !Number.isInteger(mood)) {
     throw new Error("An exact entry note and mood are required before deletion.");
   }
 
-  const nodes = readHierarchy(serial, { adbPath, timeoutMs: dumpTimeoutMs });
+  const nodes = readHierarchyImpl(serial, { adbPath, timeoutMs: dumpTimeoutMs });
   const noteMatcher = {
     allOf: [
       { testIdPrefix: "mood-entry-note-" },
@@ -158,6 +159,29 @@ function captureEntryIdentity(serial, {
     throw new Error(`Entry identity was not unique before deletion (counts: ${counts.join(", ")}).`);
   }
   return { ...identity, selectors };
+}
+
+async function waitForEntryIdentity(serial, target, {
+  timeoutMs = 3000,
+  pollIntervalMs = 80,
+  ...options
+} = {}) {
+  const deadline = Date.now() + timeoutMs;
+  let lastError = null;
+  do {
+    try {
+      const remainingMs = Math.max(1, deadline - Date.now());
+      return captureEntryIdentity(serial, {
+        ...target,
+        ...options,
+        dumpTimeoutMs: Math.min(options.dumpTimeoutMs ?? timeoutMs, remainingMs),
+      });
+    } catch (error) {
+      lastError = error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+  } while (Date.now() <= deadline);
+  throw new Error(`Entry identity was not ready within ${timeoutMs}ms. Last inspection failed: ${lastError?.message ?? "unknown error"}`);
 }
 
 function entryIdentityCounts(nodes, identity) {
@@ -265,10 +289,13 @@ async function runDeleteUndoAcceptance(serial, flowPath, {
   await runMaestro(serial, flowPath, { cwd, timeoutMs: maestroTimeoutMs });
   coordination = transition(coordination, "maestro-complete");
 
-  const identity = captureEntryIdentity(serial, {
-    ...target,
+  const identity = await waitForEntryIdentity(serial, target, {
     adbPath: waitOptions.adbPath,
-    dumpTimeoutMs: waitOptions.dumpTimeoutMs,
+    timeoutMs: waitOptions.identityTimeoutMs ?? 3000,
+    pollIntervalMs: waitOptions.identityPollIntervalMs ?? 80,
+    // Identity capture precedes the time-sensitive Undo phase. Give each dump
+    // its normal allowance instead of inheriting the 300ms Undo probe budget.
+    dumpTimeoutMs: waitOptions.identityDumpTimeoutMs,
   });
   coordination = transition(coordination, "target-captured");
 
@@ -340,6 +367,7 @@ module.exports = {
   undoMatcher,
   waitForEntryAbsent,
   waitForEntryHierarchyGone,
+  waitForEntryIdentity,
   waitForExactEntry,
   waitForEntryVisibleAbsent,
 };

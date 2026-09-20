@@ -18,6 +18,7 @@ const appId = "com.lab4code.moodinator.qa";
 const root = path.resolve(__dirname, "..");
 const importFlow = path.join(root, ".maestro/flows/native-stress-import.yaml");
 const MAESTRO_TIMEOUT_MS = 120000;
+const TIMEZONE_FIXTURE_OFFSET_MINUTES = -330;
 
 function parseOptions(argv) {
   const serial = argv.shift();
@@ -132,6 +133,40 @@ function recordedLabelFromNode(node) {
   return label;
 }
 
+function recordedDateTimeExpectation(entry, locale = "en-US") {
+  if (!Number.isFinite(entry?.timestamp) || !Number.isInteger(entry?.utcOffsetMinutes)) {
+    throw new Error("The timezone fixture entry must have a timestamp and recorded offset.");
+  }
+  const recordedDate = new Date(entry.timestamp - entry.utcOffsetMinutes * 60_000);
+  return {
+    dateLabel: new Intl.DateTimeFormat(locale, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      timeZone: "UTC",
+    }).format(recordedDate),
+    timeLabel: new Intl.DateTimeFormat(locale, {
+      hour: "numeric",
+      minute: "2-digit",
+      timeZone: "UTC",
+    }).format(recordedDate),
+  };
+}
+
+function labelContainsRecordedDateTime(label, expected) {
+  return typeof label === "string"
+    && label.includes(`logged on ${expected.dateLabel} at ${expected.timeLabel}`);
+}
+
+function createTimezoneFixture(count = 100) {
+  const entries = createQaFixture(count);
+  entries[0] = {
+    ...entries[0],
+    utcOffsetMinutes: TIMEZONE_FIXTURE_OFFSET_MINUTES,
+  };
+  return entries;
+}
+
 function evaluateTimezoneObservations(observations) {
   const accepted = observations.length === 2 && observations.every((observation) => (
     observation.accepted
@@ -142,13 +177,19 @@ function evaluateTimezoneObservations(observations) {
   const sameRecordedLabel = observations.length === 2
     && observations.every((observation) => observation.contentDescription)
     && observations[0].contentDescription === observations[1].contentDescription;
-  const stableRecordedLabel = accepted && distinctStates && sameRecordedLabel;
+  const expectedRecordedDateTime = observations.length === 2
+    && observations.every((observation) => observation.matchesExpectedRecordedDateTime);
+  const stableRecordedLabel = accepted
+    && distinctStates
+    && sameRecordedLabel
+    && expectedRecordedDateTime;
   return {
     stableRecordedLabel,
     status: stableRecordedLabel ? "passed" : observations.some((observation) => !observation.accepted) ? "blocked" : "failed",
     accepted,
     distinctStates,
     sameRecordedLabel,
+    expectedRecordedDateTime,
   };
 }
 
@@ -190,7 +231,8 @@ async function main(argv = process.argv.slice(2)) {
     : mkdtempSync(path.join(tmpdir(), "moodinator-native-timezone-"));
   mkdirSync(outputDirectory, { recursive: true });
 
-  const entries = createQaFixture(100);
+  const entries = createTimezoneFixture();
+  const expectedRecordedDateTime = recordedDateTimeExpectation(entries[0]);
   const fixtureName = "moodinator-qa-timezone.json";
   const fixturePath = path.join(outputDirectory, fixtureName);
   const baseEvidence = {
@@ -203,6 +245,7 @@ async function main(argv = process.argv.slice(2)) {
       entryCount: entries.length,
       firstNote: entries[0].note,
       recordedOffsetMinutes: entries[0].utcOffsetMinutes,
+      expectedRecordedDateTime,
     },
   };
   const observations = [];
@@ -249,6 +292,10 @@ async function main(argv = process.argv.slice(2)) {
       );
       observation.tested = true;
       observation.contentDescription = recordedLabelFromNode(node);
+      observation.matchesExpectedRecordedDateTime = labelContainsRecordedDateTime(
+        observation.contentDescription,
+        expectedRecordedDateTime,
+      );
       observations.push(observation);
     }
   } catch (error) {
@@ -302,12 +349,15 @@ if (require.main === module) {
 }
 
 module.exports = {
+  createTimezoneFixture,
   evaluateTimezoneObservations,
+  labelContainsRecordedDateTime,
   parseOptions,
   readDeviceTimeZone,
   selectRuntimeTimeZone,
   setRuntimeTimeZone,
   recordedLabelFromNode,
+  recordedDateTimeExpectation,
   requestRuntimeTimeZone,
   timezoneEntryMatcher,
   timezoneEntryTestId,

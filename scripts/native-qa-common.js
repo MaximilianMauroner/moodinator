@@ -35,6 +35,10 @@ function combineOperationalErrors(operationalError, restorationError) {
   );
 }
 
+function packageIsDebuggable(packageDump) {
+  return /(?:^|\n)\s*(?:pkgFlags|flags)=\[[^\]\n]*\bDEBUGGABLE\b[^\]\n]*\]/m.test(packageDump);
+}
+
 async function assertInstalledQaBuild(serial, sourceSha, {
   appId = QA_APP_ID,
   execFile = execFileSync,
@@ -46,6 +50,13 @@ async function assertInstalledQaBuild(serial, sourceSha, {
   });
   if (!installed.trim().startsWith("package:")) {
     throw new Error(`The QA package ${appId} is not installed on ${serial}.`);
+  }
+  const packageDump = execFile("adb", ["-s", serial, "shell", "dumpsys", "package", appId], {
+    encoding: "utf8",
+    timeout: 15000,
+  });
+  if (packageIsDebuggable(packageDump)) {
+    throw new Error(`The installed QA package ${appId} is debuggable; native acceptance requires a non-debuggable release build.`);
   }
   execFile("adb", ["-s", serial, "shell", "am", "force-stop", appId], { timeout: 15000 });
   execFile("adb", ["-s", serial, "shell", "monkey", "-p", appId, "1"], {
@@ -68,5 +79,6 @@ module.exports = {
   evidenceAcceptance,
   evidenceStatus,
   isToolUnavailable,
+  packageIsDebuggable,
   requireSourceSha,
 };

@@ -155,6 +155,7 @@ async function captureMatrixScreens(serial, outputDirectory, stateName, fixtureC
   };
   capture("home");
   await waitForNodeAndTap(serial, { contentDescription: "Insights tab, view mood history and summaries" });
+  await waitForNodeAndTap(serial, { contentDescription: "All history" }, { timeoutMs: 15000 });
   await waitForNode(serial, {
     allOf: [
       { testId: "insights-loaded-summary" },

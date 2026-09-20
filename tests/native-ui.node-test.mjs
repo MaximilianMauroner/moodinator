@@ -27,6 +27,7 @@ const {
   assertInstalledQaBuild,
   combineOperationalErrors,
   evidenceStatus,
+  packageIsDebuggable,
   requireSourceSha,
 } = require("../scripts/native-qa-common.js");
 const {
@@ -34,6 +35,7 @@ const {
   entryIdentityCounts,
   entrySelectors,
   isExactlyOneRestoredEntry,
+  waitForEntryIdentity,
   waitForExactEntry,
 } = require("../scripts/native-qa-runner.js");
 const {
@@ -66,8 +68,11 @@ const {
   themeValueForState,
 } = require("../scripts/run-native-matrix.js");
 const {
+  createTimezoneFixture,
   evaluateTimezoneObservations,
+  labelContainsRecordedDateTime,
   recordedLabelFromNode,
+  recordedDateTimeExpectation,
   requestRuntimeTimeZone,
   selectRuntimeTimeZone,
   timezoneEntryMatcher,
@@ -253,6 +258,29 @@ test("exact restoration retries transient hierarchy failures", async () => {
   assert.equal(attempts, 2);
 });
 
+test("entry identity capture retries with its own bounded hierarchy budget", async () => {
+  let attempts = 0;
+  const observedOptions = [];
+  const identity = await waitForEntryIdentity("emulator-5554", {
+    note: "QA exact",
+    mood: 6,
+  }, {
+    timeoutMs: 3000,
+    pollIntervalMs: 0,
+    dumpTimeoutMs: 2500,
+    readHierarchyImpl: (_serial, options) => {
+      attempts += 1;
+      observedOptions.push(options);
+      if (attempts === 1) throw new Error("transient hierarchy dump failure");
+      return parseUiHierarchy(exactEntryHierarchy());
+    },
+  });
+
+  assert.equal(attempts, 2);
+  assert.equal(identity.timestamp, 123);
+  assert.deepEqual(observedOptions.map(({ timeoutMs }) => timeoutMs), [2500, 2500]);
+});
+
 test("extracts comparable frame and memory counters from Android diagnostics", () => {
   assert.deepEqual(parseGfxInfo(diagnosticGfx), {
     totalFrames: 120,
@@ -420,6 +448,10 @@ test("visual matrix retains each screen before the next navigation", () => {
   }
   const flow = readFileSync(new URL("../.maestro/flows/native-visual-matrix.yaml", import.meta.url), "utf8");
   assert.equal(flow.includes("Insights tab"), false);
+  const openInsights = source.indexOf("Insights tab, view mood history and summaries");
+  const selectAll = source.indexOf('contentDescription: "All history"', openInsights);
+  const loadedSummary = source.indexOf('testId: "insights-loaded-summary"', selectAll);
+  assert.ok(openInsights >= 0 && selectAll > openInsights && loadedSummary > selectAll);
   assert.match(source, /testId: "insights-loaded-summary"/);
   assert.match(source, /text: `\$\{fixtureCount\} entries`/);
   assert.match(insightsSource, /testID=\{!loading \? "insights-loaded-summary" : undefined\}/);
@@ -439,10 +471,12 @@ test("Undo runner captures the row before opening its actions modal", () => {
   assert.equal(smoke.includes('assertVisible: "Delete entry"'), false);
   assert.equal(cycle.includes('assertVisible: "Delete entry"'), false);
   const source = readFileSync(new URL("../scripts/native-qa-runner.js", import.meta.url), "utf8");
-  const capture = source.indexOf("const identity = captureEntryIdentity");
+  const capture = source.indexOf("const identity = await waitForEntryIdentity");
   const openActions = source.indexOf("const actionsNode = await waitForNode", capture);
   const deleteAction = source.indexOf("const deleteNode = await waitForNode", openActions);
   assert.ok(capture >= 0 && openActions > capture && deleteAction > openActions);
+  assert.match(source.slice(capture, openActions), /dumpTimeoutMs: waitOptions\.identityDumpTimeoutMs/);
+  assert.doesNotMatch(source.slice(capture, openActions), /undoDumpTimeoutMs/);
 });
 
 test("stress settles imported Home history before performance reset", () => {
@@ -493,7 +527,30 @@ test("installed QA build must expose the requested source SHA", async () => {
     },
   });
   assert.deepEqual(result, { appId: "com.lab4code.moodinator.qa", sourceSha });
-  assert.equal(calls.length, 3);
+  assert.equal(calls.length, 4);
+  assert.deepEqual(calls[1], ["-s", "emulator-5554", "shell", "dumpsys", "package", "com.lab4code.moodinator.qa"]);
+});
+
+test("installed QA build rejects debuggable packages before collecting evidence", async () => {
+  const sourceSha = "b".repeat(40);
+  const calls = [];
+  let sourceProbeCalled = false;
+  await assert.rejects(
+    assertInstalledQaBuild("emulator-5554", sourceSha, {
+      execFile: (_command, args) => {
+        calls.push(args);
+        if (args.includes("path")) return "package:/data/app/base.apk\n";
+        if (args.includes("dumpsys")) return "  flags=[ DEBUGGABLE HAS_CODE ALLOW_CLEAR_USER_DATA ]\n";
+        return "";
+      },
+      waitForNodeImpl: async () => { sourceProbeCalled = true; },
+    }),
+    /debuggable.*non-debuggable release build/,
+  );
+  assert.equal(calls.length, 2);
+  assert.equal(sourceProbeCalled, false);
+  assert.equal(packageIsDebuggable("  pkgFlags=[ HAS_CODE ]\n"), false);
+  assert.equal(packageIsDebuggable("  privateFlags=[ PROFILEABLE_BY_SHELL ]\n"), false);
 });
 
 test("late restoration and cleanup failures fail closed", () => {
@@ -677,6 +734,7 @@ test("timezone evidence requires accepted, distinct device states", () => {
       accepted: true,
       tested: true,
       contentDescription: "January 1, 2026",
+      matchesExpectedRecordedDateTime: true,
     },
     {
       requestedTimeZone: "Pacific/Auckland",
@@ -684,10 +742,33 @@ test("timezone evidence requires accepted, distinct device states", () => {
       accepted: true,
       tested: true,
       contentDescription: "January 1, 2026",
+      matchesExpectedRecordedDateTime: true,
     },
   ]);
   assert.equal(accepted.status, "passed");
   assert.equal(accepted.stableRecordedLabel, true);
+
+  const missingRecordedDateTime = evaluateTimezoneObservations([
+    {
+      requestedTimeZone: "UTC",
+      actualTimeZone: "UTC",
+      accepted: true,
+      tested: true,
+      contentDescription: "Mood entry: Uncomfortable (6)",
+      matchesExpectedRecordedDateTime: false,
+    },
+    {
+      requestedTimeZone: "Pacific/Auckland",
+      actualTimeZone: "Pacific/Auckland",
+      accepted: true,
+      tested: true,
+      contentDescription: "Mood entry: Uncomfortable (6)",
+      matchesExpectedRecordedDateTime: false,
+    },
+  ]);
+  assert.equal(missingRecordedDateTime.status, "failed");
+  assert.equal(missingRecordedDateTime.sameRecordedLabel, true);
+  assert.equal(missingRecordedDateTime.expectedRecordedDateTime, false);
 
   const refused = evaluateTimezoneObservations([
     {
@@ -707,4 +788,33 @@ test("timezone evidence requires accepted, distinct device states", () => {
   ]);
   assert.equal(refused.status, "blocked");
   assert.equal(refused.stableRecordedLabel, false);
+});
+
+test("timezone fixture expectation uses its nonzero half-hour recorded offset", () => {
+  const entries = createTimezoneFixture();
+  assert.equal(entries.length, 100);
+  assert.equal(entries[0].utcOffsetMinutes, -330);
+  const entry = {
+    timestamp: Date.UTC(2026, 0, 2, 4, 15),
+    utcOffsetMinutes: -330,
+  };
+  const expected = recordedDateTimeExpectation(entry);
+  assert.deepEqual(expected, {
+    dateLabel: "Fri, Jan 2",
+    timeLabel: "9:45 AM",
+  });
+  assert.equal(
+    labelContainsRecordedDateTime(
+      "Mood entry: Uncomfortable (6), logged on Fri, Jan 2 at 9:45 AM",
+      expected,
+    ),
+    true,
+  );
+  assert.equal(
+    labelContainsRecordedDateTime(
+      "Mood entry: Uncomfortable (6), logged on Fri, Jan 2 at 4:15 AM",
+      expected,
+    ),
+    false,
+  );
 });
