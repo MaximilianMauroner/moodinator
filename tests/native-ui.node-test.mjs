@@ -465,10 +465,12 @@ test("stress comparison allows different revisions with per-build provenance", (
     installedSourceSha: sourceSha,
     datasetSize: 1000,
     runCount: 2,
+    status: "passed",
+    acceptance: "accepted",
     device: { serial: "emulator-5554", api: "35", model: "Pixel", refreshRate: "60" },
     runs: [
-      { thermal: { before: { ok: true, snapshot: "nominal" }, after: { ok: true, snapshot: "nominal" } } },
-      { thermal: { before: { ok: true, snapshot: "nominal" }, after: { ok: true, snapshot: "nominal" } } },
+      { status: "passed", acceptance: "accepted", thermal: { before: { ok: true, snapshot: "nominal" }, after: { ok: true, snapshot: "nominal" } } },
+      { status: "passed", acceptance: "accepted", thermal: { before: { ok: true, snapshot: "nominal" }, after: { ok: true, snapshot: "nominal" } } },
     ],
   });
   const result = validateStressComparison(make("a".repeat(40)), make("b".repeat(40)));
@@ -482,6 +484,16 @@ test("stress comparison allows different revisions with per-build provenance", (
   const changedThermal = make("b".repeat(40));
   changedThermal.runs[1].thermal.after.snapshot = "throttled";
   assert.throws(() => validateStressComparison(make("a".repeat(40)), changedThermal), /run 2/);
+  const failedSummary = make("b".repeat(40));
+  failedSummary.status = "failed";
+  failedSummary.acceptance = "not-accepted";
+  assert.throws(() => validateStressComparison(make("a".repeat(40)), failedSummary), /summary is not accepted/);
+  const blockedRun = make("b".repeat(40));
+  blockedRun.runs[1] = { ...blockedRun.runs[1], status: "blocked", acceptance: "not-accepted" };
+  assert.throws(() => validateStressComparison(make("a".repeat(40)), blockedRun), /2 accepted runs/);
+  const missingRun = make("b".repeat(40));
+  missingRun.runs.pop();
+  assert.throws(() => validateStressComparison(make("a".repeat(40)), missingRun), /2 accepted runs/);
 });
 
 test("measured stress flows do not relaunch the app process", () => {

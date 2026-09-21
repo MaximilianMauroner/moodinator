@@ -414,6 +414,13 @@ function validateStressComparison(baseline, current) {
     if (!summary?.sourceSha || summary.sourceSha !== summary.installedSourceSha) {
       throw new Error(`${label} source SHA does not match its installed QA binary.`);
     }
+    if (summary.status !== "passed" || summary.acceptance !== "accepted") {
+      throw new Error(`${label} stress summary is not accepted.`);
+    }
+    if (!Number.isInteger(summary.runCount) || summary.runs?.length !== summary.runCount
+        || summary.runs.some((run) => run.status !== "passed" || run.acceptance !== "accepted")) {
+      throw new Error(`${label} stress summary does not contain ${summary.runCount} accepted runs.`);
+    }
   }
   for (const field of ["datasetSize", "runCount"]) {
     if (baseline[field] !== current[field]) throw new Error(`Stress comparison requires equal ${field}.`);
