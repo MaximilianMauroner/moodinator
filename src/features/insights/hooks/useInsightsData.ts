@@ -74,7 +74,8 @@ export function useInsightsData(): InsightsData {
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const loadedSelection = useRef<string | null>(null);
+  const [loadedSelection, setLoadedSelection] = useState<string | null>(null);
+  const loadedSelectionRef = useRef<string | null>(null);
   const generation = useRef(0);
   const summaryGeneration = useRef(0);
   const invalidateSummary = useCallback(() => {
@@ -115,11 +116,12 @@ export function useInsightsData(): InsightsData {
     const request = ++generation.current;
     const selection = `${analysisRange}:${localDay}`;
     setLoading(true);
-    if (loadedSelection.current !== selection) setAnalysisMoods([]);
+    if (loadedSelectionRef.current !== selection) setAnalysisMoods([]);
     try {
       const entries = await queryLocalDays(analysisRange, localDay);
       if (request !== generation.current) return;
-      loadedSelection.current = selection;
+      loadedSelectionRef.current = selection;
+      setLoadedSelection(selection);
       setAnalysisMoods(entries);
       setError(null);
     } catch (reason) {
@@ -191,7 +193,12 @@ export function useInsightsData(): InsightsData {
     recentMoods,
     totalCount: summary.totalCount,
     loading,
-    ready: !loading && !summaryLoading && !error && !summaryError,
+    ready:
+      loadedSelection === `${analysisRange}:${localDay}` &&
+      !loading &&
+      !summaryLoading &&
+      !error &&
+      !summaryError,
     error: error ?? summaryError,
     streak,
     getMoodLabel,

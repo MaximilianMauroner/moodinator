@@ -188,7 +188,10 @@ bun run qa:stress -- emulator-5554 --size 10000 --label current --runs 2 --out /
 
 Use new empty output directories for each command. Each run records the source
 SHA, a wall-clock-independent SHA-256 workload hash, and a performance-device
-profile. The profile includes the AVD name and Android system fingerprint, CPU
+profile. The workload hash normalizes timestamps against the fixture's rounded
+anchor and covers the pristine, cycle-edited, and filter-refresh-edited fixture
+payloads plus the import, startup, and fully materialized cycle/filter flows that
+are executed. The profile includes the AVD name and Android system fingerprint, CPU
 ABI/count, total RAM, physical/override resolution and density, configured peak
 refresh, and the active display mode/actual refresh reported by Android. It also
 records `dumpsys gfxinfo` frame counters, repeated `dumpsys meminfo`

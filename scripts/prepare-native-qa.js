@@ -4,7 +4,7 @@ const { tmpdir } = require("node:os");
 const path = require("node:path");
 const { writePreparedSourceMetadata } = require("./qa-source-provenance");
 
-function prepareNativeQa(root, temporaryRoot = tmpdir()) {
+function prepareNativeQa(root, temporaryRoot = tmpdir(), { afterSourceCapture } = {}) {
   const sourceSha = execFileSync("git", ["rev-parse", "HEAD"], {
     cwd: root,
     encoding: "utf8",
@@ -19,8 +19,9 @@ function prepareNativeQa(root, temporaryRoot = tmpdir()) {
   if (worktreeStatus) {
     throw new Error("Native QA preparation requires a clean checkout so evidence matches the printed source SHA.");
   }
+  afterSourceCapture?.(sourceSha);
   const destination = mkdtempSync(path.join(temporaryRoot, "moodinator-qa-"));
-  const tracked = execFileSync("git", ["ls-tree", "-r", "-z", "--name-only", "HEAD"], { cwd: root })
+  const tracked = execFileSync("git", ["ls-tree", "-r", "-z", "--name-only", sourceSha], { cwd: root })
     .toString().split("\0");
   const copiedTracked = [];
   for (const file of tracked) {

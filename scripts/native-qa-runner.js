@@ -110,7 +110,7 @@ function readHierarchy(serial, options = {}) {
 }
 
 function entrySelectors(identity) {
-  return [
+  const selectors = [
     { testId: `mood-entry-stable-${identity.timestamp}` },
     {
       allOf: [
@@ -125,6 +125,29 @@ function entrySelectors(identity) {
       ],
     },
   ];
+  if (Object.hasOwn(identity, "utcOffsetMinutes")) {
+    selectors.push({ testId: `mood-entry-offset-${identity.timestamp}-${identity.utcOffsetMinutes ?? "null"}` });
+  }
+  if (identity.moodScale) {
+    const scale = identity.moodScale;
+    selectors.push({ testId: `mood-entry-scale-${identity.timestamp}-${scale.version}-${scale.min}-${scale.max}-${scale.lowerIsBetter}` });
+  }
+  if (typeof identity.energy === "number") {
+    selectors.push({ testId: `mood-entry-energy-${identity.timestamp}-${identity.energy}` });
+  }
+  for (const emotion of identity.emotions ?? []) {
+    selectors.push({ testId: `mood-entry-emotion-${identity.timestamp}-${emotion.name}-${emotion.category}-${emotion.energy ?? "null"}` });
+  }
+  if (Array.isArray(identity.emotions)) {
+    selectors.push({ testId: `mood-entry-emotion-count-${identity.timestamp}-${identity.emotions.length}` });
+  }
+  for (const context of identity.contextTags ?? []) {
+    selectors.push({ testId: `mood-entry-context-${identity.timestamp}-${context}` });
+  }
+  if (Array.isArray(identity.contextTags)) {
+    selectors.push({ testId: `mood-entry-context-count-${identity.timestamp}-${identity.contextTags.length}` });
+  }
+  return selectors;
 }
 
 function timestampFromNode(node) {
@@ -142,6 +165,7 @@ function captureEntryIdentity(serial, {
   adbPath = "adb",
   dumpTimeoutMs,
   readHierarchyImpl = readHierarchy,
+  ...entryFields
 } = {}) {
   if (!note || !Number.isInteger(mood)) {
     throw new Error("An exact entry note and mood are required before deletion.");
@@ -173,6 +197,11 @@ function captureEntryIdentity(serial, {
     mood,
     ...(originalNote ? { originalNote } : {}),
     ...(Number.isInteger(entryIndex) ? { entryIndex } : {}),
+    ...(Object.hasOwn(entryFields, "utcOffsetMinutes") ? { utcOffsetMinutes: entryFields.utcOffsetMinutes } : {}),
+    ...(Array.isArray(entryFields.emotions) ? { emotions: entryFields.emotions } : {}),
+    ...(Array.isArray(entryFields.contextTags) ? { contextTags: entryFields.contextTags } : {}),
+    ...(Object.hasOwn(entryFields, "energy") ? { energy: entryFields.energy } : {}),
+    ...(entryFields.moodScale ? { moodScale: entryFields.moodScale } : {}),
   };
   const selectors = entrySelectors(identity);
   const counts = selectors.map((matcher) => findNodes(nodes, matcher).length);

@@ -11,6 +11,7 @@ const {
   isToolUnavailable,
   requireSourceSha,
 } = require("./native-qa-common");
+const { runMaestro: runMaestroWithDiagnostics } = require("./native-qa-runner");
 const { runAdb, waitForNode, waitForNodeAndTap } = require("./native-ui");
 
 const appId = "com.lab4code.moodinator.qa";
@@ -156,10 +157,9 @@ function restoreSettings(serial, original) {
 }
 
 function runMaestro(serial) {
-  execFileSync("maestro", ["--device", serial, "test", flow], {
+  return runMaestroWithDiagnostics(serial, flow, {
     cwd: root,
-    stdio: "inherit",
-    timeout: MAESTRO_TIMEOUT_MS,
+    timeoutMs: MAESTRO_TIMEOUT_MS,
   });
 }
 
@@ -289,7 +289,7 @@ async function main(argv = process.argv.slice(2)) {
       }
 
       console.log(`Native matrix state: ${state.name}`);
-      runMaestro(options.serial);
+      await runMaestro(options.serial);
       const fabricatedFixtureProof = await verifyFabricatedFixture(options.serial, options);
       const screenshots = await captureMatrixScreens(
         options.serial,

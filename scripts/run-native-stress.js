@@ -127,8 +127,7 @@ function prepareEvidenceDirectory(outputDirectory) {
   mkdirSync(outputDirectory, { recursive: true });
 }
 
-function materializeCycle(outputDirectory, identity, runNumber, { indexedLookup = false } = {}) {
-  const template = readFileSync(cycleTemplatePath, "utf8");
+function renderCycle(template, identity, { indexedLookup = false } = {}) {
   const targetSetup = indexedLookup ? `- tapOn: "Filter history"
 - tapOn: "Clear filters"
 - scrollUntilVisible:
@@ -140,18 +139,22 @@ function materializeCycle(outputDirectory, identity, runNumber, { indexedLookup 
 - inputText: "${identity.originalNote}"
 - hideKeyboard
 - tapOn: "Show results"` : "";
-  const flow = template
+  return template
     .replaceAll("${TARGET_SETUP}", targetSetup)
     .replaceAll("${ENTRY_ID}", String(identity.entryIndex))
     .replaceAll("${ENTRY_TIMESTAMP}", String(identity.timestamp))
     .replaceAll("${ORIGINAL_NOTE}", identity.originalNote)
     .replaceAll("${EDITED_NOTE}", identity.note);
+}
+
+function materializeCycle(outputDirectory, identity, runNumber, { indexedLookup = false } = {}) {
+  const flow = renderCycle(readFileSync(cycleTemplatePath, "utf8"), identity, { indexedLookup });
   const flowPath = path.join(outputDirectory, `run-${runNumber}-cycle-${identity.entryIndex}.yaml`);
   writeFileSync(flowPath, flow);
   return flowPath;
 }
 
-function materializeFilter(outputDirectory, entries, size, referenceNow) {
+function prepareFilterRoute(entries, size, referenceNow, template = readFileSync(filterTemplatePath, "utf8")) {
   const editedEntries = applyNativeStressEditMutations(entries, pageBoundaryIds(size));
   const expectation = combinedFilterExpectation(editedEntries, { now: referenceNow });
   const firstMatchIndex = expectation.matchingEntryIndexes[0];
@@ -167,7 +170,6 @@ function materializeFilter(outputDirectory, entries, size, referenceNow) {
     { entryIndex: firstMatchIndex, note: refreshNote },
   ]);
   const refreshedExpectation = combinedFilterExpectation(refreshedEntries, { now: referenceNow });
-  const template = readFileSync(filterTemplatePath, "utf8");
   const flow = template
     .replaceAll("${FILTER_NOTE}", expectation.text)
     .replaceAll("${FILTER_COUNT}", String(expectation.count))
@@ -180,10 +182,8 @@ function materializeFilter(outputDirectory, entries, size, referenceNow) {
     .replaceAll("${FIRST_NON_MATCH_TIMESTAMP}", String(firstNonMatch.timestamp))
     .replaceAll("${FIRST_NON_MATCH_NOTE}", firstNonMatch.note)
     .replaceAll("${REFRESH_EDIT_NOTE}", refreshNote);
-  const flowPath = path.join(outputDirectory, "native-stress-filters-materialized.yaml");
-  writeFileSync(flowPath, flow);
   return {
-    flowPath,
+    flow,
     expectation,
     refreshedExpectation,
     editedEntries,
@@ -192,6 +192,13 @@ function materializeFilter(outputDirectory, entries, size, referenceNow) {
     firstNonMatch,
     refreshMutation: { entryIndex: firstMatchIndex, note: refreshNote },
   };
+}
+
+function materializeFilter(outputDirectory, entries, size, referenceNow) {
+  const route = prepareFilterRoute(entries, size, referenceNow);
+  const flowPath = path.join(outputDirectory, "native-stress-filters-materialized.yaml");
+  writeFileSync(flowPath, route.flow);
+  return { ...route, flowPath };
 }
 
 function importCompletionTimeoutMs(size) {
@@ -374,21 +381,67 @@ function summarizeRunEvidence({
   };
 }
 
-function normalizedWorkloadHash(entries, referenceNow, editIndexes) {
-  const editedEntries = applyNativeStressEditMutations(entries, editIndexes);
-  const filter = combinedFilterExpectation(editedEntries, { now: referenceNow });
-  const normalizedFixture = entries.map((entry) => ({
+function normalizeFixtureTimestamps(entries, fixtureAnchor) {
+  return entries.map((entry) => ({
     ...entry,
-    timestampOffsetMs: entry.timestamp - referenceNow,
+    timestampOffsetMs: entry.timestamp - fixtureAnchor,
     timestamp: undefined,
   }));
-  const workloadManifest = {
-    version: 1,
-    fixture: normalizedFixture,
+}
+
+function normalizeFlowTimestamps(flow, entries, fixtureAnchor) {
+  return entries.reduce(
+    (normalized, entry) => normalized.replaceAll(
+      String(entry.timestamp),
+      `FIXTURE_TIMESTAMP_OFFSET_${entry.timestamp - fixtureAnchor}`,
+    ),
+    flow,
+  );
+}
+
+function normalizedWorkloadManifest(entries, referenceNow, editIndexes, routeDefinitions = {}) {
+  const fixtureAnchor = entries[0]?.timestamp;
+  if (!Number.isFinite(fixtureAnchor)) throw new Error("Stress fixture must have a timestamped anchor entry.");
+  const editedEntries = applyNativeStressEditMutations(entries, editIndexes);
+  const cycleTemplate = routeDefinitions.cycleTemplate ?? readFileSync(cycleTemplatePath, "utf8");
+  const filterTemplate = routeDefinitions.filterTemplate ?? readFileSync(filterTemplatePath, "utf8");
+  const filterRoute = prepareFilterRoute(entries, entries.length, referenceNow, filterTemplate);
+  const refreshedEntries = applyFixtureNoteEdits(editedEntries, [filterRoute.refreshMutation]);
+  return {
+    version: 2,
+    fixture: normalizeFixtureTimestamps(entries, fixtureAnchor),
+    mutatedFixture: normalizeFixtureTimestamps(editedEntries, fixtureAnchor),
+    refreshedFixture: normalizeFixtureTimestamps(refreshedEntries, fixtureAnchor),
     pageBoundaryIds: editIndexes,
-    combinedFilter: filter,
+    editMutations: editIndexes.map((entryIndex) => ({
+      entryIndex,
+      note: nativeStressEditNote(entryIndex, entries[entryIndex - 1]?.note),
+    })),
+    refreshMutation: filterRoute.refreshMutation,
+    combinedFilter: filterRoute.expectation,
+    executedRoutes: {
+      import: routeDefinitions.importFlow ?? readFileSync(importFlow, "utf8"),
+      measuredStart: routeDefinitions.measuredStartFlow ?? readFileSync(measuredStartFlow, "utf8"),
+      cycles: editIndexes.map((entryIndex) => normalizeFlowTimestamps(
+        renderCycle(
+          cycleTemplate,
+          fixtureIdentity(entries, entryIndex, {
+            editedNote: nativeStressEditNote(entryIndex, entries[entryIndex - 1]?.note),
+          }),
+          { indexedLookup: entryIndex > 51 },
+        ),
+        entries,
+        fixtureAnchor,
+      )),
+      filters: normalizeFlowTimestamps(filterRoute.flow, entries, fixtureAnchor),
+    },
   };
-  return createHash("sha256").update(JSON.stringify(workloadManifest)).digest("hex");
+}
+
+function normalizedWorkloadHash(entries, referenceNow, editIndexes, routeDefinitions) {
+  return createHash("sha256")
+    .update(JSON.stringify(normalizedWorkloadManifest(entries, referenceNow, editIndexes, routeDefinitions)))
+    .digest("hex");
 }
 
 function baseMetadata(options, sourceSha, entries, fixturePath, outputDirectory, referenceNow) {
@@ -713,6 +766,7 @@ module.exports = {
   importCompletionTimeoutMs,
   materializeCycle,
   materializeFilter,
+  normalizedWorkloadManifest,
   normalizedWorkloadHash,
   pageBoundaryIds,
   parseDeviceProfile,

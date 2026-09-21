@@ -21,6 +21,7 @@ const {
   combinedFilterExpectation,
   createQaFixture,
   fixtureIdentity,
+  nativeStressEditNote,
 } = require("../scripts/generate-qa-fixtures.js");
 const {
   COORDINATION_PHASES,
@@ -63,6 +64,7 @@ const {
   importCompletionTimeoutMs,
   materializeCycle,
   materializeFilter,
+  normalizedWorkloadManifest,
   normalizedWorkloadHash,
   pageBoundaryIds,
   parseDeviceProfile,
@@ -137,6 +139,21 @@ function exactEntryHierarchy({ hiddenDuplicate = false, visible = true } = {}) {
   return `<hierarchy>${nodes.join("")}</hierarchy>`;
 }
 
+function completeEntryHierarchy({ energy = 6 } = {}) {
+  return `<hierarchy>
+    <node resource-id="app:id/mood-entry-stable-123" visible-to-user="true" enabled="true" />
+    <node text="QA exact" resource-id="app:id/mood-entry-note-123" visible-to-user="true" enabled="true" />
+    <node text="6" resource-id="app:id/mood-entry-rating-123" visible-to-user="true" enabled="true" />
+    <node resource-id="app:id/mood-entry-offset-123-330" visible-to-user="true" enabled="true" />
+    <node resource-id="app:id/mood-entry-scale-123-1-0-10-true" visible-to-user="true" enabled="true" />
+    <node resource-id="app:id/mood-entry-energy-123-${energy}" visible-to-user="true" enabled="true" />
+    <node resource-id="app:id/mood-entry-emotion-123-Happy-positive-null" visible-to-user="true" enabled="true" />
+    <node resource-id="app:id/mood-entry-emotion-count-123-1" visible-to-user="true" enabled="true" />
+    <node resource-id="app:id/mood-entry-context-123-Home" visible-to-user="true" enabled="true" />
+    <node resource-id="app:id/mood-entry-context-count-123-1" visible-to-user="true" enabled="true" />
+  </hierarchy>`;
+}
+
 const diagnosticMemory = `
  Dalvik Heap:                   12,288       8,000
  Native Heap:                   34,560      20,000
@@ -198,6 +215,34 @@ test("restoration rejects hidden duplicates and hidden-only stale rows", () => {
     hierarchy: [1, 1, 1],
   });
   assert.equal(isExactlyOneRestoredEntry(hiddenOnly, identity), false);
+});
+
+test("restoration identity rejects a changed populated entry field", () => {
+  const identity = {
+    timestamp: 123,
+    note: "QA exact",
+    mood: 6,
+    utcOffsetMinutes: 330,
+    emotions: [{ name: "Happy", category: "positive" }],
+    contextTags: ["Home"],
+    energy: 6,
+    moodScale: { version: 1, min: 0, max: 10, lowerIsBetter: true },
+  };
+  identity.selectors = entrySelectors(identity);
+  assert.equal(
+    isExactlyOneRestoredEntry(
+      parseUiHierarchy(completeEntryHierarchy()),
+      identity,
+    ),
+    true,
+  );
+  assert.equal(
+    isExactlyOneRestoredEntry(
+      parseUiHierarchy(completeEntryHierarchy({ energy: 5 })),
+      identity,
+    ),
+    false,
+  );
 });
 
 test("timezone observation targets the labeled nested entry Pressable", () => {
@@ -525,14 +570,56 @@ test("stress comparison allows different revisions with per-build provenance", (
 });
 
 test("stress workload hash ignores the fixture wall-clock anchor but detects payload drift", () => {
-  const firstNow = Date.UTC(2031, 4, 1);
-  const secondNow = Date.UTC(2032, 4, 1);
+  const firstNow = Date.UTC(2031, 4, 1, 12, 7, 11, 123);
+  const secondNow = Date.UTC(2032, 4, 1, 12, 53, 49, 987);
   const indexes = pageBoundaryIds(1000);
   const first = createQaFixture(1000, { now: firstNow });
   const second = createQaFixture(1000, { now: secondNow });
   assert.equal(normalizedWorkloadHash(first, firstNow, indexes), normalizedWorkloadHash(second, secondNow, indexes));
   second[10].note = "changed payload";
   assert.notEqual(normalizedWorkloadHash(first, firstNow, indexes), normalizedWorkloadHash(second, secondNow, indexes));
+});
+
+test("stress workload hash covers mutated payloads and materialized executed routes", () => {
+  const now = Date.UTC(2031, 4, 1, 12, 37);
+  const entries = createQaFixture(1000, { now });
+  const indexes = pageBoundaryIds(1000);
+  const routes = {
+    importFlow: "import route\n",
+    measuredStartFlow: "start route\n",
+    cycleTemplate:
+      "${ENTRY_ID}|${ENTRY_TIMESTAMP}|${ORIGINAL_NOTE}|${EDITED_NOTE}|${TARGET_SETUP}",
+    filterTemplate:
+      "${FILTER_NOTE}|${FILTER_COUNT}|${REFRESH_FILTER_COUNT}|${TOTAL_COUNT}|${FIRST_MATCH_TIMESTAMP}|${FIRST_MATCH_NOTE}|${SECOND_MATCH_TIMESTAMP}|${SECOND_MATCH_NOTE}|${FIRST_NON_MATCH_TIMESTAMP}|${FIRST_NON_MATCH_NOTE}|${REFRESH_EDIT_NOTE}",
+  };
+  const manifest = normalizedWorkloadManifest(entries, now, indexes, routes);
+  const editedNote = nativeStressEditNote(
+    indexes[0],
+    entries[indexes[0] - 1].note,
+  );
+  assert.equal(manifest.mutatedFixture[indexes[0] - 1].note, editedNote);
+  assert.equal(manifest.editMutations[0].note, editedNote);
+  assert.match(
+    manifest.executedRoutes.cycles[0],
+    new RegExp(editedNote.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+  );
+  assert.match(manifest.executedRoutes.filters, /QA refresh edit/);
+
+  const originalHash = normalizedWorkloadHash(entries, now, indexes, routes);
+  assert.notEqual(
+    originalHash,
+    normalizedWorkloadHash(entries, now, indexes, {
+      ...routes,
+      cycleTemplate: `${routes.cycleTemplate}|changed route`,
+    }),
+  );
+  assert.notEqual(
+    originalHash,
+    normalizedWorkloadHash(entries, now, indexes, {
+      ...routes,
+      importFlow: "changed import route\n",
+    }),
+  );
 });
 
 test("performance device profile records stable system, compute, memory, and display identity", () => {
@@ -576,6 +663,11 @@ test("fixture identities preserve exact original and edited values", () => {
     mood: 6,
     note: "QA stress edit 51",
     originalNote: entries[50].note,
+    utcOffsetMinutes: entries[50].utcOffsetMinutes,
+    emotions: entries[50].emotions,
+    contextTags: entries[50].contextTags,
+    energy: entries[50].energy,
+    moodScale: entries[50].moodScale,
   });
 });
 
@@ -630,7 +722,7 @@ test("visual matrix retains each screen before the next navigation", () => {
   );
   assert.match(
     hookSource,
-    /ready: !loading && !summaryLoading && !error && !summaryError/,
+    /loadedSelection === `\$\{analysisRange\}:\$\{localDay\}`/,
   );
   assert.match(source, /Calendar legend: a dot marks a day with multiple entries/);
   assert.match(source, /Local privacy/);
@@ -819,6 +911,21 @@ test("Maestro failures tee and retain stdout and stderr for availability classif
   } finally {
     process.stdout.write = stdoutWrite;
     process.stderr.write = stderrWrite;
+  }
+});
+
+test("matrix and timezone Maestro launches use the diagnostic-retaining wrapper", () => {
+  for (const relativePath of [
+    "../scripts/run-native-matrix.js",
+    "../scripts/run-native-timezone.js",
+  ]) {
+    const source = readFileSync(new URL(relativePath, import.meta.url), "utf8");
+    assert.match(
+      source,
+      /runMaestro: runMaestroWithDiagnostics.*require\("\.\/native-qa-runner"\)/,
+    );
+    assert.match(source, /return runMaestroWithDiagnostics\(serial,/);
+    assert.match(source, /await runMaestro\(/);
   }
 });
 
@@ -1127,6 +1234,48 @@ test("QA preparation copies committed HEAD blobs despite assume-unchanged worktr
     assert.equal(
       readFileSync(join(destination, "tracked.txt"), "utf8"),
       "committed bytes\n",
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+    rmSync(outputs, { recursive: true, force: true });
+  }
+});
+
+test("QA preparation enumerates the captured SHA when HEAD advances and deletes a file", () => {
+  const directory = mkdtempSync(
+    join(tmpdir(), "moodinator-prepare-race-test-"),
+  );
+  const outputs = mkdtempSync(
+    join(tmpdir(), "moodinator-prepare-race-output-test-"),
+  );
+  try {
+    execFileSync("git", ["init", "-q"], { cwd: directory });
+    execFileSync("git", ["config", "user.email", "qa@example.invalid"], {
+      cwd: directory,
+    });
+    execFileSync("git", ["config", "user.name", "QA Test"], { cwd: directory });
+    writeFileSync(join(directory, "kept.txt"), "captured revision\n");
+    execFileSync("git", ["add", "kept.txt"], { cwd: directory });
+    execFileSync("git", ["commit", "-q", "-m", "captured"], { cwd: directory });
+
+    const { destination, sourceSha } = prepareNativeQa(directory, outputs, {
+      afterSourceCapture() {
+        execFileSync("git", ["rm", "-q", "kept.txt"], { cwd: directory });
+        execFileSync("git", ["commit", "-q", "-m", "advance and delete"], {
+          cwd: directory,
+        });
+      },
+    });
+    assert.equal(
+      readFileSync(join(destination, "kept.txt"), "utf8"),
+      "captured revision\n",
+    );
+    assert.notEqual(
+      execFileSync("git", ["rev-parse", "HEAD"], {
+        cwd: directory,
+        encoding: "utf8",
+      }).trim(),
+      sourceSha,
     );
   } finally {
     rmSync(directory, { recursive: true, force: true });

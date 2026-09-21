@@ -319,6 +319,33 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
         style={[{ borderRadius: 16, overflow: "hidden" }, containerAnimatedStyle]}
       >
         <View
+          testID={`mood-entry-offset-${mood.timestamp}-${mood.utcOffsetMinutes ?? "null"}`}
+          collapsable={false}
+        />
+        <View
+          testID={`mood-entry-scale-${mood.timestamp}-${mood.moodScale.version}-${mood.moodScale.min}-${mood.moodScale.max}-${mood.moodScale.lowerIsBetter}`}
+          collapsable={false}
+        />
+        <View testID={`mood-entry-emotion-count-${mood.timestamp}-${mood.emotions.length}`} collapsable={false} />
+        <View testID={`mood-entry-context-count-${mood.timestamp}-${mood.contextTags.length}`} collapsable={false} />
+        {typeof mood.energy === "number" ? (
+          <View testID={`mood-entry-energy-${mood.timestamp}-${mood.energy}`} collapsable={false} />
+        ) : null}
+        {mood.emotions.map((emotion) => (
+          <View
+            key={`qa-emotion-${emotion.name}`}
+            testID={`mood-entry-emotion-${mood.timestamp}-${emotion.name}-${emotion.category}-${emotion.energy ?? "null"}`}
+            collapsable={false}
+          />
+        ))}
+        {mood.contextTags.map((context) => (
+          <View
+            key={`qa-context-${context}`}
+            testID={`mood-entry-context-${mood.timestamp}-${context}`}
+            collapsable={false}
+          />
+        ))}
+        <View
           pointerEvents="none"
           className="absolute inset-0 flex-row justify-between"
         >
@@ -417,11 +444,11 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
                             {moodData.label}
                           </Text>
                           {allCompactTags.map((tag) => (
-                            <MoodTag
+                          <MoodTag
                               key={tag.key}
                               label={tag.label}
                               backgroundColor={tag.colorSet.bg}
-                              textColor={tag.colorSet.text}
+                            textColor={tag.colorSet.text}
                             />
                           ))}
                         </View>

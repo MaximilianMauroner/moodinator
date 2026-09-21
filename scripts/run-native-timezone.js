@@ -1,4 +1,3 @@
-const { execFileSync } = require("node:child_process");
 const { existsSync, mkdirSync, mkdtempSync, readdirSync, statSync, writeFileSync } = require("node:fs");
 const { tmpdir } = require("node:os");
 const path = require("node:path");
@@ -12,6 +11,7 @@ const {
   isToolUnavailable,
   requireSourceSha,
 } = require("./native-qa-common");
+const { runMaestro: runMaestroWithDiagnostics } = require("./native-qa-runner");
 const { runAdb, waitForNode, waitForNodeAndTap } = require("./native-ui");
 
 const appId = "com.lab4code.moodinator.qa";
@@ -242,10 +242,9 @@ function evaluateTimezoneResult(observations, operationalError, restoreError) {
 }
 
 function runMaestro(serial) {
-  execFileSync("maestro", ["--device", serial, "test", importFlow], {
+  return runMaestroWithDiagnostics(serial, importFlow, {
     cwd: root,
-    stdio: "inherit",
-    timeout: MAESTRO_TIMEOUT_MS,
+    timeoutMs: MAESTRO_TIMEOUT_MS,
   });
 }
 
@@ -255,7 +254,7 @@ function restartApp(serial) {
 }
 
 async function importFixture(serial, fixtureName) {
-  runMaestro(serial);
+  await runMaestro(serial);
   try {
     await waitForNodeAndTap(serial, { text: fixtureName }, { timeoutMs: 3500 });
   } catch (error) {

@@ -63,7 +63,15 @@ async function main(argv = process.argv.slice(2)) {
       ".maestro/smoke.yaml",
       {
         cwd: root,
-        target: { note: "QA smoke edited note", mood: 5 },
+        target: {
+          note: "QA smoke edited note",
+          mood: 5,
+          utcOffsetMinutes: 0,
+          emotions: [{ name: "Happy", category: "positive" }],
+          contextTags: [],
+          energy: 6,
+          moodScale: { version: 1, min: 0, max: 10, lowerIsBetter: true },
+        },
         waitOptions: {
           dumpTimeoutMs: 300,
           undoDumpTimeoutMs: 300,

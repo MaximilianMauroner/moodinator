@@ -135,6 +135,11 @@ function fixtureIdentity(entries, index, { editedNote = null } = {}) {
     mood: entry.mood,
     note: editedNote ?? entry.note,
     originalNote: entry.note,
+    utcOffsetMinutes: entry.utcOffsetMinutes,
+    emotions: entry.emotions,
+    contextTags: entry.contextTags,
+    energy: entry.energy,
+    moodScale: entry.moodScale,
   };
 }
 
