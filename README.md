@@ -104,9 +104,6 @@ locally so the command does not download a different checker on each run.
 
 ```bash
 bun run qa:prepare
-# In the printed temporary workspace, first export the exact SHA printed by
-# qa:prepare (the workspace intentionally has no .git directory):
-export MOODINATOR_SOURCE_SHA=<printed-40-character-sha>
 bun install --frozen-lockfile
 MOODINATOR_VARIANT=qa MOODINATOR_QA_PREPARE_NATIVE=1 bunx expo prebuild --platform android --clean
 bun run qa:seal-native
@@ -127,8 +124,9 @@ After collecting evidence, remove that temporary workspace and disposable AVD.
 
 The QA app uses `com.lab4code.moodinator.qa` and separate local storage. The smoke
 runner accepts an explicit emulator serial and checks that package before
-running a flow which clears QA data. Native evidence commands require the
-`MOODINATOR_SOURCE_SHA` export and fail closed when it is missing. See [Native QA](docs/native-qa.md) for
+running a flow which clears QA data. Native evidence commands validate the
+executing workspace's sealed prepared manifest and fail closed if it is missing,
+unsealed, or no longer matches its files. See [Native QA](docs/native-qa.md) for
 coverage, fixture generation, manual checks and performance captures.
 
 ### Versions and builds

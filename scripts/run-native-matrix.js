@@ -9,7 +9,7 @@ const {
   evidenceAcceptance,
   evidenceStatus,
   isToolUnavailable,
-  requireSourceSha,
+  requirePreparedSourceSha,
 } = require("./native-qa-common");
 const { runMaestro: runMaestroWithDiagnostics } = require("./native-qa-runner");
 const { runAdb, waitForNode, waitForNodeAndTap } = require("./native-ui");
@@ -230,8 +230,8 @@ function prepareEvidenceDirectory(outputDirectory) {
 }
 
 async function main(argv = process.argv.slice(2)) {
+  const sourceSha = requirePreparedSourceSha(root);
   const options = parseOptions(argv);
-  const sourceSha = requireSourceSha();
   const outputDirectory = options.output
     ? path.resolve(options.output)
     : mkdtempSync(path.join(tmpdir(), "moodinator-native-matrix-"));

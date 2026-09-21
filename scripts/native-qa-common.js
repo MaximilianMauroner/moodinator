@@ -1,18 +1,11 @@
 const { execFileSync } = require("node:child_process");
 const { Buffer } = require("node:buffer");
+const { readPreparedSourceSha } = require("./qa-source-provenance");
 
-const SOURCE_SHA_ENV = "MOODINATOR_SOURCE_SHA";
 const QA_APP_ID = "com.lab4code.moodinator.qa";
 
-function requireSourceSha(env = process.env) {
-  const value = env[SOURCE_SHA_ENV];
-  if (!value || !/^[0-9a-f]{40}$/.test(value)) {
-    throw new Error(
-      `${SOURCE_SHA_ENV} is required and must be the full 40-character lowercase source SHA from the originating checkout. ` +
-      `Run: export ${SOURCE_SHA_ENV}="$(git rev-parse HEAD)"`,
-    );
-  }
-  return value;
+function requirePreparedSourceSha(workspace, env = process.env) {
+  return readPreparedSourceSha(workspace, env);
 }
 
 function isToolUnavailable(error) {
@@ -87,12 +80,11 @@ function evidenceAcceptance(status) {
 }
 
 module.exports = {
-  SOURCE_SHA_ENV,
   assertInstalledQaBuild,
   combineOperationalErrors,
   evidenceAcceptance,
   evidenceStatus,
   isToolUnavailable,
   packageIsDebuggable,
-  requireSourceSha,
+  requirePreparedSourceSha,
 };

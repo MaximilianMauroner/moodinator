@@ -44,7 +44,7 @@ if (require.main === module) {
   const result = prepareNativeQa(path.resolve(__dirname, ".."));
   console.log(`QA workspace: ${result.destination}`);
   console.log(`QA source metadata: ${result.sourceMetadata}`);
-  console.log(`export MOODINATOR_SOURCE_SHA=${result.sourceSha}`);
+  console.log(`Prepared source SHA: ${result.sourceSha}`);
   console.log("In that directory: bun install --frozen-lockfile");
   console.log("Then: MOODINATOR_VARIANT=qa MOODINATOR_QA_PREPARE_NATIVE=1 bunx expo prebuild --platform android --clean");
   console.log("Then: bun run qa:seal-native");

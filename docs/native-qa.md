@@ -77,10 +77,9 @@ Use the separate `com.lab4code.moodinator.qa` app on a disposable emulator. The
 smoke flow clears that app's data at launch. Do not point the flow at the normal
 Moodinator package or a device that holds personal mood data.
 
-1. Run `bun run qa:prepare` from the originating checkout. Copy the printed
-   `export MOODINATOR_SOURCE_SHA=<40-character-sha>` command into the isolated
-   workspace shell; that workspace intentionally has no `.git` directory.
-   Use the isolated checkout path printed by that command for the QA build.
+1. Run `bun run qa:prepare` from the originating checkout. Use the isolated
+   workspace path and prepared source SHA printed by that command for the QA
+   build; the workspace intentionally has no `.git` directory.
 2. Install dependencies, run a clean Android prebuild with
    `MOODINATOR_VARIANT=qa MOODINATOR_QA_PREPARE_NATIVE=1`, then run
    `bun run qa:seal-native`. Unset `MOODINATOR_QA_PREPARE_NATIVE`; sealed builds reject
@@ -88,8 +87,8 @@ Moodinator package or a device that holds personal mood data.
    the installed package is `com.lab4code.moodinator.qa` before continuing.
 3. Install Maestro and Android SDK platform tools. Start one disposable emulator.
 4. Run `bun run qa:smoke -- emulator-5554 --out /tmp/moodinator-native-smoke-current`
-   with the actual emulator serial and the exported source SHA. Keep its guard
-   enabled. It checks the emulator and QA package before invoking
+   with the actual emulator serial. The runner first verifies its executing
+   workspace against the sealed prepared manifest, then checks the emulator and QA package before invoking
    `.maestro/smoke.yaml`.
 5. Record the commit, Android API level, emulator profile, build type, command,
    result, and artifact paths in the task tracker.
@@ -179,7 +178,6 @@ identity and decrement the count; a cached result fails the flow. The runner
 uses only fabricated data and writes evidence outside the repository:
 
 ```bash
-export MOODINATOR_SOURCE_SHA=<40-character-sha-from-originating-checkout>
 bun run qa:stress -- emulator-5554 --size 1000 --label baseline --runs 2 --out /tmp/moodinator-native-stress-baseline-1000
 bun run qa:stress -- emulator-5554 --size 1000 --label current --runs 2 --out /tmp/moodinator-native-stress-current-1000
 bun run qa:stress -- emulator-5554 --size 10000 --label baseline --runs 2 --out /tmp/moodinator-native-stress-baseline-10000
@@ -252,7 +250,6 @@ fabricated note plus exact history count before each screenshot. Run it after
 the QA app has imported only fabricated data:
 
 ```bash
-export MOODINATOR_SOURCE_SHA=<40-character-sha-from-originating-checkout>
 bun run qa:matrix -- emulator-5554 --fixture-note 'QA match 0001: fabricated native stress record.' --fixture-count 1000 --out /tmp/moodinator-native-matrix-current
 ```
 
@@ -266,7 +263,6 @@ travels through UTC and Pacific/Auckland, and compares the row's accessibility
 date/time label:
 
 ```bash
-export MOODINATOR_SOURCE_SHA=<40-character-sha-from-originating-checkout>
 bun run qa:timezone -- emulator-5554 --out /tmp/moodinator-native-timezone-current
 ```
 

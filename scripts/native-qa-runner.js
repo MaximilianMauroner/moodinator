@@ -150,10 +150,33 @@ function entrySelectors(identity) {
   return selectors;
 }
 
+const ENTRY_METADATA_TEST_ID = /^mood-entry-(?:offset|scale|energy|emotion(?:-count)?|context(?:-count)?)-/;
+
+function isEntryMetadataMatcher(matcher) {
+  return typeof matcher?.testId === "string" && ENTRY_METADATA_TEST_ID.test(matcher.testId);
+}
+
 function timestampFromNode(node) {
   const testId = normalizeResourceId(node["resource-id"]);
   const match = /mood-entry-note-(\d+)$/.exec(testId);
   return match ? Number(match[1]) : null;
+}
+
+function recordedOffsetFromNodes(nodes, timestamp) {
+  const prefix = `mood-entry-offset-${timestamp}-`;
+  // Metadata views intentionally have no visual footprint. Android can retain
+  // their resource IDs in the hierarchy while reporting them as not visible.
+  const offsetNodes = findNodes(nodes, { testIdPrefix: prefix }, { includeHidden: true });
+  if (offsetNodes.length !== 1) {
+    throw new Error(`Expected exactly one recorded UTC offset for entry ${timestamp}, found ${offsetNodes.length}.`);
+  }
+  const value = normalizeResourceId(offsetNodes[0]["resource-id"]).slice(prefix.length);
+  if (value === "null") return null;
+  const offset = Number(value);
+  if (!Number.isInteger(offset)) {
+    throw new Error(`Entry ${timestamp} exposed an invalid recorded UTC offset: ${JSON.stringify(value)}.`);
+  }
+  return offset;
 }
 
 function captureEntryIdentity(serial, {
@@ -162,6 +185,7 @@ function captureEntryIdentity(serial, {
   timestamp = null,
   originalNote = null,
   entryIndex = null,
+  captureUtcOffsetMinutes = false,
   adbPath = "adb",
   dumpTimeoutMs,
   readHierarchyImpl = readHierarchy,
@@ -197,14 +221,20 @@ function captureEntryIdentity(serial, {
     mood,
     ...(originalNote ? { originalNote } : {}),
     ...(Number.isInteger(entryIndex) ? { entryIndex } : {}),
-    ...(Object.hasOwn(entryFields, "utcOffsetMinutes") ? { utcOffsetMinutes: entryFields.utcOffsetMinutes } : {}),
+    ...(captureUtcOffsetMinutes
+      ? { utcOffsetMinutes: recordedOffsetFromNodes(nodes, observedTimestamp) }
+      : Object.hasOwn(entryFields, "utcOffsetMinutes")
+        ? { utcOffsetMinutes: entryFields.utcOffsetMinutes }
+        : {}),
     ...(Array.isArray(entryFields.emotions) ? { emotions: entryFields.emotions } : {}),
     ...(Array.isArray(entryFields.contextTags) ? { contextTags: entryFields.contextTags } : {}),
     ...(Object.hasOwn(entryFields, "energy") ? { energy: entryFields.energy } : {}),
     ...(entryFields.moodScale ? { moodScale: entryFields.moodScale } : {}),
   };
   const selectors = entrySelectors(identity);
-  const counts = selectors.map((matcher) => findNodes(nodes, matcher).length);
+  const counts = selectors.map((matcher) => findNodes(nodes, matcher, {
+    includeHidden: isEntryMetadataMatcher(matcher),
+  }).length);
   if (counts.some((count) => count !== 1)) {
     throw new Error(`Entry identity was not unique before deletion (counts: ${counts.join(", ")}).`);
   }
@@ -250,7 +280,7 @@ function entryIdentityCounts(nodes, identity) {
  */
 function isExactlyOneRestoredEntry(nodes, identity) {
   const counts = entryIdentityCounts(nodes, identity);
-  return counts.visible.every((count) => count === 1)
+  return counts.visible.every((count, index) => isEntryMetadataMatcher(identity.selectors[index]) || count === 1)
     && counts.hierarchy.every((count) => count === 1);
 }
 
@@ -265,6 +295,9 @@ async function waitForEntryState(serial, identity, expectedCount, {
   const includeHidden = scope === "hierarchy";
   const deadline = Date.now() + timeoutMs;
   for (const matcher of identity.selectors) {
+    // Visible row state is established by the rendered card, note and rating.
+    // Zero-footprint metadata markers are checked in hierarchy scope instead.
+    if (scope === "visible" && isEntryMetadataMatcher(matcher)) continue;
     const remaining = Math.max(0, deadline - Date.now());
     await waitForNodeCount(serial, matcher, expectedCount, {
       ...options,

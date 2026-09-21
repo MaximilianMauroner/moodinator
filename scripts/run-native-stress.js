@@ -25,7 +25,7 @@ const {
   evidenceAcceptance,
   evidenceStatus,
   isToolUnavailable,
-  requireSourceSha,
+  requirePreparedSourceSha,
 } = require("./native-qa-common");
 const {
   parseGfxInfo,
@@ -558,8 +558,8 @@ function validateStressComparison(baseline, current) {
 }
 
 async function main(argv = process.argv.slice(2)) {
+  const sourceSha = requirePreparedSourceSha(root);
   const options = parseOptions(argv);
-  const sourceSha = requireSourceSha();
   const outputDirectory = options.output
     ? path.resolve(options.output)
     : mkdtempSync(path.join(tmpdir(), `moodinator-native-stress-${options.label}-${options.size}-`));

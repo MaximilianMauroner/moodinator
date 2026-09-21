@@ -35,13 +35,14 @@ const {
   evidenceStatus,
   isToolUnavailable,
   packageIsDebuggable,
-  requireSourceSha,
+  requirePreparedSourceSha,
 } = require("../scripts/native-qa-common.js");
 const {
   assertCoordinationPassed,
   entryIdentityCounts,
   entrySelectors,
   isExactlyOneRestoredEntry,
+  captureEntryIdentity,
   runMaestro,
   waitForEntryIdentity,
   waitForExactEntry,
@@ -139,18 +140,19 @@ function exactEntryHierarchy({ hiddenDuplicate = false, visible = true } = {}) {
   return `<hierarchy>${nodes.join("")}</hierarchy>`;
 }
 
-function completeEntryHierarchy({ energy = 6 } = {}) {
+function completeEntryHierarchy({ energy = 6, metadataVisible = true } = {}) {
+  const metadataVisibility = metadataVisible ? "true" : "false";
   return `<hierarchy>
     <node resource-id="app:id/mood-entry-stable-123" visible-to-user="true" enabled="true" />
     <node text="QA exact" resource-id="app:id/mood-entry-note-123" visible-to-user="true" enabled="true" />
     <node text="6" resource-id="app:id/mood-entry-rating-123" visible-to-user="true" enabled="true" />
-    <node resource-id="app:id/mood-entry-offset-123-330" visible-to-user="true" enabled="true" />
-    <node resource-id="app:id/mood-entry-scale-123-1-0-10-true" visible-to-user="true" enabled="true" />
-    <node resource-id="app:id/mood-entry-energy-123-${energy}" visible-to-user="true" enabled="true" />
-    <node resource-id="app:id/mood-entry-emotion-123-Happy-positive-null" visible-to-user="true" enabled="true" />
-    <node resource-id="app:id/mood-entry-emotion-count-123-1" visible-to-user="true" enabled="true" />
-    <node resource-id="app:id/mood-entry-context-123-Home" visible-to-user="true" enabled="true" />
-    <node resource-id="app:id/mood-entry-context-count-123-1" visible-to-user="true" enabled="true" />
+    <node resource-id="app:id/mood-entry-offset-123-330" visible-to-user="${metadataVisibility}" enabled="true" bounds="[0,0][0,0]" />
+    <node resource-id="app:id/mood-entry-scale-123-1-0-10-true" visible-to-user="${metadataVisibility}" enabled="true" bounds="[0,0][0,0]" />
+    <node resource-id="app:id/mood-entry-energy-123-${energy}" visible-to-user="${metadataVisibility}" enabled="true" bounds="[0,0][0,0]" />
+    <node resource-id="app:id/mood-entry-emotion-123-Happy-positive-null" visible-to-user="${metadataVisibility}" enabled="true" bounds="[0,0][0,0]" />
+    <node resource-id="app:id/mood-entry-emotion-count-123-1" visible-to-user="${metadataVisibility}" enabled="true" bounds="[0,0][0,0]" />
+    <node resource-id="app:id/mood-entry-context-123-Home" visible-to-user="${metadataVisibility}" enabled="true" bounds="[0,0][0,0]" />
+    <node resource-id="app:id/mood-entry-context-count-123-1" visible-to-user="${metadataVisibility}" enabled="true" bounds="[0,0][0,0]" />
   </hierarchy>`;
 }
 
@@ -243,6 +245,40 @@ test("restoration identity rejects a changed populated entry field", () => {
     ),
     false,
   );
+});
+
+test("exact identity inspects zero-footprint metadata in the full hierarchy", () => {
+  const target = {
+    note: "QA exact",
+    mood: 6,
+    utcOffsetMinutes: 330,
+    emotions: [{ name: "Happy", category: "positive" }],
+    contextTags: ["Home"],
+    energy: 6,
+    moodScale: { version: 1, min: 0, max: 10, lowerIsBetter: true },
+  };
+  const nodes = parseUiHierarchy(completeEntryHierarchy({ metadataVisible: false }));
+  const identity = captureEntryIdentity("emulator-5554", {
+    ...target,
+    readHierarchyImpl: () => nodes,
+  });
+
+  assert.deepEqual(entryIdentityCounts(nodes, identity), {
+    visible: [1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
+    hierarchy: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+  });
+  assert.equal(isExactlyOneRestoredEntry(nodes, identity), true);
+});
+
+test("smoke identity captures the entry's recorded UTC offset", () => {
+  const identity = captureEntryIdentity("emulator-5554", {
+    note: "QA exact",
+    mood: 6,
+    captureUtcOffsetMinutes: true,
+    readHierarchyImpl: () => parseUiHierarchy(completeEntryHierarchy()),
+  });
+  assert.equal(identity.utcOffsetMinutes, 330);
+  assert.deepEqual(identity.selectors[3], { testId: "mood-entry-offset-123-330" });
 });
 
 test("timezone observation targets the labeled nested entry Pressable", () => {
@@ -1121,17 +1157,33 @@ test("normal-motion matrix values are explicit and nonzero", () => {
   assert.equal(isAbsentSettingValue("1"), false);
 });
 
-test("isolated evidence requires the originating full source SHA", () => {
-  const sourceSha = "a".repeat(40);
-  assert.equal(requireSourceSha({ MOODINATOR_SOURCE_SHA: sourceSha }), sourceSha);
-  assert.throws(
-    () => requireSourceSha({ MOODINATOR_SOURCE_SHA: "unknown" }),
-    /full 40-character lowercase source SHA/,
-  );
-  assert.throws(
-    () => requireSourceSha({}),
-    /MOODINATOR_SOURCE_SHA is required/,
-  );
+test("evidence startup requires the executing sealed prepared workspace", () => {
+  const directory = mkdtempSync(join(tmpdir(), "moodinator-evidence-provenance-test-"));
+  const preparedSha = "a".repeat(40);
+  try {
+    writeFileSync(join(directory, "tracked.js"), "original\n");
+    writePreparedSourceMetadata(directory, preparedSha, ["tracked.js"]);
+    assert.throws(() => requirePreparedSourceSha(directory, {}), /Android source is not sealed/);
+    mkdirSync(join(directory, "android"), { recursive: true });
+    writeFileSync(join(directory, "android", "settings.gradle"), "// generated\n");
+    sealPreparedNativeSource(directory);
+    assert.equal(requirePreparedSourceSha(directory, {}), preparedSha);
+    writeFileSync(join(directory, "tracked.js"), "mutated\n");
+    assert.throws(() => requirePreparedSourceSha(directory, {}), /tracked\.js differs from source/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("every native evidence runner binds provenance before parsing invocation", () => {
+  for (const runner of ["smoke", "stress", "matrix", "timezone"]) {
+    const source = readFileSync(join(process.cwd(), "scripts", `run-native-${runner}.js`), "utf8");
+    const startup = source.match(/async function main\([^]*?\n}/)?.[0] ?? "";
+    const provenance = startup.indexOf("requirePreparedSourceSha(root)");
+    const options = startup.indexOf("parseOptions(argv)");
+    assert.ok(provenance >= 0, `${runner} must validate prepared provenance`);
+    assert.ok(options >= 0 && provenance < options, `${runner} must validate provenance before invocation`);
+  }
 });
 
 test("prepared QA provenance is authoritative and rejects stale environment SHAs", () => {

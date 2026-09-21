@@ -2,7 +2,7 @@ const { existsSync, mkdirSync, mkdtempSync, readdirSync, statSync, writeFileSync
 const { tmpdir } = require("node:os");
 const path = require("node:path");
 
-const { assertInstalledQaBuild, evidenceAcceptance, evidenceStatus, isToolUnavailable, requireSourceSha } = require("./native-qa-common");
+const { assertInstalledQaBuild, evidenceAcceptance, evidenceStatus, isToolUnavailable, requirePreparedSourceSha } = require("./native-qa-common");
 const { runDeleteUndoAcceptance } = require("./native-qa-runner");
 
 const appId = "com.lab4code.moodinator.qa";
@@ -41,8 +41,8 @@ function prepareEvidenceDirectory(outputDirectory) {
 }
 
 async function main(argv = process.argv.slice(2)) {
+  const sourceSha = requirePreparedSourceSha(root);
   const options = parseOptions(argv);
-  const sourceSha = requireSourceSha();
   const outputDirectory = options.output
     ? path.resolve(options.output)
     : mkdtempSync(path.join(tmpdir(), "moodinator-native-smoke-"));
@@ -66,7 +66,7 @@ async function main(argv = process.argv.slice(2)) {
         target: {
           note: "QA smoke edited note",
           mood: 5,
-          utcOffsetMinutes: 0,
+          captureUtcOffsetMinutes: true,
           emotions: [{ name: "Happy", category: "positive" }],
           contextTags: [],
           energy: 6,
