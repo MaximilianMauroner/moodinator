@@ -1,4 +1,5 @@
 const { spawn } = require("node:child_process");
+const { Buffer } = require("node:buffer");
 
 const {
   DEFAULT_DUMP_TIMEOUT_MS,
@@ -44,12 +45,29 @@ function runMaestro(serial, flowPath, {
   cwd,
   timeoutMs = DEFAULT_MAESTRO_TIMEOUT_MS,
   command = "maestro",
+  spawnImpl = spawn,
 } = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, ["--device", serial, "test", flowPath], {
+    const child = spawnImpl(command, ["--device", serial, "test", flowPath], {
       cwd,
-      stdio: "inherit",
+      stdio: ["inherit", "pipe", "pipe"],
     });
+    const stdout = [];
+    const stderr = [];
+    child.stdout?.on("data", (chunk) => {
+      stdout.push(Buffer.from(chunk));
+      process.stdout.write(chunk);
+    });
+    child.stderr?.on("data", (chunk) => {
+      stderr.push(Buffer.from(chunk));
+      process.stderr.write(chunk);
+    });
+    const maestroError = (message) => {
+      const error = new Error(message);
+      error.stdout = Buffer.concat(stdout);
+      error.stderr = Buffer.concat(stderr);
+      return error;
+    };
     let settled = false;
     let timedOut = false;
     let killTimer = null;
@@ -65,6 +83,8 @@ function runMaestro(serial, flowPath, {
       settled = true;
       clearTimeout(timer);
       if (killTimer) clearTimeout(killTimer);
+      error.stdout = Buffer.concat(stdout);
+      error.stderr = Buffer.concat(stderr);
       reject(error);
     });
     child.once("exit", (code, signal) => {
@@ -73,11 +93,11 @@ function runMaestro(serial, flowPath, {
       clearTimeout(timer);
       if (killTimer) clearTimeout(killTimer);
       if (timedOut) {
-        reject(new Error(`Maestro exceeded its ${timeoutMs}ms timeout and exited ${code ?? `from ${signal}`}.`));
+        reject(maestroError(`Maestro exceeded its ${timeoutMs}ms timeout and exited ${code ?? `from ${signal}`}.`));
         return;
       }
       if (code !== 0) {
-        reject(new Error(`Maestro exited ${code ?? `from ${signal}`}.`));
+        reject(maestroError(`Maestro exited ${code ?? `from ${signal}`}.`));
         return;
       }
       resolve({ code, signal });

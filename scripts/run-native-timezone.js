@@ -212,6 +212,7 @@ function evaluateTimezoneObservations(observations) {
   ));
   return {
     stableRecordedLabel,
+    functionalFailure,
     status: stableRecordedLabel
       ? "passed"
       : functionalFailure
@@ -222,6 +223,22 @@ function evaluateTimezoneObservations(observations) {
     sameRecordedLabel,
     expectedRecordedDateTime,
   };
+}
+
+function evaluateTimezoneResult(observations, operationalError, restoreError) {
+  const evaluation = evaluateTimezoneObservations(observations);
+  const finalError = combineOperationalErrors(operationalError, restoreError);
+  const status = evaluation.functionalFailure
+    ? "failed"
+    : finalError
+      ? evidenceStatus({
+        routeError: operationalError,
+        requiredFailures: restoreError ? [{
+          status: isToolUnavailable(restoreError) ? "blocked" : "failed",
+        }] : [],
+      })
+      : evaluation.status;
+  return { evaluation, finalError, status };
 }
 
 function runMaestro(serial) {
@@ -362,25 +379,18 @@ async function main(argv = process.argv.slice(2)) {
     }
   }
 
-  const finalError = combineOperationalErrors(operationalError, restoreError);
-  const evaluation = finalError
-    ? null
-    : evaluateTimezoneObservations(observations);
-  const status = finalError
-    ? evidenceStatus({
-      routeError: operationalError,
-      requiredFailures: restoreError ? [{
-        status: isToolUnavailable(restoreError) ? "blocked" : "failed",
-      }] : [],
-    })
-    : evaluation.status;
+  const { evaluation, finalError, status } = evaluateTimezoneResult(
+    observations,
+    operationalError,
+    restoreError,
+  );
   const evidence = {
     ...baseEvidence,
     status,
     acceptance: evidenceAcceptance(status),
     observations,
     original,
-    ...(evaluation ?? { stableRecordedLabel: false }),
+    ...evaluation,
     ...(finalError ? { blocker: finalError.message } : {}),
     restorationError: restoreError?.message ?? null,
   };
@@ -403,6 +413,7 @@ if (require.main === module) {
 module.exports = {
   createTimezoneFixture,
   evaluateTimezoneObservations,
+  evaluateTimezoneResult,
   labelContainsRecordedDateTime,
   parseOptions,
   prepareEvidenceDirectory,

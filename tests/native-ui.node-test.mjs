@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { Buffer } from "node:buffer";
 import { execFileSync } from "node:child_process";
+import { EventEmitter } from "node:events";
 import { createRequire } from "node:module";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -39,6 +41,7 @@ const {
   entryIdentityCounts,
   entrySelectors,
   isExactlyOneRestoredEntry,
+  runMaestro,
   waitForEntryIdentity,
   waitForExactEntry,
   waitForRestorationEvidence,
@@ -60,7 +63,9 @@ const {
   importCompletionTimeoutMs,
   materializeCycle,
   materializeFilter,
+  normalizedWorkloadHash,
   pageBoundaryIds,
+  parseDeviceProfile,
   prepareEvidenceDirectory: prepareStressEvidenceDirectory,
   settleImportedHistory,
   startTrace,
@@ -78,6 +83,7 @@ const {
 const {
   createTimezoneFixture,
   evaluateTimezoneObservations,
+  evaluateTimezoneResult,
   labelContainsRecordedDateTime,
   prepareEvidenceDirectory: prepareTimezoneEvidenceDirectory,
   recordedLabelFromNode,
@@ -467,7 +473,14 @@ test("stress comparison allows different revisions with per-build provenance", (
     runCount: 2,
     status: "passed",
     acceptance: "accepted",
-    device: { serial: "emulator-5554", api: "35", model: "Pixel", refreshRate: "60" },
+    workloadHash: "d".repeat(64),
+    device: {
+      serial: "emulator-5554", api: "35", model: "Pixel", refreshRate: "60",
+      avdName: "Pixel_8_API_35", systemFingerprint: "google/sdk_gphone64/x:35/build:userdebug/test-keys",
+      cpuAbiList: "x86_64,arm64-v8a", cpuCount: 4, memTotalKb: 4096000,
+      displaySize: "Physical size: 1080x2400", displayDensity: "Physical density: 420",
+      displayState: "mActiveModeId=1\nDisplayMode{id=1, width=1080, height=2400, fps=60.0}",
+    },
     runs: [
       { status: "passed", acceptance: "accepted", thermal: { before: { ok: true, snapshot: "nominal" }, after: { ok: true, snapshot: "nominal" } } },
       { status: "passed", acceptance: "accepted", thermal: { before: { ok: true, snapshot: "nominal" }, after: { ok: true, snapshot: "nominal" } } },
@@ -481,6 +494,21 @@ test("stress comparison allows different revisions with per-build provenance", (
   assert.throws(() => validateStressComparison(make("a".repeat(40)), {
     ...make("b".repeat(40)), device: { ...make("b".repeat(40)).device, refreshRate: "120" },
   }), /refreshRate/);
+  assert.throws(() => validateStressComparison(make("a".repeat(40)), {
+    ...make("b".repeat(40)), workloadHash: "e".repeat(64),
+  }), /workloadHash/);
+  assert.throws(() => validateStressComparison(make("a".repeat(40)), {
+    ...make("b".repeat(40)), workloadHash: undefined,
+  }), /normalized workload hash/);
+  assert.throws(() => validateStressComparison(make("a".repeat(40)), {
+    ...make("b".repeat(40)), device: { ...make("b".repeat(40)).device, memTotalKb: 8192000 },
+  }), /memTotalKb/);
+  assert.throws(() => validateStressComparison(make("a".repeat(40)), {
+    ...make("b".repeat(40)), device: { ...make("b".repeat(40)).device, displayState: "mActiveModeId=2\nDisplayMode{id=2, fps=120.0}" },
+  }), /displayState/);
+  assert.throws(() => validateStressComparison(make("a".repeat(40)), {
+    ...make("b".repeat(40)), device: { ...make("b".repeat(40)).device, systemFingerprint: undefined },
+  }), /device systemFingerprint/);
   const changedThermal = make("b".repeat(40));
   changedThermal.runs[1].thermal.after.snapshot = "throttled";
   assert.throws(() => validateStressComparison(make("a".repeat(40)), changedThermal), /run 2/);
@@ -494,6 +522,37 @@ test("stress comparison allows different revisions with per-build provenance", (
   const missingRun = make("b".repeat(40));
   missingRun.runs.pop();
   assert.throws(() => validateStressComparison(make("a".repeat(40)), missingRun), /2 accepted runs/);
+});
+
+test("stress workload hash ignores the fixture wall-clock anchor but detects payload drift", () => {
+  const firstNow = Date.UTC(2031, 4, 1);
+  const secondNow = Date.UTC(2032, 4, 1);
+  const indexes = pageBoundaryIds(1000);
+  const first = createQaFixture(1000, { now: firstNow });
+  const second = createQaFixture(1000, { now: secondNow });
+  assert.equal(normalizedWorkloadHash(first, firstNow, indexes), normalizedWorkloadHash(second, secondNow, indexes));
+  second[10].note = "changed payload";
+  assert.notEqual(normalizedWorkloadHash(first, firstNow, indexes), normalizedWorkloadHash(second, secondNow, indexes));
+});
+
+test("performance device profile records stable system, compute, memory, and display identity", () => {
+  const profile = parseDeviceProfile({
+    avdName: "Pixel_8_API_35\n", systemFingerprint: "google/build/fingerprint\n",
+    cpuAbiList: "x86_64,arm64-v8a\n", cpuCount: "4\n",
+    meminfo: "MemTotal:        4096000 kB\nMemFree: 1 kB\n",
+    displaySize: "Physical size: 1080x2400\n", displayDensity: "Physical density: 420\n",
+    displayState: "mActiveModeId=1\nDisplayMode{id=1, fps=60.0}\n",
+  });
+  assert.deepEqual(profile, {
+    avdName: "Pixel_8_API_35", systemFingerprint: "google/build/fingerprint",
+    cpuAbiList: "x86_64,arm64-v8a", cpuCount: 4, memTotalKb: 4096000,
+    displaySize: "Physical size: 1080x2400", displayDensity: "Physical density: 420",
+    displayState: "mActiveModeId=1\nDisplayMode{id=1, fps=60.0}",
+  });
+  assert.throws(() => parseDeviceProfile({
+    avdName: "x", systemFingerprint: "x", cpuAbiList: "x", cpuCount: "", meminfo: "",
+    displaySize: "x", displayDensity: "x", displayState: "x",
+  }), /CPU count and total RAM/);
 });
 
 test("measured stress flows do not relaunch the app process", () => {
@@ -724,6 +783,53 @@ test("canonical ADB connectivity failures block native evidence", () => {
   stderrError.stderr = Buffer.from("error: device offline\n");
   assert.equal(isToolUnavailable(stderrError), true);
   assert.equal(evidenceStatus({ routeError: stderrError }), "blocked");
+});
+
+test("Maestro failures tee and retain stdout and stderr for availability classification", async () => {
+  const child = new EventEmitter();
+  child.stdout = new EventEmitter();
+  child.stderr = new EventEmitter();
+  child.kill = () => {};
+  const stdoutWrite = process.stdout.write;
+  const stderrWrite = process.stderr.write;
+  let teeStdout = "";
+  let teeStderr = "";
+  process.stdout.write = (chunk) => { teeStdout += String(chunk); return true; };
+  process.stderr.write = (chunk) => { teeStderr += String(chunk); return true; };
+  try {
+    const result = runMaestro("emulator-5554", "flow.yaml", {
+      timeoutMs: 1000,
+      spawnImpl: () => {
+        queueMicrotask(() => {
+          child.stdout.emit("data", Buffer.from("Maestro output\n"));
+          child.stderr.emit("data", Buffer.from("error: device unauthorized\n"));
+          child.emit("exit", 1, null);
+        });
+        return child;
+      },
+    });
+    await assert.rejects(result, (error) => {
+      assert.equal(error.stdout.toString(), "Maestro output\n");
+      assert.equal(error.stderr.toString(), "error: device unauthorized\n");
+      assert.equal(isToolUnavailable(error), true);
+      return true;
+    });
+    assert.equal(teeStdout, "Maestro output\n");
+    assert.equal(teeStderr, "error: device unauthorized\n");
+  } finally {
+    process.stdout.write = stdoutWrite;
+    process.stderr.write = stderrWrite;
+  }
+});
+
+test("Android shell reports missing atrace as unavailable tooling only for its exact diagnostic", () => {
+  const unavailable = new Error("adb shell atrace exited 127");
+  unavailable.stderr = Buffer.from("/system/bin/sh: atrace: inaccessible or not found\n");
+  assert.equal(isToolUnavailable(unavailable), true);
+  assert.equal(evidenceStatus({ routeError: unavailable }), "blocked");
+
+  assert.equal(isToolUnavailable(new Error("atrace: permission denied")), false);
+  assert.equal(isToolUnavailable(new Error("report says atrace: inaccessible or not found during assertion")), false);
 });
 
 test("ADB command and app assertion failures remain failed evidence", () => {
@@ -1139,6 +1245,27 @@ test("timezone evidence requires accepted, distinct device states", () => {
   ]);
   assert.equal(failureBeforeRefusal.status, "failed");
   assert.equal(failureBeforeRefusal.stableRecordedLabel, false);
+});
+
+test("timezone functional failure outranks later unavailable operational and restoration errors", () => {
+  const observations = [{
+    requestedTimeZone: "UTC",
+    actualTimeZone: "UTC",
+    accepted: true,
+    tested: true,
+    contentDescription: "Mood entry: Uncomfortable (6), logged at the wrong time",
+    matchesExpectedRecordedDateTime: false,
+  }];
+  const operationalError = new Error("adb device offline");
+  const restorationError = new Error("adb device offline during timezone restoration");
+  const result = evaluateTimezoneResult(observations, operationalError, restorationError);
+
+  assert.equal(result.status, "failed");
+  assert.equal(result.evaluation.functionalFailure, true);
+  assert.equal(result.evaluation.stableRecordedLabel, false);
+  assert.match(result.finalError.message, /adb device offline/);
+  assert.match(result.finalError.message, /Restoration also failed: adb device offline during timezone restoration/);
+  assert.deepEqual(result.finalError.errors, [operationalError, restorationError]);
 });
 
 test("timezone restoration accepts an unsupported command when runtime is already original", () => {

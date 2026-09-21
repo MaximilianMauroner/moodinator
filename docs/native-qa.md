@@ -187,13 +187,18 @@ bun run qa:stress -- emulator-5554 --size 10000 --label current --runs 2 --out /
 ```
 
 Use new empty output directories for each command. Each run records the source
-SHA and device, `dumpsys gfxinfo` frame counters, repeated `dumpsys meminfo`
+SHA, a wall-clock-independent SHA-256 workload hash, and a performance-device
+profile. The profile includes the AVD name and Android system fingerprint, CPU
+ABI/count, total RAM, physical/override resolution and density, configured peak
+refresh, and the active display mode/actual refresh reported by Android. It also
+records `dumpsys gfxinfo` frame counters, repeated `dumpsys meminfo`
 captures, an `atrace` scroll trace when the emulator permits it, and thermal
 snapshots immediately before and after every measured run. The imported app
 process stays alive across all measured cycle and filter flows. Compare
-the baseline/current `summary.json` files only when device profile, refresh
-rate, each corresponding run's before/after thermal snapshots, fixture size,
-and run count match. Their `sourceSha`
+the baseline/current `summary.json` files only when the normalized workload
+hash, complete performance-device profile, each corresponding run's before/after
+thermal snapshots, fixture size, and run count match. A recreated AVD must not
+be treated as comparable merely because it reused an emulator serial. Their `sourceSha`
 values may differ across revisions, but each summary must match its own
 provenance-bound installed QA binary. A
 failed required memory, gfx, or trace capture produces `status: failed` or

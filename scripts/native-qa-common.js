@@ -1,4 +1,5 @@
 const { execFileSync } = require("node:child_process");
+const { Buffer } = require("node:buffer");
 
 const SOURCE_SHA_ENV = "MOODINATOR_SOURCE_SHA";
 const QA_APP_ID = "com.lab4code.moodinator.qa";
@@ -24,6 +25,7 @@ function isToolUnavailable(error) {
     : "";
   const diagnostic = `${message}\n${adbOutput}`;
   return /\bENOENT\b|\bcommand not found\b|\bexecutable not found\b|\bno such file\b|\b(?:adb|maestro) (?:is )?not installed\b/i.test(diagnostic)
+    || /(?:^|\n)\s*(?:\/system\/bin\/sh:\s*)?atrace:\s*inaccessible or not found\s*(?:\r?$)/im.test(diagnostic)
     || /\bdevice(?: [^\r\n]*)? offline\b/i.test(diagnostic)
     || /\bdevice unauthorized\b/i.test(diagnostic)
     || /\bno devices\/emulators found\b/i.test(diagnostic)

@@ -1,4 +1,5 @@
 const { execFileSync } = require("node:child_process");
+const { createHash } = require("node:crypto");
 const {
   existsSync,
   mkdirSync,
@@ -373,6 +374,23 @@ function summarizeRunEvidence({
   };
 }
 
+function normalizedWorkloadHash(entries, referenceNow, editIndexes) {
+  const editedEntries = applyNativeStressEditMutations(entries, editIndexes);
+  const filter = combinedFilterExpectation(editedEntries, { now: referenceNow });
+  const normalizedFixture = entries.map((entry) => ({
+    ...entry,
+    timestampOffsetMs: entry.timestamp - referenceNow,
+    timestamp: undefined,
+  }));
+  const workloadManifest = {
+    version: 1,
+    fixture: normalizedFixture,
+    pageBoundaryIds: editIndexes,
+    combinedFilter: filter,
+  };
+  return createHash("sha256").update(JSON.stringify(workloadManifest)).digest("hex");
+}
+
 function baseMetadata(options, sourceSha, entries, fixturePath, outputDirectory, referenceNow) {
   const editIndexes = pageBoundaryIds(options.size);
   const editedEntries = applyNativeStressEditMutations(entries, editIndexes);
@@ -386,6 +404,7 @@ function baseMetadata(options, sourceSha, entries, fixturePath, outputDirectory,
     sourceSha,
     installedSourceSha: sourceSha,
     fixtureReferenceNow: referenceNow,
+    workloadHash: normalizedWorkloadHash(entries, referenceNow, editIndexes),
     command: `bun run qa:stress -- ${options.serial} --size ${options.size} --label ${options.label} --runs ${options.runs} --out ${outputDirectory}`,
     fabricatedFixture: fixturePath,
     fabricatedDataOnly: true,
@@ -401,6 +420,42 @@ function baseMetadata(options, sourceSha, entries, fixturePath, outputDirectory,
     },
     measurementPolicy: "Comparable evidence only; no performance improvement is inferred by this runner.",
   };
+}
+
+function parseDeviceProfile(captures) {
+  const memTotalKb = Number(captures.meminfo.match(/^MemTotal:\s+(\d+)\s+kB$/m)?.[1]);
+  const cpuCount = Number(captures.cpuCount.trim());
+  if (!Number.isInteger(cpuCount) || cpuCount < 1 || !Number.isFinite(memTotalKb)) {
+    throw new Error("Could not determine emulator CPU count and total RAM.");
+  }
+  const required = ["avdName", "systemFingerprint", "cpuAbiList", "displaySize", "displayDensity", "displayState"];
+  for (const field of required) {
+    if (!captures[field]?.trim()) throw new Error(`Could not determine device ${field}.`);
+  }
+  return {
+    avdName: captures.avdName.trim(),
+    systemFingerprint: captures.systemFingerprint.trim(),
+    cpuAbiList: captures.cpuAbiList.trim(),
+    cpuCount,
+    memTotalKb,
+    displaySize: captures.displaySize.trim().replace(/\r/g, ""),
+    displayDensity: captures.displayDensity.trim().replace(/\r/g, ""),
+    displayState: captures.displayState.trim().replace(/\r/g, ""),
+  };
+}
+
+function captureDeviceProfile(serial, runAdbImpl = runAdb) {
+  const shell = (...args) => runAdbImpl(serial, ["shell", ...args]).trim();
+  return parseDeviceProfile({
+    avdName: shell("getprop", "ro.kernel.qemu.avd_name"),
+    systemFingerprint: shell("getprop", "ro.build.fingerprint"),
+    cpuAbiList: shell("getprop", "ro.product.cpu.abilist"),
+    cpuCount: shell("nproc"),
+    meminfo: shell("cat", "/proc/meminfo"),
+    displaySize: shell("wm", "size"),
+    displayDensity: shell("wm", "density"),
+    displayState: shell("dumpsys", "display", "|", "grep", "-E", "mActiveModeId|DisplayMode|refreshRate|fps"),
+  });
 }
 
 function pageBoundaryIds(size) {
@@ -421,11 +476,19 @@ function validateStressComparison(baseline, current) {
         || summary.runs.some((run) => run.status !== "passed" || run.acceptance !== "accepted")) {
       throw new Error(`${label} stress summary does not contain ${summary.runCount} accepted runs.`);
     }
+    if (!/^[a-f0-9]{64}$/.test(summary.workloadHash ?? "")) {
+      throw new Error(`${label} stress summary does not contain a normalized workload hash.`);
+    }
+    for (const field of ["serial", "api", "model", "refreshRate", "avdName", "systemFingerprint", "cpuAbiList", "cpuCount", "memTotalKb", "displaySize", "displayDensity", "displayState"]) {
+      if (summary.device?.[field] === undefined || summary.device[field] === null || summary.device[field] === "") {
+        throw new Error(`${label} stress summary does not contain device ${field}.`);
+      }
+    }
   }
-  for (const field of ["datasetSize", "runCount"]) {
+  for (const field of ["datasetSize", "runCount", "workloadHash"]) {
     if (baseline[field] !== current[field]) throw new Error(`Stress comparison requires equal ${field}.`);
   }
-  for (const field of ["serial", "api", "model", "refreshRate"]) {
+  for (const field of ["serial", "api", "model", "refreshRate", "avdName", "systemFingerprint", "cpuAbiList", "cpuCount", "memTotalKb", "displaySize", "displayDensity", "displayState"]) {
     if (baseline.device?.[field] !== current.device?.[field]) throw new Error(`Stress comparison requires equal device ${field}.`);
   }
   for (let index = 0; index < baseline.runCount; index++) {
@@ -468,6 +531,7 @@ async function main(argv = process.argv.slice(2)) {
       api: runAdb(options.serial, ["shell", "getprop", "ro.build.version.sdk"]).trim(),
       model: runAdb(options.serial, ["shell", "getprop", "ro.product.model"]).trim(),
       refreshRate: runAdb(options.serial, ["shell", "settings", "get", "system", "peak_refresh_rate"]).trim(),
+      ...captureDeviceProfile(options.serial),
     };
     metadata.device = device;
     captureJson(outputDirectory, "metadata.json", metadata);
@@ -645,10 +709,13 @@ if (require.main === module) {
 module.exports = {
   assertInstalledQaBuild,
   captureText,
+  captureDeviceProfile,
   importCompletionTimeoutMs,
   materializeCycle,
   materializeFilter,
+  normalizedWorkloadHash,
   pageBoundaryIds,
+  parseDeviceProfile,
   parseOptions,
   prepareEvidenceDirectory,
   settleImportedHistory,
