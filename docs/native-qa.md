@@ -186,7 +186,9 @@ bun run qa:stress -- emulator-5554 --size 10000 --label current --runs 2 --out /
 
 Use new empty output directories for each command. Each run records the source
 SHA, a wall-clock-independent SHA-256 workload hash, and a performance-device
-profile. The workload hash normalizes timestamps against the fixture's rounded
+profile. It also records a SHA-256 measurement-protocol hash covering capture
+placement, required metrics, trace configuration, route order, process lifetime,
+and settling rules. The workload hash normalizes timestamps against the fixture's rounded
 anchor and covers the pristine, cycle-edited, and filter-refresh-edited fixture
 payloads plus the import, startup, and fully materialized cycle/filter flows that
 are executed. The profile includes the AVD name and Android system fingerprint, CPU
@@ -198,7 +200,8 @@ snapshots immediately before and after every measured run. The imported app
 process stays alive across all measured cycle and filter flows. Compare
 the baseline/current `summary.json` files only when the normalized workload
 hash, complete performance-device profile, each corresponding run's before/after
-thermal snapshots, fixture size, and run count match. A recreated AVD must not
+thermal snapshots, measurement-protocol hash, fixture size, and run count match.
+A recreated AVD must not
 be treated as comparable merely because it reused an emulator serial. Their `sourceSha`
 values may differ across revisions, but each summary must match its own
 provenance-bound installed QA binary. A
@@ -246,11 +249,12 @@ The reproducible visual matrix sets Android font scale to 1.3 and covers light,
 dark, normal-motion, and reduced-motion states. It explicitly writes and reads
 back nonzero animation scales for normal motion, restores the emulator's font
 scale, theme, and animation settings in a `finally` path, and verifies a
-fabricated note plus exact history count before each screenshot. Run it after
-the QA app has imported only fabricated data:
+fabricated note plus exact history count before each screenshot. The runner
+generates and retains the complete fixture, imports it with Replace Data, and
+records its SHA-256 before any capture; it does not trust pre-existing app data:
 
 ```bash
-bun run qa:matrix -- emulator-5554 --fixture-note 'QA match 0001: fabricated native stress record.' --fixture-count 1000 --out /tmp/moodinator-native-matrix-current
+bun run qa:matrix -- emulator-5554 --fixture-count 1000 --out /tmp/moodinator-native-matrix-current
 ```
 
 The matrix retains one screenshot per state. A successful command proves state

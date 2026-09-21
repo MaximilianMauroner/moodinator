@@ -44,6 +44,24 @@ const measuredStartFlow = path.join(root, ".maestro/flows/native-stress-start.ya
 const cycleTemplatePath = path.join(root, ".maestro/flows/native-stress-cycle.yaml");
 const filterTemplatePath = path.join(root, ".maestro/flows/native-stress-filters.yaml");
 
+// Comparison data: update this when capture placement, required metrics, trace
+// configuration, or settling rules change.
+const measurementProtocol = Object.freeze({
+  version: 1,
+  import: { resetDatasetBeforeEachRun: true, settleOnHistoryCountMs: 30000 },
+  processLifetime: "one app process per measured run; no relaunch between measured routes",
+  trace: { tool: "atrace", bufferKb: 8192, categories: ["gfx", "view", "sched", "freq"] },
+  memory: { tool: "dumpsys meminfo", captures: ["before routes", "after each boundary route", "after all routes"] },
+  frames: { tool: "dumpsys gfxinfo", reset: "immediately before routes", capture: "after all routes" },
+  thermal: { tool: "dumpsys thermalservice", captures: ["immediately before routes", "immediately after routes"] },
+  routeOrder: ["boundary edit/delete/undo routes", "combined-filter refresh route"],
+  requiredEvidence: ["memory", "gfx reset and positive frame count", "non-empty scroll trace"],
+});
+
+function measurementProtocolHash(protocol = measurementProtocol) {
+  return createHash("sha256").update(JSON.stringify(protocol)).digest("hex");
+}
+
 function parseOptions(argv) {
   const serial = argv.shift();
   if (!serial || !/^emulator-\d+$/.test(serial)) {
@@ -458,6 +476,8 @@ function baseMetadata(options, sourceSha, entries, fixturePath, outputDirectory,
     installedSourceSha: sourceSha,
     fixtureReferenceNow: referenceNow,
     workloadHash: normalizedWorkloadHash(entries, referenceNow, editIndexes),
+    measurementProtocol,
+    measurementProtocolHash: measurementProtocolHash(),
     command: `bun run qa:stress -- ${options.serial} --size ${options.size} --label ${options.label} --runs ${options.runs} --out ${outputDirectory}`,
     fabricatedFixture: fixturePath,
     fabricatedDataOnly: true,
@@ -497,8 +517,18 @@ function parseDeviceProfile(captures) {
   };
 }
 
+function normalizeDisplayState(displayDump) {
+  return displayDump
+    .replace(/\r/g, "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => /mActiveModeId|DisplayMode|refreshRate|\bfps\b/i.test(line))
+    .join("\n");
+}
+
 function captureDeviceProfile(serial, runAdbImpl = runAdb) {
   const shell = (...args) => runAdbImpl(serial, ["shell", ...args]).trim();
+  const displayDump = shell("dumpsys", "display");
   return parseDeviceProfile({
     avdName: shell("getprop", "ro.kernel.qemu.avd_name"),
     systemFingerprint: shell("getprop", "ro.build.fingerprint"),
@@ -507,7 +537,7 @@ function captureDeviceProfile(serial, runAdbImpl = runAdb) {
     meminfo: shell("cat", "/proc/meminfo"),
     displaySize: shell("wm", "size"),
     displayDensity: shell("wm", "density"),
-    displayState: shell("dumpsys", "display", "|", "grep", "-E", "mActiveModeId|DisplayMode|refreshRate|fps"),
+    displayState: normalizeDisplayState(displayDump),
   });
 }
 
@@ -532,13 +562,17 @@ function validateStressComparison(baseline, current) {
     if (!/^[a-f0-9]{64}$/.test(summary.workloadHash ?? "")) {
       throw new Error(`${label} stress summary does not contain a normalized workload hash.`);
     }
+    if (!/^[a-f0-9]{64}$/.test(summary.measurementProtocolHash ?? "")
+        || summary.measurementProtocolHash !== measurementProtocolHash(summary.measurementProtocol)) {
+      throw new Error(`${label} stress summary does not contain a valid measurement protocol hash.`);
+    }
     for (const field of ["serial", "api", "model", "refreshRate", "avdName", "systemFingerprint", "cpuAbiList", "cpuCount", "memTotalKb", "displaySize", "displayDensity", "displayState"]) {
       if (summary.device?.[field] === undefined || summary.device[field] === null || summary.device[field] === "") {
         throw new Error(`${label} stress summary does not contain device ${field}.`);
       }
     }
   }
-  for (const field of ["datasetSize", "runCount", "workloadHash"]) {
+  for (const field of ["datasetSize", "runCount", "workloadHash", "measurementProtocolHash"]) {
     if (baseline[field] !== current[field]) throw new Error(`Stress comparison requires equal ${field}.`);
   }
   for (const field of ["serial", "api", "model", "refreshRate", "avdName", "systemFingerprint", "cpuAbiList", "cpuCount", "memTotalKb", "displaySize", "displayDensity", "displayState"]) {
@@ -766,8 +800,11 @@ module.exports = {
   importCompletionTimeoutMs,
   materializeCycle,
   materializeFilter,
+  measurementProtocol,
+  measurementProtocolHash,
   normalizedWorkloadManifest,
   normalizedWorkloadHash,
+  normalizeDisplayState,
   pageBoundaryIds,
   parseDeviceProfile,
   parseOptions,

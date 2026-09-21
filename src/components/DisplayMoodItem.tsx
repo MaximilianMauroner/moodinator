@@ -17,6 +17,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
+import Constants from "expo-constants";
 import type { SwipeDirection } from "../types/mood";
 import { MoodEntry } from "@db/types";
 import { getMoodRatingDisplay } from "@/constants/moodScaleInterpretation";
@@ -37,6 +38,10 @@ interface Props {
   onDelete?: (mood: MoodEntry) => void;
   swipeThreshold: number;
 }
+
+const hasQaMetadata = /^[0-9a-f]{40}$/.test(
+  String(Constants.expoConfig?.extra?.qaSourceSha ?? ""),
+);
 
 function MoodTag({
   label,
@@ -318,33 +323,37 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
         onLayout={handleContainerLayout}
         style={[{ borderRadius: 16, overflow: "hidden" }, containerAnimatedStyle]}
       >
-        <View
-          testID={`mood-entry-offset-${mood.timestamp}-${mood.utcOffsetMinutes ?? "null"}`}
-          collapsable={false}
-        />
-        <View
-          testID={`mood-entry-scale-${mood.timestamp}-${mood.moodScale.version}-${mood.moodScale.min}-${mood.moodScale.max}-${mood.moodScale.lowerIsBetter}`}
-          collapsable={false}
-        />
-        <View testID={`mood-entry-emotion-count-${mood.timestamp}-${mood.emotions.length}`} collapsable={false} />
-        <View testID={`mood-entry-context-count-${mood.timestamp}-${mood.contextTags.length}`} collapsable={false} />
-        {typeof mood.energy === "number" ? (
-          <View testID={`mood-entry-energy-${mood.timestamp}-${mood.energy}`} collapsable={false} />
+        {hasQaMetadata ? (
+          <>
+            <View
+              testID={`mood-entry-offset-${mood.timestamp}-${mood.utcOffsetMinutes ?? "null"}`}
+              collapsable={false}
+            />
+            <View
+              testID={`mood-entry-scale-${mood.timestamp}-${mood.moodScale.version}-${mood.moodScale.min}-${mood.moodScale.max}-${mood.moodScale.lowerIsBetter}`}
+              collapsable={false}
+            />
+            <View testID={`mood-entry-emotion-count-${mood.timestamp}-${mood.emotions.length}`} collapsable={false} />
+            <View testID={`mood-entry-context-count-${mood.timestamp}-${mood.contextTags.length}`} collapsable={false} />
+            {typeof mood.energy === "number" ? (
+              <View testID={`mood-entry-energy-${mood.timestamp}-${mood.energy}`} collapsable={false} />
+            ) : null}
+            {mood.emotions.map((emotion) => (
+              <View
+                key={`qa-emotion-${emotion.name}`}
+                testID={`mood-entry-emotion-${mood.timestamp}-${emotion.name}-${emotion.category}-${emotion.energy ?? "null"}`}
+                collapsable={false}
+              />
+            ))}
+            {mood.contextTags.map((context) => (
+              <View
+                key={`qa-context-${context}`}
+                testID={`mood-entry-context-${mood.timestamp}-${context}`}
+                collapsable={false}
+              />
+            ))}
+          </>
         ) : null}
-        {mood.emotions.map((emotion) => (
-          <View
-            key={`qa-emotion-${emotion.name}`}
-            testID={`mood-entry-emotion-${mood.timestamp}-${emotion.name}-${emotion.category}-${emotion.energy ?? "null"}`}
-            collapsable={false}
-          />
-        ))}
-        {mood.contextTags.map((context) => (
-          <View
-            key={`qa-context-${context}`}
-            testID={`mood-entry-context-${mood.timestamp}-${context}`}
-            collapsable={false}
-          />
-        ))}
         <View
           pointerEvents="none"
           className="absolute inset-0 flex-row justify-between"

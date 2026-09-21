@@ -1,8 +1,10 @@
 const { execFileSync } = require("node:child_process");
+const { createHash } = require("node:crypto");
 const { existsSync, mkdtempSync, mkdirSync, readdirSync, statSync, writeFileSync } = require("node:fs");
 const { tmpdir } = require("node:os");
 const path = require("node:path");
 
+const { createQaFixture } = require("./generate-qa-fixtures");
 const {
   assertInstalledQaBuild,
   combineOperationalErrors,
@@ -17,6 +19,7 @@ const { runAdb, waitForNode, waitForNodeAndTap } = require("./native-ui");
 const appId = "com.lab4code.moodinator.qa";
 const root = path.resolve(__dirname, "..");
 const flow = path.join(root, ".maestro/flows/native-visual-matrix.yaml");
+const importFlow = path.join(root, ".maestro/flows/native-stress-import.yaml");
 const SETTING_TIMEOUT_MS = 10000;
 const MAESTRO_TIMEOUT_MS = 120000;
 const SCREENSHOT_TIMEOUT_MS = 30000;
@@ -27,21 +30,34 @@ function parseOptions(argv) {
     throw new Error("Use a disposable emulator serial such as emulator-5554.");
   }
 
-  const options = { serial, output: null, fixtureNote: null, fixtureCount: null };
+  const options = { serial, output: null, fixtureCount: null };
   while (argv.length) {
     const flag = argv.shift();
     const value = argv.shift();
     if (!value) throw new Error(`Missing value for ${flag}.`);
     if (flag === "--out") options.output = value;
-    else if (flag === "--fixture-note") options.fixtureNote = value;
     else if (flag === "--fixture-count") options.fixtureCount = Number(value);
     else throw new Error(`Unknown option ${flag}.`);
   }
-  if (!options.fixtureNote) throw new Error("--fixture-note is required to prove fabricated data is displayed.");
   if (![100, 1000, 10000].includes(options.fixtureCount)) {
     throw new Error("--fixture-count must be 100, 1000, or 10000.");
   }
   return options;
+}
+
+function createMatrixFixture(fixtureCount, { now = Date.now() } = {}) {
+  const entries = createQaFixture(fixtureCount, { now });
+  const serialized = JSON.stringify(entries);
+  const fixtureNote = entries[0]?.note;
+  if (!fixtureNote || entries.length !== fixtureCount) {
+    throw new Error(`Could not generate the complete ${fixtureCount}-entry matrix fixture.`);
+  }
+  return {
+    entries,
+    serialized,
+    fixtureNote,
+    sha256: createHash("sha256").update(serialized).digest("hex"),
+  };
 }
 
 function setting(serial, namespace, key) {
@@ -163,6 +179,25 @@ function runMaestro(serial) {
   });
 }
 
+async function importFabricatedFixture(serial, fixtureName, fixtureCount) {
+  await runMaestroWithDiagnostics(serial, importFlow, {
+    cwd: root,
+    timeoutMs: MAESTRO_TIMEOUT_MS,
+  });
+
+  try {
+    await waitForNodeAndTap(serial, { text: fixtureName }, { timeoutMs: 3500 });
+  } catch (error) {
+    await waitForNodeAndTap(serial, { text: "Downloads", contains: true }, { timeoutMs: 2500 });
+    await waitForNodeAndTap(serial, { text: fixtureName }, { timeoutMs: 5000 });
+  }
+
+  await waitForNodeAndTap(serial, { text: "Replace Data" }, { timeoutMs: 5000 });
+  const timeoutMs = fixtureCount === 10000 ? 600000 : fixtureCount === 1000 ? 120000 : 30000;
+  await waitForNode(serial, { text: "Import Successful", contains: true }, { timeoutMs });
+  await waitForNodeAndTap(serial, { text: "OK" }, { timeoutMs: 5000 });
+}
+
 function screenshot(serial, filePath) {
   const image = execFileSync("adb", ["-s", serial, "exec-out", "screencap", "-p"], {
     encoding: null,
@@ -236,6 +271,9 @@ async function main(argv = process.argv.slice(2)) {
     ? path.resolve(options.output)
     : mkdtempSync(path.join(tmpdir(), "moodinator-native-matrix-"));
   prepareEvidenceDirectory(outputDirectory);
+  const fixture = createMatrixFixture(options.fixtureCount);
+  const fixtureName = `moodinator-matrix-${options.fixtureCount}.json`;
+  const fixturePath = path.join(outputDirectory, fixtureName);
 
   const states = [
     { name: "light-large-font", night: "no", reducedMotion: false },
@@ -249,20 +287,41 @@ async function main(argv = process.argv.slice(2)) {
     sourceSha,
     journey: "native-visual-matrix.yaml",
     states,
-    fabricatedDataOnly: true,
+    fabricatedDataOnly: false,
+    fabricatedFixture: {
+      path: fixturePath,
+      sha256: fixture.sha256,
+      entryCount: fixture.entries.length,
+      importMode: "replace-data",
+      generatedBy: "createQaFixture",
+    },
     fixtureExpectation: {
-      note: options.fixtureNote,
-      count: options.fixtureCount,
+      note: fixture.fixtureNote,
+      count: fixture.entries.length,
     },
   };
   writeFileSync(path.join(outputDirectory, "metadata.json"), `${JSON.stringify(baseEvidence, null, 2)}\n`);
 
   let original = null;
+  let fabricatedDataOnly = false;
   const observations = [];
   let operationalError = null;
   let restoreError = null;
   try {
     await assertInstalledQaBuild(options.serial, sourceSha);
+    writeFileSync(fixturePath, fixture.serialized, { flag: "wx" });
+    runAdb(options.serial, ["push", fixturePath, `/sdcard/Download/${fixtureName}`], { timeoutMs: 120000 });
+    await importFabricatedFixture(options.serial, fixtureName, fixture.entries.length);
+    await waitForNodeAndTap(options.serial, { contentDescription: "Home tab, log your mood" }, { timeoutMs: 5000 });
+    await verifyFabricatedFixture(options.serial, {
+      fixtureNote: fixture.fixtureNote,
+      fixtureCount: fixture.entries.length,
+    });
+    fabricatedDataOnly = true;
+    writeFileSync(path.join(outputDirectory, "metadata.json"), `${JSON.stringify({
+      ...baseEvidence,
+      fabricatedDataOnly,
+    }, null, 2)}\n`);
     original = {
       fontScale: setting(options.serial, "system", "font_scale"),
       nightMode: setting(options.serial, "secure", "ui_night_mode"),
@@ -290,7 +349,10 @@ async function main(argv = process.argv.slice(2)) {
 
       console.log(`Native matrix state: ${state.name}`);
       await runMaestro(options.serial);
-      const fabricatedFixtureProof = await verifyFabricatedFixture(options.serial, options);
+      const fabricatedFixtureProof = await verifyFabricatedFixture(options.serial, {
+        fixtureNote: fixture.fixtureNote,
+        fixtureCount: fixture.entries.length,
+      });
       const screenshots = await captureMatrixScreens(
         options.serial,
         outputDirectory,
@@ -328,6 +390,7 @@ async function main(argv = process.argv.slice(2)) {
     });
     writeEvidence(outputDirectory, {
       ...baseEvidence,
+      fabricatedDataOnly,
       status,
       acceptance: evidenceAcceptance(status),
       observations,
@@ -340,6 +403,7 @@ async function main(argv = process.argv.slice(2)) {
 
   writeEvidence(outputDirectory, {
     ...baseEvidence,
+    fabricatedDataOnly,
     status: "passed",
     // Automation proves the requested states and captures screenshots. A still
     // image cannot prove reduced-motion behavior, and layout/readability still
@@ -361,6 +425,8 @@ if (require.main === module) {
 module.exports = {
   animationValueForState,
   captureMatrixScreens,
+  createMatrixFixture,
+  importFabricatedFixture,
   isAbsentSettingValue,
   parseOptions,
   prepareEvidenceDirectory,

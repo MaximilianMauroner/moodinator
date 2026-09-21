@@ -12,7 +12,9 @@ if (process.env.MOODINATOR_METRO_MAX_WORKERS !== undefined) {
   config.maxWorkers = maxWorkers;
 }
 
-if (process.env.MOODINATOR_VARIANT === "qa") {
+const isIosQaConfig =
+  process.env.EAS_BUILD_PLATFORM === "ios" || process.env.EXPO_OS === "ios";
+if (process.env.MOODINATOR_VARIANT === "qa" && !isIosQaConfig) {
   require("./scripts/qa-source-provenance").readPreparedSourceSha(__dirname, process.env);
 }
 

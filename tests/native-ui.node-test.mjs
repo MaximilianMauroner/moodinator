@@ -44,6 +44,7 @@ const {
   isExactlyOneRestoredEntry,
   captureEntryIdentity,
   runMaestro,
+  waitForDeletedEntryWithUndo,
   waitForEntryIdentity,
   waitForExactEntry,
   waitForRestorationEvidence,
@@ -61,12 +62,16 @@ const {
 } = require("../scripts/native-ui.js");
 const {
   assertInstalledQaBuild: stressInstalledBuildGuard,
+  captureDeviceProfile,
   captureText,
   importCompletionTimeoutMs,
   materializeCycle,
   materializeFilter,
+  measurementProtocol,
+  measurementProtocolHash,
   normalizedWorkloadManifest,
   normalizedWorkloadHash,
+  normalizeDisplayState,
   pageBoundaryIds,
   parseDeviceProfile,
   prepareEvidenceDirectory: prepareStressEvidenceDirectory,
@@ -78,6 +83,7 @@ const {
 } = require("../scripts/run-native-stress.js");
 const {
   animationValueForState,
+  createMatrixFixture,
   isAbsentSettingValue,
   prepareEvidenceDirectory: prepareMatrixEvidenceDirectory,
   restoreTheme,
@@ -358,6 +364,32 @@ test("exact restoration retries transient hierarchy failures", async () => {
   assert.equal(attempts, 2);
 });
 
+test("Delete and Undo evidence comes from one hierarchy snapshot with the exact row gone", async () => {
+  const identity = {
+    timestamp: 123,
+    note: "QA exact",
+    mood: 6,
+    selectors: entrySelectors({ timestamp: 123, note: "QA exact", mood: 6 }),
+  };
+  const undo = `<node text="Undo" resource-id="app:id/undo-delete" content-desc="Undo delete"
+    visible-to-user="true" enabled="true" bounds="[10,20][110,80]" />`;
+  const snapshots = [
+    parseUiHierarchy("<hierarchy></hierarchy>"),
+    parseUiHierarchy(exactEntryHierarchy({ visible: false, hiddenDuplicate: true }).replace("</hierarchy>", `${undo}</hierarchy>`)),
+    parseUiHierarchy(`<hierarchy>${undo}</hierarchy>`),
+  ];
+  let inspections = 0;
+
+  const undoNode = await waitForDeletedEntryWithUndo("emulator-5554", identity, {
+    timeoutMs: 100,
+    pollIntervalMs: 0,
+    readHierarchyImpl: () => snapshots[Math.min(inspections++, snapshots.length - 1)],
+  });
+
+  assert.equal(inspections, 3);
+  assert.equal(undoNode.text, "Undo");
+});
+
 test("restored toast observation starts concurrently and uses the full restoration deadline", async () => {
   const events = [];
   let finishExactEntry;
@@ -555,6 +587,8 @@ test("stress comparison allows different revisions with per-build provenance", (
     status: "passed",
     acceptance: "accepted",
     workloadHash: "d".repeat(64),
+    measurementProtocol,
+    measurementProtocolHash: measurementProtocolHash(),
     device: {
       serial: "emulator-5554", api: "35", model: "Pixel", refreshRate: "60",
       avdName: "Pixel_8_API_35", systemFingerprint: "google/sdk_gphone64/x:35/build:userdebug/test-keys",
@@ -581,6 +615,14 @@ test("stress comparison allows different revisions with per-build provenance", (
   assert.throws(() => validateStressComparison(make("a".repeat(40)), {
     ...make("b".repeat(40)), workloadHash: undefined,
   }), /normalized workload hash/);
+  assert.throws(() => validateStressComparison(make("a".repeat(40)), {
+    ...make("b".repeat(40)),
+    measurementProtocol: { ...measurementProtocol, version: 2 },
+    measurementProtocolHash: measurementProtocolHash({ ...measurementProtocol, version: 2 }),
+  }), /measurementProtocolHash/);
+  assert.throws(() => validateStressComparison(make("a".repeat(40)), {
+    ...make("b".repeat(40)), measurementProtocolHash: "e".repeat(64),
+  }), /valid measurement protocol hash/);
   assert.throws(() => validateStressComparison(make("a".repeat(40)), {
     ...make("b".repeat(40)), device: { ...make("b".repeat(40)).device, memTotalKb: 8192000 },
   }), /memTotalKb/);
@@ -678,6 +720,28 @@ test("performance device profile records stable system, compute, memory, and dis
   }), /CPU count and total RAM/);
 });
 
+test("device profile captures the full remote display dump and normalizes it locally", () => {
+  const calls = [];
+  const values = new Map([
+    ["getprop ro.kernel.qemu.avd_name", "Pixel_8_API_35\n"],
+    ["getprop ro.build.fingerprint", "google/build/fingerprint\n"],
+    ["getprop ro.product.cpu.abilist", "x86_64\n"],
+    ["nproc", "4\n"],
+    ["cat /proc/meminfo", "MemTotal: 4096000 kB\n"],
+    ["wm size", "Physical size: 1080x2400\n"],
+    ["wm density", "Physical density: 420\n"],
+    ["dumpsys display", "ignored\n  mActiveModeId=1\n DisplayMode{id=1, fps=60.0}\n"],
+  ]);
+  const profile = captureDeviceProfile("emulator-5554", (_serial, args) => {
+    calls.push(args);
+    return values.get(args.slice(1).join(" ")) ?? "";
+  });
+  assert.ok(calls.some((args) => args.join(" ") === "shell dumpsys display"));
+  assert.ok(calls.every((args) => !args.includes("|") && !args.includes("grep")));
+  assert.equal(profile.displayState, "mActiveModeId=1\nDisplayMode{id=1, fps=60.0}");
+  assert.equal(normalizeDisplayState("noise\r\n refreshRate=120.0\r\n"), "refreshRate=120.0");
+});
+
 test("measured stress flows do not relaunch the app process", () => {
   for (const flowPath of [
     "../.maestro/flows/native-stress-cycle.yaml",
@@ -762,6 +826,23 @@ test("visual matrix retains each screen before the next navigation", () => {
   );
   assert.match(source, /Calendar legend: a dot marks a day with multiple entries/);
   assert.match(source, /Local privacy/);
+});
+
+test("visual matrix replaces app data with its complete retained fabricated fixture", () => {
+  const fixture = createMatrixFixture(100, { now: Date.UTC(2026, 8, 21, 12) });
+  assert.equal(fixture.entries.length, 100);
+  assert.equal(JSON.parse(fixture.serialized).length, 100);
+  assert.equal(fixture.fixtureNote, fixture.entries[0].note);
+  assert.match(fixture.sha256, /^[a-f0-9]{64}$/);
+
+  const source = readFileSync(new URL("../scripts/run-native-matrix.js", import.meta.url), "utf8");
+  const generated = source.indexOf("const fixture = createMatrixFixture(options.fixtureCount)");
+  const retained = source.indexOf("writeFileSync(fixturePath, fixture.serialized", generated);
+  const pushed = source.indexOf('runAdb(options.serial, ["push", fixturePath', retained);
+  const replaced = source.indexOf("await importFabricatedFixture(options.serial", pushed);
+  const verified = source.indexOf("await verifyFabricatedFixture(options.serial", replaced);
+  assert.ok(generated >= 0 && retained > generated && pushed > retained && replaced > pushed && verified > replaced);
+  assert.doesNotMatch(source, /fixtureNote: options\.fixtureNote/);
 });
 
 test("matrix theme cleanup restores runtime and its independent secure backing value", () => {
@@ -879,6 +960,14 @@ test("delete timing starts before the synchronous ADB tap", () => {
   assert.ok(transition >= 0 && tap > transition);
 });
 
+test("Delete waits for its modal tap callback before inspecting a fresh Undo snapshot", () => {
+  const source = readFileSync(new URL("../scripts/native-qa-runner.js", import.meta.url), "utf8");
+  const tap = source.indexOf("const deleteTap = tapNode(serial, deleteNode");
+  const coherentSnapshot = source.indexOf("await waitForDeletedEntryWithUndo(serial, identity", tap);
+  const undoTap = source.indexOf("tapNode(serial, undoNode", coherentSnapshot);
+  assert.ok(tap >= 0 && coherentSnapshot > tap && undoTap > coherentSnapshot);
+});
+
 test("functional evidence failures outrank unavailable diagnostics", () => {
   assert.equal(evidenceStatus({
     routeError: new Error("Maestro assertion failed"),
@@ -932,6 +1021,7 @@ test("Maestro failures tee and retain stdout and stderr for availability classif
           child.stdout.emit("data", Buffer.from("Maestro output\n"));
           child.stderr.emit("data", Buffer.from("error: device unauthorized\n"));
           child.emit("exit", 1, null);
+          child.emit("close", 1, null);
         });
         return child;
       },
@@ -944,6 +1034,43 @@ test("Maestro failures tee and retain stdout and stderr for availability classif
     });
     assert.equal(teeStdout, "Maestro output\n");
     assert.equal(teeStderr, "error: device unauthorized\n");
+  } finally {
+    process.stdout.write = stdoutWrite;
+    process.stderr.write = stderrWrite;
+  }
+});
+
+test("Maestro retains output emitted after exit and settles only after stdio close", async () => {
+  const child = new EventEmitter();
+  child.stdout = new EventEmitter();
+  child.stderr = new EventEmitter();
+  child.kill = () => {};
+  const stdoutWrite = process.stdout.write;
+  const stderrWrite = process.stderr.write;
+  process.stdout.write = () => true;
+  process.stderr.write = () => true;
+  try {
+    let settled = false;
+    const result = runMaestro("emulator-5554", "flow.yaml", {
+      timeoutMs: 1000,
+      spawnImpl: () => child,
+    }).then(
+      () => { settled = true; },
+      (error) => { settled = true; throw error; },
+    );
+
+    child.stdout.emit("data", Buffer.from("before exit\n"));
+    child.emit("exit", 1, null);
+    await Promise.resolve();
+    assert.equal(settled, false);
+    child.stderr.emit("data", Buffer.from("late diagnostic\n"));
+    child.emit("close", 1, null);
+
+    await assert.rejects(result, (error) => {
+      assert.equal(error.stdout.toString(), "before exit\n");
+      assert.equal(error.stderr.toString(), "late diagnostic\n");
+      return true;
+    });
   } finally {
     process.stdout.write = stdoutWrite;
     process.stderr.write = stderrWrite;
@@ -1345,6 +1472,55 @@ test("QA config derives its embedded SHA from prepared provenance", () => {
   assert.match(metroSource, /MOODINATOR_METRO_MAX_WORKERS/);
   assert.match(prepareSource, /writePreparedSourceMetadata\(destination, sourceSha, copiedTracked\)/);
   assert.doesNotMatch(configSource, /const sourceSha = process\.env\.MOODINATOR_SOURCE_SHA/);
+});
+
+test("QA iOS config does not require Android-sealed provenance", () => {
+  const previousVariant = process.env.MOODINATOR_VARIANT;
+  const previousPlatform = process.env.EAS_BUILD_PLATFORM;
+  process.env.MOODINATOR_VARIANT = "qa";
+  process.env.EAS_BUILD_PLATFORM = "ios";
+  try {
+    const configure = require("../app.config.js");
+    const configured = configure({
+      config: {
+        name: "Moodinator",
+        ios: { bundleIdentifier: "com.lab4code.moodinator" },
+        android: { package: "com.lab4code.moodinator" },
+        extra: { retained: true },
+      },
+    });
+    assert.equal(configured.ios.bundleIdentifier, "com.lab4code.moodinator.qa");
+    assert.equal(configured.android.package, "com.lab4code.moodinator.qa");
+    assert.deepEqual(configured.extra, { retained: true });
+    assert.doesNotThrow(() => {
+      const metroPath = require.resolve("../metro.config.js");
+      delete require.cache[metroPath];
+      require(metroPath);
+      delete require.cache[metroPath];
+    });
+  } finally {
+    if (previousVariant === undefined) delete process.env.MOODINATOR_VARIANT;
+    else process.env.MOODINATOR_VARIANT = previousVariant;
+    if (previousPlatform === undefined) delete process.env.EAS_BUILD_PLATFORM;
+    else process.env.EAS_BUILD_PLATFORM = previousPlatform;
+  }
+});
+
+test("history metadata markers are mounted only in provenance-bound QA builds", () => {
+  const source = readFileSync(
+    new URL("../src/components/DisplayMoodItem.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(source, /const hasQaMetadata = \/\^\[0-9a-f\]\{40\}\$\/\.test\(/);
+  assert.match(source, /\{hasQaMetadata \? \(\s*<>[^]*mood-entry-offset-/);
+});
+
+test("README enters the prepared workspace before native QA installation", () => {
+  const source = readFileSync(new URL("../README.md", import.meta.url), "utf8");
+  assert.match(
+    source,
+    /QA_WORKSPACE="\$\(bun run qa:prepare \| tee \/dev\/stderr \| sed -n '[^']+'\)"\ncd "\$QA_WORKSPACE"\nbun install --frozen-lockfile/,
+  );
 });
 
 test("timezone evidence requires accepted, distinct device states", () => {

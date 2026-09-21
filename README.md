@@ -103,7 +103,8 @@ locally so the command does not download a different checker on each run.
 ### Isolated native verification
 
 ```bash
-bun run qa:prepare
+QA_WORKSPACE="$(bun run qa:prepare | tee /dev/stderr | sed -n 's/^QA workspace: //p')"
+cd "$QA_WORKSPACE"
 bun install --frozen-lockfile
 MOODINATOR_VARIANT=qa MOODINATOR_QA_PREPARE_NATIVE=1 bunx expo prebuild --platform android --clean
 bun run qa:seal-native

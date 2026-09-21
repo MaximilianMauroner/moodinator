@@ -70,6 +70,7 @@ function runMaestro(serial, flowPath, {
     };
     let settled = false;
     let timedOut = false;
+    let spawnError = null;
     let killTimer = null;
     const timer = setTimeout(() => {
       if (settled) return;
@@ -79,19 +80,23 @@ function runMaestro(serial, flowPath, {
     }, timeoutMs);
 
     child.once("error", (error) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      if (killTimer) clearTimeout(killTimer);
-      error.stdout = Buffer.concat(stdout);
-      error.stderr = Buffer.concat(stderr);
-      reject(error);
+      spawnError = error;
     });
-    child.once("exit", (code, signal) => {
+    // `exit` can precede the stdout/stderr streams closing. Finalize only on
+    // `close`, after Node has drained both pipes, so diagnostics cannot lose a
+    // trailing chunk. This also keeps timeout escalation armed until the child
+    // has actually been reaped.
+    child.once("close", (code, signal) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
       if (killTimer) clearTimeout(killTimer);
+      if (spawnError) {
+        spawnError.stdout = Buffer.concat(stdout);
+        spawnError.stderr = Buffer.concat(stderr);
+        reject(spawnError);
+        return;
+      }
       if (timedOut) {
         reject(maestroError(`Maestro exceeded its ${timeoutMs}ms timeout and exited ${code ?? `from ${signal}`}.`));
         return;
@@ -367,6 +372,43 @@ async function waitForEntryAbsent(serial, identity, options = {}) {
   await waitForEntryVisibleAbsent(serial, identity, options);
 }
 
+async function waitForDeletedEntryWithUndo(serial, identity, {
+  timeoutMs = DEFAULT_RESTORATION_TIMEOUT_MS,
+  dumpTimeoutMs = DEFAULT_DUMP_TIMEOUT_MS,
+  pollIntervalMs = 35,
+  readHierarchyImpl = readHierarchy,
+  ...options
+} = {}) {
+  const deadline = Date.now() + timeoutMs;
+  let lastCounts = null;
+  let lastUndoCount = null;
+  let lastInspectionError = null;
+  while (Date.now() <= deadline) {
+    try {
+      const remainingMs = Math.max(1, deadline - Date.now());
+      const nodes = readHierarchyImpl(serial, {
+        ...options,
+        timeoutMs: Math.min(dumpTimeoutMs, remainingMs),
+      });
+      lastCounts = entryIdentityCounts(nodes, identity).hierarchy;
+      const undoNodes = findNodes(nodes, undoMatcher);
+      lastUndoCount = undoNodes.length;
+      lastInspectionError = null;
+      if (lastCounts.every((count) => count === 0) && undoNodes.length === 1) {
+        return undoNodes[0];
+      }
+    } catch (error) {
+      lastInspectionError = error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+  }
+  const inspection = lastInspectionError ? ` Last inspection failed: ${lastInspectionError.message}.` : "";
+  throw new Error(
+    `Deleted entry absence and its new Undo control were not observed in one hierarchy snapshot `
+      + `(identity counts: ${JSON.stringify(lastCounts)}, Undo count: ${lastUndoCount}).${inspection}`,
+  );
+}
+
 function transition(state, event) {
   return transitionUndoCoordination(state, event, Date.now());
 }
@@ -426,18 +468,13 @@ async function runDeleteUndoAcceptance(serial, flowPath, {
   coordination = transition(coordination, "delete-requested");
   const deleteTap = tapNode(serial, deleteNode, waitOptions);
 
-  await waitForEntryVisibleAbsent(serial, identity, {
-    ...waitOptions,
-    timeoutMs: coordinationRemainingMs(coordination),
-  });
-  coordination = transition(coordination, "target-absent");
-
-  const undoNode = await waitForNode(serial, undoMatcher, {
+  const undoNode = await waitForDeletedEntryWithUndo(serial, identity, {
     ...waitOptions,
     timeoutMs: coordinationRemainingMs(coordination),
     pollIntervalMs: waitOptions.undoPollIntervalMs ?? 35,
     dumpTimeoutMs: waitOptions.undoDumpTimeoutMs ?? waitOptions.dumpTimeoutMs,
   });
+  coordination = transition(coordination, "target-absent");
   coordination = transition(coordination, "undo-visible");
   const undoTap = tapNode(serial, undoNode, waitOptions);
   coordination = transition(coordination, "undo-tapped");
@@ -474,6 +511,7 @@ module.exports = {
   waitForEntryAbsent,
   waitForEntryHierarchyGone,
   waitForEntryIdentity,
+  waitForDeletedEntryWithUndo,
   waitForExactEntry,
   waitForRestorationEvidence,
   waitForEntryVisibleAbsent,
