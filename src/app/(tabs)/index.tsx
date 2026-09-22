@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Platform,
   View,
   Pressable,
   RefreshControl,
@@ -7,6 +8,7 @@ import {
   type LayoutChangeEvent,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useFocusEffect } from "expo-router";
 import { FlashList, type FlashListRef } from "@shopify/flash-list";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -50,6 +52,7 @@ import {
 } from "@/hooks/useHomeHeaderCollapse";
 import { haptics } from "@/lib/haptics";
 import { addHomeTabDoublePressListener } from "@/lib/homeTabEvents";
+import { getHomeJumpButtonBottomOffset } from "@/lib/homeOverlayLayout";
 import {
   commitThenRunPostCommitEffects,
   getMoodEntryPersistenceValues,
@@ -73,6 +76,7 @@ function HomeScreenContent() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const insets = useSafeAreaInsets();
+  const tabBarHeight = useBottomTabBarHeight();
 
   const filters = useMoodsStore((state) => state.filters);
   const clearFilters = useMoodsStore((state) => state.clearFilters);
@@ -289,7 +293,11 @@ function HomeScreenContent() {
   const refreshIndicatorOffset = selectorCollapsed
     ? totalCollapsedHeaderHeight
     : totalExpandedHeaderHeight;
-  const jumpButtonBottomOffset = Math.max(insets.bottom, 8) + 76;
+  const jumpButtonBottomOffset = getHomeJumpButtonBottomOffset({
+    platform: Platform.OS,
+    safeAreaBottom: insets.bottom,
+    tabBarHeight,
+  });
   const jumpButtonStyle = useMemo(
     () => ({
       alignItems: "center" as const,
