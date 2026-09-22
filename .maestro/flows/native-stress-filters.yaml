@@ -1,0 +1,99 @@
+appId: com.lab4code.moodinator.qa
+name: Discriminating combined history filters and refresh
+---
+- tapOn: "Home tab, log your mood"
+- tapOn: "Filter history"
+- tapOn: "Clear filters"
+- tapOn: "Last 90 days"
+- tapOn:
+    id: "history-filter-mood-6"
+- scrollUntilVisible:
+    element:
+      id: "history-filter-expand-emotions"
+    direction: DOWN
+- tapOn:
+    id: "history-filter-expand-emotions"
+- scrollUntilVisible:
+    element:
+      id: "history-filter-emotion-Tired"
+    direction: DOWN
+- tapOn:
+    id: "history-filter-emotion-Tired"
+- scrollUntilVisible:
+    element:
+      id: "history-filter-context-Home"
+    direction: DOWN
+- tapOn:
+    id: "history-filter-context-Home"
+- scrollUntilVisible:
+    element:
+      id: "history-filter-note"
+    direction: DOWN
+- tapOn:
+    id: "history-filter-note"
+- inputText: "${FILTER_NOTE}"
+- hideKeyboard
+- tapOn: "Show results"
+- assertVisible:
+    id: "history-count"
+    text: "${FILTER_COUNT} total"
+- assertVisible:
+    id: "mood-entry-note-${FIRST_MATCH_TIMESTAMP}"
+    text: "${FIRST_MATCH_NOTE}"
+- assertNotVisible: "${FIRST_NON_MATCH_NOTE}"
+# Edit a matching row through the supported app journey while the filter is
+# active. Saving makes the collection stale and starts the supported SQL
+# refresh; the changed note makes a cached result observable.
+- tapOn:
+    id: "mood-entry-actions-${FIRST_MATCH_TIMESTAMP}"
+- tapOn: "Edit entry"
+- assertVisible: "(?i)How are you feeling[?]"
+- tapOn: "Next step"
+- tapOn: "Next step"
+- scrollUntilVisible:
+    element:
+      id: "entry-notes"
+    direction: DOWN
+- assertVisible:
+    id: "entry-notes"
+    text: "${FIRST_MATCH_NOTE}"
+- tapOn:
+    id: "entry-notes"
+- eraseText
+- inputText: "${REFRESH_EDIT_NOTE}"
+- hideKeyboard
+- tapOn: "Save entry"
+# The automatically refreshed query must remove the changed row and expose the
+# exact next positive identity/count. There is no assertion against the stale
+# intermediate list, so a correctly fast refresh cannot race this flow.
+- assertVisible:
+    id: "history-count"
+    text: "${REFRESH_FILTER_COUNT} total"
+- assertNotVisible:
+    id: "mood-entry-note-${FIRST_MATCH_TIMESTAMP}"
+- assertVisible:
+    id: "mood-entry-note-${SECOND_MATCH_TIMESTAMP}"
+    text: "${SECOND_MATCH_NOTE}"
+# Clear returns the full fabricated dataset, proving the filter did not merely
+# leave the previous generic note visible.
+- tapOn: "Filter history"
+- tapOn: "Clear filters"
+- tapOn: "Show results"
+- assertVisible:
+    id: "history-count"
+    text: "${TOTAL_COUNT} total"
+- assertVisible:
+    id: "mood-entry-note-${FIRST_NON_MATCH_TIMESTAMP}"
+    text: "${FIRST_NON_MATCH_NOTE}"
+# A no-match query must produce the explicit empty state.
+- tapOn: "Filter history"
+- tapOn:
+    id: "history-filter-note"
+- inputText: "QA no-match 0000"
+- hideKeyboard
+- tapOn: "Show results"
+- assertVisible: "No matching entries"
+- tapOn: "Clear filters"
+- assertVisible:
+    id: "history-count"
+    text: "${TOTAL_COUNT} total"

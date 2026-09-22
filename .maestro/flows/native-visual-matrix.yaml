@@ -1,0 +1,7 @@
+appId: com.lab4code.moodinator.qa
+name: Large-font theme and reduced-motion journey
+---
+- launchApp:
+    clearState: false
+- tapOn: "Home tab, log your mood"
+- assertVisible: "Recent entries"

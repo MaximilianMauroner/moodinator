@@ -77,22 +77,31 @@ Use the separate `com.lab4code.moodinator.qa` app on a disposable emulator. The
 smoke flow clears that app's data at launch. Do not point the flow at the normal
 Moodinator package or a device that holds personal mood data.
 
-1. Run `bun run qa:prepare` from the repository. Use the isolated checkout path
-   printed by that command for the QA build.
-2. Build and install its Android app with `MOODINATOR_VARIANT=qa`. Confirm that
+1. Run `bun run qa:prepare` from the originating checkout. Use the isolated
+   workspace path and prepared source SHA printed by that command for the QA
+   build; the workspace intentionally has no `.git` directory.
+2. Install dependencies, run a clean Android prebuild with
+   `MOODINATOR_VARIANT=qa MOODINATOR_QA_PREPARE_NATIVE=1`, then run
+   `bun run qa:seal-native`. Unset `MOODINATOR_QA_PREPARE_NATIVE`; sealed builds reject
+   that prebuild-only flag. Build and install with `MOODINATOR_VARIANT=qa`. Confirm that
    the installed package is `com.lab4code.moodinator.qa` before continuing.
 3. Install Maestro and Android SDK platform tools. Start one disposable emulator.
-4. Run `bun run qa:smoke -- emulator-5554` with the actual emulator serial. Keep its guard enabled. It checks the emulator and QA
-   package before invoking `.maestro/smoke.yaml`.
+4. Run `bun run qa:smoke -- emulator-5554 --out /tmp/moodinator-native-smoke-current`
+   with the actual emulator serial. The runner first verifies its executing
+   workspace against the sealed prepared manifest, then checks the emulator and QA package before invoking
+   `.maestro/smoke.yaml`.
 5. Record the commit, Android API level, emulator profile, build type, command,
    result, and artifact paths in the task tracker.
 
 On hosts with limited RAM, check available memory before builds, dependency installs
 and emulator launches. Compile before starting the emulator; do not overlap native
 compilation, the emulator and broad test runs. In the disposable checkout, cap Metro
-workers with `config.maxWorkers = 1` and Gradle with `--max-workers=1`; bound JVM and
-Node heaps to fit the available memory. Keep these machine-specific limits out of
-the production app configuration. Stop or reduce an owned workload if memory
+workers with `MOODINATOR_METRO_MAX_WORKERS=1` and Gradle with `--max-workers=1`; bound
+JVM and Node heaps to fit the available memory. Do not edit `metro.config.js` or any
+other tracked file after `qa:prepare`: QA configuration verifies every copied tracked
+file and every sealed generated Android input against the prepared manifest and
+rejects unlisted project inputs. Only dependency, Expo-state, and native build-output
+directories are excluded. Run `qa:prepare` again for a different source tree. Stop or reduce an owned workload if memory
 pressure keeps rising.
 
 Use an installed build that starts directly into the app. If a debug build opens
@@ -104,8 +113,12 @@ flow does not dismiss unexpected screens or skip failed steps.
 The flow checks all four onboarding pages, creates a detailed neutral mood with
 an emotion, energy, and note, restarts the process, and reads the saved fields in
 the edit form. It then updates the note, reopens the form to check it, opens
-and refreshes Insights, and deletes the entry. Undo is verified separately
-through the manual gesture journey below.
+and refreshes Insights, and leaves the action menu open immediately before
+Delete. The smoke runner captures the one exact timestamp/note/rating identity,
+activates Delete from the live hierarchy, proves that identity absent, then
+inspects and taps the transient `undo-delete` control at its current bounds and
+proves the same identity is restored exactly once. The production five-second
+toast duration is not changed.
 
 The flow expects fresh QA data, the default entry fields, and English app text.
 It uses accessibility labels for actions and test IDs for repeated controls.
@@ -141,9 +154,61 @@ Do not substitute disabling networking: the app stores its data locally.
 
 ## Large history and performance
 
-Generate synthetic exports with `bun run qa:fixtures -- 1000 /tmp/moodinator-fixtures-1000.json` and repeat with 10,000 entries. Transfer each
-file to the QA emulator, then import it through the normal Settings import flow.
-Use a fresh QA dataset between sizes. Do not load fixtures into the normal app.
+The stress runner generates relative-time fabricated exports itself, pushes each
+one to the disposable emulator, and imports it through the normal Settings flow.
+The pristine fixture has positive `QA match` records and negative `QA other`
+records; 60 records match the combined 90-day/mood/emotion/context/note filter
+before the boundary edit cycles. Edited notes retain their original fabricated
+text so exact-note indexed lookup remains active; 60 records still match until
+the dedicated refresh mutation removes one. The standalone generator remains
+available for manual setup: `bun run qa:fixtures -- 1000 /tmp/moodinator-fixtures-1000.json` and repeat with 10,000 entries. Use a fresh
+QA dataset between sizes. Do not load fixtures into the normal app.
+
+The repeatable stress runner performs that import through Android's document
+picker, then scrolls to the 51st, 501st, and 951st entries for a 1,000-entry
+fixture. For 10,000 entries it reaches the 51st normally, then uses an exact
+fabricated-note filter as a bounded indexed lookup for the 5,001st and 9,951st
+entries instead of trying to render nearly 10,000 cards inside a 30-second
+Maestro step.
+Each route edits, deletes, and restores the recycled row. It then derives the
+combined 90-day, mood, emotion, context, and note filter from the post-edit
+fixture (60 matching identities for either size). While the filter is active,
+it edits the first matching note so the mutation-triggered refresh must remove that exact
+identity and decrement the count; a cached result fails the flow. The runner
+uses only fabricated data and writes evidence outside the repository:
+
+```bash
+bun run qa:stress -- emulator-5554 --size 1000 --label baseline --runs 2 --out /tmp/moodinator-native-stress-baseline-1000
+bun run qa:stress -- emulator-5554 --size 1000 --label current --runs 2 --out /tmp/moodinator-native-stress-current-1000
+bun run qa:stress -- emulator-5554 --size 10000 --label baseline --runs 2 --out /tmp/moodinator-native-stress-baseline-10000
+bun run qa:stress -- emulator-5554 --size 10000 --label current --runs 2 --out /tmp/moodinator-native-stress-current-10000
+```
+
+Use new empty output directories for each command. Each run records the source
+SHA, a wall-clock-independent SHA-256 workload hash, and a performance-device
+profile. It also records a SHA-256 measurement-protocol hash covering capture
+placement, required metrics, trace configuration, route order, process lifetime,
+and settling rules. The workload hash normalizes timestamps against the fixture's rounded
+anchor and covers the pristine, cycle-edited, and filter-refresh-edited fixture
+payloads plus the import, startup, and fully materialized cycle/filter flows that
+are executed. The profile includes the AVD name and Android system fingerprint, CPU
+ABI/count, total RAM, physical/override resolution and density, configured peak
+refresh, and the active display mode/actual refresh reported by Android. It also
+records `dumpsys gfxinfo` frame counters, repeated `dumpsys meminfo`
+captures, an `atrace` scroll trace when the emulator permits it, and thermal
+snapshots immediately before and after every measured run. The imported app
+process stays alive across all measured cycle and filter flows. Compare
+the baseline/current `summary.json` files only when the normalized workload
+hash, complete performance-device profile, each corresponding run's before/after
+thermal snapshots, measurement-protocol hash, fixture size, and run count match.
+A recreated AVD must not
+be treated as comparable merely because it reused an emulator serial. Their `sourceSha`
+values may differ across revisions, but each summary must match its own
+provenance-bound installed QA binary. A
+failed required memory, gfx, or trace capture produces `status: failed` or
+`blocked` with `acceptance: not-accepted`; optional thermal diagnostics are
+labelled separately. The runner deliberately does not calculate or claim a
+performance improvement.
 
 Use an Android profile or release build for measurements. Record the device,
 build, dataset size, refresh rate, thermal state, and measurement tool. Keep
@@ -180,6 +245,37 @@ On a narrow device and with large text, verify Findings/Charts/Calendar and all
 four ranges remain reachable without overlapping labels. Check both themes and
 reduced motion; capture 30 idle seconds on Charts after transitions settle.
 
+The reproducible visual matrix sets Android font scale to 1.3 and covers light,
+dark, normal-motion, and reduced-motion states. It explicitly writes and reads
+back nonzero animation scales for normal motion, restores the emulator's font
+scale, theme, and animation settings in a `finally` path, and verifies a
+fabricated note plus exact history count before each screenshot. The runner
+generates and retains the complete fixture, imports it with Replace Data, and
+records its SHA-256 before any capture; it does not trust pre-existing app data:
+
+```bash
+bun run qa:matrix -- emulator-5554 --fixture-count 1000 --out /tmp/moodinator-native-matrix-current
+```
+
+The matrix retains one screenshot per state. A successful command proves state
+setup, fixture identity, and capture only; its evidence remains pending visual
+review for clipping/readability, and reduced-motion behavior still needs a live
+manual check. Android timezone travel should be
+run on a fresh fabricated fixture with its recorded `utcOffsetMinutes` and
+verified at UTC plus a second zone. The dedicated journey imports 100 entries,
+travels through UTC and Pacific/Auckland, and compares the row's accessibility
+date/time label:
+
+```bash
+bun run qa:timezone -- emulator-5554 --out /tmp/moodinator-native-timezone-current
+```
+
+It reads the device timezone back after every request and records requested vs
+actual values. It restores the emulator's timezone settings in a `finally`
+path. If the emulator refuses or ignores a timezone, the observation is
+`tested: false`, the evidence is `blocked`/`not-accepted`, and the command exits
+nonzero; it cannot produce `stableRecordedLabel: true`.
+
 On Home, open Filter history and apply note text, mood 7 or worse, an emotion,
 a context and a date range separately, then combine them. Verify empty results,
 Clear filters and a failed refresh after deleting a filtered row. Scroll past two
@@ -202,10 +298,12 @@ checks the insufficient-sample message and the empty driver comparison, and
 returns to Findings. It does not establish populated chart correctness or
 large-history performance; use the fabricated comparisons above for those.
 
-Maestro 2.3.0 on the shared Android emulator can spend longer obtaining an
-accessibility hierarchy than the five-second Undo toast stays visible. Shorter
-settle waits and disabling system animations did not resolve this. The automated
-smoke checks persistent entry state and deletion; verify Undo separately by
-promptly tapping the visible button and checking the restored record. Do not
-extend the production toast lifetime or use fixed screen coordinates in the
-reusable smoke merely to accommodate this driver limitation.
+The Undo probe begins only after the final Maestro flow has completed at the
+open action menu. The runner captures an exact timestamp-based row/note/rating
+identity, clears any prior Undo control, taps Delete from the inspected bounds,
+waits for exact identity absence, and only then polls the five-second transient
+control. It uses `adb shell uiautomator dump --compressed /dev/tty`, matches
+stable resource IDs (with the existing accessibility label as a fallback), and
+derives every tap point from current bounds. Disabled/invisible controls,
+hierarchy failure, or a late control fail the evidence; no production toast
+duration is changed.

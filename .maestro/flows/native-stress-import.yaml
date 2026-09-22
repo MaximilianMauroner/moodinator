@@ -1,0 +1,13 @@
+appId: com.lab4code.moodinator.qa
+name: Import a fabricated native stress fixture
+---
+- launchApp:
+    clearState: true
+- runFlow: onboarding.yaml
+- tapOn: "Settings tab, customize app preferences"
+- scrollUntilVisible:
+    element:
+      text: "Data & Backups"
+    direction: DOWN
+- tapOn: "Data & Backups settings"
+- tapOn: "Import Data"

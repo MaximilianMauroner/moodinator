@@ -32,6 +32,7 @@ export function HistoryListHeader({ moodCount }: HistoryListHeaderProps) {
           style={{ backgroundColor: isDark ? colors.primaryBg.dark : colors.primaryBg.light }}
         >
           <Text
+            testID="history-count"
             className="text-xs font-medium"
             style={{ color: isDark ? colors.positive.text.dark : colors.positive.text.light }}
           >

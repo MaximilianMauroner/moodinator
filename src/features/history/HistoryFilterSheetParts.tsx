@@ -82,18 +82,21 @@ export function ChoiceChip({
   accessibilityLabel,
   palette,
   onPress,
+  testID,
 }: {
   label: string;
   selected: boolean;
   accessibilityLabel: string;
   palette: FilterPalette;
   onPress: () => void;
+  testID?: string;
 }) {
   return (
     <Pressable
       accessibilityRole="checkbox"
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ checked: selected }}
+      testID={testID}
       hitSlop={CHIP_HIT_SLOP}
       onPress={onPress}
       className="justify-center rounded-full px-3"
@@ -148,6 +151,7 @@ export function CollapsibleChoices({
           label={name}
           selected={selected.includes(name)}
           accessibilityLabel={`${label}: ${name}`}
+          testID={`history-filter-${label === "Emotions" ? "emotion" : "context"}-${name.replace(/[^a-zA-Z0-9_-]/g, "-")}`}
           palette={palette}
           onPress={() => onToggle(name)}
         />
@@ -160,6 +164,7 @@ export function CollapsibleChoices({
               ? `Show fewer ${label.toLowerCase()}`
               : `Show all ${choices.length} ${label.toLowerCase()}`
           }
+          testID={`history-filter-expand-${label.toLowerCase()}`}
           hitSlop={CHIP_HIT_SLOP}
           onPress={() => setExpanded((current) => !current)}
           className="justify-center rounded-full px-3"
@@ -206,6 +211,7 @@ export function MoodRangeRow({
             accessibilityRole="button"
             accessibilityLabel={`Mood ${value}, ${moodLabel(value)}`}
             accessibilityState={{ selected: inRange }}
+            testID={`history-filter-mood-${value}`}
             onPress={() => onPick(value)}
             className="flex-1 items-center justify-center gap-1"
             style={{

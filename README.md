@@ -103,23 +103,31 @@ locally so the command does not download a different checker on each run.
 ### Isolated native verification
 
 ```bash
-bun run qa:prepare
-# In the printed temporary workspace:
+QA_WORKSPACE="$(bun run qa:prepare | tee /dev/stderr | sed -n 's/^QA workspace: //p')"
+cd "$QA_WORKSPACE"
 bun install --frozen-lockfile
+MOODINATOR_VARIANT=qa MOODINATOR_QA_PREPARE_NATIVE=1 bunx expo prebuild --platform android --clean
+bun run qa:seal-native
 MOODINATOR_VARIANT=qa bunx expo run:android --variant release --device
-bun run qa:smoke -- emulator-5554
+bun run qa:smoke -- emulator-5554 --out /tmp/moodinator-native-smoke-current
 ```
 
-`qa:prepare` copies current tracked files and relevant new source/test files,
-including uncommitted edits, into a temporary directory. It excludes native
+`qa:prepare` requires a clean checkout, then materializes committed `HEAD` files for the
+printed source SHA into a temporary directory. It excludes native
 build folders, dependencies, credentials and personal scratch files. It does
-not install or launch anything. Use one disposable emulator per concurrent run.
+not install or launch anything. The clean prebuild and `qa:seal-native` steps bind
+generated Android inputs to that SHA; later source additions or native-source edits
+fail closed, while dependency directories and native build outputs remain excluded.
+Unset `MOODINATOR_QA_PREPARE_NATIVE` after sealing; sealed builds reject the prebuild-only flag.
+Use one disposable emulator per concurrent run.
 The release QA build embeds its bundle and does not need a shared Metro port.
 After collecting evidence, remove that temporary workspace and disposable AVD.
 
 The QA app uses `com.lab4code.moodinator.qa` and separate local storage. The smoke
 runner accepts an explicit emulator serial and checks that package before
-running a flow which clears QA data. See [Native QA](docs/native-qa.md) for
+running a flow which clears QA data. Native evidence commands validate the
+executing workspace's sealed prepared manifest and fail closed if it is missing,
+unsealed, or no longer matches its files. See [Native QA](docs/native-qa.md) for
 coverage, fixture generation, manual checks and performance captures.
 
 ### Versions and builds

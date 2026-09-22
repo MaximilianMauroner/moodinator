@@ -191,6 +191,27 @@ describe("useInsightsData hook", () => {
     expect(result.analysisMoods).toEqual([]);
   });
 
+  it("does not report a changed range ready until that range request completes", async () => {
+    useMoodsStore.getState().setLocal([createMockMoodEntry()]);
+    await mount();
+    expect(result.ready).toBe(true);
+
+    let resolveAll!: (value: ReturnType<typeof createMockMoodEntry>[]) => void;
+    vi.mocked(moodService.getInRange).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveAll = resolve;
+        }),
+    );
+    act(() => result.setAnalysisRange("all"));
+
+    expect(result.analysisRange).toBe("all");
+    expect(result.ready).toBe(false);
+
+    await act(async () => resolveAll([createMockMoodEntry()]));
+    expect(result.ready).toBe(true);
+  });
+
   it("includes entries on their recorded day across a device midnight", async () => {
     const data = createMockMoodEntry({
       timestamp: Date.parse("2026-09-07T01:00:00Z"),

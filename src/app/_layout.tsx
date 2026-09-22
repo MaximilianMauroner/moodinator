@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { View, Text, AppState, AppStateStatus, ActivityIndicator, Pressable } from "react-native";
 import { Stack, useNavigationContainerRef, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import Constants from "expo-constants";
 import { Ionicons } from "@expo/vector-icons";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { registerBackgroundBackupTask } from "@db/backgroundBackup";
@@ -163,6 +164,15 @@ export default function Layout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <StatusBar style={isDark ? "light" : "dark"} />
       <View className="flex-1 bg-paper-100 dark:bg-paper-900">
+        {typeof Constants.expoConfig?.extra?.qaSourceSha === "string" && (
+          <Text
+            testID={`qa-source-sha-${Constants.expoConfig.extra.qaSourceSha}`}
+            accessibilityLabel={`QA source ${Constants.expoConfig.extra.qaSourceSha}`}
+            className="absolute h-px w-px text-transparent"
+          >
+            QA source
+          </Text>
+        )}
         <View
           className="flex-1"
           style={blocksNavigator ? { display: "none" } : undefined}

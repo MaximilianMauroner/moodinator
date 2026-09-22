@@ -4,6 +4,20 @@ const path = require("path");
 
 const config = getDefaultConfig(__dirname);
 
+if (process.env.MOODINATOR_METRO_MAX_WORKERS !== undefined) {
+  const maxWorkers = Number(process.env.MOODINATOR_METRO_MAX_WORKERS);
+  if (!Number.isSafeInteger(maxWorkers) || maxWorkers < 1) {
+    throw new Error("MOODINATOR_METRO_MAX_WORKERS must be a positive integer");
+  }
+  config.maxWorkers = maxWorkers;
+}
+
+const isIosQaConfig =
+  process.env.EAS_BUILD_PLATFORM === "ios" || process.env.EXPO_OS === "ios";
+if (process.env.MOODINATOR_VARIANT === "qa" && !isIosQaConfig) {
+  require("./scripts/qa-source-provenance").readPreparedSourceSha(__dirname, process.env);
+}
+
 config.resolver.assetExts = Array.from(
   new Set([...(config.resolver.assetExts ?? []), "wasm"])
 );

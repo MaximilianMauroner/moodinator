@@ -1,0 +1,817 @@
+const { execFileSync } = require("node:child_process");
+const { createHash } = require("node:crypto");
+const {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  writeFileSync,
+} = require("node:fs");
+const { tmpdir } = require("node:os");
+const path = require("node:path");
+
+const {
+  applyFixtureNoteEdits,
+  applyNativeStressEditMutations,
+  combinedFilterExpectation,
+  createQaFixture,
+  fixtureIdentity,
+  nativeStressEditNote,
+} = require("./generate-qa-fixtures");
+const {
+  assertInstalledQaBuild,
+  evidenceAcceptance,
+  evidenceStatus,
+  isToolUnavailable,
+  requirePreparedSourceSha,
+} = require("./native-qa-common");
+const {
+  parseGfxInfo,
+  parseMemInfo,
+  runAdb,
+  waitForNode,
+  waitForNodeAndTap,
+  waitForNodeHierarchyGone,
+} = require("./native-ui");
+const { runDeleteUndoAcceptance, runMaestro } = require("./native-qa-runner");
+
+const appId = "com.lab4code.moodinator.qa";
+const root = path.resolve(__dirname, "..");
+const importFlow = path.join(root, ".maestro/flows/native-stress-import.yaml");
+const measuredStartFlow = path.join(root, ".maestro/flows/native-stress-start.yaml");
+const cycleTemplatePath = path.join(root, ".maestro/flows/native-stress-cycle.yaml");
+const filterTemplatePath = path.join(root, ".maestro/flows/native-stress-filters.yaml");
+
+// Comparison data: update this when capture placement, required metrics, trace
+// configuration, or settling rules change.
+const measurementProtocol = Object.freeze({
+  version: 1,
+  import: { resetDatasetBeforeEachRun: true, settleOnHistoryCountMs: 30000 },
+  processLifetime: "one app process per measured run; no relaunch between measured routes",
+  trace: { tool: "atrace", bufferKb: 8192, categories: ["gfx", "view", "sched", "freq"] },
+  memory: { tool: "dumpsys meminfo", captures: ["before routes", "after each boundary route", "after all routes"] },
+  frames: { tool: "dumpsys gfxinfo", reset: "immediately before routes", capture: "after all routes" },
+  thermal: { tool: "dumpsys thermalservice", captures: ["immediately before routes", "immediately after routes"] },
+  routeOrder: ["boundary edit/delete/undo routes", "combined-filter refresh route"],
+  requiredEvidence: ["memory", "gfx reset and positive frame count", "non-empty scroll trace"],
+});
+
+function measurementProtocolHash(protocol = measurementProtocol) {
+  return createHash("sha256").update(JSON.stringify(protocol)).digest("hex");
+}
+
+function parseOptions(argv) {
+  const serial = argv.shift();
+  if (!serial || !/^emulator-\d+$/.test(serial)) {
+    throw new Error("The first argument must be a disposable emulator serial such as emulator-5554.");
+  }
+
+  const options = {
+    serial,
+    size: null,
+    label: null,
+    runs: 2,
+    output: null,
+  };
+
+  while (argv.length) {
+    const flag = argv.shift();
+    const value = argv.shift();
+    if (!value) throw new Error(`Missing value for ${flag}.`);
+
+    switch (flag) {
+      case "--size":
+        options.size = Number(value);
+        break;
+      case "--label":
+        options.label = value;
+        break;
+      case "--runs":
+        options.runs = Number(value);
+        break;
+      case "--out":
+        options.output = value;
+        break;
+      default:
+        throw new Error(`Unknown option ${flag}.`);
+    }
+  }
+
+  if (![1000, 10000].includes(options.size)) throw new Error("--size must be 1000 or 10000.");
+  if (!options.label || !/^[\w.-]+$/.test(options.label)) {
+    throw new Error("--label must contain only letters, numbers, dot, dash, or underscore.");
+  }
+  if (!Number.isInteger(options.runs) || options.runs < 1 || options.runs > 5) {
+    throw new Error("--runs must be an integer from 1 to 5.");
+  }
+
+  return options;
+}
+
+function captureText(serial, args, outputPath, {
+  timeoutMs = 30000,
+  maxBuffer,
+  required = false,
+  runAdbImpl = runAdb,
+  label = args.join(" "),
+} = {}) {
+  try {
+    const output = runAdbImpl(serial, args, { timeoutMs, maxBuffer });
+    writeFileSync(outputPath, output);
+    return { output, ok: true, required, label };
+  } catch (error) {
+    const output = `COMMAND: adb -s ${serial} ${args.join(" ")}\nERROR: ${error.message}\n`;
+    writeFileSync(outputPath, output);
+    return { output, ok: false, required, label, error: error.message };
+  }
+}
+
+function captureJson(outputDirectory, name, value) {
+  writeFileSync(path.join(outputDirectory, name), `${JSON.stringify(value, null, 2)}\n`);
+}
+
+function prepareEvidenceDirectory(outputDirectory) {
+  if (existsSync(outputDirectory)) {
+    if (!statSync(outputDirectory).isDirectory()) {
+      throw new Error(`Native stress evidence output already exists and is not a directory: ${outputDirectory}`);
+    }
+    if (readdirSync(outputDirectory).length > 0) {
+      throw new Error(`Native stress evidence output must be empty: ${outputDirectory}`);
+    }
+    return;
+  }
+  mkdirSync(outputDirectory, { recursive: true });
+}
+
+function renderCycle(template, identity, { indexedLookup = false } = {}) {
+  const targetSetup = indexedLookup ? `- tapOn: "Filter history"
+- tapOn: "Clear filters"
+- scrollUntilVisible:
+    element:
+      id: "history-filter-note"
+    direction: DOWN
+- tapOn:
+    id: "history-filter-note"
+- inputText: "${identity.originalNote}"
+- hideKeyboard
+- tapOn: "Show results"` : "";
+  return template
+    .replaceAll("${TARGET_SETUP}", targetSetup)
+    .replaceAll("${ENTRY_ID}", String(identity.entryIndex))
+    .replaceAll("${ENTRY_TIMESTAMP}", String(identity.timestamp))
+    .replaceAll("${ORIGINAL_NOTE}", identity.originalNote)
+    .replaceAll("${EDITED_NOTE}", identity.note);
+}
+
+function materializeCycle(outputDirectory, identity, runNumber, { indexedLookup = false } = {}) {
+  const flow = renderCycle(readFileSync(cycleTemplatePath, "utf8"), identity, { indexedLookup });
+  const flowPath = path.join(outputDirectory, `run-${runNumber}-cycle-${identity.entryIndex}.yaml`);
+  writeFileSync(flowPath, flow);
+  return flowPath;
+}
+
+function prepareFilterRoute(entries, size, referenceNow, template = readFileSync(filterTemplatePath, "utf8")) {
+  const editedEntries = applyNativeStressEditMutations(entries, pageBoundaryIds(size));
+  const expectation = combinedFilterExpectation(editedEntries, { now: referenceNow });
+  const firstMatchIndex = expectation.matchingEntryIndexes[0];
+  const secondMatchIndex = expectation.matchingEntryIndexes[1];
+  if (!firstMatchIndex || !secondMatchIndex) {
+    throw new Error("The stress fixture must provide at least two matching identities after edit cycles.");
+  }
+  const firstMatch = fixtureIdentity(editedEntries, firstMatchIndex);
+  const secondMatch = fixtureIdentity(editedEntries, secondMatchIndex);
+  const firstNonMatch = fixtureIdentity(editedEntries, 2);
+  const refreshNote = `QA refresh edit ${String(firstMatchIndex).padStart(4, "0")}`;
+  const refreshedEntries = applyFixtureNoteEdits(editedEntries, [
+    { entryIndex: firstMatchIndex, note: refreshNote },
+  ]);
+  const refreshedExpectation = combinedFilterExpectation(refreshedEntries, { now: referenceNow });
+  const flow = template
+    .replaceAll("${FILTER_NOTE}", expectation.text)
+    .replaceAll("${FILTER_COUNT}", String(expectation.count))
+    .replaceAll("${REFRESH_FILTER_COUNT}", String(refreshedExpectation.count))
+    .replaceAll("${TOTAL_COUNT}", String(size))
+    .replaceAll("${FIRST_MATCH_TIMESTAMP}", String(firstMatch.timestamp))
+    .replaceAll("${FIRST_MATCH_NOTE}", firstMatch.note)
+    .replaceAll("${SECOND_MATCH_TIMESTAMP}", String(secondMatch.timestamp))
+    .replaceAll("${SECOND_MATCH_NOTE}", secondMatch.note)
+    .replaceAll("${FIRST_NON_MATCH_TIMESTAMP}", String(firstNonMatch.timestamp))
+    .replaceAll("${FIRST_NON_MATCH_NOTE}", firstNonMatch.note)
+    .replaceAll("${REFRESH_EDIT_NOTE}", refreshNote);
+  return {
+    flow,
+    expectation,
+    refreshedExpectation,
+    editedEntries,
+    firstMatch,
+    secondMatch,
+    firstNonMatch,
+    refreshMutation: { entryIndex: firstMatchIndex, note: refreshNote },
+  };
+}
+
+function materializeFilter(outputDirectory, entries, size, referenceNow) {
+  const route = prepareFilterRoute(entries, size, referenceNow);
+  const flowPath = path.join(outputDirectory, "native-stress-filters-materialized.yaml");
+  writeFileSync(flowPath, route.flow);
+  return { ...route, flowPath };
+}
+
+function importCompletionTimeoutMs(size) {
+  if (size === 1000) return 120000;
+  if (size === 10000) return 600000;
+  throw new Error(`Unsupported stress fixture size: ${size}.`);
+}
+
+async function importFixture(serial, fixtureName, size) {
+  await runMaestro(serial, importFlow, { cwd: root });
+
+  try {
+    await waitForNodeAndTap(serial, { text: fixtureName }, { timeoutMs: 3500 });
+  } catch (error) {
+    await waitForNodeAndTap(serial, { text: "Downloads", contains: true }, { timeoutMs: 2500 });
+    await waitForNodeAndTap(serial, { text: fixtureName }, { timeoutMs: 5000 });
+  }
+
+  await waitForNodeAndTap(serial, { text: "Replace Data" }, { timeoutMs: 5000 });
+  await waitForNode(serial, { text: "Import Successful", contains: true }, {
+    timeoutMs: importCompletionTimeoutMs(size),
+  });
+  await waitForNodeAndTap(serial, { text: "OK" }, { timeoutMs: 5000 });
+}
+
+async function settleImportedHistory(serial, expectedCount) {
+  await waitForNodeAndTap(serial, { contentDescription: "Home tab, log your mood" }, { timeoutMs: 5000 });
+  await waitForNode(serial, {
+    allOf: [
+      { testId: "history-count" },
+      { text: `${expectedCount} total` },
+    ],
+  }, { timeoutMs: 30000 });
+}
+
+function startTrace(serial, {
+  runAdbImpl = runAdb,
+  timeoutMs = 5000,
+} = {}) {
+  try {
+    runAdbImpl(serial, ["shell", "atrace", "--async_start", "-b", "8192", "gfx", "view", "sched", "freq"], {
+      timeoutMs,
+    });
+    return { status: "started", available: true };
+  } catch (error) {
+    return {
+      status: isToolUnavailable(error) ? "blocked" : "failed",
+      available: false,
+      error: error.message,
+    };
+  }
+}
+
+function stopTrace(serial, outputPath, traceState, {
+  capture = captureText,
+} = {}) {
+  if (!traceState || traceState.status !== "started") {
+    const error = traceState?.error ?? "atrace did not start";
+    writeFileSync(outputPath, `TRACE NOT CAPTURED: ${error}\n`);
+    return {
+      ok: false,
+      status: traceState?.status === "failed" ? "failed" : "blocked",
+      error,
+      output: "",
+    };
+  }
+
+  const result = capture(serial, ["shell", "atrace", "--async_stop"], outputPath, {
+    required: true,
+    label: "atrace finalization",
+    maxBuffer: 32 * 1024 * 1024,
+  });
+  if (!result.ok) {
+    return {
+      ...result,
+      status: isToolUnavailable(result.error) ? "blocked" : "failed",
+    };
+  }
+  const entriesMatch = result.output.match(/entries-in-buffer\/entries-written:\s*(\d+)\s*\/\s*(\d+)/i);
+  const hasEvents = entriesMatch
+    ? Number(entriesMatch[1]) > 0
+    : result.output.split("\n").some((line) => /^\s*\S.+?\s+\(\s*\d+\)\s+\[\d+\].*?:\s+\S/.test(line));
+  if (!hasEvents) {
+    return {
+      ...result,
+      ok: false,
+      status: "failed",
+      error: "atrace --async_stop returned no trace events.",
+    };
+  }
+  return { ...result, status: "captured" };
+}
+
+function missingMetricFields(value, fields) {
+  return fields.filter((field) => {
+    const metric = value?.[field];
+    return metric === null || metric === undefined || (typeof metric === "number" && Number.isNaN(metric));
+  });
+}
+
+function summarizeRunEvidence({
+  run,
+  routeError = null,
+  beforeMemory,
+  boundaryMemory = [],
+  afterMemory,
+  gfxReset,
+  gfx,
+  trace,
+  thermalBefore,
+  thermalAfter,
+}) {
+  const requiredFailures = [];
+  const checkCapture = (label, capture, parsed, fields) => {
+    if (!capture?.ok) {
+      requiredFailures.push({
+        label,
+        status: isToolUnavailable(capture?.error) ? "blocked" : "failed",
+        error: capture?.error ?? "capture did not run",
+      });
+      return;
+    }
+    const missing = missingMetricFields(parsed, fields);
+    if (missing.length) requiredFailures.push({ label, status: "failed", error: `Missing metrics: ${missing.join(", ")}` });
+  };
+
+  checkCapture("memory before", beforeMemory, parseMemInfo(beforeMemory?.output ?? ""), ["totalPssKb"]);
+  boundaryMemory.forEach(({ entryId, capture }) => {
+    checkCapture(`memory after entry ${entryId}`, capture, parseMemInfo(capture?.output ?? ""), ["totalPssKb"]);
+  });
+  checkCapture("memory after", afterMemory, parseMemInfo(afterMemory?.output ?? ""), ["totalPssKb"]);
+  if (!gfxReset?.ok) {
+    requiredFailures.push({
+      label: "gfxinfo reset",
+      status: isToolUnavailable(gfxReset?.error) ? "blocked" : "failed",
+      error: gfxReset?.error ?? "capture did not run",
+    });
+  }
+  const parsedGfx = parseGfxInfo(gfx?.output ?? "");
+  checkCapture("gfxinfo", gfx, parsedGfx, ["totalFrames", "jankyFrames"]);
+  if (gfx?.ok && !missingMetricFields(parsedGfx, ["totalFrames", "jankyFrames"]).length
+      && parsedGfx.totalFrames <= 0) {
+    requiredFailures.push({
+      label: "gfxinfo",
+      status: "failed",
+      error: "Total frames rendered must be greater than zero.",
+    });
+  }
+  if (!trace?.ok) requiredFailures.push({
+    label: "scroll trace",
+    status: trace?.status === "blocked" ? "blocked" : "failed",
+    error: trace?.error ?? "trace was not finalized",
+  });
+
+  const status = evidenceStatus({ routeError, requiredFailures });
+  return {
+    run,
+    status,
+    acceptance: evidenceAcceptance(status),
+    routeError: routeError?.message ?? null,
+    trace: {
+      status: trace?.status ?? "not-run",
+      captured: trace?.status === "captured",
+      error: trace?.error ?? null,
+    },
+    thermal: {
+      before: { ok: Boolean(thermalBefore?.ok), error: thermalBefore?.error ?? null, snapshot: thermalBefore?.output?.trim() ?? "" },
+      after: { ok: Boolean(thermalAfter?.ok), error: thermalAfter?.error ?? null, snapshot: thermalAfter?.output?.trim() ?? "" },
+    },
+    memoryBefore: parseMemInfo(beforeMemory?.output ?? ""),
+    memoryAfter: parseMemInfo(afterMemory?.output ?? ""),
+    memoryAfterBoundaries: boundaryMemory.map(({ entryId, capture }) => ({
+      entryId,
+      metrics: parseMemInfo(capture?.output ?? ""),
+    })),
+    frames: parseGfxInfo(gfx?.output ?? ""),
+    memoryCaptureSucceeded: Boolean(beforeMemory?.ok && afterMemory?.ok && boundaryMemory.every(({ capture }) => capture.ok)),
+    gfxCaptureSucceeded: Boolean(gfxReset?.ok && gfx?.ok),
+    requiredEvidenceFailures: requiredFailures,
+  };
+}
+
+function normalizeFixtureTimestamps(entries, fixtureAnchor) {
+  return entries.map((entry) => ({
+    ...entry,
+    timestampOffsetMs: entry.timestamp - fixtureAnchor,
+    timestamp: undefined,
+  }));
+}
+
+function normalizeFlowTimestamps(flow, entries, fixtureAnchor) {
+  return entries.reduce(
+    (normalized, entry) => normalized.replaceAll(
+      String(entry.timestamp),
+      `FIXTURE_TIMESTAMP_OFFSET_${entry.timestamp - fixtureAnchor}`,
+    ),
+    flow,
+  );
+}
+
+function normalizedWorkloadManifest(entries, referenceNow, editIndexes, routeDefinitions = {}) {
+  const fixtureAnchor = entries[0]?.timestamp;
+  if (!Number.isFinite(fixtureAnchor)) throw new Error("Stress fixture must have a timestamped anchor entry.");
+  const editedEntries = applyNativeStressEditMutations(entries, editIndexes);
+  const cycleTemplate = routeDefinitions.cycleTemplate ?? readFileSync(cycleTemplatePath, "utf8");
+  const filterTemplate = routeDefinitions.filterTemplate ?? readFileSync(filterTemplatePath, "utf8");
+  const filterRoute = prepareFilterRoute(entries, entries.length, referenceNow, filterTemplate);
+  const refreshedEntries = applyFixtureNoteEdits(editedEntries, [filterRoute.refreshMutation]);
+  return {
+    version: 2,
+    fixture: normalizeFixtureTimestamps(entries, fixtureAnchor),
+    mutatedFixture: normalizeFixtureTimestamps(editedEntries, fixtureAnchor),
+    refreshedFixture: normalizeFixtureTimestamps(refreshedEntries, fixtureAnchor),
+    pageBoundaryIds: editIndexes,
+    editMutations: editIndexes.map((entryIndex) => ({
+      entryIndex,
+      note: nativeStressEditNote(entryIndex, entries[entryIndex - 1]?.note),
+    })),
+    refreshMutation: filterRoute.refreshMutation,
+    combinedFilter: filterRoute.expectation,
+    executedRoutes: {
+      import: routeDefinitions.importFlow ?? readFileSync(importFlow, "utf8"),
+      measuredStart: routeDefinitions.measuredStartFlow ?? readFileSync(measuredStartFlow, "utf8"),
+      cycles: editIndexes.map((entryIndex) => normalizeFlowTimestamps(
+        renderCycle(
+          cycleTemplate,
+          fixtureIdentity(entries, entryIndex, {
+            editedNote: nativeStressEditNote(entryIndex, entries[entryIndex - 1]?.note),
+          }),
+          { indexedLookup: entryIndex > 51 },
+        ),
+        entries,
+        fixtureAnchor,
+      )),
+      filters: normalizeFlowTimestamps(filterRoute.flow, entries, fixtureAnchor),
+    },
+  };
+}
+
+function normalizedWorkloadHash(entries, referenceNow, editIndexes, routeDefinitions) {
+  return createHash("sha256")
+    .update(JSON.stringify(normalizedWorkloadManifest(entries, referenceNow, editIndexes, routeDefinitions)))
+    .digest("hex");
+}
+
+function baseMetadata(options, sourceSha, entries, fixturePath, outputDirectory, referenceNow) {
+  const editIndexes = pageBoundaryIds(options.size);
+  const editedEntries = applyNativeStressEditMutations(entries, editIndexes);
+  const filter = combinedFilterExpectation(editedEntries, { now: referenceNow });
+  return {
+    appId,
+    label: options.label,
+    datasetSize: options.size,
+    runCount: options.runs,
+    pageBoundaryIds: pageBoundaryIds(options.size),
+    sourceSha,
+    installedSourceSha: sourceSha,
+    fixtureReferenceNow: referenceNow,
+    workloadHash: normalizedWorkloadHash(entries, referenceNow, editIndexes),
+    measurementProtocol,
+    measurementProtocolHash: measurementProtocolHash(),
+    command: `bun run qa:stress -- ${options.serial} --size ${options.size} --label ${options.label} --runs ${options.runs} --out ${outputDirectory}`,
+    fabricatedFixture: fixturePath,
+    fabricatedDataOnly: true,
+    fabricatedDataProof: {
+      entryCount: entries.length,
+      combinedFilter: filter,
+      editMutations: editIndexes.map((entryIndex) => ({
+        entryIndex,
+        note: nativeStressEditNote(entryIndex, entries[entryIndex - 1].note),
+      })),
+      firstMatchNote: editedEntries[filter.matchingEntryIndexes[0] - 1]?.note ?? null,
+      firstNonMatchNote: editedEntries[1]?.note ?? null,
+    },
+    measurementPolicy: "Comparable evidence only; no performance improvement is inferred by this runner.",
+  };
+}
+
+function parseDeviceProfile(captures) {
+  const memTotalKb = Number(captures.meminfo.match(/^MemTotal:\s+(\d+)\s+kB$/m)?.[1]);
+  const cpuCount = Number(captures.cpuCount.trim());
+  if (!Number.isInteger(cpuCount) || cpuCount < 1 || !Number.isFinite(memTotalKb)) {
+    throw new Error("Could not determine emulator CPU count and total RAM.");
+  }
+  const required = ["avdName", "systemFingerprint", "cpuAbiList", "displaySize", "displayDensity", "displayState"];
+  for (const field of required) {
+    if (!captures[field]?.trim()) throw new Error(`Could not determine device ${field}.`);
+  }
+  return {
+    avdName: captures.avdName.trim(),
+    systemFingerprint: captures.systemFingerprint.trim(),
+    cpuAbiList: captures.cpuAbiList.trim(),
+    cpuCount,
+    memTotalKb,
+    displaySize: captures.displaySize.trim().replace(/\r/g, ""),
+    displayDensity: captures.displayDensity.trim().replace(/\r/g, ""),
+    displayState: captures.displayState.trim().replace(/\r/g, ""),
+  };
+}
+
+function normalizeDisplayState(displayDump) {
+  return displayDump
+    .replace(/\r/g, "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => /mActiveModeId|DisplayMode|refreshRate|\bfps\b/i.test(line))
+    .join("\n");
+}
+
+function captureDeviceProfile(serial, runAdbImpl = runAdb) {
+  const shell = (...args) => runAdbImpl(serial, ["shell", ...args]).trim();
+  const displayDump = shell("dumpsys", "display");
+  return parseDeviceProfile({
+    avdName: shell("getprop", "ro.kernel.qemu.avd_name"),
+    systemFingerprint: shell("getprop", "ro.build.fingerprint"),
+    cpuAbiList: shell("getprop", "ro.product.cpu.abilist"),
+    cpuCount: shell("nproc"),
+    meminfo: shell("cat", "/proc/meminfo"),
+    displaySize: shell("wm", "size"),
+    displayDensity: shell("wm", "density"),
+    displayState: normalizeDisplayState(displayDump),
+  });
+}
+
+function pageBoundaryIds(size) {
+  if (size === 1000) return [51, 501, 951];
+  if (size === 10000) return [51, 5001, 9951];
+  throw new Error(`Unsupported stress fixture size: ${size}.`);
+}
+
+function validateStressComparison(baseline, current) {
+  for (const [label, summary] of [["baseline", baseline], ["current", current]]) {
+    if (!summary?.sourceSha || summary.sourceSha !== summary.installedSourceSha) {
+      throw new Error(`${label} source SHA does not match its installed QA binary.`);
+    }
+    if (summary.status !== "passed" || summary.acceptance !== "accepted") {
+      throw new Error(`${label} stress summary is not accepted.`);
+    }
+    if (!Number.isInteger(summary.runCount) || summary.runs?.length !== summary.runCount
+        || summary.runs.some((run) => run.status !== "passed" || run.acceptance !== "accepted")) {
+      throw new Error(`${label} stress summary does not contain ${summary.runCount} accepted runs.`);
+    }
+    if (!/^[a-f0-9]{64}$/.test(summary.workloadHash ?? "")) {
+      throw new Error(`${label} stress summary does not contain a normalized workload hash.`);
+    }
+    if (!/^[a-f0-9]{64}$/.test(summary.measurementProtocolHash ?? "")
+        || summary.measurementProtocolHash !== measurementProtocolHash(summary.measurementProtocol)) {
+      throw new Error(`${label} stress summary does not contain a valid measurement protocol hash.`);
+    }
+    for (const field of ["serial", "api", "model", "refreshRate", "avdName", "systemFingerprint", "cpuAbiList", "cpuCount", "memTotalKb", "displaySize", "displayDensity", "displayState"]) {
+      if (summary.device?.[field] === undefined || summary.device[field] === null || summary.device[field] === "") {
+        throw new Error(`${label} stress summary does not contain device ${field}.`);
+      }
+    }
+  }
+  for (const field of ["datasetSize", "runCount", "workloadHash", "measurementProtocolHash"]) {
+    if (baseline[field] !== current[field]) throw new Error(`Stress comparison requires equal ${field}.`);
+  }
+  for (const field of ["serial", "api", "model", "refreshRate", "avdName", "systemFingerprint", "cpuAbiList", "cpuCount", "memTotalKb", "displaySize", "displayDensity", "displayState"]) {
+    if (baseline.device?.[field] !== current.device?.[field]) throw new Error(`Stress comparison requires equal device ${field}.`);
+  }
+  for (let index = 0; index < baseline.runCount; index++) {
+    const baselineThermal = baseline.runs?.[index]?.thermal;
+    const currentThermal = current.runs?.[index]?.thermal;
+    if (!baselineThermal?.before?.ok || !baselineThermal?.after?.ok
+        || !currentThermal?.before?.ok || !currentThermal?.after?.ok
+        || baselineThermal.before?.snapshot !== currentThermal.before?.snapshot
+        || baselineThermal.after?.snapshot !== currentThermal.after?.snapshot) {
+      throw new Error(`Stress comparison requires equal per-run thermal conditions for run ${index + 1}.`);
+    }
+  }
+  return { baselineSourceSha: baseline.sourceSha, currentSourceSha: current.sourceSha };
+}
+
+async function main(argv = process.argv.slice(2)) {
+  const sourceSha = requirePreparedSourceSha(root);
+  const options = parseOptions(argv);
+  const outputDirectory = options.output
+    ? path.resolve(options.output)
+    : mkdtempSync(path.join(tmpdir(), `moodinator-native-stress-${options.label}-${options.size}-`));
+  prepareEvidenceDirectory(outputDirectory);
+
+  const fixtureReferenceNow = Date.now();
+  const entries = createQaFixture(options.size, { now: fixtureReferenceNow });
+  const fixtureName = `moodinator-qa-${options.size}.json`;
+  const fixturePath = path.join(outputDirectory, fixtureName);
+  const metadata = baseMetadata(options, sourceSha, entries, fixturePath, outputDirectory, fixtureReferenceNow);
+  captureJson(outputDirectory, "metadata.json", metadata);
+  const runSummaries = [];
+  let finalStatus = null;
+
+  try {
+    await assertInstalledQaBuild(options.serial, sourceSha);
+    writeFileSync(fixturePath, JSON.stringify(entries), { flag: "wx" });
+    runAdb(options.serial, ["push", fixturePath, `/sdcard/Download/${fixtureName}`], { timeoutMs: 120000 });
+
+    const device = {
+      serial: options.serial,
+      api: runAdb(options.serial, ["shell", "getprop", "ro.build.version.sdk"]).trim(),
+      model: runAdb(options.serial, ["shell", "getprop", "ro.product.model"]).trim(),
+      refreshRate: runAdb(options.serial, ["shell", "settings", "get", "system", "peak_refresh_rate"]).trim(),
+      ...captureDeviceProfile(options.serial),
+    };
+    metadata.device = device;
+    captureJson(outputDirectory, "metadata.json", metadata);
+
+    for (let runNumber = 1; runNumber <= options.runs; runNumber++) {
+      console.log(`Importing ${options.size} fabricated entries for route ${runNumber}/${options.runs}.`);
+      await importFixture(options.serial, fixtureName, options.size);
+      await runMaestro(options.serial, measuredStartFlow, { cwd: root });
+      await settleImportedHistory(options.serial, options.size);
+
+      const runPrefix = `run-${runNumber}`;
+      const beforeMemoryPath = path.join(outputDirectory, `${runPrefix}-memory-before.txt`);
+      const afterMemoryPath = path.join(outputDirectory, `${runPrefix}-memory-after.txt`);
+      const gfxPath = path.join(outputDirectory, `${runPrefix}-gfxinfo.txt`);
+      const tracePath = path.join(outputDirectory, `${runPrefix}-scroll-trace.txt`);
+      const thermalBefore = captureText(
+        options.serial,
+        ["shell", "dumpsys", "thermalservice"],
+        path.join(outputDirectory, `${runPrefix}-thermal-before.txt`),
+        { label: "optional thermal diagnostic before measured run" },
+      );
+      const gfxReset = captureText(
+        options.serial,
+        ["shell", "dumpsys", "gfxinfo", appId, "reset"],
+        path.join(outputDirectory, `${runPrefix}-gfxinfo-reset.txt`),
+        { required: true, label: "required gfxinfo reset" },
+      );
+      const beforeMemory = captureText(
+        options.serial,
+        ["shell", "dumpsys", "meminfo", appId],
+        beforeMemoryPath,
+        { required: true, label: "required memory before" },
+      );
+      const traceState = startTrace(options.serial);
+      const boundaryMemory = [];
+      let routeError = null;
+      let afterMemory;
+      let gfx;
+      let trace;
+      let thermalAfter;
+
+      try {
+        for (const entryId of pageBoundaryIds(options.size)) {
+          const identity = fixtureIdentity(entries, entryId, {
+            editedNote: nativeStressEditNote(entryId, entries[entryId - 1].note),
+          });
+          console.log(`Stress route ${runNumber}: scrolling to recycled entry ${entryId}.`);
+          const result = await runDeleteUndoAcceptance(
+            options.serial,
+            materializeCycle(outputDirectory, identity, runNumber, {
+              indexedLookup: entryId > 51,
+            }),
+            {
+              cwd: root,
+              target: identity,
+              waitOptions: {
+                dumpTimeoutMs: 300,
+                undoDumpTimeoutMs: 300,
+                undoPollIntervalMs: 35,
+                observeRestoredToast: true,
+              },
+            },
+          );
+          captureJson(outputDirectory, `${runPrefix}-undo-${entryId}.json`, {
+            entryId,
+            timestamp: identity.timestamp,
+            beforeDelete: {
+              note: result.identity.note,
+              mood: result.identity.mood,
+            },
+            afterDelete: { visibleActionableExactIdentityAbsent: true },
+            undo: {
+              observedResourceId: result.undo.node["resource-id"] ?? null,
+              tapPoint: result.undo.point,
+            },
+            restored: {
+              exactIdentity: result.identity,
+              exactlyOne: true,
+            },
+          });
+          await waitForNodeHierarchyGone(options.serial, { testId: "restored-mood-toast" }, {
+            timeoutMs: 5000,
+          });
+          const memory = captureText(
+            options.serial,
+            ["shell", "dumpsys", "meminfo", appId],
+            path.join(outputDirectory, `${runPrefix}-memory-after-entry-${entryId}.txt`),
+            { required: true, label: `required memory after entry ${entryId}` },
+          );
+          boundaryMemory.push({ entryId, capture: memory });
+        }
+
+        const filter = materializeFilter(outputDirectory, entries, options.size, fixtureReferenceNow);
+        await runMaestro(options.serial, filter.flowPath, { cwd: root });
+      } catch (error) {
+        routeError = error;
+      } finally {
+        trace = stopTrace(options.serial, tracePath, traceState);
+        afterMemory = captureText(
+          options.serial,
+          ["shell", "dumpsys", "meminfo", appId],
+          afterMemoryPath,
+          { required: true, label: "required memory after" },
+        );
+        gfx = captureText(
+          options.serial,
+          ["shell", "dumpsys", "gfxinfo", appId],
+          gfxPath,
+          { required: true, label: "required gfxinfo" },
+        );
+        thermalAfter = captureText(
+          options.serial,
+          ["shell", "dumpsys", "thermalservice"],
+          path.join(outputDirectory, `${runPrefix}-thermal-after.txt`),
+          { label: "optional thermal diagnostic after measured run" },
+        );
+      }
+
+      const summary = summarizeRunEvidence({
+        run: runNumber,
+        routeError,
+        beforeMemory,
+        boundaryMemory,
+        afterMemory,
+        gfxReset,
+        gfx,
+        trace,
+        thermalBefore,
+        thermalAfter,
+      });
+      runSummaries.push(summary);
+      captureJson(outputDirectory, `${runPrefix}-summary.json`, summary);
+      if (summary.status !== "passed") break;
+    }
+
+    const status = runSummaries.every((summary) => summary.status === "passed")
+      ? "passed"
+      : runSummaries.some((summary) => summary.status === "failed") ? "failed" : "blocked";
+    finalStatus = status;
+    const evidence = {
+      ...metadata,
+      status,
+      acceptance: evidenceAcceptance(status),
+      runs: runSummaries,
+      comparison: null,
+    };
+    captureJson(outputDirectory, "summary.json", evidence);
+    if (status !== "passed") throw new Error(`Native stress evidence was ${status}; required evidence was not accepted.`);
+    console.log(`Native stress evidence: ${outputDirectory}`);
+    console.log("Compare baseline and current summaries under identical device, refresh-rate, thermal, and run conditions; this command makes no improvement claim.");
+  } catch (error) {
+    const status = finalStatus
+      ?? (runSummaries.some((summary) => summary.status === "failed") || !isToolUnavailable(error)
+        ? "failed"
+        : "blocked");
+    captureJson(outputDirectory, "summary.json", {
+      ...metadata,
+      status,
+      acceptance: evidenceAcceptance(status),
+      runs: runSummaries,
+      comparison: null,
+      blocker: error.message,
+    });
+    throw error;
+  }
+}
+
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(error.message);
+    process.exitCode = 1;
+  });
+}
+
+module.exports = {
+  assertInstalledQaBuild,
+  captureText,
+  captureDeviceProfile,
+  importCompletionTimeoutMs,
+  materializeCycle,
+  materializeFilter,
+  measurementProtocol,
+  measurementProtocolHash,
+  normalizedWorkloadManifest,
+  normalizedWorkloadHash,
+  normalizeDisplayState,
+  pageBoundaryIds,
+  parseDeviceProfile,
+  parseOptions,
+  prepareEvidenceDirectory,
+  settleImportedHistory,
+  startTrace,
+  stopTrace,
+  summarizeRunEvidence,
+  validateStressComparison,
+};

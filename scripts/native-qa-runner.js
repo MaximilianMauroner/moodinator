@@ -1,0 +1,518 @@
+const { spawn } = require("node:child_process");
+const { Buffer } = require("node:buffer");
+
+const {
+  DEFAULT_DUMP_TIMEOUT_MS,
+  dumpUiHierarchy,
+  findNodes,
+  normalizeResourceId,
+  parseUiHierarchy,
+  tapNode,
+  waitForNode,
+  waitForNodeHierarchyGone,
+  waitForNodeCount,
+} = require("./native-ui");
+const {
+  coordinationRemainingMs,
+  createUndoCoordination,
+  transitionUndoCoordination,
+} = require("./native-qa-coordination");
+
+const undoMatcher = {
+  description: "the transient Undo control",
+  anyOf: [
+    { testId: "undo-delete" },
+    { contentDescription: "Undo delete" },
+  ],
+};
+
+const deleteMatcher = {
+  description: "the Delete entry action",
+  text: "Delete entry",
+};
+
+const DEFAULT_MAESTRO_TIMEOUT_MS = 120000;
+const DEFAULT_RESTORATION_TIMEOUT_MS = 4000;
+
+function assertCoordinationPassed(coordination) {
+  if (coordination.phase !== "passed") {
+    throw new Error(coordination.failure || `Undo coordination ended in ${coordination.phase}.`);
+  }
+  return coordination;
+}
+
+function runMaestro(serial, flowPath, {
+  cwd,
+  timeoutMs = DEFAULT_MAESTRO_TIMEOUT_MS,
+  command = "maestro",
+  spawnImpl = spawn,
+} = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawnImpl(command, ["--device", serial, "test", flowPath], {
+      cwd,
+      stdio: ["inherit", "pipe", "pipe"],
+    });
+    const stdout = [];
+    const stderr = [];
+    child.stdout?.on("data", (chunk) => {
+      stdout.push(Buffer.from(chunk));
+      process.stdout.write(chunk);
+    });
+    child.stderr?.on("data", (chunk) => {
+      stderr.push(Buffer.from(chunk));
+      process.stderr.write(chunk);
+    });
+    const maestroError = (message) => {
+      const error = new Error(message);
+      error.stdout = Buffer.concat(stdout);
+      error.stderr = Buffer.concat(stderr);
+      return error;
+    };
+    let settled = false;
+    let timedOut = false;
+    let spawnError = null;
+    let killTimer = null;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      timedOut = true;
+      child.kill("SIGTERM");
+      killTimer = setTimeout(() => child.kill("SIGKILL"), 2000);
+    }, timeoutMs);
+
+    child.once("error", (error) => {
+      spawnError = error;
+    });
+    // `exit` can precede the stdout/stderr streams closing. Finalize only on
+    // `close`, after Node has drained both pipes, so diagnostics cannot lose a
+    // trailing chunk. This also keeps timeout escalation armed until the child
+    // has actually been reaped.
+    child.once("close", (code, signal) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (killTimer) clearTimeout(killTimer);
+      if (spawnError) {
+        spawnError.stdout = Buffer.concat(stdout);
+        spawnError.stderr = Buffer.concat(stderr);
+        reject(spawnError);
+        return;
+      }
+      if (timedOut) {
+        reject(maestroError(`Maestro exceeded its ${timeoutMs}ms timeout and exited ${code ?? `from ${signal}`}.`));
+        return;
+      }
+      if (code !== 0) {
+        reject(maestroError(`Maestro exited ${code ?? `from ${signal}`}.`));
+        return;
+      }
+      resolve({ code, signal });
+    });
+  });
+}
+
+function readHierarchy(serial, options = {}) {
+  return parseUiHierarchy(dumpUiHierarchy(serial, options));
+}
+
+function entrySelectors(identity) {
+  const selectors = [
+    { testId: `mood-entry-stable-${identity.timestamp}` },
+    {
+      allOf: [
+        { testId: `mood-entry-note-${identity.timestamp}` },
+        { text: identity.note },
+      ],
+    },
+    {
+      allOf: [
+        { testId: `mood-entry-rating-${identity.timestamp}` },
+        { text: String(identity.mood) },
+      ],
+    },
+  ];
+  if (Object.hasOwn(identity, "utcOffsetMinutes")) {
+    selectors.push({ testId: `mood-entry-offset-${identity.timestamp}-${identity.utcOffsetMinutes ?? "null"}` });
+  }
+  if (identity.moodScale) {
+    const scale = identity.moodScale;
+    selectors.push({ testId: `mood-entry-scale-${identity.timestamp}-${scale.version}-${scale.min}-${scale.max}-${scale.lowerIsBetter}` });
+  }
+  if (typeof identity.energy === "number") {
+    selectors.push({ testId: `mood-entry-energy-${identity.timestamp}-${identity.energy}` });
+  }
+  for (const emotion of identity.emotions ?? []) {
+    selectors.push({ testId: `mood-entry-emotion-${identity.timestamp}-${emotion.name}-${emotion.category}-${emotion.energy ?? "null"}` });
+  }
+  if (Array.isArray(identity.emotions)) {
+    selectors.push({ testId: `mood-entry-emotion-count-${identity.timestamp}-${identity.emotions.length}` });
+  }
+  for (const context of identity.contextTags ?? []) {
+    selectors.push({ testId: `mood-entry-context-${identity.timestamp}-${context}` });
+  }
+  if (Array.isArray(identity.contextTags)) {
+    selectors.push({ testId: `mood-entry-context-count-${identity.timestamp}-${identity.contextTags.length}` });
+  }
+  return selectors;
+}
+
+const ENTRY_METADATA_TEST_ID = /^mood-entry-(?:offset|scale|energy|emotion(?:-count)?|context(?:-count)?)-/;
+
+function isEntryMetadataMatcher(matcher) {
+  return typeof matcher?.testId === "string" && ENTRY_METADATA_TEST_ID.test(matcher.testId);
+}
+
+function timestampFromNode(node) {
+  const testId = normalizeResourceId(node["resource-id"]);
+  const match = /mood-entry-note-(\d+)$/.exec(testId);
+  return match ? Number(match[1]) : null;
+}
+
+function recordedOffsetFromNodes(nodes, timestamp) {
+  const prefix = `mood-entry-offset-${timestamp}-`;
+  // Metadata views intentionally have no visual footprint. Android can retain
+  // their resource IDs in the hierarchy while reporting them as not visible.
+  const offsetNodes = findNodes(nodes, { testIdPrefix: prefix }, { includeHidden: true });
+  if (offsetNodes.length !== 1) {
+    throw new Error(`Expected exactly one recorded UTC offset for entry ${timestamp}, found ${offsetNodes.length}.`);
+  }
+  const value = normalizeResourceId(offsetNodes[0]["resource-id"]).slice(prefix.length);
+  if (value === "null") return null;
+  const offset = Number(value);
+  if (!Number.isInteger(offset)) {
+    throw new Error(`Entry ${timestamp} exposed an invalid recorded UTC offset: ${JSON.stringify(value)}.`);
+  }
+  return offset;
+}
+
+function captureEntryIdentity(serial, {
+  note,
+  mood,
+  timestamp = null,
+  originalNote = null,
+  entryIndex = null,
+  captureUtcOffsetMinutes = false,
+  adbPath = "adb",
+  dumpTimeoutMs,
+  readHierarchyImpl = readHierarchy,
+  ...entryFields
+} = {}) {
+  if (!note || !Number.isInteger(mood)) {
+    throw new Error("An exact entry note and mood are required before deletion.");
+  }
+
+  const nodes = readHierarchyImpl(serial, { adbPath, timeoutMs: dumpTimeoutMs });
+  const noteMatcher = {
+    allOf: [
+      { testIdPrefix: "mood-entry-note-" },
+      { text: note },
+    ],
+  };
+  const noteNodes = findNodes(nodes, noteMatcher);
+  if (noteNodes.length !== 1) {
+    throw new Error(`Expected exactly one visible entry note ${JSON.stringify(note)}, found ${noteNodes.length}.`);
+  }
+
+  const observedTimestamp = timestamp ?? timestampFromNode(noteNodes[0]);
+  if (!Number.isSafeInteger(observedTimestamp)) {
+    throw new Error("The exact entry note did not expose a timestamp-based test identity.");
+  }
+  if (timestamp !== null && observedTimestamp !== timestamp) {
+    throw new Error(`Expected entry timestamp ${timestamp}, observed ${observedTimestamp}.`);
+  }
+
+  const identity = {
+    timestamp: observedTimestamp,
+    note,
+    mood,
+    ...(originalNote ? { originalNote } : {}),
+    ...(Number.isInteger(entryIndex) ? { entryIndex } : {}),
+    ...(captureUtcOffsetMinutes
+      ? { utcOffsetMinutes: recordedOffsetFromNodes(nodes, observedTimestamp) }
+      : Object.hasOwn(entryFields, "utcOffsetMinutes")
+        ? { utcOffsetMinutes: entryFields.utcOffsetMinutes }
+        : {}),
+    ...(Array.isArray(entryFields.emotions) ? { emotions: entryFields.emotions } : {}),
+    ...(Array.isArray(entryFields.contextTags) ? { contextTags: entryFields.contextTags } : {}),
+    ...(Object.hasOwn(entryFields, "energy") ? { energy: entryFields.energy } : {}),
+    ...(entryFields.moodScale ? { moodScale: entryFields.moodScale } : {}),
+  };
+  const selectors = entrySelectors(identity);
+  const counts = selectors.map((matcher) => findNodes(nodes, matcher, {
+    includeHidden: isEntryMetadataMatcher(matcher),
+  }).length);
+  if (counts.some((count) => count !== 1)) {
+    throw new Error(`Entry identity was not unique before deletion (counts: ${counts.join(", ")}).`);
+  }
+  return { ...identity, selectors };
+}
+
+async function waitForEntryIdentity(serial, target, {
+  timeoutMs = 3000,
+  pollIntervalMs = 80,
+  ...options
+} = {}) {
+  const deadline = Date.now() + timeoutMs;
+  let lastError = null;
+  do {
+    try {
+      const remainingMs = Math.max(1, deadline - Date.now());
+      return captureEntryIdentity(serial, {
+        ...target,
+        ...options,
+        dumpTimeoutMs: Math.min(options.dumpTimeoutMs ?? timeoutMs, remainingMs),
+      });
+    } catch (error) {
+      lastError = error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+  } while (Date.now() <= deadline);
+  throw new Error(`Entry identity was not ready within ${timeoutMs}ms. Last inspection failed: ${lastError?.message ?? "unknown error"}`);
+}
+
+function entryIdentityCounts(nodes, identity) {
+  return {
+    visible: identity.selectors.map((matcher) => findNodes(nodes, matcher).length),
+    hierarchy: identity.selectors.map((matcher) => findNodes(nodes, matcher, { includeHidden: true }).length),
+  };
+}
+
+/**
+ * Restoration is accepted only when one actionable row is present and the
+ * hierarchy contains no second stale copy of any exact identity selector.
+ * Keeping these scopes separate prevents a hidden recycled row from being
+ * mistaken for the restored entry while still making the absence semantics
+ * explicit for callers that only need visible removal.
+ */
+function isExactlyOneRestoredEntry(nodes, identity) {
+  const counts = entryIdentityCounts(nodes, identity);
+  return counts.visible.every((count, index) => isEntryMetadataMatcher(identity.selectors[index]) || count === 1)
+    && counts.hierarchy.every((count) => count === 1);
+}
+
+async function waitForEntryState(serial, identity, expectedCount, {
+  timeoutMs = DEFAULT_RESTORATION_TIMEOUT_MS,
+  scope = "visible",
+  ...options
+} = {}) {
+  if (scope !== "visible" && scope !== "hierarchy") {
+    throw new Error(`Unknown entry hierarchy scope: ${scope}.`);
+  }
+  const includeHidden = scope === "hierarchy";
+  const deadline = Date.now() + timeoutMs;
+  for (const matcher of identity.selectors) {
+    // Visible row state is established by the rendered card, note and rating.
+    // Zero-footprint metadata markers are checked in hierarchy scope instead.
+    if (scope === "visible" && isEntryMetadataMatcher(matcher)) continue;
+    const remaining = Math.max(0, deadline - Date.now());
+    await waitForNodeCount(serial, matcher, expectedCount, {
+      ...options,
+      timeoutMs: remaining,
+      includeHidden,
+    });
+  }
+}
+
+async function waitForExactEntry(serial, identity, options = {}) {
+  const timeoutMs = options.timeoutMs ?? DEFAULT_RESTORATION_TIMEOUT_MS;
+  const dumpTimeoutMs = options.dumpTimeoutMs ?? DEFAULT_DUMP_TIMEOUT_MS;
+  const deadline = Date.now() + timeoutMs;
+  let lastCounts = null;
+  let lastInspectionError = null;
+  while (Date.now() <= deadline) {
+    try {
+      const remainingMs = Math.max(1, deadline - Date.now());
+      const nodes = (options.readHierarchyImpl ?? readHierarchy)(serial, {
+        ...options,
+        timeoutMs: Math.min(dumpTimeoutMs, remainingMs),
+      });
+      lastCounts = entryIdentityCounts(nodes, identity);
+      lastInspectionError = null;
+      if (isExactlyOneRestoredEntry(nodes, identity)) return;
+    } catch (error) {
+      lastInspectionError = error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, options.pollIntervalMs ?? 80));
+  }
+  const inspection = lastInspectionError ? ` Last inspection failed: ${lastInspectionError.message}.` : "";
+  throw new Error(`Exact restored entry was not present in one hierarchy snapshot: ${JSON.stringify(lastCounts)}.${inspection}`);
+}
+
+async function waitForRestorationEvidence(serial, identity, {
+  observeRestoredToast = false,
+  waitForExactEntryImpl = waitForExactEntry,
+  waitForNodeImpl = waitForNode,
+  ...options
+} = {}) {
+  const exactEntry = waitForExactEntryImpl(serial, identity, options);
+  const restoredToast = observeRestoredToast
+    ? waitForNodeImpl(serial, { testId: "restored-mood-toast" }, {
+      ...options,
+      timeoutMs: options.timeoutMs ?? DEFAULT_RESTORATION_TIMEOUT_MS,
+    })
+    : Promise.resolve(null);
+  const [, toastNode] = await Promise.all([exactEntry, restoredToast]);
+  return { restoredToast: toastNode };
+}
+
+async function waitForEntryVisibleAbsent(serial, identity, options = {}) {
+  await waitForEntryState(serial, identity, 0, {
+    ...options,
+    scope: "visible",
+  });
+}
+
+async function waitForEntryHierarchyGone(serial, identity, options = {}) {
+  await waitForEntryState(serial, identity, 0, {
+    ...options,
+    scope: "hierarchy",
+  });
+}
+
+async function waitForEntryAbsent(serial, identity, options = {}) {
+  await waitForEntryVisibleAbsent(serial, identity, options);
+}
+
+async function waitForDeletedEntryWithUndo(serial, identity, {
+  timeoutMs = DEFAULT_RESTORATION_TIMEOUT_MS,
+  dumpTimeoutMs = DEFAULT_DUMP_TIMEOUT_MS,
+  pollIntervalMs = 35,
+  readHierarchyImpl = readHierarchy,
+  ...options
+} = {}) {
+  const deadline = Date.now() + timeoutMs;
+  let lastCounts = null;
+  let lastUndoCount = null;
+  let lastInspectionError = null;
+  while (Date.now() <= deadline) {
+    try {
+      const remainingMs = Math.max(1, deadline - Date.now());
+      const nodes = readHierarchyImpl(serial, {
+        ...options,
+        timeoutMs: Math.min(dumpTimeoutMs, remainingMs),
+      });
+      lastCounts = entryIdentityCounts(nodes, identity).hierarchy;
+      const undoNodes = findNodes(nodes, undoMatcher);
+      lastUndoCount = undoNodes.length;
+      lastInspectionError = null;
+      if (lastCounts.every((count) => count === 0) && undoNodes.length === 1) {
+        return undoNodes[0];
+      }
+    } catch (error) {
+      lastInspectionError = error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+  }
+  const inspection = lastInspectionError ? ` Last inspection failed: ${lastInspectionError.message}.` : "";
+  throw new Error(
+    `Deleted entry absence and its new Undo control were not observed in one hierarchy snapshot `
+      + `(identity counts: ${JSON.stringify(lastCounts)}, Undo count: ${lastUndoCount}).${inspection}`,
+  );
+}
+
+function transition(state, event) {
+  return transitionUndoCoordination(state, event, Date.now());
+}
+
+/**
+ * Run the Maestro preparation flow, then coordinate deletion and Undo from the
+ * native hierarchy. The probe is deliberately not started until Maestro has
+ * completed at the open action menu and the target identity has been captured.
+ */
+async function runDeleteUndoAcceptance(serial, flowPath, {
+  cwd,
+  target,
+  waitOptions = {},
+  maestroTimeoutMs = DEFAULT_MAESTRO_TIMEOUT_MS,
+  undoWindowMs,
+  deleteAbsenceTimeoutMs,
+  restorationTimeoutMs = DEFAULT_RESTORATION_TIMEOUT_MS,
+} = {}) {
+  let coordination = createUndoCoordination({
+    undoWindowMs,
+    deleteAbsenceTimeoutMs,
+    restorationTimeoutMs,
+  });
+
+  await runMaestro(serial, flowPath, { cwd, timeoutMs: maestroTimeoutMs });
+  coordination = transition(coordination, "maestro-complete");
+
+  const identity = await waitForEntryIdentity(serial, target, {
+    adbPath: waitOptions.adbPath,
+    timeoutMs: waitOptions.identityTimeoutMs ?? 3000,
+    pollIntervalMs: waitOptions.identityPollIntervalMs ?? 80,
+    // Identity capture precedes the time-sensitive Undo phase. Give each dump
+    // its normal allowance instead of inheriting the 300ms Undo probe budget.
+    dumpTimeoutMs: waitOptions.identityDumpTimeoutMs,
+  });
+  coordination = transition(coordination, "target-captured");
+
+  const actionsNode = await waitForNode(serial, {
+    testId: `mood-entry-actions-${identity.timestamp}`,
+  }, {
+    ...waitOptions,
+    timeoutMs: waitOptions.actionsTimeoutMs ?? 3000,
+  });
+  tapNode(serial, actionsNode, waitOptions);
+
+  // A prior toast would make an early hierarchy match a false positive. It must
+  // be absent before this deletion begins.
+  await waitForNodeHierarchyGone(serial, undoMatcher, {
+    ...waitOptions,
+    timeoutMs: Math.min(waitOptions.preDeleteUndoTimeoutMs ?? 1000, 1000),
+  });
+
+  const deleteNode = await waitForNode(serial, deleteMatcher, {
+    ...waitOptions,
+    timeoutMs: waitOptions.deleteTimeoutMs ?? 3000,
+  });
+  coordination = transition(coordination, "delete-requested");
+  const deleteTap = tapNode(serial, deleteNode, waitOptions);
+
+  const undoNode = await waitForDeletedEntryWithUndo(serial, identity, {
+    ...waitOptions,
+    timeoutMs: coordinationRemainingMs(coordination),
+    pollIntervalMs: waitOptions.undoPollIntervalMs ?? 35,
+    dumpTimeoutMs: waitOptions.undoDumpTimeoutMs ?? waitOptions.dumpTimeoutMs,
+  });
+  coordination = transition(coordination, "target-absent");
+  coordination = transition(coordination, "undo-visible");
+  const undoTap = tapNode(serial, undoNode, waitOptions);
+  coordination = transition(coordination, "undo-tapped");
+
+  const restoration = await waitForRestorationEvidence(serial, identity, {
+    ...waitOptions,
+    timeoutMs: coordinationRemainingMs(coordination),
+  });
+  coordination = transition(coordination, "target-restored");
+  assertCoordinationPassed(coordination);
+
+  return {
+    coordination,
+    identity,
+    delete: { node: deleteNode, ...deleteTap },
+    undo: { node: undoNode, ...undoTap },
+    restoration,
+  };
+}
+
+module.exports = {
+  DEFAULT_MAESTRO_TIMEOUT_MS,
+  assertCoordinationPassed,
+  captureEntryIdentity,
+  deleteMatcher,
+  entryIdentityCounts,
+  entrySelectors,
+  isExactlyOneRestoredEntry,
+  readHierarchy,
+  runDeleteUndoAcceptance,
+  runMaestro,
+  timestampFromNode,
+  undoMatcher,
+  waitForEntryAbsent,
+  waitForEntryHierarchyGone,
+  waitForEntryIdentity,
+  waitForDeletedEntryWithUndo,
+  waitForExactEntry,
+  waitForRestorationEvidence,
+  waitForEntryVisibleAbsent,
+};

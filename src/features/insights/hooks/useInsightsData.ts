@@ -24,6 +24,7 @@ export interface InsightsData {
   recentMoods: MoodEntry[];
   totalCount: number;
   loading: boolean;
+  ready: boolean;
   error: string | null;
   streak: { current: number; longest: number };
   getMoodLabel: (value: number, sourceScale?: MoodScaleSnapshot) => string;
@@ -70,9 +71,11 @@ export function useInsightsData(): InsightsData {
   >({ totalCount: 0, oldestTimestamp: null, days: [] });
   const [analysisMoods, setAnalysisMoods] = useState<MoodEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [summaryLoading, setSummaryLoading] = useState(true);
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const loadedSelection = useRef<string | null>(null);
+  const [loadedSelection, setLoadedSelection] = useState<string | null>(null);
+  const loadedSelectionRef = useRef<string | null>(null);
   const generation = useRef(0);
   const summaryGeneration = useRef(0);
   const invalidateSummary = useCallback(() => {
@@ -83,6 +86,7 @@ export function useInsightsData(): InsightsData {
   }, []);
   const loadSummary = useCallback(async () => {
     const request = ++summaryGeneration.current;
+    setSummaryLoading(true);
     try {
       const [value, recent] = await Promise.all([
         moodService.getHistorySummary(),
@@ -100,6 +104,8 @@ export function useInsightsData(): InsightsData {
             : "Could not load history summary",
         );
       }
+    } finally {
+      if (request === summaryGeneration.current) setSummaryLoading(false);
     }
   }, []);
   useEffect(() => {
@@ -110,11 +116,12 @@ export function useInsightsData(): InsightsData {
     const request = ++generation.current;
     const selection = `${analysisRange}:${localDay}`;
     setLoading(true);
-    if (loadedSelection.current !== selection) setAnalysisMoods([]);
+    if (loadedSelectionRef.current !== selection) setAnalysisMoods([]);
     try {
       const entries = await queryLocalDays(analysisRange, localDay);
       if (request !== generation.current) return;
-      loadedSelection.current = selection;
+      loadedSelectionRef.current = selection;
+      setLoadedSelection(selection);
       setAnalysisMoods(entries);
       setError(null);
     } catch (reason) {
@@ -186,6 +193,12 @@ export function useInsightsData(): InsightsData {
     recentMoods,
     totalCount: summary.totalCount,
     loading,
+    ready:
+      loadedSelection === `${analysisRange}:${localDay}` &&
+      !loading &&
+      !summaryLoading &&
+      !error &&
+      !summaryError,
     error: error ?? summaryError,
     streak,
     getMoodLabel,

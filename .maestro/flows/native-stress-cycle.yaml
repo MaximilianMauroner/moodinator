@@ -1,0 +1,33 @@
+appId: com.lab4code.moodinator.qa
+name: Recycled-row stress cycle
+---
+- tapOn: "Home tab, log your mood"
+${TARGET_SETUP}
+- scrollUntilVisible:
+    element:
+      id: "mood-entry-stable-${ENTRY_TIMESTAMP}"
+    direction: DOWN
+    timeout: 30000
+- tapOn:
+    id: "mood-entry-actions-${ENTRY_TIMESTAMP}"
+- tapOn: "Edit entry"
+- assertVisible: "(?i)How are you feeling[?]"
+- tapOn: "Next step"
+- tapOn: "Next step"
+- scrollUntilVisible:
+    element:
+      id: "entry-notes"
+    direction: DOWN
+- assertVisible:
+    id: "entry-notes"
+    text: "${ORIGINAL_NOTE}"
+- tapOn:
+    id: "entry-notes"
+- eraseText
+- inputText: "${EDITED_NOTE}"
+- hideKeyboard
+- tapOn: "Save entry"
+- scrollUntilVisible:
+    element:
+      id: "mood-entry-actions-${ENTRY_TIMESTAMP}"
+    direction: DOWN
