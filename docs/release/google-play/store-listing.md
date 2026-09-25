@@ -11,6 +11,11 @@ fabricated data only.
 - Checked-in source baseline: `0.1.5` / Android version code 40. The
   coordinated release ledger assigns the version and code for each build;
   confirm the current candidate against its release record and Play Internal.
+- Internal tester candidate (owner-confirmed Play Console status, September 25,
+  2026): `0.1.9` / Android version code 44, source
+  `7eac4f18f8229ecae21f0f705983a31fddc6d48d`. Internal opt-in:
+  <https://play.google.com/apps/internaltest/4701130940304073493>. This does
+  not establish Play-installed acceptance or approve a production listing.
 - Category: Health & Fitness
 - Pricing: Free
 - Ads: None
@@ -112,17 +117,24 @@ and backups.
 ## Graphic inventory
 
 - `assets/store/google-play/icon-512.png`: 512×512 32-bit RGBA PNG store icon.
-- `assets/store/google-play/feature-graphic-1024x500.png`: 1024×500 PNG feature graphic draft; human visual approval required.
-- Historical screenshot inventory (not a current candidate): `assets/store/google-play/screenshots/01-home.png` through `04-quick-entry.png` are 1080×2160 24-bit RGB portrait phone screenshots from an older release QA build with fabricated data.
-- Historical screenshot inventory (not a current candidate): `assets/store/google-play/screenshots/05-history-insights.png` was captured on the `moodqa` Android 35 AVD from a locally signed universal APK generated from production AAB version code 34. Its 100 entries came from the repository's synthetic QA fixture generator. Recapture all screenshots from the exact audited candidate before submission.
+- `assets/store/google-play/feature-graphic-1024x500.png`: 1024×500 PNG feature graphic; retain this owner-selected graphic for review.
+- `assets/store/google-play/historical/01-home.png` through `04-quick-entry.png` are older 1080×2160 RGB captures with fabricated data. They include an empty Home and mixed themes and are not current listing assets.
+- `assets/store/google-play/historical/05-history-insights.png` was captured on the `moodqa` Android 35 AVD from a locally signed universal APK generated from production AAB version code 34. Its 100 entries came from the synthetic QA fixture generator. It shows Insights Findings, not the History list.
+- `assets/store/google-play/screenshots/` is reserved for five replacement captures from the final accepted build. It currently has no upload-ready phone screenshots; see its capture instructions. A source-matched QA build can produce drafts, but it is not the exact Play artifact.
 
-## Screenshot order and captions
+## Required replacement screenshot order and captions
 
-1. Home — “A private check-in, whenever you need it”
-2. Detailed entry — “Add the detail that matters to you”
-3. Data export — “Your history stays under your control”
-4. Quick entry — “Log how you feel in a moment”
-5. History and insights — “See descriptive findings from your history”
+1. Populated Home — “A private check-in, whenever you need it”
+2. Current quick-entry flow — “Log a mood in a moment”
+3. History with fabricated entries — “Revisit the entries you recorded”
+4. Insights with enough fabricated entries for honest descriptive summaries — “Explore descriptive insights from your history”
+5. Data export and sharing choice — “Choose when and where to export”
+
+Capture all five from the same accepted build and fabricated dataset, with a
+consistent app theme, status bar, and Android system navigation bar. Record the
+build SHA, package, version/code, signing identity, device/OS, and capture date
+before human review. Keep the feature graphic and support address above. The
+owner's layout direction is not final copy, image, or production approval.
 
 ## Claim and submission guardrails
 
