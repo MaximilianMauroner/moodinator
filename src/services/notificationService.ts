@@ -3,6 +3,7 @@ import { getCalendars } from 'expo-localization';
 import { Platform } from 'react-native';
 import type * as ExpoNotifications from 'expo-notifications';
 import { normalizeReminderDays } from '../lib/reminderDays';
+import { createNoEntryReminderScheduler, NO_ENTRY_REMINDER_TAG, type NoEntryReminderSettings } from './noEntryReminderScheduler';
 
 const NOTIFICATIONS_ENABLED_KEY = 'notificationsEnabled';
 const NOTIFICATION_TIME_KEY = 'notificationTime';
@@ -69,6 +70,71 @@ function enqueueMutation<T>(operation: () => Promise<T>): Promise<T> {
     return result;
 }
 
+const noEntryReminderScheduler = createNoEntryReminderScheduler({
+    storage: AsyncStorage,
+    getAccess: getNotificationAccess,
+    getModule: getNotificationsModule,
+    getEntryTimestamps: async (start, end) => {
+        const { moodService } = await import('./moodService');
+        const entries = await moodService.getInRange({ startDate: start.getTime(), endDate: end.getTime() - 1 });
+        return entries.map((entry) => entry.timestamp);
+    },
+    now: () => new Date(),
+    getTimeZone: getCurrentTimeZone,
+});
+
+let notificationResetInProgress = false;
+const RESET_IN_PROGRESS_MESSAGE = 'App reset is in progress. Try changing reminders after it finishes.';
+
+/** Exclude new user schedules while reset performs work that re-enters this queue. */
+export async function withNotificationReset<T>(operation: () => Promise<T>): Promise<T> {
+    if (notificationResetInProgress) throw new Error(RESET_IN_PROGRESS_MESSAGE);
+    notificationResetInProgress = true;
+    try {
+        // Drain any operation already running before cleaning its native effects.
+        await enqueueMutation(async () => undefined);
+        return await operation();
+    } finally {
+        await enqueueMutation(async () => undefined);
+        notificationResetInProgress = false;
+    }
+}
+
+/** Recompute collisions before releasing the existing shared native mutation queue. */
+function enqueueReminderMutation<T>(operation: () => Promise<T>, allowDuringReset = false): Promise<T> {
+    if (notificationResetInProgress && !allowDuringReset) return Promise.reject(new Error(RESET_IN_PROGRESS_MESSAGE));
+    return enqueueMutation(async () => {
+        if (notificationResetInProgress && !allowDuringReset) throw new Error(RESET_IN_PROGRESS_MESSAGE);
+        try {
+            return await operation();
+        } finally {
+            try {
+                await noEntryReminderScheduler.reconcile();
+            } catch (error) {
+                console.warn('Could not refresh conditional reminders:', error);
+            }
+        }
+    });
+}
+
+export function getNoEntryReminderSettings(): Promise<NoEntryReminderSettings> {
+    return enqueueMutation(noEntryReminderScheduler.getSettings);
+}
+
+export function saveNoEntryReminderSettings(
+    choice: Pick<NoEntryReminderSettings, 'enabled' | 'hour' | 'minute'>
+): Promise<NoEntryReminderSettings> {
+    if (notificationResetInProgress && choice.enabled) return Promise.reject(new Error(RESET_IN_PROGRESS_MESSAGE));
+    return enqueueMutation(() => {
+        if (notificationResetInProgress && choice.enabled) throw new Error(RESET_IN_PROGRESS_MESSAGE);
+        return noEntryReminderScheduler.save(choice);
+    });
+}
+
+export function reconcileNoEntryReminder(): Promise<NoEntryReminderSettings> {
+    return enqueueMutation(noEntryReminderScheduler.reconcile);
+}
+
 function configureNotificationHandler(Notifications: NotificationsModule): void {
     if (notificationHandlerConfigured) {
         return;
@@ -78,12 +144,17 @@ function configureNotificationHandler(Notifications: NotificationsModule): void 
         handleError(notificationId, error) {
             console.error(`[notifications] Error handling notification ${notificationId}:`, error);
         },
-        handleNotification: async () => ({
-            shouldPlaySound: false,
-            shouldSetBadge: false,
-            shouldShowBanner: true,
-            shouldShowList: true,
-        }),
+        handleNotification: async (notification) => {
+            // Read-only delivery check stays outside the native mutation queue so a
+            // pending permission prompt cannot delay Expo's foreground deadline.
+            const show = await noEntryReminderScheduler.shouldPresent(notification.request.content.data ?? {});
+            return {
+                shouldPlaySound: false,
+                shouldSetBadge: false,
+                shouldShowBanner: show,
+                shouldShowList: show,
+            };
+        },
     });
 
     notificationHandlerConfigured = true;
@@ -530,6 +601,20 @@ async function rescheduleAllNotificationsUnlocked(
         );
     }
 
+    try {
+        const requiredSlots = enabledNotifications.reduce((count, notification) => {
+            const days = normalizeReminderDays(notification.weekdays);
+            return count + (days.length === 7 ? 1 : days.length);
+        }, 0);
+        if (requiredSlots > 0) await noEntryReminderScheduler.reserveOrdinaryCapacity(Notifications, requiredSlots);
+    } catch (error) {
+        return persistCleanupFailedResult(
+            nextNotifications.map((notification) => applyUnscheduledState(notification, 'failed', 'Notification capacity could not be reserved.')),
+            error,
+            'Notification capacity could not be reserved.'
+        );
+    }
+
     const schedulingErrors: string[] = [];
     const scheduledNotifications: NotificationConfig[] = [];
     for (const notification of nextNotifications) {
@@ -621,7 +706,7 @@ export function getAllNotifications(): Promise<NotificationConfig[]> {
 export function saveAllNotifications(
     notifications: NotificationConfig[]
 ): Promise<ReminderScheduleResult> {
-    return enqueueMutation(async () => {
+    return enqueueReminderMutation(async () => {
         notifications.forEach(validateReminder);
         const previousNotifications = await getAllNotificationsUnlocked();
         const desiredNotifications = materializeDesiredNotifications(notifications);
@@ -635,7 +720,7 @@ export function saveAllNotifications(
 }
 
 export function cancelMoodReminder(): Promise<ReminderScheduleResult> {
-    return enqueueMutation(async () => {
+    return enqueueReminderMutation(async () => {
         const notifications = await getAllNotificationsUnlocked();
         const desiredNotifications = materializeDesiredNotifications(notifications).map(
             (notification) => ({ ...notification, enabled: false })
@@ -650,7 +735,7 @@ export function cancelMoodReminder(): Promise<ReminderScheduleResult> {
             await AsyncStorage.setItem(NOTIFICATIONS_ENABLED_KEY, 'false');
         }
         return result;
-    });
+    }, true);
 }
 
 export function saveNotificationSettings(
@@ -658,7 +743,7 @@ export function saveNotificationSettings(
     hour: number,
     minute: number
 ): Promise<ReminderScheduleStatus> {
-    return enqueueMutation(async () => {
+    return enqueueReminderMutation(async () => {
         validateReminder({ hour, minute });
         await AsyncStorage.setItem(NOTIFICATION_TIME_KEY, JSON.stringify({ hour, minute }));
         const previousNotifications = await getAllNotificationsUnlocked();
@@ -703,7 +788,7 @@ export function addNotification(
         'id' | 'scheduledId' | 'scheduledIds' | 'scheduleStatus' | 'unscheduledReason' | 'pendingAction'
     >
 ): Promise<NotificationConfig> {
-    return enqueueMutation(async () => {
+    return enqueueReminderMutation(async () => {
         validateReminder(notification);
         const notifications = await getAllNotificationsUnlocked();
         const desiredNotifications = materializeDesiredNotifications(notifications);
@@ -731,7 +816,7 @@ export function updateNotification(
     id: string,
     updates: Partial<Omit<NotificationConfig, 'id' | 'pendingAction'>>
 ): Promise<ReminderScheduleResult> {
-    return enqueueMutation(async () => {
+    return enqueueReminderMutation(async () => {
         const previousNotifications = await getAllNotificationsUnlocked();
         const notifications = materializeDesiredNotifications(previousNotifications);
         const index = notifications.findIndex((notification) => notification.id === id);
@@ -749,7 +834,7 @@ export function updateNotification(
 }
 
 export function deleteNotification(id: string): Promise<ReminderScheduleResult> {
-    return enqueueMutation(async () => {
+    return enqueueReminderMutation(async () => {
         const previousNotifications = await getAllNotificationsUnlocked();
         const notifications = materializeDesiredNotifications(previousNotifications);
         const desiredNotifications = notifications.filter((notification) => notification.id !== id);
@@ -763,7 +848,7 @@ export function deleteNotification(id: string): Promise<ReminderScheduleResult> 
 }
 
 export function ensureMoodReminderScheduled(): Promise<ReminderScheduleResult | null> {
-    return enqueueMutation(async () => {
+    return enqueueReminderMutation(async () => {
         const notifications = await getAllNotificationsUnlocked();
         const hasPendingActions = notifications.some((notification) => notification.pendingAction);
         if (hasPendingActions) {
@@ -843,7 +928,7 @@ export function ensureMoodReminderScheduled(): Promise<ReminderScheduleResult | 
             access,
             scheduledIds,
         }, notifications);
-    });
+    }, true);
 }
 
 export async function addNotificationResponseReceivedListener(
@@ -885,7 +970,7 @@ export function isMoodReminderResponse(response: unknown): response is Notificat
         return false;
     }
     const data = content.data;
-    return typeof data === 'object' && data !== null && 'type' in data && data.type === MOOD_REMINDER_TAG;
+    return typeof data === 'object' && data !== null && 'type' in data && (data.type === MOOD_REMINDER_TAG || data.type === NO_ENTRY_REMINDER_TAG);
 }
 
 export function getNotificationResponseIdentity(response: NotificationResponse): string {
@@ -899,14 +984,18 @@ export function getNotificationResponseIdentity(response: NotificationResponse):
 export function cancelAllScheduledNotifications(): Promise<void> {
     return enqueueMutation(async () => {
         const Notifications = await getNotificationsModule();
-        if (Notifications) {
-            await Notifications.cancelAllScheduledNotificationsAsync();
+        if (!Notifications) throw new Error('Notifications are unavailable; existing reminders could not be cleared.');
+        await Notifications.cancelAllScheduledNotificationsAsync();
+        if ((await Notifications.getAllScheduledNotificationsAsync()).length > 0) {
+            throw new Error('Some scheduled notifications remain. Try clearing reminders again.');
         }
     });
 }
 
 export function scheduleTestNotification(): Promise<boolean> {
+    if (notificationResetInProgress) return Promise.resolve(false);
     return enqueueMutation(async () => {
+        if (notificationResetInProgress) return false;
         const access = await getNotificationAccess('request');
         if (!access.ok) {
             return false;
@@ -927,6 +1016,10 @@ export function scheduleTestNotification(): Promise<boolean> {
 }
 
 export const notificationService = {
+    withNotificationReset,
+    getNoEntryReminderSettings,
+    saveNoEntryReminderSettings,
+    reconcileNoEntryReminder,
     addNotification,
     addNotificationResponseReceivedListener,
     cancelAllScheduledNotifications,
