@@ -71,16 +71,18 @@ A configured key that Google rejects will fail the attempted release and consume
 its number, as other build or upload failures do. Live API publishing remains
 unverified until the authorized credential is available.
 
-After the initial 0.1.5 releases are available to Internal testers, seed each
-ledger once with its actual versionCode and source SHA:
+The following seed command is for initial ledger setup only. Use it only when
+an app has an existing Internal release but no ledger record, and supply that
+release's actual version, version code, and source SHA:
 
 ```sh
-node scripts/nightly-release.mjs seed 0.1.5 VERSION_CODE FULL_SOURCE_SHA
+node scripts/nightly-release.mjs seed VERSION VERSION_CODE FULL_SOURCE_SHA
 ```
 
 Seeding is idempotent for the same release. It refuses to overwrite an existing
-ledger with another identity. The initial release also counts as that day's
-attempt, so a new nightly starts on a later day after a new commit.
+ledger with another identity. Do not seed an already initialized ledger to
+advance a version or recover a failed attempt. The seeded release counts as
+that day's attempt, so a new nightly starts on a later day after a new commit.
 
 ## Schedule both apps
 

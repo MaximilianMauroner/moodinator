@@ -138,10 +138,10 @@ version and version code into an isolated build workspace. Use its shared
 release ledger and Play Internal record for the current candidate; the
 checked-in values do not identify the latest uploaded build.
 
-`bun run version:bump` explicitly increments the minor version in `app.json`
-and `package.json`. Build commands do not invoke it automatically. Run it only
-when preparing an intended version change. Native generation uses
-`bunx expo prebuild` in an isolated workspace.
+Normal Internal releases use `bun run release:internal`; the shared ledger
+reserves the next version and Android code. There is no standalone
+`version:bump` command. Native generation uses `bunx expo prebuild` in an
+isolated workspace.
 
 ## Known Issues
 
