@@ -2,7 +2,7 @@
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 import type { SQLiteDatabase } from "expo-sqlite";
 import { afterAll, beforeAll, vi } from "vitest";
-import type { Emotion, MoodEntry } from "../../db/types";
+import type { MoodEntry } from "../../db/types";
 
 export type MockRow = {
   id: number;
@@ -131,17 +131,6 @@ export function createMockMoodEntry(overrides?: Partial<MoodEntry>): MoodEntry {
     energy: null,
     moodScale: { version: 1, min: 0, max: 10, lowerIsBetter: true },
     basedOnEntryId: null,
-    ...overrides,
-  };
-}
-
-/**
- * Helper to create a mock Emotion for testing.
- */
-export function createMockEmotion(overrides?: Partial<Emotion>): Emotion {
-  return {
-    name: "Happy",
-    category: "positive",
     ...overrides,
   };
 }
