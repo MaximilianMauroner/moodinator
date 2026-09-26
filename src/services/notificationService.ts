@@ -648,7 +648,7 @@ export function addNotification(
         const nextNotifications = [...desiredNotifications, newNotification];
         const result = await rescheduleAllNotificationsUnlocked(
             nextNotifications,
-            'request',
+            newNotification.enabled ? 'request' : 'check-only',
             undefined,
             buildCleanupFailureNotifications(notifications, nextNotifications)
         );
@@ -675,7 +675,7 @@ export function updateNotification(
         notifications[index] = { ...notifications[index], ...updates };
         return rescheduleAllNotificationsUnlocked(
             notifications,
-            'request',
+            notifications[index].enabled ? 'request' : 'check-only',
             undefined,
             buildCleanupFailureNotifications(previousNotifications, notifications)
         );
@@ -689,7 +689,7 @@ export function deleteNotification(id: string): Promise<ReminderScheduleResult> 
         const desiredNotifications = notifications.filter((notification) => notification.id !== id);
         return rescheduleAllNotificationsUnlocked(
             desiredNotifications,
-            'request',
+            'check-only',
             undefined,
             buildCleanupFailureNotifications(previousNotifications, desiredNotifications)
         );
