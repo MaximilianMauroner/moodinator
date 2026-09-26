@@ -32,6 +32,7 @@ import {
 import { formatReminderDays } from "@/lib/reminderDays";
 import { formatReminderTime } from "@/lib/reminderTimePresentation";
 import { useCalendars, useLocales } from "expo-localization";
+import { NoEntryReminderSettings } from "@/features/reminders/NoEntryReminderSettings";
 
 const NotificationsErrorFallback = createScreenErrorFallback("Notifications");
 
@@ -231,6 +232,8 @@ function NotificationsScreenContent() {
             </Pressable>
           </Link>
 
+          <NoEntryReminderSettings />
+
           {/* Notifications List */}
           {notifications.length === 0 ? (
             <View
@@ -254,13 +257,13 @@ function NotificationsScreenContent() {
                 className="text-lg font-semibold text-center mb-2"
                 style={{ color: get("text") }}
               >
-                No reminders yet
+                No repeating reminders yet
               </Text>
               <Text
                 className="text-sm text-center max-w-[240px] leading-5"
                 style={{ color: get("textMuted") }}
               >
-                Choose an optional reminder, then review its time and days before saving.
+                Add a repeating reminder above, then review its time and days before saving.
               </Text>
             </View>
           ) : (

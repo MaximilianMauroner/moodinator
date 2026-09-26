@@ -5,6 +5,7 @@
  */
 
 import type { MoodEntry, MoodEntryInput, Emotion } from "@db/types";
+import { reconcileRemindersAfterMoodChange } from "./reminderReconciliation";
 import {
   insertMoodEntry,
   updateMoodEntry,
@@ -96,18 +97,23 @@ function getEndOfYesterday(): number {
 export const moodService: MoodServiceInterface = {
   getHistorySummary: () => getMoodHistorySummary(),
   async create(entry: MoodEntryInput): Promise<MoodEntry> {
-    return insertMoodEntry(entry);
+    const created = await insertMoodEntry(entry);
+    await reconcileRemindersAfterMoodChange();
+    return created;
   },
 
   async update(
     id: number,
     updates: Partial<MoodEntryInput>
   ): Promise<MoodEntry | undefined> {
-    return updateMoodEntry(id, updates);
+    const updated = await updateMoodEntry(id, updates);
+    if (updated) await reconcileRemindersAfterMoodChange();
+    return updated;
   },
 
   async delete(id: number): Promise<void> {
     await deleteMood(id);
+    await reconcileRemindersAfterMoodChange();
   },
 
   async getAll(): Promise<MoodEntry[]> {
@@ -148,14 +154,22 @@ export const moodService: MoodServiceInterface = {
 
   async clearAll(): Promise<void> {
     await clearMoodData();
+    await reconcileRemindersAfterMoodChange();
   },
 
   async seedSampleData(): Promise<number> {
-    return seedMoods();
+    try {
+      return await seedMoods();
+    } finally {
+      // Seeding commits in batches, so a rejected later batch can leave changes.
+      await reconcileRemindersAfterMoodChange();
+    }
   },
 
   async updateNote(id: number, note: string): Promise<MoodEntry | undefined> {
-    return updateMoodNote(id, note);
+    const updated = await updateMoodNote(id, note);
+    if (updated) await reconcileRemindersAfterMoodChange();
+    return updated;
   },
 
   async updateTimestamp(
@@ -163,14 +177,18 @@ export const moodService: MoodServiceInterface = {
     timestamp: number,
     utcOffsetMinutes?: number | null,
   ): Promise<MoodEntry | undefined> {
-    return updateMoodTimestamp(id, timestamp, utcOffsetMinutes);
+    const updated = await updateMoodTimestamp(id, timestamp, utcOffsetMinutes);
+    if (updated) await reconcileRemindersAfterMoodChange();
+    return updated;
   },
 
   async updateEmotionCategory(
     emotionName: string,
     category: Emotion["category"]
   ): Promise<{ updated: number }> {
-    return updateEmotionCategoryInMoods(emotionName, category);
+    const result = await updateEmotionCategoryInMoods(emotionName, category);
+    if (result.updated > 0) await reconcileRemindersAfterMoodChange();
+    return result;
   },
 
   async getEmotionNames(): Promise<string[]> {

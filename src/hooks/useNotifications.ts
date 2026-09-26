@@ -21,6 +21,8 @@ type NotificationLifecycleDependencies = {
         listener: (state: AppStateStatus) => void
     ) => RemovableSubscription;
     onMoodReminderResponse: () => void;
+    getCalendarContext: () => string;
+    getAppState: () => AppStateStatus | null;
     onError: (error: unknown) => void;
 };
 
@@ -31,6 +33,11 @@ const defaultLifecycleDependencies: NotificationLifecycleDependencies = {
     clearLastNotificationResponse,
     addAppStateChangeListener: (listener) => AppState.addEventListener("change", listener),
     onMoodReminderResponse: () => undefined,
+    getCalendarContext: () => {
+        const now = new Date();
+        return `${now.toDateString()}:${now.getTimezoneOffset()}:${Intl.DateTimeFormat().resolvedOptions().timeZone}`;
+    },
+    getAppState: () => AppState.currentState,
     onError: (error) => {
         console.warn("Failed to handle notification lifecycle:", error);
     },
@@ -88,6 +95,8 @@ export function startNotificationLifecycle(
     const handledResponseIds = new Set<string>();
     let notificationSubscription: RemovableSubscription | null = null;
     let cancelled = false;
+    let calendarContext = deps.getCalendarContext();
+    let calendarTimer: ReturnType<typeof setInterval> | null = null;
 
     const recoverReminders = () => {
         void deps.ensureMoodReminderScheduled().catch(deps.onError);
@@ -106,11 +115,35 @@ export function startNotificationLifecycle(
         void deps.clearLastNotificationResponse().catch(deps.onError);
     };
 
+    const stopCalendarWatch = () => {
+        if (calendarTimer !== null) {
+            clearInterval(calendarTimer);
+            calendarTimer = null;
+        }
+    };
+    const startCalendarWatch = () => {
+        stopCalendarWatch();
+        calendarContext = deps.getCalendarContext();
+        calendarTimer = setInterval(() => {
+            if (cancelled) return;
+            const nextContext = deps.getCalendarContext();
+            if (nextContext !== calendarContext) {
+                calendarContext = nextContext;
+                recoverReminders();
+            }
+        }, 60_000);
+    };
+
     recoverReminders();
+    if (!deps.getAppState() || deps.getAppState() === "active") startCalendarWatch();
 
     const appStateSubscription = deps.addAppStateChangeListener((state) => {
+        if (cancelled) return;
         if (state === "active") {
             recoverReminders();
+            startCalendarWatch();
+        } else {
+            stopCalendarWatch();
         }
     });
 
@@ -133,6 +166,7 @@ export function startNotificationLifecycle(
 
     return () => {
         cancelled = true;
+        stopCalendarWatch();
         notificationSubscription?.remove();
         appStateSubscription.remove();
     };
