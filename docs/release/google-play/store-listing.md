@@ -8,8 +8,9 @@ fabricated data only.
 
 - App name: Moodinator
 - Package: `com.lab4code.moodinator`
-- Release candidate version: `0.1.5` (Android versionCode is assigned from the
-  monotonically increasing EAS remote counter)
+- Checked-in source baseline: `0.1.5` / Android version code 40. The
+  coordinated release ledger assigns the version and code for each build;
+  confirm the current candidate against its release record and Play Internal.
 - Category: Health & Fitness
 - Pricing: Free
 - Ads: None

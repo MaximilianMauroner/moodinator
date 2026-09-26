@@ -132,9 +132,11 @@ coverage, fixture generation, manual checks and performance captures.
 
 ### Versions and builds
 
-The current Google Play release candidate uses marketing version `0.1.5`.
-Android build numbers come from EAS's remote counter and must remain
-monotonically increasing independently of the marketing version.
+The checked-in app metadata starts at marketing version `0.1.5` and Android
+version code 40. The coordinated release runner stamps the reserved patch
+version and version code into an isolated build workspace. Use its shared
+release ledger and Play Internal record for the current candidate; the
+checked-in values do not identify the latest uploaded build.
 
 `bun run version:bump` explicitly increments the minor version in `app.json`
 and `package.json`. Build commands do not invoke it automatically. Run it only
