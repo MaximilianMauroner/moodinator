@@ -162,7 +162,7 @@ describe('no-entry reminder scheduler', () => {
         h.state.ordinary = [{ ...enabled, scheduleStatus: 'scheduled', scheduledId: 'ordinary' }];
         await h.scheduler.save(enabled);
         expect(h.requests.size).toBe(14);
-        h.requests.set('ordinary', { identifier: 'ordinary', content: {} });
+        h.requests.set('ordinary', { identifier: 'ordinary', content: { data: { type: 'mood-reminder' } }, trigger: { type: 'daily', hour: 21, minute: 0 } });
         const result = await h.scheduler.reconcile();
         expect(result.retainedIds).toEqual([]);
         expect(h.requests.size).toBe(1);
@@ -172,11 +172,11 @@ describe('no-entry reminder scheduler', () => {
         const h = harness();
         // September 26 is Saturday; IDs use normalized weekday order: Sunday, Saturday.
         h.state.ordinary = [{ ...enabled, weekdays: [7, 1], scheduleStatus: 'scheduled', scheduledIds: ['sunday', 'saturday'] }];
-        h.requests.set('saturday', { identifier: 'saturday', content: {} });
+        h.requests.set('saturday', { identifier: 'saturday', content: { data: { type: 'mood-reminder' } }, trigger: { type: 'weekly', hour: 21, minute: 0, weekday: 7 } });
         await h.scheduler.save(enabled);
         expect(h.requests.has('no-entry-2026-09-26')).toBe(false);
         expect(h.requests.has('no-entry-2026-09-27')).toBe(true);
-        h.requests.set('sunday', { identifier: 'sunday', content: {} });
+        h.requests.set('sunday', { identifier: 'sunday', content: { data: { type: 'mood-reminder' } }, trigger: { type: 'weekly', hour: 21, minute: 0, weekday: 1 } });
         await h.scheduler.reconcile();
         expect(h.requests.has('no-entry-2026-09-26')).toBe(false);
         expect(h.requests.has('no-entry-2026-09-27')).toBe(false);
@@ -191,6 +191,26 @@ describe('no-entry reminder scheduler', () => {
         expect(h.requests.has('no-entry-2026-09-26')).toBe(true);
         h.state.ordinary[0].scheduledIds = ['saturday', 'saturday'];
         await h.scheduler.reconcile();
+        expect(h.requests.has('no-entry-2026-09-26')).toBe(true);
+    });
+
+    it.each([
+        { type: 'weekly', weekday: 7, hour: 21, minute: 0 },
+        { type: 'calendar', repeats: true, dateComponents: { weekday: 7, hour: 21, minute: 0, timeZone: null, calendar: null, isLeapMonth: false } },
+    ])('uses surviving native weekday/time after a failed or disabled weekly rollback: %j', async (trigger) => {
+        const h = harness();
+        h.state.ordinary = [{ ...enabled, enabled: false, hour: 19, weekdays: [1, 7], scheduleStatus: 'failed', scheduledIds: ['saturday'] }];
+        h.requests.set('saturday', { identifier: 'saturday', content: { data: { type: 'mood-reminder' } }, trigger });
+        await h.scheduler.save(enabled);
+        expect(h.requests.has('no-entry-2026-09-26')).toBe(false);
+        expect(h.requests.has('no-entry-2026-09-27')).toBe(true);
+    });
+
+    it('does not treat unrelated or date-constrained native requests as recurring ordinary collisions', async () => {
+        const h = harness();
+        h.requests.set('unrelated', { identifier: 'unrelated', content: {}, trigger: { type: 'daily', hour: 21, minute: 0 } });
+        h.requests.set('specific', { identifier: 'specific', content: { data: { type: 'mood-reminder' } }, trigger: { type: 'calendar', repeats: true, dateComponents: { year: 2027, hour: 21, minute: 0 } } });
+        await h.scheduler.save(enabled);
         expect(h.requests.has('no-entry-2026-09-26')).toBe(true);
     });
 

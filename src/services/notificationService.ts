@@ -74,7 +74,6 @@ const noEntryReminderScheduler = createNoEntryReminderScheduler({
     storage: AsyncStorage,
     getAccess: getNotificationAccess,
     getModule: getNotificationsModule,
-    getOrdinaryReminders: getAllNotificationsUnlocked,
     getEntryTimestamps: async (start, end) => {
         const { moodService } = await import('./moodService');
         const entries = await moodService.getInRange({ startDate: start.getTime(), endDate: end.getTime() - 1 });
@@ -84,9 +83,28 @@ const noEntryReminderScheduler = createNoEntryReminderScheduler({
     getTimeZone: getCurrentTimeZone,
 });
 
+let notificationResetInProgress = false;
+const RESET_IN_PROGRESS_MESSAGE = 'App reset is in progress. Try changing reminders after it finishes.';
+
+/** Exclude new user schedules while reset performs work that re-enters this queue. */
+export async function withNotificationReset<T>(operation: () => Promise<T>): Promise<T> {
+    if (notificationResetInProgress) throw new Error(RESET_IN_PROGRESS_MESSAGE);
+    notificationResetInProgress = true;
+    try {
+        // Drain any operation already running before cleaning its native effects.
+        await enqueueMutation(async () => undefined);
+        return await operation();
+    } finally {
+        await enqueueMutation(async () => undefined);
+        notificationResetInProgress = false;
+    }
+}
+
 /** Recompute collisions before releasing the existing shared native mutation queue. */
-function enqueueReminderMutation<T>(operation: () => Promise<T>): Promise<T> {
+function enqueueReminderMutation<T>(operation: () => Promise<T>, allowDuringReset = false): Promise<T> {
+    if (notificationResetInProgress && !allowDuringReset) return Promise.reject(new Error(RESET_IN_PROGRESS_MESSAGE));
     return enqueueMutation(async () => {
+        if (notificationResetInProgress && !allowDuringReset) throw new Error(RESET_IN_PROGRESS_MESSAGE);
         try {
             return await operation();
         } finally {
@@ -106,7 +124,11 @@ export function getNoEntryReminderSettings(): Promise<NoEntryReminderSettings> {
 export function saveNoEntryReminderSettings(
     choice: Pick<NoEntryReminderSettings, 'enabled' | 'hour' | 'minute'>
 ): Promise<NoEntryReminderSettings> {
-    return enqueueMutation(() => noEntryReminderScheduler.save(choice));
+    if (notificationResetInProgress && choice.enabled) return Promise.reject(new Error(RESET_IN_PROGRESS_MESSAGE));
+    return enqueueMutation(() => {
+        if (notificationResetInProgress && choice.enabled) throw new Error(RESET_IN_PROGRESS_MESSAGE);
+        return noEntryReminderScheduler.save(choice);
+    });
 }
 
 export function reconcileNoEntryReminder(): Promise<NoEntryReminderSettings> {
@@ -579,6 +601,20 @@ async function rescheduleAllNotificationsUnlocked(
         );
     }
 
+    try {
+        const requiredSlots = enabledNotifications.reduce((count, notification) => {
+            const days = normalizeReminderDays(notification.weekdays);
+            return count + (days.length === 7 ? 1 : days.length);
+        }, 0);
+        if (requiredSlots > 0) await noEntryReminderScheduler.reserveOrdinaryCapacity(Notifications, requiredSlots);
+    } catch (error) {
+        return persistCleanupFailedResult(
+            nextNotifications.map((notification) => applyUnscheduledState(notification, 'failed', 'Notification capacity could not be reserved.')),
+            error,
+            'Notification capacity could not be reserved.'
+        );
+    }
+
     const schedulingErrors: string[] = [];
     const scheduledNotifications: NotificationConfig[] = [];
     for (const notification of nextNotifications) {
@@ -699,7 +735,7 @@ export function cancelMoodReminder(): Promise<ReminderScheduleResult> {
             await AsyncStorage.setItem(NOTIFICATIONS_ENABLED_KEY, 'false');
         }
         return result;
-    });
+    }, true);
 }
 
 export function saveNotificationSettings(
@@ -892,7 +928,7 @@ export function ensureMoodReminderScheduled(): Promise<ReminderScheduleResult | 
             access,
             scheduledIds,
         }, notifications);
-    });
+    }, true);
 }
 
 export async function addNotificationResponseReceivedListener(
@@ -948,14 +984,18 @@ export function getNotificationResponseIdentity(response: NotificationResponse):
 export function cancelAllScheduledNotifications(): Promise<void> {
     return enqueueMutation(async () => {
         const Notifications = await getNotificationsModule();
-        if (Notifications) {
-            await Notifications.cancelAllScheduledNotificationsAsync();
+        if (!Notifications) throw new Error('Notifications are unavailable; existing reminders could not be cleared.');
+        await Notifications.cancelAllScheduledNotificationsAsync();
+        if ((await Notifications.getAllScheduledNotificationsAsync()).length > 0) {
+            throw new Error('Some scheduled notifications remain. Try clearing reminders again.');
         }
     });
 }
 
 export function scheduleTestNotification(): Promise<boolean> {
+    if (notificationResetInProgress) return Promise.resolve(false);
     return enqueueMutation(async () => {
+        if (notificationResetInProgress) return false;
         const access = await getNotificationAccess('request');
         if (!access.ok) {
             return false;
@@ -976,6 +1016,7 @@ export function scheduleTestNotification(): Promise<boolean> {
 }
 
 export const notificationService = {
+    withNotificationReset,
     getNoEntryReminderSettings,
     saveNoEntryReminderSettings,
     reconcileNoEntryReminder,

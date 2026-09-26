@@ -2,9 +2,9 @@ import React, { useCallback } from "react";
 import { View, Text, ScrollView } from "react-native";
 import { Redirect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { moodService } from "@/services/moodService";
+import { resetDeveloperAppData } from "@/services/developerResetService";
 import { notificationService } from "@/services/notificationService";
 import { useSettingsStore } from "@/shared/state/settingsStore";
 import { useMoodsStore } from "@/shared/state/moodsStore";
@@ -107,10 +107,7 @@ export function DeveloperSettingsScreen() {
           style: "destructive",
           onPress: async () => {
             try {
-              await notificationService.cancelAllScheduledNotifications();
-              await clearPin();
-              await moodService.clearAll();
-              await AsyncStorage.clear();
+              await resetDeveloperAppData(clearPin);
               await resetOnboarding();
               invalidateMoods();
               await Promise.all([
@@ -121,7 +118,7 @@ export function DeveloperSettingsScreen() {
               Alert.alert("Reset Complete", "Setup is available again.");
             } catch (error) {
               console.error("Failed to reset app to setup:", error);
-              Alert.alert("Error", "Failed to reset app state.");
+              Alert.alert("Error", error instanceof Error ? error.message : "Failed to reset app state.");
             }
           },
         },

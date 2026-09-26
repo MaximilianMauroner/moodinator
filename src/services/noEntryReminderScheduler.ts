@@ -1,5 +1,4 @@
 import type * as ExpoNotifications from 'expo-notifications';
-import { normalizeReminderDays } from '../lib/reminderDays';
 import {
     createNoEntryReminderPlan,
     getLocalDayKey,
@@ -32,7 +31,6 @@ export type NoEntryReminderDependencies = {
     storage: { getItem(key: string): Promise<string | null>; setItem(key: string, value: string): Promise<unknown> };
     getAccess(mode: 'request' | 'check-only'): Promise<AccessResult>;
     getModule(): Promise<NotificationsModule | null>;
-    getOrdinaryReminders(): Promise<readonly (OrdinaryReminderForPlan & { scheduledId?: string; scheduledIds?: string[] })[]>;
     getEntryTimestamps(start: Date, end: Date): Promise<readonly number[]>;
     now(): Date;
     getTimeZone(): string;
@@ -55,6 +53,43 @@ function dayBounds(now: Date, days: number): [Date, Date] {
     const end = new Date(start);
     end.setDate(end.getDate() + days);
     return [start, end];
+}
+
+type NativeRequest = Awaited<ReturnType<NotificationsModule['getAllScheduledNotificationsAsync']>>[number];
+function isConditional(request: NativeRequest): boolean {
+    return request.identifier.startsWith(NO_ENTRY_REMINDER_ID_PREFIX)
+        || request.content.data?.type === NO_ENTRY_REMINDER_TAG;
+}
+
+/** Expo serializes Android daily/weekly triggers directly and iOS as calendar components. */
+function nativeOrdinaryPlan(request: NativeRequest, timeZone: string): OrdinaryReminderForPlan | null {
+    // SDK55 types include calendar input, but native output has dateComponents.
+    const trigger = request.trigger as ExpoNotifications.NotificationTrigger | ExpoNotifications.CalendarNotificationTrigger;
+    if (!trigger || !('type' in trigger)) return null;
+    let hour: number;
+    let minute: number;
+    let weekday: number | undefined;
+    if (trigger.type === 'daily' || trigger.type === 'weekly') {
+        hour = trigger.hour;
+        minute = trigger.minute;
+        weekday = trigger.type === 'weekly' ? trigger.weekday : undefined;
+    } else if (trigger.type === 'calendar' && trigger.repeats && 'dateComponents' in trigger) {
+        const components = trigger.dateComponents;
+        if (!components || typeof components !== 'object') return null;
+        const constrained = ['era', 'year', 'month', 'day', 'weekdayOrdinal', 'quarter',
+            'weekOfMonth', 'weekOfYear', 'yearForWeekOfYear'] as const;
+        if (constrained.some((key) => components[key] != null)
+            || (components.second != null && components.second !== 0)
+            || (components.nanosecond != null && components.nanosecond !== 0)
+            || components.calendar != null || components.isLeapMonth || components.isRepeatedDay
+            || (components.timeZone != null && components.timeZone !== timeZone)) return null;
+        hour = components.hour!;
+        minute = components.minute!;
+        weekday = components.weekday;
+    } else return null;
+    if (!validTime(hour, minute)
+        || (weekday !== undefined && (!Number.isInteger(weekday) || weekday < 1 || weekday > 7))) return null;
+    return { hour, minute, weekdays: weekday === undefined ? undefined : [weekday], enabled: true, scheduleStatus: 'scheduled' };
 }
 
 /** Caller serializes these methods with all other native notification mutations. */
@@ -98,10 +133,8 @@ export function createNoEntryReminderScheduler(deps: NoEntryReminderDependencies
                     message: `${access && !access.ok ? access.message : 'Notifications are unavailable on this device.'}${retained.size ? ` ${CLEANUP_WARNING}` : ''}` });
             }
             const scheduled = await native.getAllScheduledNotificationsAsync();
-            const owned = scheduled.filter((request) => request.identifier.startsWith(NO_ENTRY_REMINDER_ID_PREFIX)
-                || request.content.data?.type === NO_ENTRY_REMINDER_TAG);
+            const owned = scheduled.filter(isConditional);
             retained = new Set([...retained, ...owned.map((request) => request.identifier)]);
-            const nativeIds = new Set(scheduled.map((request) => request.identifier));
             const timeZone = deps.getTimeZone();
             const now = deps.now();
             const [start, end] = dayBounds(now, NO_ENTRY_REMINDER_HORIZON_DAYS);
@@ -109,22 +142,12 @@ export function createNoEntryReminderScheduler(deps: NoEntryReminderDependencies
             const plan = canSchedule ? createNoEntryReminderPlan({
                 now: now.getTime(), hour: settings.hour, minute: settings.minute,
                 entryTimestamps: await deps.getEntryTimestamps(start, end),
-                ordinaryReminders: (await deps.getOrdinaryReminders()).flatMap<OrdinaryReminderForPlan>((reminder) => {
-                    const ids = reminder.scheduledIds?.length ? reminder.scheduledIds
-                        : reminder.scheduledId ? [reminder.scheduledId] : [];
-                    try {
-                        const days = normalizeReminderDays(reminder.weekdays);
-                        const expectedCount = days.length === 7 ? 1 : days.length;
-                        if (ids.length !== expectedCount || new Set(ids).size !== expectedCount) return [];
-                        // Weekly IDs are persisted in normalizeReminderDays order.
-                        // An absent native request releases only its own weekday.
-                        const scheduledDays = days.length === 7
-                            ? (nativeIds.has(ids[0]) ? days : [])
-                            : days.filter((_, index) => nativeIds.has(ids[index]));
-                        return scheduledDays.length ? [{ ...reminder, weekdays: scheduledDays }] : [];
-                    } catch {
-                        return [];
-                    }
+                ordinaryReminders: scheduled.flatMap((request) => {
+                    if (request.content.data?.type !== 'mood-reminder'
+                        && request.content.title !== 'How are you feeling?') return [];
+                    if (isConditional(request)) return [];
+                    const reminder = nativeOrdinaryPlan(request, timeZone);
+                    return reminder ? [reminder] : [];
                 }),
                 capacity: Math.max(0, 64 - (scheduled.length - owned.length)),
             }) : null;
@@ -204,6 +227,32 @@ export function createNoEntryReminderScheduler(deps: NoEntryReminderDependencies
         if (!settings.enabled && settings.status === 'disabled' && settings.retainedIds.length === 0) return settings;
         return update(settings, 'check-only');
     }
+    /** Called after ordinary cleanup, before scheduling the complete replacement set. */
+    async function reserveOrdinaryCapacity(native: NotificationsModule, requiredSlots: number): Promise<void> {
+        const settings = await getSettings();
+        if (!settings.enabled && settings.retainedIds.length === 0 && settings.status === 'disabled') return;
+        const scheduled = await native.getAllScheduledNotificationsAsync();
+        const conditional = scheduled.filter(isConditional)
+            .sort((a, b) => b.identifier.localeCompare(a.identifier));
+        // Free all possible conditional capacity; ordinary scheduling still reports
+        // per-reminder partial success when the full desired set exceeds OS limits.
+        const removeCount = Math.min(conditional.length, Math.max(0, scheduled.length + requiredSlots - 64));
+        if (removeCount === 0) return;
+        const retained = new Set([...settings.retainedIds, ...conditional.map((request) => request.identifier)]);
+        let failed = false;
+        for (const request of conditional.slice(0, removeCount)) {
+            try {
+                await native.cancelScheduledNotificationAsync(request.identifier);
+                retained.delete(request.identifier);
+            } catch {
+                failed = true;
+            }
+        }
+        await persist({ ...settings, retainedIds: [...retained], scheduledThroughDayKey: null,
+            status: failed ? 'failed' : 'limited',
+            message: failed ? CLEANUP_WARNING : 'Device notification capacity limits this reminder.' });
+        if (failed) throw new Error('Could not safely free notification capacity. Some earlier reminders may still arrive.');
+    }
     async function shouldPresent(data: Record<string, unknown>): Promise<boolean> {
         if (data.type !== NO_ENTRY_REMINDER_TAG) return true;
         try {
@@ -219,5 +268,5 @@ export function createNoEntryReminderScheduler(deps: NoEntryReminderDependencies
             return false;
         }
     }
-    return { getSettings, save, reconcile, shouldPresent };
+    return { getSettings, save, reconcile, shouldPresent, reserveOrdinaryCapacity };
 }

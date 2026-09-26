@@ -86,7 +86,7 @@ export function NoEntryReminderSettings() {
       <Text accessibilityLiveRegion="polite" style={{ color: get("text") }}>
         {settings.status === "disabled" ? "Off" : settings.status === "scheduled"
           ? `Planned through ${settings.scheduledThroughDayKey}. Device delivery may be delayed.`
-          : settings.status === "limited" ? "Only some days could be planned."
+          : settings.status === "limited" ? "Planning is limited by device capacity."
           : settings.status === "failed" ? "Schedule needs attention" : "Not scheduled"}
       </Text>
       {settings.message && <Text accessibilityRole="alert" style={{ color: get("text") }}>{settings.message}</Text>}
