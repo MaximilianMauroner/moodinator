@@ -119,6 +119,89 @@ describe("notificationService scheduling persistence", () => {
     ]);
   });
 
+  describe.each(["ios", "android"])("%s reminder consent", (platform) => {
+    it.each(["add paused", "edit paused", "pause", "delete"])(
+      "%s does not request permission for another enabled reminder",
+      async (operation) => {
+        platformMock.Platform.OS = platform;
+        await AsyncStorage.setItem("notificationsList", JSON.stringify([
+          reminder("other"),
+          reminder("target", operation === "pause"),
+        ]));
+        notificationMocks.getPermissionsAsync.mockResolvedValue({ status: "denied" });
+        const service = await loadService();
+
+        if (operation === "add paused") {
+          await service.addNotification({
+            title: "Paused draft", body: "Check in", hour: 9, minute: 30, enabled: false,
+          });
+        } else if (operation === "delete") {
+          await service.deleteNotification("target");
+        } else {
+          await service.updateNotification("target", {
+            title: "Edited draft", hour: 9, minute: 30, enabled: false,
+          });
+        }
+
+        expect(notificationMocks.requestPermissionsAsync).not.toHaveBeenCalled();
+        expect(notificationMocks.scheduleNotificationAsync).not.toHaveBeenCalled();
+        expect(await storedNotifications()).toContainEqual(expect.objectContaining({
+          id: "other", enabled: true, scheduleStatus: "permission-denied",
+        }));
+        if (operation === "delete" || operation === "pause") {
+          expect(await storedNotifications()).toContainEqual(expect.objectContaining({
+            id: "target", pendingAction: operation === "delete" ? "delete" : "disable",
+          }));
+        }
+
+        // A later permission grant reconciles the persisted intent without a prompt.
+        notificationMocks.getPermissionsAsync.mockResolvedValue({ status: "granted" });
+        const restartedService = await loadService();
+        await restartedService.ensureMoodReminderScheduled();
+        const saved = await restartedService.getAllNotifications();
+        if (operation === "delete") {
+          expect(saved.map((item) => item.id)).not.toContain("target");
+        } else {
+          expect(saved).toContainEqual(expect.objectContaining({
+            title: operation === "add paused" ? "Paused draft" : "Edited draft",
+            hour: 9, minute: 30, enabled: false, scheduleStatus: "disabled",
+          }));
+        }
+        expect(notificationMocks.requestPermissionsAsync).not.toHaveBeenCalled();
+        expect(notificationMocks.scheduleNotificationAsync).toHaveBeenCalledTimes(1);
+        expect(notificationMocks.scheduleNotificationAsync).toHaveBeenCalledWith(
+          expect.objectContaining({
+            content: expect.objectContaining({ data: expect.objectContaining({ notificationId: "other" }) }),
+          })
+        );
+      }
+    );
+  });
+
+  it.each([
+    ["add", "granted"], ["add", "denied"],
+    ["enable", "granted"], ["enable", "denied"],
+  ])("explicit %s respects a %s permission response", async (operation, permission) => {
+    await AsyncStorage.setItem("notificationsList", JSON.stringify([reminder("paused", false)]));
+    notificationMocks.getPermissionsAsync.mockResolvedValue({ status: "undetermined" });
+    notificationMocks.requestPermissionsAsync.mockResolvedValue({ status: permission });
+    const service = await loadService();
+
+    if (operation === "add") {
+      await service.addNotification({
+        title: "Active reminder", body: "Check in", hour: 20, minute: 0, enabled: true,
+      });
+    } else {
+      await service.updateNotification("paused", { enabled: true });
+    }
+
+    expect(notificationMocks.requestPermissionsAsync).toHaveBeenCalledTimes(1);
+    expect(notificationMocks.scheduleNotificationAsync).toHaveBeenCalledTimes(permission === "granted" ? 1 : 0);
+    expect(await storedNotifications()).toContainEqual(expect.objectContaining({
+      enabled: true, scheduleStatus: permission === "granted" ? "scheduled" : "permission-denied",
+    }));
+  });
+
   it("uses provisional iOS permission during passive recovery without prompting", async () => {
     await AsyncStorage.setItem(
       "notificationsList",
