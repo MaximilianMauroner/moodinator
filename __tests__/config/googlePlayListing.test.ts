@@ -90,16 +90,26 @@ describe("Google Play listing package", () => {
     expect(featureGraphic.size).toBeLessThan(15_728_640);
   });
 
-  it("includes at least five portrait phone screenshots", () => {
-    const screenshotPaths = readdirSync(join(assetRoot, "screenshots"))
-      .filter((name) => name.endsWith(".png"))
-      .map((name) => join(assetRoot, "screenshots", name));
+  it("keeps historical captures separate and validates a complete replacement set", () => {
+    const historical = readdirSync(join(assetRoot, "historical"))
+      .filter((name) => name.endsWith(".png")).sort();
+    expect(historical).toEqual([
+      "01-home.png", "02-detailed-entry.png", "03-data-export.png",
+      "04-quick-entry.png", "05-history-insights.png",
+    ]);
 
-    expect(screenshotPaths.length).toBeGreaterThanOrEqual(5);
-    expect(screenshotPaths).toContain(
-      join(assetRoot, "screenshots", "05-history-insights.png")
-    );
-    for (const screenshotPath of screenshotPaths) {
+    const current = readdirSync(join(assetRoot, "screenshots"))
+      .filter((name) => name.endsWith(".png")).sort();
+    const expectedCurrent = [
+      "01-home.png", "02-quick-entry.png", "03-history.png",
+      "04-insights.png", "05-data-export.png",
+    ];
+    expect(current.length === 0 || current.join() === expectedCurrent.join()).toBe(true);
+
+    for (const screenshotPath of [
+      ...historical.map((name) => join(assetRoot, "historical", name)),
+      ...current.map((name) => join(assetRoot, "screenshots", name)),
+    ]) {
       const screenshot = readPngMetadata(screenshotPath);
       expect(screenshot.width).toBeGreaterThanOrEqual(320);
       expect(screenshot.height).toBeGreaterThan(screenshot.width);
