@@ -250,6 +250,9 @@ four ranges remain reachable without overlapping labels. Check both themes and
 reduced motion; capture 30 idle seconds on Charts after transitions settle.
 Verify that Average Mood, Entries, Mood Range, tag/emotion comparisons and streaks
 retain their values and labels, with lower mood numbers interpreted as better.
+With more than 20 eligible tags or emotions, Charts initially shows 20
+comparisons. Use Show more comparisons to reach later rows; changing the range
+or refreshing the data returns to the first 20.
 
 The reproducible visual matrix sets Android font scale to 1.3 and covers light,
 dark, normal-motion, and reduced-motion states. It explicitly writes and reads

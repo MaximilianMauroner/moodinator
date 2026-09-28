@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Platform,
   Pressable,
@@ -31,6 +31,7 @@ import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import type { MoodEntry } from "@db/types";
 
 type ViewMode = "charts" | "calendar";
+const COMPARISON_PAGE_SIZE = 20;
 const viewModes: {
   id: ViewMode;
   label: string;
@@ -65,6 +66,7 @@ export function InsightsScreen() {
   const { get } = useThemeColors();
   const [selectedEntry, setSelectedEntry] = useState<MoodEntry | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("charts");
+  const [visibleComparisonCount, setVisibleComparisonCount] = useState(COMPARISON_PAGE_SIZE);
   const calendarRefreshRef = useRef<(() => Promise<void>) | null>(null);
   const {
     recentMoods,
@@ -81,6 +83,9 @@ export function InsightsScreen() {
     setAnalysisRange,
     analysisMoods,
   } = useInsightsData();
+  useEffect(() => {
+    setVisibleComparisonCount(COMPARISON_PAGE_SIZE);
+  }, [analysisRange, analysisMoods]);
   const handleCalendarRefreshReady = useCallback(
     (callback: (() => Promise<void>) | null) => {
       calendarRefreshRef.current = callback;
@@ -212,9 +217,24 @@ export function InsightsScreen() {
                     These are entries you recorded, not causes.
                   </Text>
                   {analysis.drivers.length ? (
-                    analysis.drivers.map((driver) => (
-                      <DriverRow key={driver.id} driver={driver} />
-                    ))
+                    <>
+                      {analysis.drivers.slice(0, visibleComparisonCount).map((driver) => (
+                        <DriverRow key={driver.id} driver={driver} />
+                      ))}
+                      {analysis.drivers.length > visibleComparisonCount && (
+                        <Pressable
+                          onPress={() => setVisibleComparisonCount((count) => count + COMPARISON_PAGE_SIZE)}
+                          accessibilityRole="button"
+                          accessibilityLabel="Show more comparisons"
+                          className="mt-2 rounded-xl px-4 py-3"
+                          style={{ minHeight: 44, backgroundColor: get("surfaceAlt") }}
+                        >
+                          <Text className="text-center font-semibold text-paper-800 dark:text-paper-200">
+                            Show more comparisons ({Math.min(COMPARISON_PAGE_SIZE, analysis.drivers.length - visibleComparisonCount)} of {analysis.drivers.length - visibleComparisonCount} remaining)
+                          </Text>
+                        </Pressable>
+                      )}
+                    </>
                   ) : (
                     <Text className="mt-3 text-sm text-paper-700 dark:text-sand-300">
                       A comparison needs 5 entries with a tag or emotion and 5 without it.

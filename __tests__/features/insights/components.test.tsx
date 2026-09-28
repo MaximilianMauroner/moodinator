@@ -8,6 +8,8 @@ import { InsightsScreen } from "../../../src/features/insights/screens/InsightsS
 
 const insightsScreenState = vi.hoisted(() => ({
   analysisMoods: [] as Array<Record<string, unknown>>,
+  analysisRange: "7" as "7" | "30",
+  drivers: [] as Array<Record<string, unknown>>,
   error: null as string | null,
 }));
 
@@ -37,9 +39,9 @@ vi.mock("../../../src/features/insights/hooks/useInsightsData", () => ({
     analysis: {
       dailySeries: [],
       rhythm: [],
-      drivers: [],
+      drivers: insightsScreenState.drivers,
     },
-    analysisRange: "7",
+    analysisRange: insightsScreenState.analysisRange,
     setAnalysisRange: vi.fn(),
     analysisMoods: insightsScreenState.analysisMoods,
   }),
@@ -116,6 +118,38 @@ describe("insight presentation", () => {
       ),
     ).toBe(true);
     await act(async () => renderer.unmount());
+  });
+
+  it("bounds comparison rows and resets the batch when the range changes", async () => {
+    insightsScreenState.error = null;
+    insightsScreenState.drivers = Array.from({ length: 2000 }, (_, index) => ({
+      id: `context:Tag${index}`,
+      name: `Tag${index}`,
+      kind: "context",
+      withCount: 5,
+      withoutCount: 40,
+      withMean: 2,
+      withoutMean: 6,
+    }));
+    insightsScreenState.analysisRange = "7";
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(<InsightsScreen />);
+    });
+    const visibleRows = () => renderer.root.findAllByType("View").filter(
+      (node) => typeof node.props.accessibilityLabel === "string" &&
+        node.props.accessibilityLabel.startsWith("Tag"),
+    );
+    expect(visibleRows()).toHaveLength(20);
+    const showMore = () => renderer.root.findByProps({ accessibilityLabel: "Show more comparisons" });
+    await act(async () => showMore().props.onPress());
+    expect(visibleRows()).toHaveLength(40);
+    insightsScreenState.analysisRange = "30";
+    await act(async () => renderer.update(<InsightsScreen />));
+    expect(visibleRows()).toHaveLength(20);
+    await act(async () => renderer.unmount());
+    insightsScreenState.drivers = [];
+    insightsScreenState.analysisRange = "7";
   });
 
   it.each([0, 1, 2])("renders the correct visible entry plural for %i records", async (count) => {
