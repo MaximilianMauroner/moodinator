@@ -30,14 +30,15 @@ export function ComparisonBars({ means }: { means: [number, number] }) {
   );
 }
 export function DriverRow({ driver }: { driver: Driver }) {
+  const label = `${driver.kind === "context" ? "Context tag" : "Emotion"}: ${driver.name}`;
   return (
     <View
       className="py-3"
       accessible
-      accessibilityLabel={`${driver.name}, average ${driver.withMean.toFixed(1)} with across ${driver.withCount} entries, average ${driver.withoutMean.toFixed(1)} without across ${driver.withoutCount} entries. Lower is better.`}
+      accessibilityLabel={`${label}, average ${driver.withMean.toFixed(1)} with across ${driver.withCount} entries, average ${driver.withoutMean.toFixed(1)} without across ${driver.withoutCount} entries. Lower is better.`}
     >
       <Text className="font-semibold text-paper-800 dark:text-paper-200">
-        {driver.name}
+        {label}
       </Text>
       <Text className="text-sm text-paper-700 dark:text-sand-300">
         {driver.withMean.toFixed(1)} average with ({driver.withCount}) · {driver.withoutMean.toFixed(1)} without ({driver.withoutCount})

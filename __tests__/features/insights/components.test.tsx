@@ -100,7 +100,25 @@ describe("insight presentation", () => {
       .map((node) => node.children.join(""))
       .join(" ");
     expect(rendered).toContain("2.0 average with (5) · 4.0 without (8)");
+    expect(rendered).toContain("Context tag: Outside");
     expect(rendered).not.toContain("2.0 better");
+    await act(async () => renderer.unmount());
+  });
+  it("distinguishes a context tag from an emotion with the same name", async () => {
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(
+        <>
+          <DriverRow driver={{ id: "context:Calm", name: "Calm", kind: "context", withCount: 5, withoutCount: 5, withMean: 2, withoutMean: 6 }} />
+          <DriverRow driver={{ id: "emotion:Calm", name: "Calm", kind: "emotion", withCount: 5, withoutCount: 5, withMean: 7, withoutMean: 3 }} />
+        </>,
+      );
+    });
+    const labels = renderer.root.findAllByType("View")
+      .map((node) => node.props.accessibilityLabel)
+      .filter((label) => typeof label === "string");
+    expect(labels[0]).toContain("Context tag: Calm, average 2.0 with");
+    expect(labels[1]).toContain("Emotion: Calm, average 7.0 with");
     await act(async () => renderer.unmount());
   });
   it("exposes every empty rhythm cell and does not label it as a zero mood", async () => {
@@ -138,7 +156,7 @@ describe("insight presentation", () => {
     });
     const visibleRows = () => renderer.root.findAllByType("View").filter(
       (node) => typeof node.props.accessibilityLabel === "string" &&
-        node.props.accessibilityLabel.startsWith("Tag"),
+        node.props.accessibilityLabel.startsWith("Context tag: Tag"),
     );
     expect(visibleRows()).toHaveLength(20);
     const showMore = () => renderer.root.findByProps({ accessibilityLabel: "Show more comparisons" });
