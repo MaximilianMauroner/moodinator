@@ -25,7 +25,7 @@ const EXPANDED_ROW_GAP = 8;
 const EXPANDED_H_MARGIN = 4; // mx-1 each side
 const EXPANDED_GRADIENT_TOP =
   EXPANDED_HEADER_HEIGHT + 3 * EXPANDED_ROW_HEIGHT + 2 * EXPANDED_ROW_GAP + 8;
-const EXPANDED_GRADIENT_HEIGHT = 28; // bar + labels
+const EXPANDED_GRADIENT_HEIGHT = 36; // bar, label spacing, Android font padding
 
 /** Total height occupied by this component when fully expanded (compact mode). */
 export const UNIFIED_COMPACT_EXPANDED_HEIGHT =
