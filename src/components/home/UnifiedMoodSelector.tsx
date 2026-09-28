@@ -20,7 +20,7 @@ import { getMoodButtonLabel, getMoodButtonHint } from "@/constants/accessibility
 
 // Expanded compact grid
 const EXPANDED_HEADER_HEIGHT = 36; // divider row + spacing below
-const EXPANDED_ROW_HEIGHT = 44;
+const EXPANDED_ROW_HEIGHT = 52;
 const EXPANDED_ROW_GAP = 8;
 const EXPANDED_H_MARGIN = 4; // mx-1 each side
 const EXPANDED_GRADIENT_TOP =
