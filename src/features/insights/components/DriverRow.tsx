@@ -3,7 +3,6 @@ import { Text, View } from "react-native";
 import { useThemeColors } from "@/constants/colors";
 import { getMoodHex } from "@/lib/moodPresentation";
 import type { Driver } from "../utils/drivers";
-import { effectWords } from "../utils/findings";
 export function ComparisonBars({ means }: { means: [number, number] }) {
   const { isDark } = useThemeColors();
   return (
@@ -35,13 +34,13 @@ export function DriverRow({ driver }: { driver: Driver }) {
     <View
       className="py-3"
       accessible
-      accessibilityLabel={`${driver.name}, ${effectWords(driver.effect)}, ${driver.withCount} with, ${driver.withoutCount} without`}
+      accessibilityLabel={`${driver.name}, average ${driver.withMean.toFixed(1)} with across ${driver.withCount} entries, average ${driver.withoutMean.toFixed(1)} without across ${driver.withoutCount} entries. Lower is better.`}
     >
       <Text className="font-semibold text-paper-800 dark:text-paper-200">
-        {driver.name} · {effectWords(driver.effect)}
+        {driver.name}
       </Text>
       <Text className="text-sm text-paper-700 dark:text-sand-300">
-        {driver.withCount} with · {driver.withoutCount} without
+        {driver.withMean.toFixed(1)} average with ({driver.withCount}) · {driver.withoutMean.toFixed(1)} without ({driver.withoutCount})
       </Text>
       <ComparisonBars means={[driver.withMean, driver.withoutMean]} />
     </View>

@@ -800,18 +800,21 @@ test("visual matrix retains each screen before the next navigation", () => {
     new URL("../src/features/insights/screens/InsightsScreen.tsx", import.meta.url),
     "utf8",
   );
-  for (const screen of ["home", "findings", "charts", "calendar", "settings"]) {
+  for (const screen of ["home", "charts", "calendar", "settings"]) {
     assert.match(source, new RegExp(`capture\\(\"${screen}\"\\)`));
   }
+  assert.doesNotMatch(source, /capture\("findings"\)/);
   const flow = readFileSync(new URL("../.maestro/flows/native-visual-matrix.yaml", import.meta.url), "utf8");
   assert.equal(flow.includes("Insights tab"), false);
   const openInsights = source.indexOf("Insights tab, view mood history and summaries");
   const selectAll = source.indexOf('contentDescription: "All history"', openInsights);
   const loadedSummary = source.indexOf('testId: "insights-loaded-summary"', selectAll);
   assert.ok(openInsights >= 0 && selectAll > openInsights && loadedSummary > selectAll);
-  const chartsView = source.indexOf('contentDescription: "Charts view"', loadedSummary);
-  const calendarView = source.indexOf('contentDescription: "Calendar view"', chartsView);
-  assert.ok(chartsView > loadedSummary && calendarView > chartsView);
+  const trend = source.indexOf('text: "Trend"', loadedSummary);
+  const chartsCapture = source.indexOf('capture("charts")', trend);
+  const calendarView = source.indexOf('contentDescription: "Calendar view"', chartsCapture);
+  assert.ok(trend > loadedSummary && chartsCapture > trend && calendarView > chartsCapture);
+  assert.doesNotMatch(source, /contentDescription: "Findings view"/);
   assert.doesNotMatch(source, /waitForNodeAndTap\(serial, \{ text: "(?:Charts|Calendar) view" \}\)/);
   assert.match(source, /testId: "insights-loaded-summary"/);
   assert.match(source, /text: `\$\{fixtureCount\} entries`/);
@@ -826,6 +829,18 @@ test("visual matrix retains each screen before the next navigation", () => {
   );
   assert.match(source, /Calendar legend: a dot marks a day with multiple entries/);
   assert.match(source, /Local privacy/);
+  assert.match(insightsSource, /<ChartCard title="Comparisons">/);
+});
+
+test("one-entry Insights smoke checks Charts, comparisons, and Calendar without Findings", () => {
+  const flow = readFileSync(new URL("../.maestro/flows/insights.yaml", import.meta.url), "utf8");
+  const charts = flow.indexOf('- assertVisible: "Charts view"');
+  const trend = flow.indexOf('- assertVisible: "Trend"', charts);
+  const shortfall = flow.indexOf('text: "A comparison needs 5 entries with a tag or emotion and 5 without it."', trend);
+  const calendar = flow.indexOf('- tapOn: "Calendar view"', shortfall);
+  const backToCharts = flow.indexOf('- tapOn: "Charts view"', calendar);
+  assert.ok(charts >= 0 && trend > charts && shortfall > trend && calendar > shortfall && backToCharts > calendar);
+  assert.doesNotMatch(flow, /Findings view|Not enough data yet/);
 });
 
 test("visual matrix replaces app data with its complete retained fabricated fixture", () => {

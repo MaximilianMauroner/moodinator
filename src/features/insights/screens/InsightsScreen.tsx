@@ -15,7 +15,6 @@ import { InsightCard, CompactInsightCard } from "../components/InsightCard";
 import { StreakBadge } from "../components/StreakBadge";
 import { EntryDetailModal } from "../components/EntryDetailModal";
 import { InsightsHeader } from "../components/InsightsHeader";
-import { FindingCard } from "../components/FindingCard";
 import { TrendBand } from "../components/TrendBand";
 import { RhythmGrid } from "../components/RhythmGrid";
 import { DriverRow } from "../components/DriverRow";
@@ -31,13 +30,12 @@ import { useThemeColors } from "@/constants/colors";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import type { MoodEntry } from "@db/types";
 
-type ViewMode = "findings" | "charts" | "calendar";
+type ViewMode = "charts" | "calendar";
 const viewModes: {
   id: ViewMode;
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
 }[] = [
-  { id: "findings", label: "Findings", icon: "bulb-outline" },
   { id: "charts", label: "Charts", icon: "analytics" },
   { id: "calendar", label: "Calendar", icon: "calendar" },
 ];
@@ -66,7 +64,7 @@ function ChartCard({
 export function InsightsScreen() {
   const { get } = useThemeColors();
   const [selectedEntry, setSelectedEntry] = useState<MoodEntry | null>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>("findings");
+  const [viewMode, setViewMode] = useState<ViewMode>("charts");
   const calendarRefreshRef = useRef<(() => Promise<void>) | null>(null);
   const {
     recentMoods,
@@ -200,17 +198,6 @@ export function InsightsScreen() {
                 onRefreshReady={handleCalendarRefreshReady}
                 onEditEntry={setSelectedEntry}
               />
-            ) : viewMode === "findings" ? (
-              <>
-                {analysis.findings.map((finding) => (
-                  <FindingCard key={finding.id} finding={finding} />
-                ))}
-                <Text className="mb-4 text-xs text-paper-700 dark:text-sand-300">
-                  These are associations in your entries, not explanations.
-                  Logging habits and other circumstances can affect the
-                  patterns.
-                </Text>
-              </>
             ) : (
               <>
                 <ChartCard title="Trend">
@@ -219,9 +206,10 @@ export function InsightsScreen() {
                 <ChartCard title="Rhythm">
                   <RhythmGrid cells={analysis.rhythm} />
                 </ChartCard>
-                <ChartCard title="Drivers">
+                <ChartCard title="Comparisons">
                   <Text className="text-xs text-paper-700 dark:text-sand-300">
-                    Mean with above · mean without below. Lower is better.
+                    Average with above · average without below. Lower is better.
+                    These are entries you recorded, not causes.
                   </Text>
                   {analysis.drivers.length ? (
                     analysis.drivers.map((driver) => (
@@ -229,9 +217,7 @@ export function InsightsScreen() {
                     ))
                   ) : (
                     <Text className="mt-3 text-sm text-paper-700 dark:text-sand-300">
-                      {analysis.inconclusiveDrivers.length
-                        ? "No clear difference yet. The tags and emotions with enough entries did not stand apart from the rest."
-                        : "A comparison needs 5 entries with a tag or emotion and 5 without it."}
+                      A comparison needs 5 entries with a tag or emotion and 5 without it.
                     </Text>
                   )}
                 </ChartCard>

@@ -23,7 +23,7 @@ export interface RhythmCell {
   daypart: number;
   count: number;
   mean: number | null;
-  /** Second moment, so a cell can be compared against the rest with a spread. */
+  /** Recorded count and sum for this time slot. */
   stats: GroupStats;
 }
 export function rhythm(entries: MoodEntry[]): RhythmCell[] {

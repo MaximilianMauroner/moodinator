@@ -34,8 +34,8 @@ native control remained reachable.
 | Detailed entry | Emotions, context, energy, and notes remain optional/configurable; keyboard and draft-discard behavior are covered by source/tests. | Long-press opens the detailed form; notes remain reachable with the keyboard; save/reject/cancel preserve the correct draft. |
 | Recorded time | History, accessibility, detail, calendar, and related toasts use the recorded offset; original timestamps are not rewritten. | Verify cross-midnight positive, negative, and half-hour offsets, change device timezone, and confirm the displayed day/time stays stable. |
 | Read/edit/delete | History actions edit, change date/time, delete, and undo through the mood service/store. | Edit persists after restart; date/time changes are intentional; delete removes one row and Undo restores the same data. |
-| Insights | Zero, one, and multiple records have no-data/insufficient-sample states; findings describe associations, not causes. | Check Findings, Charts, Calendar, ranges, refresh, and populated fixtures on a clean QA install. |
-| Settings and portability | Presets affect the next entry; JSON import replacement is confirmed; export, backup, deletion, and external-copy limits are disclosed. | Verify preset application, malformed import recovery, selected Android backup folder, manual backup, deletion scope, restart, and offline use. |
+| Insights | Charts is the default view; Calendar remains available. Zero, one, and multiple records have honest no-data/insufficient-sample states, descriptive comparisons, mood statistics, and streaks. | Check Charts, Calendar, all ranges, refresh, and populated fixtures on a clean QA install. Verify that no confidence dots or pattern-confidence sentences remain. |
+| Settings and portability | Local privacy status and all Settings destinations remain available; presets affect the next entry; JSON import replacement is confirmed; export, backup, deletion, and external-copy limits are disclosed. | Verify privacy status, every Settings destination, therapy export, preset application, malformed import recovery, selected Android backup folder, manual backup, deletion scope, restart, and offline use. |
 | Protection and reminders | Optional app lock, biometrics, and local reminders are separate existing functionality. | Verify PIN/biometric recovery and reminder delivery after restart on the exact candidate; physical-device notification behavior remains separate. |
 
 ## Evidence boundary and remaining runtime inventory
@@ -147,6 +147,8 @@ failures. Use fabricated data only.
 | Draft errors | Change a note, close the form, choose Keep editing, then close and discard. | Keep editing preserves the draft. Discard leaves the saved entry unchanged. |
 | Save errors | In an isolated test build, make the storage write reject through a local debugger or test harness. Submit a populated draft, restore storage, and retry. | Save failed appears. The form and draft remain. Retrying creates one entry. No production error switch is required. |
 | Load errors | In an isolated test build, make the history or Insights read reject, then restore it and refresh. | The error is visible. Loading ends. Retry recovers. Existing entries remain intact. |
+| Insights navigation | Open Insights from Home, change ranges, open Calendar, then return to Charts. | Charts opens by default. Calendar and all four ranges remain reachable; no Findings tab or pattern-confidence copy/dots appear. |
+| Settings destinations | Open Settings and inspect Local privacy, then open each category and return. Export a fabricated therapy CSV. | Privacy status is visible, all existing destinations work, and the therapy export remains available. No redundant ProfileCard or subscription prompt appears. |
 | Import errors | Import malformed JSON through the normal Settings import action. | The error is visible and existing entries are unchanged. |
 
 If fault injection is unavailable, mark save and load errors as not tested.
@@ -234,16 +236,20 @@ prepared smoke flow is a functional check and does not measure frame rate.
 ## Insights, filters and recorded dates
 
 Use fabricated entries with known ratings. Seed five entries tagged Outside at mood
-2 and five untagged entries at mood 6 inside the selected range. Findings should
-say Outside entries average 4.0 better, with 5 with and 5 without. Removing one
-tagged entry must remove that comparison and identify the sample shortfall.
-Charts must show the same driver numbers. Check 7, 30, 90 and All ranges, including
+2 and five untagged entries at mood 6 inside the selected range. Charts'
+Comparisons section should show numeric averages of 2.0 with Outside and 6.0
+without it, with counts of five in each group. It must avoid a causal claim,
+confidence score/dot, or an unvalidated better/worse sentence. Removing one
+tagged entry must remove that comparison and show the insufficient-sample state.
+Check 7, 30, 90 and All ranges, including
 empty periods and isolated days. Missing dates must leave gaps in the trend; an
 isolated day with multiple ratings must still show its min/max range.
 
-On a narrow device and with large text, verify Findings/Charts/Calendar and all
+On a narrow device and with large text, verify Charts/Calendar and all
 four ranges remain reachable without overlapping labels. Check both themes and
 reduced motion; capture 30 idle seconds on Charts after transitions settle.
+Verify that Average Mood, Entries, Mood Range, tag/emotion comparisons and streaks
+retain their values and labels, with lower mood numbers interpreted as better.
 
 The reproducible visual matrix sets Android font scale to 1.3 and covers light,
 dark, normal-motion, and reduced-motion states. It explicitly writes and reads
@@ -293,9 +299,9 @@ Android encryption and notification quick-log delivery require their separately
 tracked migration rehearsal and physical-device spike. Emulator success does not
 establish terminated-process notification behavior on a physical device.
 
-The smoke also opens Findings, Charts and Calendar with its one-entry fixture,
-checks the insufficient-sample message and the empty driver comparison, and
-returns to Findings. It does not establish populated chart correctness or
+The smoke opens Charts by default, then Calendar, and returns to Charts with
+its one-entry fixture. It checks the insufficient-sample message in the
+Comparisons section. It does not establish populated chart correctness or
 large-history performance; use the fabricated comparisons above for those.
 
 The Undo probe begins only after the final Maestro flow has completed at the

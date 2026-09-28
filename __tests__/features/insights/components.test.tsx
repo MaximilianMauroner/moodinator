@@ -1,7 +1,7 @@
 import React from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { describe, expect, it, vi } from "vitest";
-import { FindingCard } from "../../../src/features/insights/components/FindingCard";
+import { DriverRow } from "../../../src/features/insights/components/DriverRow";
 import { RhythmGrid } from "../../../src/features/insights/components/RhythmGrid";
 import { rhythm } from "../../../src/features/insights/utils/rhythm";
 import { InsightsScreen } from "../../../src/features/insights/screens/InsightsScreen";
@@ -35,11 +35,9 @@ vi.mock("../../../src/features/insights/hooks/useInsightsData", () => ({
     getMoodColor: () => "#000",
     refresh: vi.fn(async () => {}),
     analysis: {
-      findings: [],
       dailySeries: [],
       rhythm: [],
       drivers: [],
-      inconclusiveDrivers: [],
     },
     analysisRange: "7",
     setAnalysisRange: vi.fn(),
@@ -54,15 +52,15 @@ vi.mock("../../../src/features/insights/components/StreakBadge", () => ({ Streak
 vi.mock("../../../src/features/insights/components/EntryDetailModal", () => ({ EntryDetailModal: () => null }));
 vi.mock("../../../src/features/insights/components/InsightsHeader", () => ({ InsightsHeader: () => null }));
 vi.mock("../../../src/features/insights/components/TrendBand", () => ({ TrendBand: () => null }));
-vi.mock("../../../src/features/insights/components/DriverRow", () => ({
-  DriverRow: () => null,
-  ComparisonBars: () => null,
-}));
+vi.mock("@/lib/moodPresentation", () => ({ getMoodHex: () => "#000" }));
 vi.mock("@/components/calendar", () => ({ MoodCalendar: () => null }));
 vi.mock("@/components/ui/EmptyState", () => ({ EmptyState: () => null }));
 vi.mock("@/components/ui/LoadingSpinner", () => ({ LoadingSpinner: () => null }));
 vi.mock("@/components/layout/ScreenBackgroundAccent", () => ({ ScreenBackgroundAccent: () => null }));
-vi.mock("@/components/ui/SegmentedControl", () => ({ SegmentedControl: () => null }));
+vi.mock("@/components/ui/SegmentedControl", () => ({
+  SegmentedControl: ({ items }: { items: { label: string }[] }) =>
+    React.createElement("Text", null, items.map((item) => item.label).join(" · ")),
+}));
 vi.mock("@/hooks/usePullToRefresh", () => ({
   usePullToRefresh: () => ({ refreshing: false, onRefresh: vi.fn() }),
 }));
@@ -78,28 +76,29 @@ vi.mock("@/constants/colors", () => ({
 vi.mock("@/components/ui/SurfaceCard", () => ({
   SurfaceCard: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
-function textOf(renderer: ReactTestRenderer) {
-  return JSON.stringify(renderer.toJSON());
-}
 describe("insight presentation", () => {
-  it("renders the claim and both sample sizes visibly", async () => {
+  it("renders both recorded averages and sample sizes without a pattern claim", async () => {
     let renderer!: ReactTestRenderer;
     await act(async () => {
       renderer = create(
-        <FindingCard
-          finding={{
+        <DriverRow
+          driver={{
             id: "outside",
-            effect: -2,
-            text: "Outside entries average 2.0 better.",
-            sample: "5 with · 8 without",
-            means: [2, 4],
+            name: "Outside",
+            kind: "context",
+            withCount: 5,
+            withoutCount: 8,
+            withMean: 2,
+            withoutMean: 4,
           }}
         />,
       );
     });
-    expect(textOf(renderer)).toContain("Outside entries average 2.0 better.");
-    expect(textOf(renderer)).toContain("5 with · 8 without");
-    expect(textOf(renderer)).toContain("Lower is better");
+    const rendered = renderer.root.findAllByType("Text")
+      .map((node) => node.children.join(""))
+      .join(" ");
+    expect(rendered).toContain("2.0 average with (5) · 4.0 without (8)");
+    expect(rendered).not.toContain("2.0 better");
     await act(async () => renderer.unmount());
   });
   it("exposes every empty rhythm cell and does not label it as a zero mood", async () => {
@@ -142,6 +141,8 @@ describe("insight presentation", () => {
       .join(" ");
     const expected = `${count} ${count === 1 ? "entry" : "entries"}`;
     expect(rendered).toContain(expected);
+    expect(rendered).toContain("Charts · Calendar");
+    expect(rendered).not.toContain("Findings");
     expect(rendered).not.toContain(`${count} ${count === 1 ? "entries" : "entry"}`);
     await act(async () => renderer.unmount());
   });

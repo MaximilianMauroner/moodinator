@@ -1,9 +1,7 @@
 appId: com.lab4code.moodinator.qa
-name: Insights segments with one recorded entry
+name: Insights charts and calendar with one recorded entry
 ---
-- assertVisible: "Findings view"
-- assertVisible: "Not enough data yet.*"
-- tapOn: "Charts view"
+- assertVisible: "Charts view"
 - assertVisible: "Trend"
 - scrollUntilVisible:
     element:
@@ -11,5 +9,5 @@ name: Insights segments with one recorded entry
     direction: DOWN
 - assertVisible: "A comparison needs 5 entries with a tag or emotion and 5 without it."
 - tapOn: "Calendar view"
-- tapOn: "Findings view"
-- assertVisible: "Not enough data yet.*"
+- tapOn: "Charts view"
+- assertVisible: "Trend"
