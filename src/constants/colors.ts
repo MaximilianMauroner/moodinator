@@ -173,32 +173,6 @@ export const colors = {
 export type ColorKey = keyof typeof colors;
 export type ThemeMode = "light" | "dark";
 
-/**
- * Chart-specific color tokens for consistent chart styling.
- */
-export const chartColors = {
-  // Line/area chart colors
-  line: { light: "#5B8A5B", dark: "#A6E39B" },
-  lineSecondary: { light: "#847596", dark: "#D5CCDD" },
-  fill: { light: "#7BA87B", dark: "#A6E39B" },
-  fillOpacity: 0.14,
-
-  // Grid and axis
-  gridLine: { light: "#EDE7DA", dark: "#47414C" },
-  axisLabel: { light: "#7A6B55", dark: "#C7B895" },
-
-  // Background
-  chartBg: { light: "#FDFCFA", dark: "#14251C" },
-
-  // Dot styling
-  dotStroke: "#ffffff",
-  dotRadius: 4,
-
-  // Tooltip
-  tooltipBg: { light: "#3D352A", dark: "#F5F1E8" },
-  tooltipText: { light: "#F5F1E8", dark: "#3D352A" },
-} as const;
-
 export const semanticToneColors = {
   sage: {
     light: { bg: "#E8EFE8", fg: "#476D47", ring: "rgba(91, 138, 91, 0.16)", border: "#D1DFD1" },
@@ -244,20 +218,6 @@ export function getEnergySegmentColor(level: number, isDark: boolean): string {
     ? colors.energySegmentColors.dark
     : colors.energySegmentColors.light;
   return stops[i] ?? stops[stops.length - 1];
-}
-
-/**
- * Get chart color based on theme.
- */
-export function getChartColor(
-  key: keyof typeof chartColors,
-  isDark: boolean
-): string | number {
-  const value = chartColors[key];
-  if (typeof value === "object" && value !== null && "light" in value) {
-    return isDark ? value.dark : value.light;
-  }
-  return value;
 }
 
 /**
