@@ -1,7 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createMockMoodEntry } from "../../db/mockClient";
 import { buildForecastDays } from "@/features/history/forecast";
+import { getRecentQueryRange } from "@/features/history/useRecentMoodEntries";
+
+vi.mock("expo-router", () => ({ useFocusEffect: () => {} }));
+vi.mock("@/services/moodService", () => ({ moodService: {} }));
+vi.mock("@/shared/state/moodsStore", () => ({ useMoodsStore: () => 0 }));
+vi.mock("react-native", () => ({ AppState: { addEventListener: () => ({ remove: () => {} }) } }));
 
 function mood(value: number, local: [number, number, number, number]) {
   const [year, month, day, hour] = local;
@@ -43,5 +49,27 @@ describe("buildForecastDays", () => {
   it("ignores entries outside the window", () => {
     const days = buildForecastDays([mood(2, [2026, 9, 20, 9])], today);
     expect(days.every((day) => day.entries.length === 0)).toBe(true);
+  });
+});
+
+describe("getRecentQueryRange", () => {
+  const originalTimezone = process.env.TZ;
+  afterEach(() => {
+    process.env.TZ = originalTimezone;
+  });
+
+  it("reaches entries recorded at the start of the first day in UTC+14 from a UTC-12 device", () => {
+    process.env.TZ = "Etc/GMT+12";
+    const now = new Date(2026, 8, 28, 12);
+    // Recorded 00:00 on 22 Sep in UTC+14, the first of seven days: 21 Sep 10:00 UTC.
+    const traveled = createMockMoodEntry({
+      mood: 2,
+      timestamp: Date.UTC(2026, 8, 21, 10),
+      utcOffsetMinutes: -14 * 60,
+    });
+    const range = getRecentQueryRange(now, 7);
+
+    expect(range.startDate).toBeLessThanOrEqual(traveled.timestamp);
+    expect(buildForecastDays([traveled], now).at(-1)).toMatchObject({ dayKey: "2026-09-22", entries: [traveled] });
   });
 });

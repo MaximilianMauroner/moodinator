@@ -24,7 +24,6 @@ import {
   KeptEntryDetailModal,
   MoodEntryFormValues,
 } from "@/components/MoodEntryModal";
-import { createMoodOnlyEntryValues } from "@/components/entry/moodEntryDraft";
 import { DisplayMoodItem } from "@/components/DisplayMoodItem";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ScreenBackgroundAccent } from "@/components/layout/ScreenBackgroundAccent";
@@ -51,7 +50,7 @@ import {
   useHomeHeaderCollapse,
 } from "@/hooks/useHomeHeaderCollapse";
 import { haptics } from "@/lib/haptics";
-import { getKeptEntryFollowUp } from "@/lib/keptEntryFollowUp";
+import { keepMoodTap } from "@/lib/keepMoodTap";
 import { showCrisisSupportAlert } from "@/lib/showCrisisSupportAlert";
 import { toastService } from "@/services/toastService";
 import { addHomeTabDoublePressListener } from "@/lib/homeTabEvents";
@@ -89,8 +88,8 @@ function HomeScreenContent() {
 
   const today = useRecentMoodEntries(1);
   const todayEntries = useMemo(
-    () => buildForecastDays(today.entries, new Date(), 1)[0]!.entries.slice().reverse(),
-    [today.entries]
+    () => buildForecastDays(today.entries, today.asOf, 1)[0]!.entries.slice().reverse(),
+    [today.entries, today.asOf]
   );
   const [homeChromeHeight, setHomeChromeHeight] = useState(0);
   const [expandedPanelHeight, setExpandedPanelHeight] = useState(0);
@@ -226,46 +225,28 @@ function HomeScreenContent() {
   const offersDetailAfterKeep =
     quickFields.emotions || quickFields.context || quickFields.energy || quickFields.notes;
 
-  /**
-   * One tap keeps the entry with the mood only. Severe ratings show support
-   * first and continue after "Not now"; other ratings continue at once. The
-   * follow-up is the optional detail sheet, or a toast with Undo when every
-   * quick-entry field is switched off.
-   */
-  const handleMoodTap = useCallback(async (mood: number) => {
-    let entry: MoodEntry;
-    try {
-      entry = await commitThenRunPostCommitEffects(
-        () => createMood(getMoodEntryPersistenceValues(createMoodOnlyEntryValues(mood))),
-        [scrollHomeListToTop, schedulePostSaveTopResets],
-      );
-    } catch (error) {
-      console.error("Failed to save mood entry:", error);
-      haptics.reject();
-      Alert.alert("Save failed", "Unable to save your entry. Please try again.");
-      return;
-    }
-
-    const followUp = getKeptEntryFollowUp(mood, offersDetailAfterKeep);
-    const continueAfterKeep = () => {
-      if (followUp.then === "detail") {
-        modals.setKeptEntry(entry);
-      } else {
-        toastService.showKeptMood(entry, async () => {
-          await removeMood(entry.id);
-        });
-      }
-    };
-
-    if (followUp.supportFirst) {
-      haptics.reject();
-      setTimeout(() => showCrisisSupportAlert({ onDecline: continueAfterKeep }), 250);
-      return;
-    }
-
-    haptics.commit();
-    continueAfterKeep();
-  }, [createMood, modals, offersDetailAfterKeep, removeMood, schedulePostSaveTopResets, scrollHomeListToTop]);
+  const tapInFlightRef = useRef(false);
+  const handleMoodTap = useCallback(
+    (mood: number) =>
+      keepMoodTap(mood, {
+        inFlight: tapInFlightRef,
+        create: createMood,
+        afterCommit: [scrollHomeListToTop, schedulePostSaveTopResets],
+        offersDetail: offersDetailAfterKeep,
+        openDetail: modals.setKeptEntry,
+        showUndoToast: (entry) =>
+          toastService.showKeptMood(entry, async () => {
+            await removeMood(entry.id);
+          }),
+        showSupport: (onDecline) => showCrisisSupportAlert({ onDecline }),
+        feedback: haptics,
+        onSaveError: (error) => {
+          console.error("Failed to save mood entry:", error);
+          Alert.alert("Save failed", "Unable to save your entry. Please try again.");
+        },
+      }),
+    [createMood, modals.setKeptEntry, offersDetailAfterKeep, removeMood, schedulePostSaveTopResets, scrollHomeListToTop]
+  );
 
   const handleJumpToTopPress = useCallback(() => {
     haptics.tap();

@@ -62,8 +62,8 @@ function HistoryScreenContent() {
 
   const recent = useRecentMoodEntries(FORECAST_DAYS);
   const forecastDays = useMemo(
-    () => buildForecastDays(recent.entries, new Date(), FORECAST_DAYS),
-    [recent.entries]
+    () => buildForecastDays(recent.entries, recent.asOf, FORECAST_DAYS),
+    [recent.entries, recent.asOf]
   );
 
   const entrySettings = useEntrySettings();
