@@ -369,6 +369,18 @@ function HomeScreenContent() {
               // a working native scroll ref.
               renderScrollComponent={RNScrollView}
               data={todayEntries}
+              ListFooterComponent={
+                today.error && todayEntries.length > 0 ? (
+                  <EmptyState
+                    icon="warning-outline"
+                    tone="coral"
+                    title="Today's entries could not refresh"
+                    description={today.error}
+                    actionLabel="Try again"
+                    onAction={today.reload}
+                  />
+                ) : null
+              }
               keyExtractor={keyExtractor}
               renderItem={renderMoodItem}
               ListEmptyComponent={listEmptyComponent}

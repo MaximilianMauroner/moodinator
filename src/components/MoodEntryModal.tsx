@@ -89,6 +89,11 @@ type BaseMoodEntryModalProps = {
     onCreateContextTag?: CreateContextOption;
     /** Toast title after a successful save; defaults by variant title. */
     successMessage?: string;
+    /**
+     * A rating whose support prompt was already shown for this entry. Saving
+     * with the same rating does not show it again; another severe rating does.
+     */
+    supportShownForMood?: number;
     /** Optional text action beside the close button, for example Undo. */
     headerAction?: {
         label: string;
@@ -137,6 +142,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     onCreateEmotion,
     onCreateContextTag,
     successMessage,
+    supportShownForMood,
     headerAction,
 }) => {
     const { isDark, get } = useThemeColors();
@@ -343,7 +349,8 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
             return;
         }
 
-        const offersCrisisSupport = shouldOfferCrisisSupport(mood);
+        const offersCrisisSupport =
+            shouldOfferCrisisSupport(mood) && mood !== supportShownForMood;
         if (offersCrisisSupport) {
             runPostCommitEffect("Crisis haptic", () => haptics.reject());
         } else {
@@ -373,6 +380,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
         onClose,
         onSubmit,
         successMessage,
+        supportShownForMood,
         title,
     ]);
 
@@ -1308,6 +1316,8 @@ export const KeptEntryDetailModal: React.FC<KeptEntryDetailModalProps> = ({
         showMoodSelector={false}
         flow="quick"
         successMessage="Detail added"
+        // One tap already offered support for a severe rating before this sheet.
+        supportShownForMood={props.initialMood}
         headerAction={{ label: "Undo", accessibilityLabel: "Undo this entry", onPress: onUndo }}
     />
 );

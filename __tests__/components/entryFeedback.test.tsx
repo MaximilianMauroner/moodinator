@@ -485,6 +485,30 @@ describe("entry save acknowledgement", () => {
     );
   });
 
+  it("does not repeat support when adding detail to a severe entry already shown support", async () => {
+    vi.useFakeTimers();
+    try {
+      const onSubmit = vi.fn(async () => {});
+      await render(
+        <SaveEntryModal variant="kept" mood={9} onClose={vi.fn()} onSubmit={onSubmit} />,
+      );
+
+      await act(async () => {
+        renderer.root.findByProps({ accessibilityLabel: "Save entry" }).props.onPress();
+        await Promise.resolve();
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(250);
+      });
+
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+      expect(entryFeedback.crisisSupport).not.toHaveBeenCalled();
+      expect(entryFeedback.toastSuccess).toHaveBeenCalledWith("Detail added");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("keeps crisis support primary after a successful high-distress write", async () => {
     vi.useFakeTimers();
     try {

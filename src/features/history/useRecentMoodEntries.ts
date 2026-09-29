@@ -32,10 +32,12 @@ function msUntilNextLocalMidnight(now: Date): number {
 }
 
 /**
- * Entries around the last `days` calendar days, with the moment they were
- * read (`asOf`). Reads its own range, so history filters and pagination do not
- * change it. Reloads after every entry change, when the screen gains focus,
- * when the app returns to the foreground, and at local midnight.
+ * Entries around the last `days` calendar days, with the moment of the latest
+ * read attempt (`asOf`). Callers bucket against `asOf`, so after midnight a
+ * failed read shows no entries from the previous day as today's. Reads its
+ * own range, so history filters and pagination do not change it. Reloads
+ * after every entry change, when the screen gains focus, when the app returns
+ * to the foreground, and at local midnight.
  */
 export function useRecentMoodEntries(days: number) {
   const revision = useMoodsStore((state) => state.revision);
@@ -63,13 +65,13 @@ export function useRecentMoodEntries(days: number) {
     let active = true;
     const now = new Date();
     setLoaded(false);
+    setAsOf(now);
 
     moodService
       .getInRange(getRecentQueryRange(now, days))
       .then((result) => {
         if (!active) return;
         setEntries(result);
-        setAsOf(now);
         setError(null);
         setLoaded(true);
       })

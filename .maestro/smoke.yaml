@@ -5,6 +5,12 @@ name: Isolated Android entry lifecycle
 - launchApp:
     clearState: true
 - runFlow: flows/onboarding.yaml
+# Exercise the new one-tap path before the existing detailed-entry journey.
+# Undo leaves the fixture count at one after the detailed entry below.
+- tapOn: "Mood Rating 5 of 10, Neutral. Lower numbers are better."
+- assertVisible: "Add detail"
+- tapOn: "Undo this entry"
+- assertVisible: "No entries yet today"
 - longPressOn: "Mood Rating 5 of 10, Neutral. Lower numbers are better."
 - assertVisible: "(?i)What emotions are present[?]"
 - scrollUntilVisible:
