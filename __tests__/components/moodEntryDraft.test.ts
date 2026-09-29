@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildMoodEntrySubmitValues,
   createMoodEntryFormValues,
+  createMoodOnlyEntryValues,
   DEFAULT_MOOD_ENTRY_ENERGY,
   getMoodEntrySteps,
   getNotesPlaceholder,
@@ -71,6 +72,12 @@ describe("moodEntryDraft", () => {
   it("starts new entries at neutral energy while preserving an explicit clear", () => {
     expect(createMoodEntryFormValues(5).energy).toBe(DEFAULT_MOOD_ENTRY_ENERGY);
     expect(createMoodEntryFormValues(5, { energy: null }).energy).toBeNull();
+  });
+
+  it("keeps a one-tap entry to the mood alone, with energy unanswered", () => {
+    expect(createMoodOnlyEntryValues(7)).toEqual({
+      mood: 7, emotions: [], contextTags: [], energy: null, note: "", basedOnEntryId: null,
+    });
   });
 
   it("omits disabled fields from submit values", () => {

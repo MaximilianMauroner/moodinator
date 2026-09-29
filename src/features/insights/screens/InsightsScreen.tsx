@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from "react";
+import React, { useState } from "react";
 import {
   Platform,
   Pressable,
@@ -13,15 +13,15 @@ import { Ionicons } from "@expo/vector-icons";
 import { useInsightsData } from "../hooks/useInsightsData";
 import { InsightCard, CompactInsightCard } from "../components/InsightCard";
 import { StreakBadge } from "../components/StreakBadge";
-import { EntryDetailModal } from "../components/EntryDetailModal";
 import { InsightsHeader } from "../components/InsightsHeader";
 import { FindingCard } from "../components/FindingCard";
 import { TrendBand } from "../components/TrendBand";
 import { RhythmGrid } from "../components/RhythmGrid";
 import { DriverRow } from "../components/DriverRow";
+import { ClimateCard } from "../components/ClimateCard";
+import { daypartMeans } from "../utils/rhythm";
 import { calculatePeriodStats } from "../utils/periodStats";
 import type { AnalysisRange } from "../utils/analysis";
-import { MoodCalendar } from "@/components/calendar";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
@@ -29,9 +29,8 @@ import { ScreenBackgroundAccent } from "@/components/layout/ScreenBackgroundAcce
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { useThemeColors } from "@/constants/colors";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
-import type { MoodEntry } from "@db/types";
 
-type ViewMode = "findings" | "charts" | "calendar";
+type ViewMode = "findings" | "charts";
 const viewModes: {
   id: ViewMode;
   label: string;
@@ -39,7 +38,6 @@ const viewModes: {
 }[] = [
   { id: "findings", label: "Findings", icon: "bulb-outline" },
   { id: "charts", label: "Charts", icon: "analytics" },
-  { id: "calendar", label: "Calendar", icon: "calendar" },
 ];
 const ranges: { id: AnalysisRange; label: string }[] = [
   { id: "7", label: "7" },
@@ -65,9 +63,7 @@ function ChartCard({
 }
 export function InsightsScreen() {
   const { get } = useThemeColors();
-  const [selectedEntry, setSelectedEntry] = useState<MoodEntry | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("findings");
-  const calendarRefreshRef = useRef<(() => Promise<void>) | null>(null);
   const {
     recentMoods,
     totalCount,
@@ -83,16 +79,7 @@ export function InsightsScreen() {
     setAnalysisRange,
     analysisMoods,
   } = useInsightsData();
-  const handleCalendarRefreshReady = useCallback(
-    (callback: (() => Promise<void>) | null) => {
-      calendarRefreshRef.current = callback;
-    },
-    [],
-  );
-  const handleRefresh = useCallback(async () => {
-    await Promise.all([refresh(), calendarRefreshRef.current?.()]);
-  }, [refresh]);
-  const { refreshing, onRefresh } = usePullToRefresh(handleRefresh);
+  const { refreshing, onRefresh } = usePullToRefresh(refresh);
   const stats = calculatePeriodStats(analysisMoods, []);
   const dailyValues = analysis.dailySeries.filter(
     (point) => point.min !== null,
@@ -123,45 +110,41 @@ export function InsightsScreen() {
           variant="primary"
           padding={4}
         />
-        {viewMode !== "calendar" && (
-          <>
-            <View className="mx-4 mb-3 flex-row gap-2">
-              {ranges.map((range) => (
-                <Pressable
-                  key={range.id}
-                  onPress={() => setAnalysisRange(range.id)}
-                  accessibilityRole="button"
-                  accessibilityLabel={
-                    range.id === "all" ? "All history" : `Last ${range.id} days`
-                  }
-                  accessibilityState={{ selected: analysisRange === range.id }}
-                  className="flex-1 rounded-xl px-2 py-3"
-                  style={{
-                    minHeight: 44,
-                    backgroundColor: get(
-                      analysisRange === range.id ? "primaryBg" : "surfaceAlt",
-                    ),
-                  }}
-                >
-                  <Text className="text-center font-semibold text-paper-800 dark:text-paper-200">
-                    {range.label}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-            <Text
-              testID={ready ? "insights-loaded-summary" : undefined}
-              className="px-4 mb-3 text-sm text-paper-700 dark:text-sand-300"
+        <View className="mx-4 mb-3 flex-row gap-2">
+          {ranges.map((range) => (
+            <Pressable
+              key={range.id}
+              onPress={() => setAnalysisRange(range.id)}
+              accessibilityRole="button"
+              accessibilityLabel={
+                range.id === "all" ? "All history" : `Last ${range.id} days`
+              }
+              accessibilityState={{ selected: analysisRange === range.id }}
+              className="flex-1 rounded-xl px-2 py-3"
+              style={{
+                minHeight: 44,
+                backgroundColor: get(
+                  analysisRange === range.id ? "primaryBg" : "surfaceAlt",
+                ),
+              }}
             >
-              {analysisRange === "all"
-                ? "All history"
-                : `Last ${analysisRange} days`}{" "}
-              · {analysisMoods.length}{" "}
-              {analysisMoods.length === 1 ? "entry" : "entries"}
-            </Text>
-          </>
-        )}
-        {loading && viewMode !== "calendar" ? (
+              <Text className="text-center font-semibold text-paper-800 dark:text-paper-200">
+                {range.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+        <Text
+          testID={ready ? "insights-loaded-summary" : undefined}
+          className="px-4 mb-3 text-sm text-paper-700 dark:text-sand-300"
+        >
+          {analysisRange === "all"
+            ? "All history"
+            : `Last ${analysisRange} days`}{" "}
+          · {analysisMoods.length}{" "}
+          {analysisMoods.length === 1 ? "entry" : "entries"}
+        </Text>
+        {loading ? (
           <LoadingSpinner message="Loading insights..." />
         ) : error && analysisMoods.length === 0 ? (
           <EmptyState
@@ -195,12 +178,10 @@ export function InsightsScreen() {
                 Showing saved insights. Refresh failed.
               </Text>
             )}
-            {viewMode === "calendar" ? (
-              <MoodCalendar
-                onRefreshReady={handleCalendarRefreshReady}
-                onEditEntry={setSelectedEntry}
-              />
-            ) : viewMode === "findings" ? (
+            {stats.entryCount > 0 && (
+              <ClimateCard averageMood={stats.averageMood} entryCount={stats.entryCount} dayparts={daypartMeans(analysis.rhythm)} />
+            )}
+            {viewMode === "findings" ? (
               <>
                 {analysis.findings.map((finding) => (
                   <FindingCard key={finding.id} finding={finding} />
@@ -302,12 +283,6 @@ export function InsightsScreen() {
           </ScrollView>
         )}
       </SafeAreaView>
-      <EntryDetailModal
-        entry={selectedEntry}
-        onClose={() => setSelectedEntry(null)}
-        getMoodLabel={getMoodLabel}
-        getMoodColor={getMoodColor}
-      />
     </GestureHandlerRootView>
   );
 }

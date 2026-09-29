@@ -32,16 +32,16 @@ export function getMoodButtonLabel(moodValue: number, moodLabel: string): string
  * Get accessibility hint for a mood button.
  */
 export function getMoodButtonHint(): string {
-  return "Tap to log this mood quickly, long press for detailed entry";
+  return "Tap to save this mood now, long press for detailed entry";
 }
 
 /**
  * Tab bar accessibility labels.
  */
 export const TAB_ACCESSIBILITY_LABELS = {
-  home: "Home tab, log your mood",
-  insights: "Insights tab, view mood history and summaries",
-  settings: "Settings tab, customize app preferences",
+  today: "Today tab, log your mood",
+  history: "History tab, view past days and months",
+  insights: "Insights tab, view mood patterns and summaries",
 } as const;
 
 /**

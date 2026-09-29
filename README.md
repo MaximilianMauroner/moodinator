@@ -5,13 +5,14 @@ A privacy-focused mood tracking app built with React Native. Record how you feel
 ## Features
 
 ### Mood Tracking
-- **11-level mood scale** from Elated (0) to Emergency (10)
-- **Quick entry** with tap for fast logging
+- **11-level mood scale** from Elated (0) to Emergency (10), each shown as a weather sign from sun to storm
+- **One-tap entry**: a tap saves the mood, then optional detail with Undo
 - **Detailed entry** with long-press for comprehensive records
 - Attach **emotions**, **context tags**, **energy**, and **notes**
 
-### Insights & Analytics
-- **Color-coded calendar** for browsing mood history
+### History & Insights
+- **Forecast-style history**: each day shows its range from lightest to heaviest
+- **Month calendar** with each day's weather
 - **Weekly and monthly statistics**
 - Compare mood averages across periods
 - Streak tracking
@@ -23,11 +24,11 @@ A privacy-focused mood tracking app built with React Native. Record how you feel
 - Core mood tracking works offline; crisis-support links and user-selected sharing destinations may require connectivity
 
 ### User Experience
-- **Dark and light mode** with warm, organic color palette
+- **Dark and light mode** with the calm Soft Sage palette
 - Haptic feedback for tactile interactions
 - Swipe actions for quick edits and deletes
 - Customizable emotion and context tags
-- Configurable quick entry fields
+- Configurable fields offered after a tap
 
 ## Tech Stack
 

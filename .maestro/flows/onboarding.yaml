@@ -8,4 +8,4 @@ appId: com.lab4code.moodinator.qa
 - tapOn: "Next onboarding page"
 - assertVisible: "Your Data, Your Control"
 - tapOn: "Get started"
-- assertVisible: "Home tab, log your mood"
+- assertVisible: "Today tab, log your mood"

@@ -87,6 +87,19 @@ type BaseMoodEntryModalProps = {
     flow?: MoodEntryFlow;
     onCreateEmotion?: CreateEmotionOption;
     onCreateContextTag?: CreateContextOption;
+    /** Toast title after a successful save; defaults by variant title. */
+    successMessage?: string;
+    /**
+     * A rating whose support prompt was already shown for this entry. Saving
+     * with the same rating does not show it again; another severe rating does.
+     */
+    supportShownForMood?: number;
+    /** Optional text action beside the close button, for example Undo. */
+    headerAction?: {
+        label: string;
+        accessibilityLabel: string;
+        onPress: () => void;
+    };
 };
 
 // ─── Step title map ────────────────────────────────────────────────────────
@@ -128,6 +141,9 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     flow = "detailed",
     onCreateEmotion,
     onCreateContextTag,
+    successMessage,
+    supportShownForMood,
+    headerAction,
 }) => {
     const { isDark, get } = useThemeColors();
     const { height: windowHeight } = useWindowDimensions();
@@ -333,14 +349,17 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
             return;
         }
 
-        const offersCrisisSupport = shouldOfferCrisisSupport(mood);
+        const offersCrisisSupport =
+            shouldOfferCrisisSupport(mood) && mood !== supportShownForMood;
         if (offersCrisisSupport) {
             runPostCommitEffect("Crisis haptic", () => haptics.reject());
         } else {
             runPostCommitEffect("Save haptic", () => haptics.commit());
             runPostCommitEffect(
                 "Save acknowledgement",
-                () => toastService.success(title === "Edit Entry" ? "Entry updated" : "Entry saved"),
+                () => toastService.success(
+                    successMessage ?? (title === "Edit Entry" ? "Entry updated" : "Entry saved"),
+                ),
             );
         }
 
@@ -360,6 +379,8 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
         note,
         onClose,
         onSubmit,
+        successMessage,
+        supportShownForMood,
         title,
     ]);
 
@@ -1009,6 +1030,19 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                     >
                                         {title}
                                     </Text>
+                                    {headerAction ? (
+                                        <Pressable
+                                            onPress={headerAction.onPress}
+                                            disabled={isSaving}
+                                            className="h-11 items-center justify-center px-3"
+                                            accessibilityRole="button"
+                                            accessibilityLabel={headerAction.accessibilityLabel}
+                                        >
+                                            <Text className="text-base font-semibold" style={{ color: get("primary") }}>
+                                                {headerAction.label}
+                                            </Text>
+                                        </Pressable>
+                                    ) : null}
                                     <Pressable
                                         onPress={closeWithConfirmation}
                                         className="h-11 w-11 items-center justify-center rounded-full"
@@ -1261,13 +1295,32 @@ type MoodEntryModalVariantProps = MoodEntryModalSharedProps & {
     fieldConfig: MoodEntryFieldConfig;
 };
 
-export type QuickMoodEntryModalProps = MoodEntryModalVariantProps;
+export type KeptEntryDetailModalProps = MoodEntryModalVariantProps & {
+    /** Removes the entry that one tap already kept. */
+    onUndo: () => void;
+};
 export type DetailedMoodEntryModalProps = MoodEntryModalVariantProps;
 export type EditMoodEntryModalProps = MoodEntryModalVariantProps;
 
-export const QuickMoodEntryModal: React.FC<QuickMoodEntryModalProps> = (
-    props
-) => <BaseMoodEntryModal {...props} title="Quick Entry" showMoodSelector={false} flow="quick" />;
+/**
+ * Optional detail for an entry that one tap on the picker already saved. It
+ * follows the quick-entry field settings and updates that entry.
+ */
+export const KeptEntryDetailModal: React.FC<KeptEntryDetailModalProps> = ({
+    onUndo,
+    ...props
+}) => (
+    <BaseMoodEntryModal
+        {...props}
+        title="Add detail"
+        showMoodSelector={false}
+        flow="quick"
+        successMessage="Detail added"
+        // One tap already offered support for a severe rating before this sheet.
+        supportShownForMood={props.initialMood}
+        headerAction={{ label: "Undo", accessibilityLabel: "Undo this entry", onPress: onUndo }}
+    />
+);
 
 export const DetailedMoodEntryModal: React.FC<DetailedMoodEntryModalProps> = (
     props

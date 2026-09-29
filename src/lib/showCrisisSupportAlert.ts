@@ -1,12 +1,14 @@
 import { Linking } from "react-native";
 import { getLocales } from "expo-localization";
 
-import { Alert } from "@/components/ui/AppAlert";
+import { showSupportSheet } from "@/components/ui/AppAlert";
 import { presentCrisisSupportAlert } from "@/lib/crisisSupport";
 
-export function showCrisisSupportAlert(): void {
+/** Presents crisis support as the support-first sheet after a severe rating. */
+export function showCrisisSupportAlert(options: { onDecline?: () => void } = {}): void {
   presentCrisisSupportAlert({
-    showAlert: Alert.alert,
+    onDecline: options.onDecline,
+    showAlert: (title, message, buttons) => showSupportSheet(title, message, buttons ?? []),
     openUrl: Linking.openURL,
     getRegion: () => getLocales()[0]?.regionCode,
   });

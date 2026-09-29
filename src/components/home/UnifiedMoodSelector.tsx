@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import { View, Text, StyleSheet, ScrollView } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import Animated, {
   Extrapolation,
   interpolate,
+  interpolateColor,
   runOnJS,
   useAnimatedReaction,
   useAnimatedStyle,
@@ -15,21 +17,21 @@ import {
 } from "@/constants/moodScaleInterpretation";
 import { useThemeColors, colors } from "@/constants/colors";
 import { getMoodButtonLabel, getMoodButtonHint } from "@/constants/accessibility";
+import { getMoodWeatherColor, getMoodWeatherIcon } from "@/constants/moodWeather";
 
 // ─── Layout constants ──────────────────────────────────────────────────────────
 
-// Expanded compact grid
+// Expanded weather grid: rows of 4, 3, and 4 (clear, cloudy, rain). The middle
+// row is centered and uses the same tile width as the outer rows.
 const EXPANDED_HEADER_HEIGHT = 36; // divider row + spacing below
-const EXPANDED_ROW_HEIGHT = 44;
+const EXPANDED_ROW_HEIGHT = 64;
 const EXPANDED_ROW_GAP = 8;
 const EXPANDED_H_MARGIN = 4; // mx-1 each side
-const EXPANDED_GRADIENT_TOP =
-  EXPANDED_HEADER_HEIGHT + 3 * EXPANDED_ROW_HEIGHT + 2 * EXPANDED_ROW_GAP + 8;
-const EXPANDED_GRADIENT_HEIGHT = 28; // bar + labels
+const EXPANDED_ICON_SIZE = 24;
 
 /** Total height occupied by this component when fully expanded (compact mode). */
 export const UNIFIED_COMPACT_EXPANDED_HEIGHT =
-  EXPANDED_GRADIENT_TOP + EXPANDED_GRADIENT_HEIGHT;
+  EXPANDED_HEADER_HEIGHT + 3 * EXPANDED_ROW_HEIGHT + 2 * EXPANDED_ROW_GAP + 8;
 
 // Collapsed pill row (must match constants in index.tsx)
 const COLLAPSED_HEIGHT = 60;
@@ -56,13 +58,14 @@ function collapsedPos(index: number) {
 
 function expandedPos(index: number, containerWidth: number) {
   "worklet";
-  const colCount = index < 8 ? 4 : 3;
-  const col = index < 4 ? index : index < 8 ? index - 4 : index - 8;
-  const row = index < 4 ? 0 : index < 8 ? 1 : 2;
-  const btnW =
-    (containerWidth - colCount * EXPANDED_H_MARGIN * 2) / colCount;
+  // Matches MOOD_WEATHER_ROWS: 0-3, 4-6 (centered), 7-10.
+  const row = index < 4 ? 0 : index < 7 ? 1 : 2;
+  const col = row === 0 ? index : row === 1 ? index - 4 : index - 7;
+  const slot = containerWidth / 4;
+  const btnW = slot - EXPANDED_H_MARGIN * 2;
+  const rowOffset = row === 1 ? slot / 2 : 0;
   return {
-    left: col * (btnW + EXPANDED_H_MARGIN * 2) + EXPANDED_H_MARGIN,
+    left: rowOffset + col * slot + EXPANDED_H_MARGIN,
     top:
       EXPANDED_HEADER_HEIGHT + row * (EXPANDED_ROW_HEIGHT + EXPANDED_ROW_GAP),
     width: btnW,
@@ -78,6 +81,7 @@ interface MoodButtonProps {
   index: number;
   collapseProgress: SharedValue<number>;
   expandedWidth: number;
+  isDark: boolean;
   onMoodPress: (mood: number) => void;
   onLongPress: (mood: number) => void;
 }
@@ -87,9 +91,14 @@ function MoodButton({
   index,
   collapseProgress,
   expandedWidth,
+  isDark,
   onMoodPress,
   onLongPress,
 }: MoodButtonProps) {
+  const { get } = useThemeColors();
+  const tileBg = get("background");
+  const tileBorder = get("border");
+  const numberInk = get("text");
   const containerStyle = useAnimatedStyle(() => {
     const p = collapseProgress.value;
     const c = collapsedPos(index);
@@ -112,14 +121,38 @@ function MoodButton({
         Extrapolation.CLAMP
       ),
       overflow: "hidden" as const,
+      // Expanded tiles are outlined; the collapsed pill takes the mood tint.
+      backgroundColor: interpolateColor(p, [0, 1], [tileBg, mood.backgroundHex]),
+      borderWidth: 1,
+      borderColor: interpolateColor(p, [0, 1], [tileBorder, mood.backgroundHex]),
     };
   });
 
+  const iconStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      collapseProgress.value,
+      [0, 0.3],
+      [1, 0],
+      Extrapolation.CLAMP
+    ),
+    height: interpolate(
+      collapseProgress.value,
+      [0, 0.45],
+      [EXPANDED_ICON_SIZE + 2, 0],
+      Extrapolation.CLAMP
+    ),
+  }));
+
   const numberStyle = useAnimatedStyle(() => ({
+    color: interpolateColor(
+      collapseProgress.value,
+      [0, 1],
+      [numberInk, mood.colorHex]
+    ),
     fontSize: interpolate(
       collapseProgress.value,
       [0, 1],
-      [20, 14],
+      [17, 14],
       Extrapolation.CLAMP
     ),
     marginBottom: interpolate(
@@ -146,9 +179,7 @@ function MoodButton({
   }));
 
   return (
-    <Animated.View
-      style={[containerStyle, { backgroundColor: mood.backgroundHex }]}
-    >
+    <Animated.View style={containerStyle}>
       <HapticTab
         style={{
           flex: 1,
@@ -162,10 +193,16 @@ function MoodButton({
         accessibilityLabel={getMoodButtonLabel(mood.value, mood.label)}
         accessibilityHint={getMoodButtonHint()}
       >
+        <Animated.View style={[{ overflow: "hidden" }, iconStyle]}>
+          <Ionicons
+            name={getMoodWeatherIcon(mood.value)}
+            size={EXPANDED_ICON_SIZE}
+            color={getMoodWeatherColor(mood.value, isDark)}
+          />
+        </Animated.View>
         <Animated.Text
           style={[
             {
-              color: mood.colorHex,
               fontWeight: "700",
               fontVariant: ["tabular-nums"],
               alignSelf: "stretch",
@@ -179,10 +216,10 @@ function MoodButton({
         <Animated.Text
           style={[
             {
-              color: mood.colorHex,
-              fontSize: 12,
-              fontWeight: "600",
-              lineHeight: 16,
+              color: get("textSubtle"),
+              fontSize: 11,
+              fontWeight: "500",
+              lineHeight: 15,
               textAlign: "center",
             },
             labelStyle,
@@ -219,10 +256,6 @@ export function UnifiedMoodSelector({
   const trackBgColor = isDark ? colors.surface.dark : colors.surface.light;
   const trackBorderColor = isDark ? colors.border.dark : colors.border.light;
   const textMutedColor = isDark ? colors.sand.textMuted.dark : colors.textMuted.light;
-  const accentColor = isDark ? colors.primaryMuted.dark : colors.positive.textDark.light;
-  const negativeColor = isDark
-    ? colors.negative.text.dark
-    : colors.negative.text.light;
   const moodData = React.useMemo(
     () => getAllMoodRatingDisplays(isDark),
     [isDark]
@@ -262,16 +295,6 @@ export function UnifiedMoodSelector({
         ),
       },
     ],
-  }));
-
-  // Gradient scale fades out when collapsing
-  const gradientBarStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(
-      collapseProgress.value,
-      [0, 0.3],
-      [1, 0],
-      Extrapolation.CLAMP
-    ),
   }));
 
   useAnimatedReaction(
@@ -377,6 +400,7 @@ export function UnifiedMoodSelector({
                 index={index}
                 collapseProgress={collapseProgress}
                 expandedWidth={expandedContentWidth}
+                isDark={isDark}
                 onMoodPress={onMoodPress}
                 onLongPress={onLongPress}
               />
@@ -385,51 +409,6 @@ export function UnifiedMoodSelector({
         </View>
       </ScrollView>
 
-      {/* Gradient scale bar */}
-      <Animated.View
-        style={[
-          {
-            position: "absolute",
-            left: 8,
-            right: 8,
-            top: EXPANDED_GRADIENT_TOP,
-          },
-          gradientBarStyle,
-        ]}
-        pointerEvents="none"
-      >
-        <View
-          style={{
-            flexDirection: "row",
-            height: 4,
-            borderRadius: 999,
-            overflow: "hidden",
-          }}
-        >
-          {colors.moodGradient.map((color, i) => (
-            <View key={i} style={{ flex: 1, backgroundColor: color }} />
-          ))}
-        </View>
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "space-between",
-            marginTop: 8,
-            paddingHorizontal: 2,
-          }}
-        >
-          <Text
-            style={{ fontSize: 12, fontWeight: "500", color: accentColor }}
-          >
-            Great
-          </Text>
-          <Text
-            style={{ fontSize: 12, fontWeight: "500", color: negativeColor }}
-          >
-            Need support
-          </Text>
-        </View>
-      </Animated.View>
     </View>
   );
 }

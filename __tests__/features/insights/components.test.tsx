@@ -51,14 +51,13 @@ vi.mock("../../../src/features/insights/components/InsightCard", () => ({
   CompactInsightCard: () => null,
 }));
 vi.mock("../../../src/features/insights/components/StreakBadge", () => ({ StreakBadge: () => null }));
-vi.mock("../../../src/features/insights/components/EntryDetailModal", () => ({ EntryDetailModal: () => null }));
+vi.mock("../../../src/features/insights/components/ClimateCard", () => ({ ClimateCard: () => null }));
 vi.mock("../../../src/features/insights/components/InsightsHeader", () => ({ InsightsHeader: () => null }));
 vi.mock("../../../src/features/insights/components/TrendBand", () => ({ TrendBand: () => null }));
 vi.mock("../../../src/features/insights/components/DriverRow", () => ({
   DriverRow: () => null,
   ComparisonBars: () => null,
 }));
-vi.mock("@/components/calendar", () => ({ MoodCalendar: () => null }));
 vi.mock("@/components/ui/EmptyState", () => ({ EmptyState: () => null }));
 vi.mock("@/components/ui/LoadingSpinner", () => ({ LoadingSpinner: () => null }));
 vi.mock("@/components/layout/ScreenBackgroundAccent", () => ({ ScreenBackgroundAccent: () => null }));

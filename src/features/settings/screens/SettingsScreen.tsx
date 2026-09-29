@@ -74,7 +74,7 @@ export function SettingsScreen() {
         items: [
           {
             title: "Quick Entry",
-            description: "Choose fields shown while logging",
+            description: "Choose fields offered after a tap",
             icon: "flash-outline",
             href: "/settings/quick-entry",
             accentColor: "sand",
