@@ -3,5 +3,6 @@ name: Large-font theme and reduced-motion journey
 ---
 - launchApp:
     clearState: false
-- tapOn: "Home tab, log your mood"
-- assertVisible: "Recent entries"
+- tapOn: "Today tab, log your mood"
+- assertVisible:
+    id: "today-count"

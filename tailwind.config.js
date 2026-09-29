@@ -21,11 +21,11 @@ module.exports = {
           500: "#9A8D78",
           600: "#766957",
           700: "#5C5042",
-          // Dark mode variants: clean eucalyptus ink with lifted green paper layers.
-          800: "#182C20",
-          850: "#14251C",
-          900: "#08150F",
-          950: "#09130E",
+          // Dark mode variants: Soft Sage ink with low-glare lifted layers.
+          800: "#1D2520",
+          850: "#181E1A",
+          900: "#101411",
+          950: "#0C0F0D",
         },
         sage: {
           50: "#F4F7F4",

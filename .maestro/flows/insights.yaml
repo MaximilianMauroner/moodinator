@@ -10,6 +10,5 @@ name: Insights segments with one recorded entry
       text: "A comparison needs 5 entries with a tag or emotion and 5 without it."
     direction: DOWN
 - assertVisible: "A comparison needs 5 entries with a tag or emotion and 5 without it."
-- tapOn: "Calendar view"
 - tapOn: "Findings view"
 - assertVisible: "Not enough data yet.*"

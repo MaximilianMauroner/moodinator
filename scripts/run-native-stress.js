@@ -243,7 +243,7 @@ async function importFixture(serial, fixtureName, size) {
 }
 
 async function settleImportedHistory(serial, expectedCount) {
-  await waitForNodeAndTap(serial, { contentDescription: "Home tab, log your mood" }, { timeoutMs: 5000 });
+  await waitForNodeAndTap(serial, { contentDescription: "History tab, view past days and months" }, { timeoutMs: 5000 });
   await waitForNode(serial, {
     allOf: [
       { testId: "history-count" },

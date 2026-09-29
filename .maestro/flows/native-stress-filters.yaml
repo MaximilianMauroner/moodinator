@@ -1,7 +1,7 @@
 appId: com.lab4code.moodinator.qa
 name: Discriminating combined history filters and refresh
 ---
-- tapOn: "Home tab, log your mood"
+- tapOn: "History tab, view past days and months"
 - tapOn: "Filter history"
 - tapOn: "Clear filters"
 - tapOn: "Last 90 days"

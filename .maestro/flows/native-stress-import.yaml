@@ -4,7 +4,8 @@ name: Import a fabricated native stress fixture
 - launchApp:
     clearState: true
 - runFlow: onboarding.yaml
-- tapOn: "Settings tab, customize app preferences"
+- tapOn:
+    id: "open-settings"
 - scrollUntilVisible:
     element:
       text: "Data & Backups"

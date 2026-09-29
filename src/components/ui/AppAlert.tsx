@@ -13,6 +13,7 @@ import {
   type AlertStatic,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 
 import { colors, effectColors, useThemeColors } from "@/constants/colors";
 import { fontFamilies, typography } from "@/constants/typography";
@@ -24,6 +25,8 @@ type AlertRequest = {
   message?: string;
   buttons: AlertButton[];
   options?: AlertOptions;
+  /** "support" renders a bottom sheet whose first action is emphasized. */
+  variant?: "dialog" | "support";
 };
 
 type AlertOptions = {
@@ -61,6 +64,19 @@ export const Alert: Pick<AlertStatic, "alert"> = {
     });
   },
 };
+
+/**
+ * Support-first sheet for severe ratings. Same button contract as
+ * `Alert.alert`; the first non-cancel button is the primary support action.
+ */
+export function showSupportSheet(title: string, message: string, buttons: AlertButton[]): void {
+  enqueueAlert({
+    title,
+    message,
+    buttons: buttons.length ? buttons : [{ text: "OK" }],
+    variant: "support",
+  });
+}
 
 function buttonColor(button: AlertButton, isDark: boolean) {
   if (button.style === "destructive") {
@@ -135,8 +151,13 @@ export function AppAlertProvider() {
   if (!request) return null;
 
   const cancelable = request.options?.cancelable === true;
+  const isSupport = request.variant === "support";
+  const mode = isDark ? "dark" : "light";
+  const primarySupportIndex = isSupport
+    ? request.buttons.findIndex((button) => button.style !== "cancel")
+    : -1;
 
-  const horizontalActions = request.buttons.length === 2
+  const horizontalActions = !isSupport && request.buttons.length === 2
     && width >= 360 && fontScale <= 1.2
     && request.buttons.every((button) => (button.text ?? "OK").length <= 14);
 
@@ -164,11 +185,16 @@ export function AppAlertProvider() {
             onPress={dismiss}
           />
         ) : null}
-        <SafeAreaView style={styles.safeArea} pointerEvents="box-none">
+        <SafeAreaView
+          style={[styles.safeArea, isSupport && styles.sheetArea]}
+          edges={isSupport ? ["bottom"] : undefined}
+          pointerEvents="box-none"
+        >
           <View
             accessibilityViewIsModal
             style={[
               styles.dialog,
+              isSupport && styles.sheet,
               {
                 backgroundColor: get("surface"),
                 borderColor: get("border"),
@@ -183,6 +209,16 @@ export function AppAlertProvider() {
               bounces={false}
               keyboardShouldPersistTaps="handled"
             >
+              {isSupport ? (
+                <Ionicons
+                  name="thunderstorm-outline"
+                  size={32}
+                  color={colors.supportAction[mode]}
+                  style={styles.sheetIcon}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no"
+                />
+              ) : null}
               <Text
                 ref={titleRef}
                 accessibilityRole="header"
@@ -194,31 +230,55 @@ export function AppAlertProvider() {
                 <Text style={[styles.message, { color: get("textMuted") }]}>{request.message}</Text>
               ) : null}
               <View style={[styles.buttons, horizontalActions && styles.buttonRow]}>
-                {request.buttons.map((button, index) => (
-                  <Pressable
-                    key={`${button.text ?? "button"}-${index}`}
-                    accessibilityRole="button"
-                    accessibilityLabel={button.text ?? "Button"}
-                    onPress={() => pressButton(button)}
-                    className="active:opacity-70"
-                    style={[
-                      styles.button,
-                      horizontalActions && styles.rowButton,
-                      {
-                        backgroundColor: button.style === "destructive"
-                          ? colors.negative.bg[isDark ? "dark" : "light"]
-                          : get("surfaceAlt"),
-                        borderColor: button.style === "destructive"
-                          ? colors.negative.border[isDark ? "dark" : "light"]
-                          : get("border"),
-                      },
-                    ]}
-                  >
-                    <Text style={[styles.buttonText, { color: buttonColor(button, isDark) }]}>
-                      {button.text ?? "OK"}
-                    </Text>
-                  </Pressable>
-                ))}
+                {request.buttons.map((button, index) => {
+                  const isPrimarySupport = index === primarySupportIndex;
+                  const isQuietCancel = isSupport && button.style === "cancel";
+                  return (
+                    <Pressable
+                      key={`${button.text ?? "button"}-${index}`}
+                      accessibilityRole="button"
+                      accessibilityLabel={button.text ?? "Button"}
+                      onPress={() => pressButton(button)}
+                      className="active:opacity-70"
+                      style={[
+                        styles.button,
+                        isSupport && styles.sheetButton,
+                        horizontalActions && styles.rowButton,
+                        {
+                          backgroundColor: isPrimarySupport
+                            ? colors.supportAction[mode]
+                            : isQuietCancel
+                              ? "transparent"
+                              : button.style === "destructive"
+                                ? colors.negative.bg[mode]
+                                : get("surfaceAlt"),
+                          borderColor: isPrimarySupport
+                            ? colors.supportAction[mode]
+                            : isQuietCancel
+                              ? "transparent"
+                              : button.style === "destructive"
+                                ? colors.negative.border[mode]
+                                : get("border"),
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.buttonText,
+                          {
+                            color: isPrimarySupport
+                              ? colors.onSupportAction[mode]
+                              : isSupport && !isQuietCancel
+                                ? get("text")
+                                : buttonColor(button, isDark),
+                          },
+                        ]}
+                      >
+                        {button.text ?? "OK"}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
               </View>
             </ScrollView>
           </View>
@@ -238,6 +298,23 @@ const styles = StyleSheet.create({
     padding: 20,
     justifyContent: "center",
     alignItems: "center",
+  },
+  sheetArea: {
+    padding: 0,
+    justifyContent: "flex-end",
+  },
+  sheet: {
+    maxWidth: undefined,
+    borderRadius: 0,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    borderBottomWidth: 0,
+  },
+  sheetIcon: {
+    marginBottom: 8,
+  },
+  sheetButton: {
+    borderRadius: 999,
   },
   dialog: {
     width: "100%",

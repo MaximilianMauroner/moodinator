@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Alert,
   Platform,
   View,
   Pressable,
@@ -9,7 +10,6 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
-import { useFocusEffect } from "expo-router";
 import { FlashList, type FlashListRef } from "@shopify/flash-list";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -21,11 +21,11 @@ import { DateTimePickerModal } from "@/components/DateTimePickerModal";
 import {
   DetailedMoodEntryModal,
   EditMoodEntryModal,
+  KeptEntryDetailModal,
   MoodEntryFormValues,
-  QuickMoodEntryModal,
 } from "@/components/MoodEntryModal";
+import { createMoodEntryFormValues } from "@/components/entry/moodEntryDraft";
 import { DisplayMoodItem } from "@/components/DisplayMoodItem";
-import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ScreenBackgroundAccent } from "@/components/layout/ScreenBackgroundAccent";
 import { TabSceneTransition } from "@/components/ui/TabSceneTransition";
@@ -38,8 +38,7 @@ import {
   UNIFIED_COMPACT_EXPANDED_HEIGHT,
 } from "@/components/home";
 
-import { ActiveFilterChips } from "@/features/history/ActiveFilterChips";
-import { HistoryFilterSheet } from "@/features/history/HistoryFilterSheet";
+import { useRecentMoodEntries } from "@/features/history/useRecentMoodEntries";
 import { useMoodsStore } from "@/shared/state/moodsStore";
 import { useEntrySettings } from "@/hooks/useEntrySettings";
 import { useMoodModals } from "@/hooks/useMoodModals";
@@ -51,6 +50,9 @@ import {
   useHomeHeaderCollapse,
 } from "@/hooks/useHomeHeaderCollapse";
 import { haptics } from "@/lib/haptics";
+import { getKeptEntryFollowUp } from "@/lib/keptEntryFollowUp";
+import { showCrisisSupportAlert } from "@/lib/showCrisisSupportAlert";
+import { toastService } from "@/services/toastService";
 import { addHomeTabDoublePressListener } from "@/lib/homeTabEvents";
 import { getHomeJumpButtonBottomOffset } from "@/lib/homeOverlayLayout";
 import {
@@ -78,39 +80,32 @@ function HomeScreenContent() {
   const insets = useSafeAreaInsets();
   const tabBarHeight = useBottomTabBarHeight();
 
-  const filters = useMoodsStore((state) => state.filters);
-  const clearFilters = useMoodsStore((state) => state.clearFilters);
-  const total = useMoodsStore((state) => state.total);
-  const loadMore = useMoodsStore((state) => state.loadMore);
-  const loadingMore = useMoodsStore((state) => state.loadingMore);
-  const moods = useMoodsStore((state) => state.moods);
-  const status = useMoodsStore((state) => state.status);
-  const error = useMoodsStore((state) => state.error);
-  const loadAll = useMoodsStore((state) => state.loadAll);
-  const ensureFresh = useMoodsStore((state) => state.ensureFresh);
   const refreshMoods = useMoodsStore((state) => state.refreshMoods);
   const createMood = useMoodsStore((state) => state.create);
   const updateMood = useMoodsStore((state) => state.update);
+  const removeMood = useMoodsStore((state) => state.remove);
   const updateMoodTimestamp = useMoodsStore((state) => state.updateTimestamp);
 
-  const loading = status === "loading";
+  const today = useRecentMoodEntries(1);
+  const todayEntries = useMemo(
+    () => [...today.entries].sort((a, b) => b.timestamp - a.timestamp),
+    [today.entries]
+  );
   const [homeChromeHeight, setHomeChromeHeight] = useState(0);
   const [expandedPanelHeight, setExpandedPanelHeight] = useState(0);
   const [historyChromeHeight, setHistoryChromeHeight] = useState(0);
   const listRef = useRef<FlashListRef<MoodEntry>>(null);
-  const { refreshing, onRefresh: handlePullToRefresh } = usePullToRefresh(refreshMoods);
+  const refreshToday = useCallback(async () => {
+    today.reload();
+    await refreshMoods();
+  }, [refreshMoods, today]);
+  const { refreshing, onRefresh: handlePullToRefresh } = usePullToRefresh(refreshToday);
 
   const entrySettings = useEntrySettings();
   const modals = useMoodModals();
   const itemActions = useMoodItemActions({
     setEditingEntry: modals.setEditingEntry,
   });
-
-  useFocusEffect(
-    useCallback(() => {
-      void ensureFresh();
-    }, [ensureFresh])
-  );
 
   const handleEditEntrySave = useCallback(
     async (values: MoodEntryFormValues) => {
@@ -123,6 +118,24 @@ function HomeScreenContent() {
     },
     [modals.editingEntry, updateMood]
   );
+
+  const handleKeptEntrySave = useCallback(
+    async (values: MoodEntryFormValues) => {
+      if (!modals.keptEntry) return;
+      await updateMoodEntryOrThrow(updateMood, modals.keptEntry.id, values);
+    },
+    [modals.keptEntry, updateMood]
+  );
+
+  const handleKeptEntryUndo = useCallback(() => {
+    const entry = modals.keptEntry;
+    modals.closeKeptEntry();
+    if (!entry) return;
+    void removeMood(entry.id).catch((error: unknown) => {
+      console.error("Failed to undo kept entry:", error);
+      toastService.error("Undo failed", "The entry could not be removed.");
+    });
+  }, [modals, removeMood]);
 
   const handleDateTimeSave = useCallback(
     async (moodId: number, newTimestamp: number, utcOffsetMinutes?: number | null) => {
@@ -208,6 +221,46 @@ function HomeScreenContent() {
     );
   }, [createMood, schedulePostSaveTopResets, scrollHomeListToTop]);
 
+  const quickFields = entrySettings.quickEntryFieldConfig;
+  const offersDetailAfterKeep =
+    quickFields.emotions || quickFields.context || quickFields.energy || quickFields.notes;
+
+  /**
+   * One tap keeps the entry. Severe ratings go straight to support; other
+   * ratings open the optional detail sheet, or a toast with Undo when every
+   * quick-entry field is switched off.
+   */
+  const handleMoodTap = useCallback(async (mood: number) => {
+    let entry: MoodEntry;
+    try {
+      entry = await commitThenRunPostCommitEffects(
+        () => createMood(getMoodEntryPersistenceValues(createMoodEntryFormValues(mood))),
+        [scrollHomeListToTop, schedulePostSaveTopResets],
+      );
+    } catch (error) {
+      console.error("Failed to save mood entry:", error);
+      haptics.reject();
+      Alert.alert("Save failed", "Unable to save your entry. Please try again.");
+      return;
+    }
+
+    const followUp = getKeptEntryFollowUp(mood, offersDetailAfterKeep);
+    if (followUp === "support") {
+      haptics.reject();
+      setTimeout(showCrisisSupportAlert, 250);
+      return;
+    }
+
+    haptics.commit();
+    if (followUp === "detail") {
+      modals.setKeptEntry(entry);
+    } else {
+      toastService.showKeptMood(entry, async () => {
+        await removeMood(entry.id);
+      });
+    }
+  }, [createMood, modals, offersDetailAfterKeep, removeMood, schedulePostSaveTopResets, scrollHomeListToTop]);
+
   const handleJumpToTopPress = useCallback(() => {
     haptics.tap();
     scrollHomeListToTop();
@@ -256,30 +309,24 @@ function HomeScreenContent() {
 
   const listEmptyComponent = useMemo(
     () =>
-      loading ? (
-        <LoadingSpinner message="Loading..." />
-      ) : status === "error" ? (
+      today.error ? (
         <EmptyState
           icon="warning-outline"
           tone="coral"
-          title="Mood history could not load"
-          description={error ?? "Your local mood history is still on this device. Try loading it again."}
+          title="Today's entries could not load"
+          description="Your local mood history is still on this device. Try loading it again."
           actionLabel="Try Again"
-          onAction={() => {
-            void loadAll();
-          }}
+          onAction={today.reload}
         />
-      ) : Object.keys(filters).length ? (
-        <EmptyState icon="search-outline" tone="sage" title="No matching entries" description="Try changing or clearing your filters." actionLabel="Clear filters" onAction={() => { void clearFilters(); }} />
       ) : (
         <EmptyState
-          icon="leaf-outline"
+          icon="partly-sunny-outline"
           tone="sage"
-          title="Start your journey"
-          description="Tap a mood above to log how you're feeling right now"
+          title="No entries yet today"
+          description="Tap the weather you feel above. One tap saves it."
         />
       ),
-    [clearFilters, error, filters, loadAll, loading, status]
+    [today.error, today.reload]
   );
 
   const listContentContainerStyle = useMemo(
@@ -334,12 +381,7 @@ function HomeScreenContent() {
               // Supplying a plain ScrollView keeps it a single wrap and restores
               // a working native scroll ref.
               renderScrollComponent={RNScrollView}
-              data={moods}
-              onEndReached={() => { void loadMore(); }}
-              onEndReachedThreshold={0.4}
-              ListFooterComponent={loadingMore ? <LoadingSpinner message="Loading more..." /> : error && moods.length > 0 ? (
-                <EmptyState icon="warning-outline" tone="coral" title="History could not load" description={error} actionLabel="Try again" onAction={() => { void refreshMoods(); }} />
-              ) : null}
+              data={todayEntries}
               keyExtractor={keyExtractor}
               renderItem={renderMoodItem}
               ListEmptyComponent={listEmptyComponent}
@@ -379,7 +421,7 @@ function HomeScreenContent() {
             >
               <ScreenBackgroundAccent density="compact" />
               <View
-                pointerEvents="none"
+                pointerEvents="box-none"
                 onLayout={handleHomeChromeLayout}
                 style={{ paddingTop: HEADER_TOP_PADDING }}
               >
@@ -395,7 +437,7 @@ function HomeScreenContent() {
                       style={expandedSelectorAnimatedStyle}
                     >
                       <DetailedMoodButtonSelector
-                        onMoodPress={modals.handleMoodPress}
+                        onMoodPress={handleMoodTap}
                         onLongPress={modals.handleLongPress}
                       />
                     </Animated.View>
@@ -415,7 +457,7 @@ function HomeScreenContent() {
                     >
                       <CollapsedMoodSelector
                         isDark={isDark}
-                        onMoodPress={modals.handleMoodPress}
+                        onMoodPress={handleMoodTap}
                         onLongPress={modals.handleLongPress}
                       />
                     </Animated.View>
@@ -424,7 +466,7 @@ function HomeScreenContent() {
                   <UnifiedMoodSelector
                     collapseProgress={collapseProgress}
                     isDark={isDark}
-                    onMoodPress={modals.handleMoodPress}
+                    onMoodPress={handleMoodTap}
                     onLongPress={modals.handleLongPress}
                   />
                 )}
@@ -435,11 +477,14 @@ function HomeScreenContent() {
                 onLayout={handleHistoryChromeLayout}
                 style={{ paddingTop: HEADER_SECTION_GAP }}
               >
-                <View className="mb-3 flex-row items-center justify-between gap-2">
-                  <View className="flex-1"><HistoryListHeader moodCount={total} /></View>
-                  <HistoryFilterSheet />
+                <View className="mb-3">
+                  <HistoryListHeader
+                    title="Today"
+                    moodCount={todayEntries.length}
+                    countSuffix="today"
+                    countTestID="today-count"
+                  />
                 </View>
-                <ActiveFilterChips />
               </View>
             </Animated.View>
 
@@ -488,14 +533,16 @@ function HomeScreenContent() {
           }}
         />
       )}
-      <QuickMoodEntryModal
-        visible={modals.quickEntryVisible}
-        initialMood={modals.pendingMood}
+      <KeptEntryDetailModal
+        visible={Boolean(modals.keptEntry)}
+        initialMood={modals.keptEntry?.mood ?? modals.pendingMood}
         emotionOptions={entrySettings.emotionOptions}
         contextOptions={entrySettings.contextOptions}
         fieldConfig={entrySettings.quickEntryFieldConfig}
-        onClose={modals.closeQuickEntry}
-        onSubmit={handleEntrySave}
+        initialValues={modals.keptInitialValues}
+        onClose={modals.closeKeptEntry}
+        onSubmit={handleKeptEntrySave}
+        onUndo={handleKeptEntryUndo}
         onCreateEmotion={entrySettings.createEmotionOption}
         onCreateContextTag={entrySettings.createContextOption}
       />

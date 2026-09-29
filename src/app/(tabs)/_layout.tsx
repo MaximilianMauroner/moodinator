@@ -54,13 +54,12 @@ export default function TabLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
 
-  // Soft Organic palette: tab chrome follows the same botanical night tokens
-  // as the screens so dark mode keeps the warm field-journal feel.
+  // Tab chrome uses the same Soft Sage tokens as the screens.
   const colors = {
-    active: isDark ? "#A6E39B" : "#476D47",
+    active: getThemedColor("primary", isDark),
     inactive: getThemedColor("textSubtle", isDark),
     background: getThemedColor("background", isDark),
-    border: isDark ? "#233D2D" : "#E5D9BF",
+    border: getThemedColor("border", isDark),
   };
 
   return (
@@ -94,12 +93,22 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Home",
+          title: "Today",
           tabBarButton: HomeTabButton,
           tabBarIcon: ({ color, size }) => (
             <IconSymbol size={size} name="house.fill" color={color} />
           ),
-          tabBarAccessibilityLabel: TAB_ACCESSIBILITY_LABELS.home,
+          tabBarAccessibilityLabel: TAB_ACCESSIBILITY_LABELS.today,
+        }}
+      />
+      <Tabs.Screen
+        name="history"
+        options={{
+          title: "History",
+          tabBarIcon: ({ color, size }) => (
+            <IconSymbol size={size} name="clock.arrow.circlepath" color={color} />
+          ),
+          tabBarAccessibilityLabel: TAB_ACCESSIBILITY_LABELS.history,
         }}
       />
       <Tabs.Screen
@@ -116,10 +125,8 @@ export default function TabLayout() {
         name="settings"
         options={{
           title: "Settings",
-          tabBarIcon: ({ color, size }) => (
-            <IconSymbol size={size} name="gear" color={color} />
-          ),
-          tabBarAccessibilityLabel: TAB_ACCESSIBILITY_LABELS.settings,
+          // Reached through the gear in each screen header, not the tab bar.
+          href: null,
         }}
       />
     </Tabs>

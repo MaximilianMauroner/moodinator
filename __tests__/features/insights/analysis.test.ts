@@ -3,6 +3,7 @@ import { createMockMoodEntry } from "../../db/mockClient";
 import { drivers } from "../../../src/features/insights/utils/drivers";
 import { dailySeries } from "../../../src/features/insights/utils/dailySeries";
 import {
+  daypartMeans,
   rhythm,
   rhythmCellColor,
 } from "../../../src/features/insights/utils/rhythm";
@@ -129,6 +130,20 @@ describe("shared insights analysis", () => {
     );
     expect(trendGeometry(series).whiskers).toEqual([
       { x: 150, minY: 0, maxY: 120 },
+    ]);
+  });
+
+  it("averages each part of the day across weekdays", () => {
+    const parts = daypartMeans(rhythm([
+      entry(2, [], "2026-09-07T09:00:00"),
+      entry(4, [], "2026-09-09T09:30:00"),
+      entry(6, [], "2026-09-08T13:00:00"),
+    ]));
+    expect(parts).toEqual([
+      { daypart: "Morning", count: 2, mean: 3 },
+      { daypart: "Midday", count: 1, mean: 6 },
+      { daypart: "Evening", count: 0, mean: null },
+      { daypart: "Night", count: 0, mean: null },
     ]);
   });
 });

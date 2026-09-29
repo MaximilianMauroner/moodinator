@@ -1,7 +1,7 @@
 appId: com.lab4code.moodinator.qa
 name: Recycled-row stress cycle
 ---
-- tapOn: "Home tab, log your mood"
+- tapOn: "History tab, view past days and months"
 ${TARGET_SETUP}
 - scrollUntilVisible:
     element:

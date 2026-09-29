@@ -7,7 +7,7 @@ import type { MoodEntry } from "@db/types";
 import { getInterpretedMoodRating } from "@/constants/moodScaleInterpretation";
 import { getMoodHex } from "@/lib/moodPresentation";
 import { getThemedColor } from "@/constants/colors";
-import { addToGroup, emptyGroup, groupMean, type GroupStats } from "./statistics";
+import { addToGroup, emptyGroup, groupMean, mergeGroups, type GroupStats } from "./statistics";
 export const DAYPARTS = ["Morning", "Midday", "Evening", "Night"] as const;
 export const WEEKDAYS = [
   "Monday",
@@ -51,6 +51,20 @@ export function rhythm(entries: MoodEntry[]): RhythmCell[] {
     mean: cell.stats.count ? groupMean(cell.stats) : null,
   }));
 }
+export interface DaypartMean {
+  daypart: (typeof DAYPARTS)[number];
+  count: number;
+  mean: number | null;
+}
+
+/** Mean rating per part of the day across all weekdays. */
+export function daypartMeans(cells: RhythmCell[]): DaypartMean[] {
+  return DAYPARTS.map((daypart, index) => {
+    const merged = mergeGroups(cells.filter((cell) => cell.daypart === index).map((cell) => cell.stats));
+    return { daypart, count: merged.count, mean: merged.count ? groupMean(merged) : null };
+  });
+}
+
 export function rhythmCellColor(cell: RhythmCell, isDark: boolean): string {
   return cell.mean === null
     ? getThemedColor("surfaceAlt", isDark)

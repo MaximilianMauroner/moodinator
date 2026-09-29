@@ -1,7 +1,8 @@
 import React, { StrictMode } from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Alert, AppAlertProvider } from "@/components/ui/AppAlert";
+import { Alert, AppAlertProvider, showSupportSheet } from "@/components/ui/AppAlert";
+import { colors } from "@/constants/colors";
 
 const nativeFocus = vi.hoisted(() => vi.fn());
 const scrollTo = vi.hoisted(() => vi.fn());
@@ -15,6 +16,7 @@ vi.mock("react-native", () => ({
   findNodeHandle: () => 42,
 }));
 vi.mock("react-native-safe-area-context", () => ({ SafeAreaView: "SafeAreaView" }));
+vi.mock("@expo/vector-icons", () => ({ Ionicons: "Ionicons" }));
 vi.mock("@/hooks/useColorScheme", () => ({ useColorScheme: () => "dark" }));
 vi.mock("@/hooks/useReducedMotion", () => ({ useReducedMotion: () => true }));
 
@@ -144,5 +146,27 @@ describe("app dialogs", () => {
     await press("Continue");
     expect(titles()).toEqual(["Next"]);
     await press("OK");
+  });
+
+  it("shows the support sheet with the first support action emphasized", async () => {
+    const helpline = vi.fn(); const call = vi.fn(); const notNow = vi.fn();
+    await mount();
+    await act(async () => showSupportSheet("Support is available", "Reach out now.", [
+      { text: "Find A Helpline", onPress: helpline },
+      { text: "Call 988 (U.S.)", onPress: call },
+      { text: "Not now", style: "cancel", onPress: notNow },
+    ]));
+    const buttons = renderer.root.findAllByProps({ accessibilityRole: "button" });
+    expect(buttons.map((node) => node.props.accessibilityLabel))
+      .toEqual(["Find A Helpline", "Call 988 (U.S.)", "Not now"]);
+    const fills = buttons.map((node) => node.props.style.at(-1).backgroundColor);
+    expect(fills[0]).toBe(colors.supportAction.dark);
+    expect(fills[1]).not.toBe(colors.supportAction.dark);
+    expect(fills[2]).toBe("transparent");
+    await press("Find A Helpline");
+    expect(helpline).toHaveBeenCalledOnce();
+    expect(call).not.toHaveBeenCalled();
+    expect(notNow).not.toHaveBeenCalled();
+    expect(titles()).toEqual([]);
   });
 });

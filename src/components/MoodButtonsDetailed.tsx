@@ -1,5 +1,6 @@
 import React from "react";
 import { View, Text, type ViewStyle } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { HapticTab } from "./HapticTab";
 import { getAllMoodRatingDisplays } from "@/constants/moodScaleInterpretation";
 import {
@@ -7,6 +8,7 @@ import {
 	getMoodButtonHint,
 } from "@/constants/accessibility";
 import { useThemeColors, colors } from "@/constants/colors";
+import { getMoodWeatherColor, getMoodWeatherIcon } from "@/constants/moodWeather";
 
 const THREE_COLUMN_CARD_HEIGHT = 78;
 const THREE_COLUMN_CARD_WIDTH = "31.5%";
@@ -29,11 +31,6 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
 			value: mood.value,
 			label: mood.label,
 			description: mood.description,
-			color: mood.color,
-			bg: mood.bg,
-			borderColor: mood.borderColor,
-			textHex: mood.colorHex,
-			bgHex: mood.backgroundHex,
 		}));
 	}, [isDark]);
 
@@ -48,12 +45,9 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
 		const cardStyle: ViewStyle = {
 			width,
 			height,
-			backgroundColor: mood.bgHex || "#F1F5F9",
-			shadowColor: mood.textHex || "#64748B",
-			shadowOffset: { width: 0, height: 4 },
-			shadowOpacity: 0.15,
-			shadowRadius: 8,
-			elevation: 4,
+			backgroundColor: get("background"),
+			borderWidth: 1,
+			borderColor: get("border"),
 		};
 
 		return (
@@ -68,22 +62,26 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
 			accessibilityLabel={getMoodButtonLabel(mood.value, mood.label)}
 			accessibilityHint={getMoodButtonHint()}
 		>
-			<Text
-				className="mb-0.5 text-[18px] font-bold"
-				style={{ color: mood.textHex || "#64748B" }}
-			>
-				{mood.value}
-			</Text>
+			<View className="mb-0.5 flex-row items-center">
+				<Ionicons
+					name={getMoodWeatherIcon(mood.value)}
+					size={20}
+					color={getMoodWeatherColor(mood.value, isDark)}
+				/>
+				<Text className="ml-1.5 text-[18px] font-bold" style={{ color: get("text") }}>
+					{mood.value}
+				</Text>
+			</View>
 			<Text
 				className="mb-0.5 text-xs font-semibold"
-				style={{ color: mood.textHex || "#64748B" }}
+				style={{ color: get("textMuted") }}
 				numberOfLines={1}
 			>
 				{mood.label}
 			</Text>
 			<Text
 				className="px-1.5 text-center text-xs leading-tight"
-				style={{ color: mood.textHex || "#64748B" }}
+				style={{ color: get("textSubtle") }}
 				numberOfLines={2}
 			>
 				{mood.description}
@@ -128,44 +126,6 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
 				)}
 			</View>
 
-			{/* Gentle scale indicator */}
-			<View className="mx-1 mt-2">
-				<View
-					className="flex-row h-1 rounded-full overflow-hidden"
-					style={{ backgroundColor: get("surfaceAlt") }}
-				>
-					{colors.moodGradient.map((color, index) => (
-						<View
-							key={index}
-							className="flex-1"
-							style={{ backgroundColor: color }}
-						/>
-					))}
-				</View>
-				<View
-					className="flex-row justify-between px-0.5"
-					style={{ marginTop: 6 }}
-				>
-					<Text
-						className="text-xs font-medium"
-						style={{
-							color: isDark ? colors.primaryMuted.dark : colors.positive.textDark.light,
-						}}
-					>
-						Great
-					</Text>
-					<Text
-						className="text-xs font-medium"
-						style={{
-							color: isDark
-								? colors.negative.text.dark
-								: colors.negative.text.light,
-						}}
-					>
-						Need support
-					</Text>
-				</View>
-			</View>
 		</View>
 	);
 };

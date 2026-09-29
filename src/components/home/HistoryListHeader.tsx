@@ -4,17 +4,20 @@ import { useColorScheme } from "@/hooks/useColorScheme";
 import { colors } from "@/constants/colors";
 
 interface HistoryListHeaderProps {
+  title: string;
   moodCount: number;
+  /** Badge text after the count, for example "total" or "today". */
+  countSuffix: string;
+  countTestID: string;
 }
 
 /**
- * Header for the mood history list section.
- * Shows "Recent entries" title with count badge.
+ * Header for a list of mood entries: a title with a count badge.
  *
  * Carries no bottom margin: it shares a centred row with the filter button, and
  * a margin here would push the title off that row's centre line.
  */
-export function HistoryListHeader({ moodCount }: HistoryListHeaderProps) {
+export function HistoryListHeader({ title, moodCount, countSuffix, countTestID }: HistoryListHeaderProps) {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
 
@@ -24,7 +27,7 @@ export function HistoryListHeader({ moodCount }: HistoryListHeaderProps) {
         className="font-semibold text-base"
         style={{ color: isDark ? colors.text.dark : colors.text.light }}
       >
-        Recent entries
+        {title}
       </Text>
       {moodCount > 0 && (
         <View
@@ -32,11 +35,11 @@ export function HistoryListHeader({ moodCount }: HistoryListHeaderProps) {
           style={{ backgroundColor: isDark ? colors.primaryBg.dark : colors.primaryBg.light }}
         >
           <Text
-            testID="history-count"
+            testID={countTestID}
             className="text-xs font-medium"
             style={{ color: isDark ? colors.positive.text.dark : colors.positive.text.light }}
           >
-            {moodCount} total
+            {moodCount} {countSuffix}
           </Text>
         </View>
       )}

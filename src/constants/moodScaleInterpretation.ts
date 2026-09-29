@@ -146,15 +146,6 @@ export function getMoodRatingTextHex(
   return (dark ? item.textHexDark : item.textHex) ?? "#64748b";
 }
 
-export function getMoodRatingBackgroundHex(
-  value: number,
-  dark = false,
-  sourceScale: MoodScaleSnapshot = CURRENT_MOOD_SCALE
-): string {
-  const item = getMoodRatingScaleItem(value, sourceScale);
-  return (dark ? item.bgHexDark : item.bgHex) ?? "#F9F5ED";
-}
-
 export type MoodTrendDirection = "up" | "down" | "stable";
 
 export function getMoodTrendDirection(change: number, threshold = 0.1): MoodTrendDirection {
