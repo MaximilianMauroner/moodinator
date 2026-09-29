@@ -80,9 +80,12 @@ name: Isolated Android entry lifecycle
 - tapOn: "Save entry"
 # Check Insights before deletion; the runner owns the synchronized native
 # delete/absence/Undo/restoration phase below.
-- tapOn: "Insights tab, view mood history and summaries"
+- tapOn: "Insights tab, view mood patterns and summaries"
 - assertVisible: "Your history · 1 entry"
 - tapOn: "Refresh insights"
 - assertVisible: "Your history · 1 entry"
 - runFlow: flows/insights.yaml
-- tapOn: "Home tab, log your mood"
+- tapOn: "History tab, view past days and months"
+- tapOn: "Month view"
+- assertVisible: "Calendar legend: a dot marks a day with multiple entries."
+- tapOn: "Today tab, log your mood"

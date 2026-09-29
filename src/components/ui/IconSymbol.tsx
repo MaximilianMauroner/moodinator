@@ -18,6 +18,7 @@ const MAPPING = {
   "camera.fill": "photo-camera",
   "camera.aperture": "cameraswitch",
   "clock.fill": "access-time-filled",
+  "clock.arrow.circlepath": "history",
   "bell.fill": "notifications",
   "bell.slash.fill": "notifications-off",
   "plus.circle.fill": "add-circle",

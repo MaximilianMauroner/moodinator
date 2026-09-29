@@ -800,19 +800,22 @@ test("visual matrix retains each screen before the next navigation", () => {
     new URL("../src/features/insights/screens/InsightsScreen.tsx", import.meta.url),
     "utf8",
   );
-  for (const screen of ["home", "findings", "charts", "calendar", "settings"]) {
+  for (const screen of ["today", "history", "calendar", "findings", "charts", "settings"]) {
     assert.match(source, new RegExp(`capture\\(\"${screen}\"\\)`));
   }
   const flow = readFileSync(new URL("../.maestro/flows/native-visual-matrix.yaml", import.meta.url), "utf8");
   assert.equal(flow.includes("Insights tab"), false);
-  const openInsights = source.indexOf("Insights tab, view mood history and summaries");
+  const openHistory = source.indexOf("History tab, view past days and months");
+  const monthView = source.indexOf('contentDescription: "Month view"', openHistory);
+  const openInsights = source.indexOf("Insights tab, view mood patterns and summaries", monthView);
+  assert.ok(openHistory >= 0 && monthView > openHistory && openInsights > monthView);
   const selectAll = source.indexOf('contentDescription: "All history"', openInsights);
   const loadedSummary = source.indexOf('testId: "insights-loaded-summary"', selectAll);
-  assert.ok(openInsights >= 0 && selectAll > openInsights && loadedSummary > selectAll);
+  assert.ok(selectAll > openInsights && loadedSummary > selectAll);
   const chartsView = source.indexOf('contentDescription: "Charts view"', loadedSummary);
-  const calendarView = source.indexOf('contentDescription: "Calendar view"', chartsView);
-  assert.ok(chartsView > loadedSummary && calendarView > chartsView);
-  assert.doesNotMatch(source, /waitForNodeAndTap\(serial, \{ text: "(?:Charts|Calendar) view" \}\)/);
+  const openSettings = source.indexOf('testId: "open-settings"', chartsView);
+  assert.ok(chartsView > loadedSummary && openSettings > chartsView);
+  assert.doesNotMatch(source, /waitForNodeAndTap\(serial, \{ text: "(?:Charts|Month) view" \}\)/);
   assert.match(source, /testId: "insights-loaded-summary"/);
   assert.match(source, /text: `\$\{fixtureCount\} entries`/);
   assert.match(insightsSource, /testID=\{ready \? "insights-loaded-summary" : undefined\}/);
@@ -940,7 +943,7 @@ test("Undo runner captures the row before opening its actions modal", () => {
   assert.doesNotMatch(source.slice(capture, openActions), /undoDumpTimeoutMs/);
 });
 
-test("stress settles imported Home history before performance reset", () => {
+test("stress settles imported History before performance reset", () => {
   assert.equal(typeof settleImportedHistory, "function");
   const source = readFileSync(new URL("../scripts/run-native-stress.js", import.meta.url), "utf8");
   const imported = source.indexOf("await importFixture(options.serial, fixtureName, options.size)");
