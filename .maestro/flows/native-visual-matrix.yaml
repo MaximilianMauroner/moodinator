@@ -4,5 +4,4 @@ name: Large-font theme and reduced-motion journey
 - launchApp:
     clearState: false
 - tapOn: "Today tab, log your mood"
-- assertVisible:
-    id: "today-count"
+- assertVisible: "Mood Rating 5 of 10, Neutral. Lower numbers are better."

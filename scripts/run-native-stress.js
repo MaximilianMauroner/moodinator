@@ -250,6 +250,8 @@ async function settleImportedHistory(serial, expectedCount) {
       { text: `${expectedCount} total` },
     ],
   }, { timeoutMs: 30000 });
+  // History also loads the seven-day forecast; keep it out of the measured window.
+  await waitForNode(serial, { testId: "forecast-ready" }, { timeoutMs: 30000 });
 }
 
 function startTrace(serial, {

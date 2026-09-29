@@ -805,7 +805,13 @@ test("visual matrix retains each screen before the next navigation", () => {
   }
   const flow = readFileSync(new URL("../.maestro/flows/native-visual-matrix.yaml", import.meta.url), "utf8");
   assert.equal(flow.includes("Insights tab"), false);
-  const openHistory = source.indexOf("History tab, view past days and months");
+  const openToday = source.indexOf("Today tab, log your mood");
+  const todayCapture = source.indexOf('capture("today")', openToday);
+  const openHistory = source.indexOf("History tab, view past days and months", todayCapture);
+  const forecastReady = source.indexOf('testId: "forecast-ready"', openHistory);
+  const historyCapture = source.indexOf('capture("history")', forecastReady);
+  assert.ok(openToday >= 0 && todayCapture > openToday && openHistory > todayCapture);
+  assert.ok(forecastReady > openHistory && historyCapture > forecastReady);
   const monthView = source.indexOf('contentDescription: "Month view"', openHistory);
   const openInsights = source.indexOf("Insights tab, view mood patterns and summaries", monthView);
   assert.ok(openHistory >= 0 && monthView > openHistory && openInsights > monthView);
@@ -954,6 +960,10 @@ test("stress settles imported History before performance reset", () => {
   assert.ok(imported >= 0 && launched > imported && settled > launched && reset > settled && baseline > settled);
   assert.match(source, /testId: "history-count"/);
   assert.match(source, /text: `\$\{expectedCount\} total`/);
+  const settleStart = source.indexOf("async function settleImportedHistory");
+  const count = source.indexOf('testId: "history-count"', settleStart);
+  const forecast = source.indexOf('testId: "forecast-ready"', count);
+  assert.ok(settleStart >= 0 && count > settleStart && forecast > count);
 });
 
 test("delete timing starts before the synchronous ADB tap", () => {

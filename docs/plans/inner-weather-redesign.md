@@ -2,9 +2,8 @@
 
 Status: implemented on branch `feat/inner-weather-redesign` (2026-09-29). Native visual check pending.
 
-Design source: `.agents/artifacts/design/moodinator-redesign/review.html`
-(rounds 13 and 14, direction S3 with the 4/3/4 picker). Product record:
-`docs/PRODUCT.md`.
+Design source: the local design exploration (rounds 13 and 14, direction S3
+with the 4/3/4 picker), kept outside the repository.
 
 ## Result
 
@@ -121,17 +120,33 @@ Work on a feature branch. I commit or open a pull request only when asked.
 
 ## Outcome (2026-09-29)
 
-- All seven phases are implemented. Checks pass: lint, typecheck, 612 unit
-  tests, 67 native QA source tests, color tokens, and expo-doctor.
-  `verify:android-release-config` still fails on the untracked local
-  `android/app/build.gradle`, as before this change.
-- Not verified: the screens on a device or emulator. This machine has no
-  Android SDK or emulator, and the app does not run on the web.
+- All seven phases are implemented on `feat/inner-weather-redesign`
+  (PR #85), rebased onto `main` after #82.
+- Review fixes after the first Codex review:
+  - A one-tap entry stores the mood only; energy stays unanswered.
+  - Severe ratings show support first; "Not now" continues to the detail
+    sheet or the Undo toast, so a mistaken 9 or 10 can be removed.
+  - The month calendar reloads after any entry change.
+  - Today and the forecast query one extra day on each side and bucket by
+    the recorded local day.
+  - History keeps its load-error footer with Retry.
+  - The climate card states averages with entry counts, not a most-common
+    condition.
+  - Native QA waits for a `forecast-ready` marker and captures Today first.
 - Changes from the plan:
   - Collapsed picker pills keep the number on the mood tint, without an icon.
   - `rhythmCellColor` stays in `utils/rhythm.ts`; moving it was not needed.
   - The Insights calendar mode moved to History (Month). The Insights entry
     detail modal was only reachable from that calendar and was removed.
-  - The QA runner scripts and Maestro flows now use the Today, History, and
+  - The QA runner scripts and Maestro flows use the Today, History, and
     Insights tabs and the settings gear (testID `open-settings`).
-
+- Overlap with PR #83 (descriptive Insights): both change
+  `InsightsScreen.tsx`, `UnifiedMoodSelector.tsx`, the Insights tests, and the
+  native matrix. The second PR to merge must take #83's charts-only Insights,
+  keep the climate card and History-owned calendar from this PR, and drop
+  Findings from the QA matrix and `.maestro/flows/insights.yaml`.
+- Release: this change does not touch versions or release configuration. The
+  accepted Internal candidate (0.1.9 / code 44) does not include it. Before a
+  build with this change ships, the Play listing copy and screenshots that
+  describe "tap for a quick entry" on Home must be updated.
+- Not verified here: human product acceptance on a physical device.

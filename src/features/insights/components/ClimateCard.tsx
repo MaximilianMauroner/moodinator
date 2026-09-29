@@ -20,30 +20,43 @@ const GROUP_WORDS: Record<MoodWeatherGroup, string> = {
   rain: "rainy",
 };
 
+function countLabel(count: number): string {
+  return `${count} ${count === 1 ? "entry" : "entries"}`;
+}
+
 type ClimateCardProps = {
   averageMood: number;
+  entryCount: number;
   dayparts: DaypartMean[];
 };
 
-/** The range read as a climate: the usual weather, then weather by time of day. */
-export function ClimateCard({ averageMood, dayparts }: ClimateCardProps) {
+/**
+ * The range read as a climate: the average rating shown as weather, then the
+ * average by time of day. Averages only; it names no most-common condition.
+ */
+export function ClimateCard({ averageMood, entryCount, dayparts }: ClimateCardProps) {
   const { get, isDark } = useThemeColors();
   const level = Math.round(averageMood);
-  const summary = `Mostly ${GROUP_WORDS[getMoodWeatherGroup(level)]}, ${getMoodRatingLabel(level)} ${level}`;
+  const summary = `Average: ${GROUP_WORDS[getMoodWeatherGroup(level)]}, ${getMoodRatingLabel(level)} ${level}`;
 
   return (
     <SurfaceCard tone="sage" style={{ marginBottom: 12 }}>
       <Text style={[typography.eyebrow, { color: get("textSubtle") }]}>Your climate</Text>
       <View className="mt-2 flex-row items-center" style={{ gap: 12 }}>
         <Ionicons name={getMoodWeatherIcon(level)} size={40} color={getMoodWeatherColor(level, isDark)} />
-        <Text style={[typography.titleMd, { flex: 1, color: get("text"), fontSize: 20, lineHeight: 26 }]}>
-          {summary}
-        </Text>
+        <View style={{ flex: 1 }}>
+          <Text style={[typography.titleMd, { color: get("text"), fontSize: 20, lineHeight: 26 }]}>
+            {summary}
+          </Text>
+          <Text style={[typography.bodySm, { color: get("textSubtle") }]}>
+            Average of {countLabel(entryCount)}
+          </Text>
+        </View>
       </View>
       <View className="mt-4 flex-row" accessible accessibilityLabel={dayparts
         .map((part) => part.mean === null
           ? `${part.daypart}: no entries`
-          : `${part.daypart}: ${getMoodRatingLabel(part.mean)} ${Math.round(part.mean)}`)
+          : `${part.daypart}: average ${getMoodRatingLabel(part.mean)} ${Math.round(part.mean)}, ${countLabel(part.count)}`)
         .join(", ")}
       >
         {dayparts.map((part) => {
@@ -59,6 +72,9 @@ export function ClimateCard({ averageMood, dayparts }: ClimateCardProps) {
               <Text style={[typography.bodySm, { color: get("textSubtle") }]}>
                 {partLevel === null ? "No entries" : `${getMoodRatingLabel(partLevel)} ${partLevel}`}
               </Text>
+              {partLevel === null ? null : (
+                <Text style={[typography.bodySm, { color: get("textSubtle") }]}>{countLabel(part.count)}</Text>
+              )}
             </View>
           );
         })}

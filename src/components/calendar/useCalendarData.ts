@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import type { MoodEntry } from "@db/types";
 import { getInterpretedMoodRating } from "@/constants/moodScaleInterpretation";
 import { moodService } from "@/services/moodService";
+import { useMoodsStore } from "@/shared/state/moodsStore";
 
 export type CalendarDayData = {
   day: number;
@@ -31,6 +32,8 @@ export function useCalendarData(initialYear?: number, initialMonth?: number) {
   const year = displayDate.getFullYear();
   const month = displayDate.getMonth();
 
+  // Reload after any entry change so edits made elsewhere show in the month.
+  const revision = useMoodsStore((state) => state.revision);
   const loadMonthData = useCallback(async () => {
     const requestId = ++latestRequestIdRef.current;
     setLoading(true);
@@ -90,7 +93,7 @@ export function useCalendarData(initialYear?: number, initialMonth?: number) {
 
   useEffect(() => {
     loadMonthData();
-  }, [loadMonthData]);
+  }, [loadMonthData, revision]);
 
   const goToPreviousMonth = useCallback(() => {
     setDisplayDate((previousDate) => (

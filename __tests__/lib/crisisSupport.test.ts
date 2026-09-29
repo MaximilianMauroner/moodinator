@@ -36,6 +36,19 @@ describe("crisis support", () => {
     expect(shouldOfferCrisisSupport(Number.NaN)).toBe(false);
   });
 
+  it("runs the decline callback for Not now only, not for support actions", () => {
+    const onDecline = vi.fn();
+    const showAlert = vi.fn();
+    presentCrisisSupportAlert({ showAlert, openUrl: vi.fn(async () => {}), onDecline });
+    const buttons = showAlert.mock.calls[0][2] as CrisisSupportAlertButton[];
+
+    buttons.find((button) => button.text === "Find A Helpline")?.onPress?.();
+    expect(onDecline).not.toHaveBeenCalled();
+
+    buttons.find((button) => button.text === "Not now")?.onPress?.();
+    expect(onDecline).toHaveBeenCalledTimes(1);
+  });
+
   it("provides U.S. 988 call/text and international helpline actions", () => {
     expect(CRISIS_SUPPORT_ACTIONS).toEqual([
       expect.objectContaining({ id: "call-988", url: "tel:988" }),

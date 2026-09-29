@@ -29,6 +29,17 @@ describe("buildForecastDays", () => {
     expect(days[2]).toMatchObject({ entries: [], lightest: null, heaviest: null, average: null });
   });
 
+  it("buckets by the recorded local day, not this device's day", () => {
+    // Recorded at 01:00 on 22 Sep in UTC+14, which is 21 Sep 11:00 UTC.
+    const traveled = createMockMoodEntry({
+      mood: 3,
+      timestamp: Date.UTC(2026, 8, 21, 11),
+      utcOffsetMinutes: -14 * 60,
+    });
+    const days = buildForecastDays([traveled], today);
+    expect(days.find((day) => day.dayKey === "2026-09-22")!.entries).toEqual([traveled]);
+  });
+
   it("ignores entries outside the window", () => {
     const days = buildForecastDays([mood(2, [2026, 9, 20, 9])], today);
     expect(days.every((day) => day.entries.length === 0)).toBe(true);

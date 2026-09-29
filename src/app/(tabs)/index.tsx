@@ -24,7 +24,7 @@ import {
   KeptEntryDetailModal,
   MoodEntryFormValues,
 } from "@/components/MoodEntryModal";
-import { createMoodEntryFormValues } from "@/components/entry/moodEntryDraft";
+import { createMoodOnlyEntryValues } from "@/components/entry/moodEntryDraft";
 import { DisplayMoodItem } from "@/components/DisplayMoodItem";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ScreenBackgroundAccent } from "@/components/layout/ScreenBackgroundAccent";
@@ -39,6 +39,7 @@ import {
 } from "@/components/home";
 
 import { useRecentMoodEntries } from "@/features/history/useRecentMoodEntries";
+import { buildForecastDays } from "@/features/history/forecast";
 import { useMoodsStore } from "@/shared/state/moodsStore";
 import { useEntrySettings } from "@/hooks/useEntrySettings";
 import { useMoodModals } from "@/hooks/useMoodModals";
@@ -88,7 +89,7 @@ function HomeScreenContent() {
 
   const today = useRecentMoodEntries(1);
   const todayEntries = useMemo(
-    () => [...today.entries].sort((a, b) => b.timestamp - a.timestamp),
+    () => buildForecastDays(today.entries, new Date(), 1)[0]!.entries.slice().reverse(),
     [today.entries]
   );
   const [homeChromeHeight, setHomeChromeHeight] = useState(0);
@@ -226,15 +227,16 @@ function HomeScreenContent() {
     quickFields.emotions || quickFields.context || quickFields.energy || quickFields.notes;
 
   /**
-   * One tap keeps the entry. Severe ratings go straight to support; other
-   * ratings open the optional detail sheet, or a toast with Undo when every
+   * One tap keeps the entry with the mood only. Severe ratings show support
+   * first and continue after "Not now"; other ratings continue at once. The
+   * follow-up is the optional detail sheet, or a toast with Undo when every
    * quick-entry field is switched off.
    */
   const handleMoodTap = useCallback(async (mood: number) => {
     let entry: MoodEntry;
     try {
       entry = await commitThenRunPostCommitEffects(
-        () => createMood(getMoodEntryPersistenceValues(createMoodEntryFormValues(mood))),
+        () => createMood(getMoodEntryPersistenceValues(createMoodOnlyEntryValues(mood))),
         [scrollHomeListToTop, schedulePostSaveTopResets],
       );
     } catch (error) {
@@ -245,20 +247,24 @@ function HomeScreenContent() {
     }
 
     const followUp = getKeptEntryFollowUp(mood, offersDetailAfterKeep);
-    if (followUp === "support") {
+    const continueAfterKeep = () => {
+      if (followUp.then === "detail") {
+        modals.setKeptEntry(entry);
+      } else {
+        toastService.showKeptMood(entry, async () => {
+          await removeMood(entry.id);
+        });
+      }
+    };
+
+    if (followUp.supportFirst) {
       haptics.reject();
-      setTimeout(showCrisisSupportAlert, 250);
+      setTimeout(() => showCrisisSupportAlert({ onDecline: continueAfterKeep }), 250);
       return;
     }
 
     haptics.commit();
-    if (followUp === "detail") {
-      modals.setKeptEntry(entry);
-    } else {
-      toastService.showKeptMood(entry, async () => {
-        await removeMood(entry.id);
-      });
-    }
+    continueAfterKeep();
   }, [createMood, modals, offersDetailAfterKeep, removeMood, schedulePostSaveTopResets, scrollHomeListToTop]);
 
   const handleJumpToTopPress = useCallback(() => {

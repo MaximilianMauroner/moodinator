@@ -134,7 +134,7 @@ function HistoryScreenContent() {
           {recent.error ? (
             <EmptyState icon="warning-outline" tone="coral" title="The last 7 days could not load" description={recent.error} actionLabel="Try Again" onAction={recent.reload} />
           ) : (
-            <ForecastCard days={forecastDays} onSelectDay={setSelectedDay} />
+            <ForecastCard days={forecastDays} ready={recent.loaded} onSelectDay={setSelectedDay} />
           )}
           <View>
             <View className="mb-3 flex-row items-center justify-between gap-2">
@@ -183,7 +183,13 @@ function HistoryScreenContent() {
             ListEmptyComponent={emptyList}
             onEndReached={() => { if (view === "days") void loadMore(); }}
             onEndReachedThreshold={0.4}
-            ListFooterComponent={view === "days" && loadingMore ? <LoadingSpinner message="Loading more..." /> : null}
+            ListFooterComponent={
+              view !== "days" ? null : loadingMore ? (
+                <LoadingSpinner message="Loading more..." />
+              ) : error && moods.length > 0 ? (
+                <EmptyState icon="warning-outline" tone="coral" title="History could not load" description={error} actionLabel="Try again" onAction={() => { void refreshMoods(); }} />
+              ) : null
+            }
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}

@@ -179,7 +179,7 @@ export function InsightsScreen() {
               </Text>
             )}
             {stats.entryCount > 0 && (
-              <ClimateCard averageMood={stats.averageMood} dayparts={daypartMeans(analysis.rhythm)} />
+              <ClimateCard averageMood={stats.averageMood} entryCount={stats.entryCount} dayparts={daypartMeans(analysis.rhythm)} />
             )}
             {viewMode === "findings" ? (
               <>

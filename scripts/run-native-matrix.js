@@ -214,9 +214,14 @@ async function captureMatrixScreens(serial, outputDirectory, stateName, fixtureC
     screenshot(serial, filePath);
     captures.push({ screen, screenshot: filePath });
   };
+  // verifyFabricatedFixture leaves History selected; return to Today first.
+  await waitForNodeAndTap(serial, { contentDescription: "Today tab, log your mood" });
+  await waitForNode(serial, { contentDescription: "Mood Rating 5 of 10, Neutral. Lower numbers are better." }, { timeoutMs: 15000 });
   capture("today");
   await waitForNodeAndTap(serial, { contentDescription: "History tab, view past days and months" });
   await waitForNode(serial, { testId: "history-count" }, { timeoutMs: 15000 });
+  // The forecast reads its own range; wait until it has loaded.
+  await waitForNode(serial, { testId: "forecast-ready" }, { timeoutMs: 15000 });
   capture("history");
   await waitForNodeAndTap(serial, { contentDescription: "Month view" });
   await waitForNode(serial, { contentDescription: "Calendar legend: a dot marks a day with multiple entries." }, { timeoutMs: 15000 });

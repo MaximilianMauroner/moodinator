@@ -10,6 +10,8 @@ import type { ForecastDay } from "./forecast";
 
 type ForecastCardProps = {
   days: ForecastDay[];
+  /** True once the range has loaded; exposes a marker for native QA. */
+  ready: boolean;
   onSelectDay: (day: ForecastDay) => void;
 };
 
@@ -28,11 +30,12 @@ function dayLabel(day: ForecastDay): string {
 }
 
 /** A week read like a weather forecast: one row per day with its range. */
-export function ForecastCard({ days, onSelectDay }: ForecastCardProps) {
+export function ForecastCard({ days, ready, onSelectDay }: ForecastCardProps) {
   const { get, isDark } = useThemeColors();
 
   return (
     <View
+      testID={ready ? "forecast-ready" : undefined}
       className="rounded-3xl px-4 pb-1 pt-3"
       style={{ backgroundColor: get("surface"), borderWidth: 1, borderColor: get("borderSubtle") }}
     >
