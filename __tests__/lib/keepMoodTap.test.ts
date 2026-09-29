@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { MoodEntry } from "@db/types";
 
 import { createMockMoodEntry } from "../db/mockClient";
-import { SUPPORT_SHEET_DELAY_MS, keepMoodTap, type KeepMoodTapDeps } from "@/lib/keepMoodTap";
+import { SUPPORT_HANDOFF_MS, SUPPORT_SHEET_DELAY_MS, keepMoodTap, type KeepMoodTapDeps } from "@/lib/keepMoodTap";
 
 function setup(overrides: Partial<KeepMoodTapDeps> = {}) {
   const deps: KeepMoodTapDeps = {
@@ -73,6 +73,8 @@ describe("keepMoodTap", () => {
     expect(deps.inFlight.current).toBe(false);
 
     vi.mocked(deps.showSupport).mock.calls[0]![0]();
+    expect(deps[followUp]).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(SUPPORT_HANDOFF_MS);
     expect(deps[followUp]).toHaveBeenCalledTimes(1);
   });
 

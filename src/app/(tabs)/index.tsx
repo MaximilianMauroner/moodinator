@@ -305,15 +305,15 @@ function HomeScreenContent() {
           actionLabel="Try Again"
           onAction={today.reload}
         />
-      ) : (
+      ) : today.loaded ? (
         <EmptyState
           icon="partly-sunny-outline"
           tone="sage"
           title="No entries yet today"
           description="Tap the weather you feel above. One tap saves it."
         />
-      ),
-    [today.error, today.reload]
+      ) : null,
+    [today.error, today.loaded, today.reload]
   );
 
   const listContentContainerStyle = useMemo(

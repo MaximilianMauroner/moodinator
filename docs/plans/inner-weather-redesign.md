@@ -127,8 +127,12 @@ Work on a feature branch. I commit or open a pull request only when asked.
   - Severe ratings show support first; "Not now" continues to the detail
     sheet or the Undo toast, so a mistaken 9 or 10 can be removed.
   - The month calendar reloads after any entry change.
-  - Today and the forecast query one extra day on each side and bucket by
-    the recorded local day.
+  - Today and the forecast pad their query by 26 hours on each side
+    (recorded offsets from UTC-12 to UTC+14) and bucket by the recorded
+    local day.
+  - A second tap during a pending save is ignored.
+  - After "Not now", the follow-up waits until the support sheet has closed,
+    because Android does not show a modal that opens during that close.
   - History keeps its load-error footer with Retry.
   - The climate card states averages with entry counts, not a most-common
     condition.

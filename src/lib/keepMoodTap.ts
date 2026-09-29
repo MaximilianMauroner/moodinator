@@ -5,6 +5,11 @@ import { commitThenRunPostCommitEffects, getMoodEntryPersistenceValues } from ".
 
 /** Delay before the support sheet, so the tile press settles first. */
 export const SUPPORT_SHEET_DELAY_MS = 250;
+/**
+ * Delay after "Not now" before the follow-up. A native modal opened while the
+ * support sheet is still closing does not show on Android.
+ */
+export const SUPPORT_HANDOFF_MS = 400;
 
 export type KeepMoodTapDeps = {
   /** Held from the tap until the follow-up takes over; a second tap is ignored. */
@@ -56,7 +61,7 @@ export async function keepMoodTap(mood: number, deps: KeepMoodTapDeps): Promise<
     deps.feedback.reject();
     setTimeout(() => {
       try {
-        deps.showSupport(continueAfterKeep);
+        deps.showSupport(() => setTimeout(continueAfterKeep, SUPPORT_HANDOFF_MS));
       } finally {
         release();
       }
