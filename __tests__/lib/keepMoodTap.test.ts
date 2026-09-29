@@ -74,8 +74,12 @@ describe("keepMoodTap", () => {
 
     vi.mocked(deps.showSupport).mock.calls[0]![0]();
     expect(deps[followUp]).not.toHaveBeenCalled();
+    await keepMoodTap(4, deps);
+    expect(deps.create).toHaveBeenCalledTimes(1);
+
     vi.advanceTimersByTime(SUPPORT_HANDOFF_MS);
     expect(deps[followUp]).toHaveBeenCalledTimes(1);
+    expect(deps.inFlight.current).toBe(false);
   });
 
   it("reports a failed write and allows another tap", async () => {

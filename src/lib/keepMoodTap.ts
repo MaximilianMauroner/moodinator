@@ -12,7 +12,11 @@ export const SUPPORT_SHEET_DELAY_MS = 250;
 export const SUPPORT_HANDOFF_MS = 400;
 
 export type KeepMoodTapDeps = {
-  /** Held from the tap until the follow-up takes over; a second tap is ignored. */
+  /**
+   * Held from the tap until the follow-up shows; a second tap is ignored. It
+   * is free while the support sheet is open, so other support actions do not
+   * leave the picker locked.
+   */
   inFlight: { current: boolean };
   create: (entry: MoodEntryInput) => Promise<MoodEntry>;
   afterCommit: readonly (() => void)[];
@@ -57,11 +61,24 @@ export async function keepMoodTap(mood: number, deps: KeepMoodTapDeps): Promise<
     else deps.showUndoToast(entry);
   };
 
+  // The sheet covers the picker until "Not now". Hold taps again until the
+  // follow-up shows, so it cannot replace a newer entry's follow-up.
+  const continueAfterSupport = () => {
+    deps.inFlight.current = true;
+    setTimeout(() => {
+      try {
+        continueAfterKeep();
+      } finally {
+        release();
+      }
+    }, SUPPORT_HANDOFF_MS);
+  };
+
   if (shouldOfferCrisisSupport(mood)) {
     deps.feedback.reject();
     setTimeout(() => {
       try {
-        deps.showSupport(() => setTimeout(continueAfterKeep, SUPPORT_HANDOFF_MS));
+        deps.showSupport(continueAfterSupport);
       } finally {
         release();
       }
