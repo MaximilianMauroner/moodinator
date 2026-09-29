@@ -7,6 +7,7 @@ import {
   Switch,
   ActivityIndicator,
   AppState,
+  Linking,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Link, useRouter, useFocusEffect } from "expo-router";
@@ -28,6 +29,7 @@ import {
   getReminderScheduleResultWarning,
   getReminderScheduleWarning,
 } from "@/lib/reminderSchedulePresentation";
+import { formatReminderDays } from "@/lib/reminderDays";
 import { formatReminderTime } from "@/lib/reminderTimePresentation";
 import { useCalendars, useLocales } from "expo-localization";
 
@@ -184,7 +186,7 @@ function NotificationsScreenContent() {
               className="text-xs font-medium mb-0.5"
               style={{ color: isDark ? get("primary") : "#476D47" }}
             >
-              Stay on track
+              Check in when it suits you
             </Text>
             <Text
               className="text-2xl font-bold tracking-tight"
@@ -258,7 +260,7 @@ function NotificationsScreenContent() {
                 className="text-sm text-center max-w-[240px] leading-5"
                 style={{ color: get("textMuted") }}
               >
-                Set up daily check-ins to build a consistent mood tracking habit
+                Choose an optional reminder, then review its time and days before saving.
               </Text>
             </View>
           ) : (
@@ -326,6 +328,9 @@ function NotificationsScreenContent() {
                     />
                   </View>
 
+                  <Text className="px-4 pt-3 text-sm" style={{ color: get("textMuted") }}>
+                    {formatReminderDays(notification.weekdays, languageTag)} · Local time
+                  </Text>
                   {/* Content */}
                   <View className="p-4">
                     <Text
@@ -373,6 +378,12 @@ function NotificationsScreenContent() {
                           >
                             {scheduleWarning.message}
                           </Text>
+                          {notification.scheduleStatus === "permission-denied" && <Pressable
+                            accessibilityRole="button" accessibilityLabel="Open notification settings"
+                            onPress={() => { void Linking.openSettings().catch(() => Alert.alert("Open device settings", "Allow notifications for Moodinator in your device settings.")); }}
+                            className="py-3">
+                            <Text style={{ color: get("text") }}>Open notification settings</Text>
+                          </Pressable>}
                         </View>
                       </View>
                     )}

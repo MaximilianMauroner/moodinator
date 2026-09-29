@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getCalendars } from 'expo-localization';
 import { Platform } from 'react-native';
 import type * as ExpoNotifications from 'expo-notifications';
+import { normalizeReminderDays } from '../lib/reminderDays';
 
 const NOTIFICATIONS_ENABLED_KEY = 'notificationsEnabled';
 const NOTIFICATION_TIME_KEY = 'notificationTime';
@@ -51,7 +52,9 @@ export interface NotificationConfig {
     hour: number;
     minute: number;
     enabled: boolean;
+    weekdays?: number[];
     scheduledId?: string;
+    scheduledIds?: string[];
     scheduleStatus?: Exclude<ReminderScheduleStatus, 'partial-failure'>;
     unscheduledReason?: string | null;
     pendingAction?: 'delete' | 'disable';
@@ -221,9 +224,13 @@ async function listScheduledMoodReminderIds(
 
 async function cancelAllMoodRemindersUnlocked(
     Notifications: NotificationsModule,
-    knownIds?: readonly string[]
+    knownIds?: readonly string[],
+    retainedIds: readonly string[] = []
 ): Promise<void> {
-    const scheduledIds = knownIds ?? await listScheduledMoodReminderIds(Notifications);
+    const scheduledIds = [...new Set([
+        ...(knownIds ?? await listScheduledMoodReminderIds(Notifications)),
+        ...retainedIds,
+    ])];
     let firstError: unknown = null;
     let cancellationFailed = false;
 
@@ -297,9 +304,26 @@ async function getLegacyNotificationSettings(): Promise<{
     };
 }
 
+function validateReminder(notification: Pick<NotificationConfig, 'hour' | 'minute' | 'weekdays'>): void {
+    if (!Number.isInteger(notification.hour) || notification.hour < 0 || notification.hour > 23
+        || !Number.isInteger(notification.minute) || notification.minute < 0 || notification.minute > 59) {
+        throw new Error('Reminder time must use an hour from 0 to 23 and a minute from 0 to 59.');
+    }
+    normalizeReminderDays(notification.weekdays);
+}
+
+function getReminderScheduledIds(notification: NotificationConfig): string[] {
+    return [...new Set([
+        ...(notification.scheduledIds ?? []),
+        ...(notification.scheduledId ? [notification.scheduledId] : []),
+    ])];
+}
+
 function cloneNotification(notification: NotificationConfig): NotificationConfig {
     return {
         ...notification,
+        weekdays: notification.weekdays ? [...notification.weekdays] : undefined,
+        scheduledIds: notification.scheduledIds ? [...notification.scheduledIds] : undefined,
         unscheduledReason: notification.unscheduledReason ?? null,
     };
 }
@@ -327,14 +351,17 @@ function buildCleanupFailureNotifications(
     const desiredWithCleanupState = desiredNotifications.map((desired) => {
         const previous = previousById.get(desired.id);
         const scheduledId = previous?.scheduledId ?? desired.scheduledId;
+        const scheduledIds = previous?.scheduledIds ?? desired.scheduledIds;
         const needsNativeDisable = !desired.enabled && Boolean(
             scheduledId
+            || scheduledIds?.length
             || previous?.enabled
             || previous?.pendingAction === 'disable'
         );
         return {
             ...desired,
             scheduledId,
+            scheduledIds,
             pendingAction: needsNativeDisable ? 'disable' as const : undefined,
         };
     });
@@ -356,6 +383,7 @@ function applyUnscheduledState(
     return {
         ...notification,
         scheduledId: undefined,
+        scheduledIds: undefined,
         scheduleStatus: status,
         unscheduledReason: reason,
     };
@@ -363,11 +391,12 @@ function applyUnscheduledState(
 
 function applyScheduledState(
     notification: NotificationConfig,
-    scheduledId: string
+    scheduledId: string | string[]
 ): NotificationConfig {
     return {
         ...notification,
-        scheduledId,
+        scheduledId: typeof scheduledId === 'string' ? scheduledId : undefined,
+        scheduledIds: Array.isArray(scheduledId) ? scheduledId : undefined,
         scheduleStatus: 'scheduled',
         unscheduledReason: null,
     };
@@ -448,7 +477,10 @@ async function rescheduleAllNotificationsUnlocked(
     },
     cleanupFailureNotifications: NotificationConfig[] = notifications
 ): Promise<ReminderScheduleResult> {
-    const nextNotifications = materializeDesiredNotifications(notifications).map(cloneNotification);
+    const nextNotifications = materializeDesiredNotifications(notifications).map((notification) => {
+        validateReminder(notification);
+        return cloneNotification(notification);
+    });
     const enabledNotifications = nextNotifications.filter((notification) => notification.enabled);
     let Notifications: NotificationsModule | null = prepared?.access.notifications ?? null;
 
@@ -485,7 +517,11 @@ async function rescheduleAllNotificationsUnlocked(
     }
 
     try {
-        await cancelAllMoodRemindersUnlocked(Notifications, prepared?.scheduledIds);
+        await cancelAllMoodRemindersUnlocked(
+            Notifications,
+            prepared?.scheduledIds,
+            cleanupFailureNotifications.flatMap(getReminderScheduledIds)
+        );
     } catch (error) {
         return persistCleanupFailedResult(
             cleanupFailureNotifications,
@@ -504,38 +540,65 @@ async function rescheduleAllNotificationsUnlocked(
             continue;
         }
 
+        const createdIds: string[] = [];
+        const days = normalizeReminderDays(notification.weekdays);
+        const isDaily = days.length === 7;
         try {
-            const id = await Notifications.scheduleNotificationAsync({
-                content: {
-                    title: notification.title,
-                    body: notification.body,
-                    data: { type: MOOD_REMINDER_TAG, notificationId: notification.id },
-                },
-                trigger: {
-                    channelId: 'default',
-                    hour: notification.hour,
-                    minute: notification.minute,
-                    type: Notifications.SchedulableTriggerInputTypes.DAILY,
-                },
-            });
-            scheduledNotifications.push(applyScheduledState(notification, id));
+            for (const weekday of isDaily ? [undefined] : days) {
+                const id = await Notifications.scheduleNotificationAsync({
+                    content: {
+                        title: notification.title,
+                        body: notification.body,
+                        data: { type: MOOD_REMINDER_TAG, notificationId: notification.id },
+                    },
+                    trigger: {
+                        channelId: 'default',
+                        hour: notification.hour,
+                        minute: notification.minute,
+                        ...(weekday === undefined
+                            ? { type: Notifications.SchedulableTriggerInputTypes.DAILY }
+                            : { type: Notifications.SchedulableTriggerInputTypes.WEEKLY, weekday }),
+                    },
+                });
+                createdIds.push(id);
+            }
+            scheduledNotifications.push(applyScheduledState(notification, isDaily ? createdIds[0] : createdIds));
         } catch (error) {
             console.error(`Failed to schedule notification ${notification.id}:`, error);
             schedulingErrors.push(notification.id);
-            scheduledNotifications.push(
-                applyUnscheduledState(
+            // Roll back the incomplete week. Keep every ID whose cancellation failed
+            // so a later retry/delete still has its native schedule references.
+            const remainingIds: string[] = [];
+            for (const identifier of createdIds) {
+                try {
+                    await Notifications.cancelScheduledNotificationAsync(identifier);
+                } catch {
+                    remainingIds.push(identifier);
+                }
+            }
+            const schedulingMessage = error instanceof Error ? error.message : 'Failed to schedule reminder.';
+            const reason = remainingIds.length > 0
+                ? `${schedulingMessage} Cleanup is pending. Some notifications may still arrive until cleanup succeeds.`
+                : schedulingMessage;
+            scheduledNotifications.push({
+                ...applyUnscheduledState(
                     notification,
                     'failed',
-                    error instanceof Error ? error.message : 'Failed to schedule reminder.'
-                )
-            );
+                    reason
+                ),
+                scheduledIds: remainingIds.length > 0 ? remainingIds : undefined,
+            });
         }
     }
 
     await persistNotifications(scheduledNotifications);
 
     if (schedulingErrors.length > 0) {
-        const message = `Failed to schedule ${schedulingErrors.length} reminder${schedulingErrors.length === 1 ? '' : 's'}.`;
+        const cleanupPending = scheduledNotifications.some(
+            (notification) => notification.scheduleStatus === 'failed' && (notification.scheduledIds?.length ?? 0) > 0
+        );
+        const message = `Failed to schedule ${schedulingErrors.length} reminder${schedulingErrors.length === 1 ? '' : 's'}.`
+            + (cleanupPending ? ' Cleanup is pending. Some notifications may still arrive until cleanup succeeds.' : '');
         return {
             status: schedulingErrors.length === enabledNotifications.length ? 'failed' : 'partial-failure',
             notifications: scheduledNotifications,
@@ -559,6 +622,7 @@ export function saveAllNotifications(
     notifications: NotificationConfig[]
 ): Promise<ReminderScheduleResult> {
     return enqueueMutation(async () => {
+        notifications.forEach(validateReminder);
         const previousNotifications = await getAllNotificationsUnlocked();
         const desiredNotifications = materializeDesiredNotifications(notifications);
         return rescheduleAllNotificationsUnlocked(
@@ -595,6 +659,7 @@ export function saveNotificationSettings(
     minute: number
 ): Promise<ReminderScheduleStatus> {
     return enqueueMutation(async () => {
+        validateReminder({ hour, minute });
         await AsyncStorage.setItem(NOTIFICATION_TIME_KEY, JSON.stringify({ hour, minute }));
         const previousNotifications = await getAllNotificationsUnlocked();
         const nextNotifications = [createSingleReminderConfig(hour, minute, enabled)];
@@ -635,10 +700,11 @@ export function getNotificationSettings(): Promise<{ enabled: boolean; hour: num
 export function addNotification(
     notification: Omit<
         NotificationConfig,
-        'id' | 'scheduledId' | 'scheduleStatus' | 'unscheduledReason' | 'pendingAction'
+        'id' | 'scheduledId' | 'scheduledIds' | 'scheduleStatus' | 'unscheduledReason' | 'pendingAction'
     >
 ): Promise<NotificationConfig> {
     return enqueueMutation(async () => {
+        validateReminder(notification);
         const notifications = await getAllNotificationsUnlocked();
         const desiredNotifications = materializeDesiredNotifications(notifications);
         const newNotification: NotificationConfig = {
@@ -709,11 +775,12 @@ export function ensureMoodReminderScheduled(): Promise<ReminderScheduleResult | 
                 buildCleanupFailureNotifications(notifications, resolvedNotifications)
             );
         }
+        notifications.forEach(validateReminder);
         const enabledNotifications = notifications.filter((notification) => notification.enabled);
 
         if (enabledNotifications.length === 0) {
             const needsCleanup = notifications.some(
-                (notification) => notification.scheduledId || notification.scheduleStatus !== 'disabled'
+                (notification) => getReminderScheduledIds(notification).length > 0 || notification.scheduleStatus !== 'disabled'
             );
             return needsCleanup
                 ? rescheduleAllNotificationsUnlocked(notifications, 'check-only')
@@ -724,7 +791,7 @@ export function ensureMoodReminderScheduled(): Promise<ReminderScheduleResult | 
         if (!access.ok) {
             const unscheduled = notifications.map((notification) =>
                 notification.enabled
-                    ? applyUnscheduledState(notification, access.status, access.message)
+                    ? { ...cloneNotification(notification), scheduleStatus: access.status, unscheduledReason: access.message }
                     : applyUnscheduledState(notification, 'disabled', 'Reminder is disabled.')
             );
             await persistNotifications(unscheduled);
@@ -750,11 +817,14 @@ export function ensureMoodReminderScheduled(): Promise<ReminderScheduleResult | 
         const currentTimeZone = getCurrentTimeZone();
         const scheduledTimeZone = await AsyncStorage.getItem(NOTIFICATION_SCHEDULE_TIME_ZONE_KEY);
         const expectedIds = enabledNotifications
-            .map((notification) => notification.scheduledId)
-            .filter((identifier): identifier is string => typeof identifier === 'string');
+            .flatMap(getReminderScheduledIds);
         const scheduledIdSet = new Set(scheduledIds);
         const allEnabledScheduled =
-            expectedIds.length === enabledNotifications.length
+            enabledNotifications.every((notification) => {
+                const days = normalizeReminderDays(notification.weekdays);
+                return getReminderScheduledIds(notification).length === (days.length === 7 ? 1 : days.length);
+            })
+            && new Set(expectedIds).size === expectedIds.length
             && expectedIds.every((identifier) => scheduledIdSet.has(identifier))
             && enabledNotifications.every(
                 (notification) => notification.scheduleStatus === 'scheduled'
