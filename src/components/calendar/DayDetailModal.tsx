@@ -6,6 +6,8 @@ import { useThemeColors, colors, getThemedColor } from "@/constants/colors";
 import { getMoodRatingDisplay } from "@/constants/moodScaleInterpretation";
 import { haptics } from "@/lib/haptics";
 import { getEntryLocalTimeLabel } from "@/lib/entryTimezone";
+import { getMoodWeatherColor, getMoodWeatherIcon } from "@/constants/moodWeather";
+import { typography } from "@/constants/typography";
 import type { MoodEntry, MoodScaleSnapshot } from "@db/types";
 
 type DayDetailModalProps = {
@@ -47,6 +49,16 @@ export function DayDetailModal({
     };
   };
 
+  const moods = entries.map((entry) => getMoodData(entry.mood, entry.moodScale));
+  const lightest = moods.reduce<(typeof moods)[number] | null>((best, m) => (best && best.value <= m.value ? best : m), null);
+  const heaviest = moods.reduce<(typeof moods)[number] | null>((worst, m) => (worst && worst.value >= m.value ? worst : m), null);
+  const entryCount = `${entries.length} ${entries.length === 1 ? "entry" : "entries"}`;
+  const summary = !lightest || !heaviest
+    ? "No entries"
+    : lightest.value === heaviest.value
+      ? `${entryCount} · ${lightest.label} ${lightest.value}`
+      : `${entryCount} · ${lightest.label} ${lightest.value} to ${heaviest.label} ${heaviest.value}`;
+
   return (
     <Modal
       visible={visible}
@@ -76,17 +88,14 @@ export function DayDetailModal({
 
             <View className="flex-row items-center justify-between">
               <View>
-                <Text
-                  className="text-xl font-bold"
-                  style={{ color: get("text") }}
-                >
-                  {format(date, "EEEE")}
+                <Text style={[typography.titleMd, { color: get("text"), fontSize: 24, lineHeight: 28 }]}>
+                  {format(date, "EEEE, MMM d")}
                 </Text>
                 <Text
                   className="text-sm"
-                  style={{ color: get("textMuted") }}
+                  style={{ color: get("textMuted"), marginTop: 2 }}
                 >
-                  {format(date, "MMMM d, yyyy")}
+                  {summary}
                 </Text>
               </View>
               <Pressable
@@ -153,34 +162,21 @@ export function DayDetailModal({
                       accessibilityLabel={`Mood Rating ${moodData.value} of 10, ${moodData.label}, ${getEntryLocalTimeLabel(entry)}`}
                     >
                       <View className="flex-row">
-                        {/* Left accent bar */}
-                        <View
-                          style={{
-                            width: 4,
-                            backgroundColor: moodData.textHex,
-                          }}
-                        />
+                        <View className="justify-center pl-4">
+                          <Ionicons
+                            name={getMoodWeatherIcon(moodData.value)}
+                            size={30}
+                            color={getMoodWeatherColor(moodData.value, isDark)}
+                          />
+                        </View>
 
                         <View className="flex-1 p-4">
                           {/* Header row */}
                           <View className="flex-row items-center justify-between mb-2">
-                            <View
-                              className="flex-row items-center px-3 py-1.5 rounded-xl"
-                              style={{ backgroundColor: moodData.bgHex }}
-                            >
-                              <Text
-                                className="text-lg font-bold mr-1.5"
-                                style={{ color: moodData.textHex }}
-                              >
-                                {moodData.value}
-                              </Text>
-                              <Text
-                                className="text-sm font-semibold"
-                                style={{ color: moodData.textHex }}
-                              >
-                                {moodData.label}
-                              </Text>
-                            </View>
+                            <Text className="text-base font-semibold" style={{ color: get("text") }}>
+                              {moodData.label}{" "}
+                              <Text style={{ color: moodData.textHex, fontVariant: ["tabular-nums"] }}>{moodData.value}</Text>
+                            </Text>
                             <Text
                               className="text-xs"
                               style={{ color: get("textMuted") }}
