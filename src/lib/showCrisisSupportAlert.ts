@@ -9,7 +9,7 @@ export function showCrisisSupportAlert(options: { onDecline?: () => void } = {})
   presentCrisisSupportAlert({
     onDecline: options.onDecline,
     showAlert: (title, message, buttons) => showSupportSheet(title, message, buttons ?? []),
-    openUrl: Linking.openURL,
+    openUrl: (url) => Linking.openURL(url),
     getRegion: () => getLocales()[0]?.regionCode,
   });
 }

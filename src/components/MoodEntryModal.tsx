@@ -18,22 +18,17 @@ import Animated, {
 } from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
 import { Alert } from "@/components/ui/AppAlert";
-import {
-    getAllMoodRatingDisplays,
-    getMoodRatingDisplay,
-} from "@/constants/moodScaleInterpretation";
-import { HapticTab } from "./HapticTab";
+import { getMoodRatingDisplay } from "@/constants/moodScaleInterpretation";
 import { useThemeColors, colors } from "@/constants/colors";
 import { typography } from "@/constants/typography";
+import { getMoodWeatherColor, getMoodWeatherIcon } from "@/constants/moodWeather";
 import type { Emotion, MoodEntry } from "../../db/types";
 import { SameAsYesterdayButton } from "./entry";
 import { EmotionPicker } from "./entry/EmotionPicker";
 import { EnergySlider } from "./entry/EnergySlider";
+import { WeatherMoodGrid } from "./entry/WeatherMoodGrid";
 import { CreatePresetModal } from "./entry/CreatePresetModal";
-import {
-    getMoodButtonLabel,
-    BUTTON_HINTS,
-} from "@/constants/accessibility";
+import { BUTTON_HINTS } from "@/constants/accessibility";
 import { haptics } from "@/lib/haptics";
 import { shouldOfferCrisisSupport } from "@/lib/crisisSupport";
 import { showCrisisSupportAlert } from "@/lib/showCrisisSupportAlert";
@@ -94,6 +89,11 @@ type BaseMoodEntryModalProps = {
      * with the same rating does not show it again; another severe rating does.
      */
     supportShownForMood?: number;
+    /**
+     * Shows every enabled field on one page with a single Done action, for
+     * detail on an entry that is already kept. Otherwise fields are steps.
+     */
+    singlePage?: boolean;
     /** Optional text action beside the close button, for example Undo. */
     headerAction?: {
         label: string;
@@ -143,6 +143,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     onCreateContextTag,
     successMessage,
     supportShownForMood,
+    singlePage = false,
     headerAction,
 }) => {
     const { isDark, get } = useThemeColors();
@@ -151,6 +152,8 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     const scrollViewRef = useRef<ScrollView>(null);
     const notesFocusedRef = useRef(false);
     const notesContainerYRef = useRef(0);
+    /** Top of the details section inside its scroll content. */
+    const detailsOffsetYRef = useRef(0);
     const notesScrollTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
     const saveInFlightRef = useRef(false);
     const mountedRef = useRef(true);
@@ -202,7 +205,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     const scrollNotesIntoView = useCallback(() => {
         requestAnimationFrame(() => {
             scrollViewRef.current?.scrollTo({
-                y: Math.max(notesContainerYRef.current - 8, 0),
+                y: Math.max(detailsOffsetYRef.current + notesContainerYRef.current - 8, 0),
                 animated: true,
             });
         });
@@ -264,7 +267,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     const isLastStep = currentStep === steps.length - 1;
     const currentStepId = steps[currentStep];
     const currentStepTitle = STEP_TITLES[currentStepId];
-    const primaryActionSaves = isLastStep;
+    const primaryActionSaves = singlePage || isLastStep;
     const isNotesKeyboardActive = isNotesFocused && keyboardHeight > 0;
 
     // ── Adaptive placeholder
@@ -394,13 +397,19 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     }, [currentStep, goToStep, handleSave, isLastStep]);
 
     const handlePrimaryAction = useCallback(() => {
+        // The entry is already kept, so Done without changes only closes.
+        if (singlePage && !isDirty) {
+            haptics.tap();
+            onClose();
+            return;
+        }
         if (primaryActionSaves) {
             handleSave();
             return;
         }
 
         handleNext();
-    }, [handleNext, handleSave, primaryActionSaves]);
+    }, [handleNext, handleSave, isDirty, onClose, primaryActionSaves, singlePage]);
 
     const closeWithConfirmation = useCallback(() => {
         if (!isDirty) {
@@ -638,73 +647,8 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
         }
     }, [createPresetModal, handleCreateContextTag, handleCreateEmotion]);
 
-    // ── Mood selector grid (Edit mode)
-    const moodButtons = useMemo(
-        () =>
-            getAllMoodRatingDisplays(isDark).map((item) => ({
-                value: item.value,
-                label: item.label,
-                textHex: item.colorHex,
-                bgHex: item.backgroundHex,
-            })),
-        [isDark]
-    );
-
     // ── Step content renderers
-    const renderMoodStep = () => (
-        <View>
-            <View className="flex-row flex-wrap gap-2">
-                {moodButtons.map((item) => {
-                    const isSelected = mood === item.value;
-                    return (
-                        <HapticTab
-                            key={item.value}
-                            onPress={() => setMood(item.value)}
-                            className="rounded-xl px-3 py-2.5 items-center"
-                            style={{
-                                width: "30%",
-                                backgroundColor: item.bgHex,
-                                borderWidth: isSelected ? 2 : 0,
-                                borderColor: item.textHex,
-                                shadowColor: isSelected ? item.textHex : "transparent",
-                                shadowOffset: { width: 0, height: isSelected ? 4 : 0 },
-                                shadowOpacity: 0.25,
-                                shadowRadius: 8,
-                                elevation: isSelected ? 4 : 0,
-                                transform: [{ scale: isSelected ? 1.04 : 1 }],
-                            }}
-                            accessibilityRole="button"
-                            accessibilityLabel={getMoodButtonLabel(item.value, item.label)}
-                            accessibilityState={{ selected: isSelected }}
-                        >
-                            <Text
-                                style={{
-                                    fontSize: 18,
-                                    fontWeight: "700",
-                                    color: item.textHex,
-                                    fontVariant: ["tabular-nums"],
-                                }}
-                            >
-                                {item.value}
-                            </Text>
-                            <Text
-                                style={{
-                                    fontSize: 12,
-                                    fontWeight: "600",
-                                    color: item.textHex,
-                                    textAlign: "center",
-                                    marginTop: 1,
-                                }}
-                                numberOfLines={1}
-                            >
-                                {item.label}
-                            </Text>
-                        </HapticTab>
-                    );
-                })}
-            </View>
-        </View>
-    );
+    const renderMoodStep = () => <WeatherMoodGrid selected={mood} onPress={setMood} />;
 
     const renderAddPresetButton = ({
         onPress,
@@ -935,6 +879,33 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
         }
     };
 
+    const renderSinglePage = () => {
+        const hasEmotions = steps.includes("emotions");
+        const hasDetails = steps.includes("details");
+        return (
+            <ScrollView
+                ref={scrollViewRef}
+                className="px-5 pt-5"
+                contentContainerStyle={{ paddingBottom: scrollBottomPadding }}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+            >
+                {hasEmotions && renderEmotionsStep()}
+                {hasEmotions && hasDetails && <Separator isDark={isDark} />}
+                {hasDetails && (
+                    <View
+                        onLayout={(event) => {
+                            detailsOffsetYRef.current = event.nativeEvent.layout.y;
+                        }}
+                    >
+                        {renderDetailsStep()}
+                    </View>
+                )}
+            </ScrollView>
+        );
+    };
+
     const renderStepPage = (stepId: MoodEntryStepId) => (
         <View key={stepId} style={{ flex: 1 }}>
             <ScrollView
@@ -1053,44 +1024,67 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                     </Pressable>
                                 </View>
 
-                                {/* Mood adjust row + Last Entry */}
-                                <View className="flex-row items-center px-4 pb-1">
-                                    <View className="flex-1">
-                                        <MoodAdjustRow
-                                            mood={mood}
-                                            onAdjust={setMood}
-                                            isDark={isDark}
+                                {singlePage ? (
+                                    <View className="flex-row items-center px-4 pb-3" style={{ gap: 12 }}>
+                                        <Ionicons
+                                            name={getMoodWeatherIcon(mood)}
+                                            size={36}
+                                            color={getMoodWeatherColor(mood, isDark)}
                                         />
-                                    </View>
-                                    <View className="ml-2">
+                                        <View className="flex-1">
+                                            <Text style={[typography.titleMd, { color: get("text"), fontSize: 22, lineHeight: 26 }]}>
+                                                {moodData.label}{" "}
+                                                <Text style={{ color: get("textSubtle") }}>{mood}</Text>
+                                            </Text>
+                                            <Text style={[typography.bodySm, { color: get("textSubtle") }]}>
+                                                Kept. Add detail if you like.
+                                            </Text>
+                                        </View>
                                         <SameAsYesterdayButton onCopy={handleCopyYesterday} />
                                     </View>
-                                </View>
+                                ) : (
+                                    <>
+                                    {/* Mood adjust row + Last Entry */}
+                                    <View className="flex-row items-center px-4 pb-1">
+                                        <View className="flex-1">
+                                            <MoodAdjustRow
+                                                mood={mood}
+                                                onAdjust={setMood}
+                                                isDark={isDark}
+                                            />
+                                        </View>
+                                        <View className="ml-2">
+                                            <SameAsYesterdayButton onCopy={handleCopyYesterday} />
+                                        </View>
+                                    </View>
 
-                                {/* Step dots */}
-                                <View className="pb-3">
-                                    <StepDots
-                                        total={steps.length}
-                                        current={currentStep}
-                                        isDark={isDark}
-                                    />
-                                    {/* Step title — matches step body direction */}
-                                    <Animated.Text
-                                        style={{
-                                            ...typography.eyebrow,
-                                            textAlign: "center",
-                                            color: get("textSubtle"),
-                                            marginTop: 6,
-                                        }}
-                                    >
-                                        {currentStepTitle}
-                                    </Animated.Text>
-                                </View>
+                                    {/* Step dots */}
+                                    <View className="pb-3">
+                                        <StepDots
+                                            total={steps.length}
+                                            current={currentStep}
+                                            isDark={isDark}
+                                        />
+                                        {/* Step title — matches step body direction */}
+                                        <Animated.Text
+                                            style={{
+                                                ...typography.eyebrow,
+                                                textAlign: "center",
+                                                color: get("textSubtle"),
+                                                marginTop: 6,
+                                            }}
+                                        >
+                                            {currentStepTitle}
+                                        </Animated.Text>
+                                    </View>
+                                    </>
+                                )}
                             </View>
                         </>
                     )}
 
                     {/* ── Step content ────────────────────────────────────── */}
+                    {singlePage ? renderSinglePage() : (
                     <PagerView
                         ref={pagerRef}
                         style={{ flex: 1 }}
@@ -1101,6 +1095,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                     >
                         {steps.map(renderStepPage)}
                     </PagerView>
+                    )}
 
                     {!isNotesKeyboardActive && (
                         <View
@@ -1121,6 +1116,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                         {/* Primary row */}
                         <View className="flex-row gap-3">
                             {/* Back / Cancel */}
+                            {!singlePage && (
                             <Animated.View style={backBtnAnimatedStyle}>
                                 <Pressable
                                     onPress={handleBack}
@@ -1162,6 +1158,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                     </Text>
                                 </Pressable>
                             </Animated.View>
+                            )}
 
                             {/* Next / Save */}
                             <Animated.View style={nextBtnAnimatedStyle}>
@@ -1189,6 +1186,8 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                     accessibilityLabel={
                                         isSaving
                                             ? "Saving"
+                                            : singlePage
+                                            ? "Done"
                                             : primaryActionSaves
                                             ? "Save entry"
                                             : "Next step"
@@ -1207,6 +1206,8 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                     >
                                         {isSaving
                                             ? "Saving…"
+                                            : singlePage
+                                            ? "Done"
                                             : primaryActionSaves
                                             ? "Save Entry"
                                             : "Next"}
@@ -1218,7 +1219,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                             color={saveContentColor}
                                         />
                                     )}
-                                    {!isSaving && primaryActionSaves && (
+                                    {!isSaving && primaryActionSaves && !singlePage && (
                                         <Ionicons
                                             name="checkmark"
                                             size={15}
@@ -1318,6 +1319,7 @@ export const KeptEntryDetailModal: React.FC<KeptEntryDetailModalProps> = ({
         successMessage="Detail added"
         // One tap already offered support for a severe rating before this sheet.
         supportShownForMood={props.initialMood}
+        singlePage
         headerAction={{ label: "Undo", accessibilityLabel: "Undo this entry", onPress: onUndo }}
     />
 );

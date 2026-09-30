@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Image, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { typography } from "@/constants/typography";
@@ -9,23 +9,9 @@ import { moodService } from "@/services/moodService";
 import { calculateStreak } from "@/features/insights/utils/streaks";
 import { SettingsGearButton } from "@/components/ui/SettingsGearButton";
 
-function getGreeting(date: Date): string {
-	const h = date.getHours();
-	if (h < 5) return "Still up";
-	if (h < 12) return "Good morning";
-	if (h < 17) return "Good afternoon";
-	if (h < 22) return "Good evening";
-	return "Late night";
-}
-
-const APP_ICON_SIZE = 48;
-const HALO_PAD = 8;
-
 /**
- * Home is the front door: the app icon carries brand identity, the serif
- * greeting carries the moment, and a single streak chip sits in the trailing
- * slot only when there's something to celebrate. Date moves under the greeting
- * as a quiet caption so we don't double-stamp "Today".
+ * Today's title row: the day, a streak chip only when there is a streak, and
+ * the settings gear.
  */
 export function HomeHeader() {
 	const isDark = useColorScheme() === "dark";
@@ -42,9 +28,7 @@ export function HomeHeader() {
 		return () => { cancelled = true; };
 	}, [revision]);
 
-	const now = new Date();
-	const greeting = getGreeting(now);
-	const dateLabel = now.toLocaleDateString([], {
+	const dateLabel = new Date().toLocaleDateString([], {
 		weekday: "long",
 		month: "short",
 		day: "numeric",
@@ -53,97 +37,25 @@ export function HomeHeader() {
 	const titleColor = isDark ? colors.text.dark : colors.text.light;
 	const captionColor = isDark ? colors.textSubtle.dark : colors.textMuted.light;
 	const accent = isDark ? colors.primary.dark : colors.primary.light;
-	const haloFill = isDark
-		? "rgba(166, 227, 155, 0.10)"
-		: "rgba(123, 168, 123, 0.10)";
-	const haloRing = isDark
-		? "rgba(166, 227, 155, 0.18)"
-		: "rgba(123, 168, 123, 0.20)";
-
 	const streakPalette = isDark
 		? semanticToneColors.sage.dark
 		: semanticToneColors.sage.light;
 
 	return (
-		<View
-			style={{
-				flexDirection: "row",
-				alignItems: "center",
-				justifyContent: "space-between",
-				paddingVertical: 4,
-				marginBottom: 4,
-			}}
-		>
-			<View
-				style={{
-					flexDirection: "row",
-					alignItems: "center",
-					flex: 1,
-					minWidth: 0,
-					paddingRight: 12,
-				}}
-			>
-				{/* Sage halo + app icon */}
-				<View
-					style={{
-						width: APP_ICON_SIZE + HALO_PAD * 2,
-						height: APP_ICON_SIZE + HALO_PAD * 2,
-						borderRadius: (APP_ICON_SIZE + HALO_PAD * 2) / 4,
-						backgroundColor: haloFill,
-						borderWidth: 1,
-						borderColor: haloRing,
-						alignItems: "center",
-						justifyContent: "center",
-						marginRight: 14,
-					}}
+		<View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+			<View style={{ flex: 1, minWidth: 0 }}>
+				<Text
+					accessibilityRole="header"
+					style={[typography.titleMd, { color: titleColor, fontSize: 24, lineHeight: 28 }]}
 				>
-					<Image
-						source={require("../../../assets/images/app-icons/app-icon.png")}
-						style={{
-							width: APP_ICON_SIZE,
-							height: APP_ICON_SIZE,
-							borderRadius: 14,
-						}}
-						resizeMode="cover"
-						accessible
-						accessibilityLabel="Moodinator"
-					/>
-				</View>
-
-				<View style={{ flex: 1, minWidth: 0 }}>
-					<Text
-						numberOfLines={1}
-						adjustsFontSizeToFit
-						minimumFontScale={0.82}
-						style={[
-							typography.titleMd,
-							{
-								color: titleColor,
-								fontSize: 24,
-								lineHeight: 28,
-								flexShrink: 1,
-							},
-						]}
-					>
-						{greeting}
-					</Text>
-					<Text
-						numberOfLines={1}
-						adjustsFontSizeToFit
-						minimumFontScale={0.9}
-						style={[
-							typography.bodySm,
-							{
-								color: captionColor,
-								marginTop: 2,
-								letterSpacing: 0.1,
-								flexShrink: 1,
-							},
-						]}
-					>
-						{dateLabel}
-					</Text>
-				</View>
+					Today
+				</Text>
+				<Text
+					numberOfLines={1}
+					style={[typography.bodySm, { color: captionColor, marginTop: 2 }]}
+				>
+					{dateLabel}
+				</Text>
 			</View>
 
 			{streak.current > 0 ? (
