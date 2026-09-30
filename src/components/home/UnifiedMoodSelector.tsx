@@ -235,27 +235,25 @@ function MoodButton({
         >
           {mood.value}
         </Animated.Text>
-        <Animated.Text
-          style={[
-            {
+        {/* The wrapper animates the label away. The label itself is a plain
+            Text: Android does not shrink an Animated.Text with an animated
+            height to fit (adjustsFontSizeToFit), so long labels were cut. */}
+        <Animated.View style={[{ alignSelf: "stretch", overflow: "hidden", paddingHorizontal: 2 }, labelStyle]}>
+          <Text
+            style={{
               color: get("textSubtle"),
               fontSize: 11,
               fontWeight: "500",
-              // No lineHeight: with one, Android does not shrink long labels
-              // to fit (adjustsFontSizeToFit), so they are cut off.
               textAlign: "center",
-              alignSelf: "stretch",
-              paddingHorizontal: 2,
-            },
-            labelStyle,
-          ]}
-          numberOfLines={1}
-          adjustsFontSizeToFit
-          minimumFontScale={0.75}
-          maxFontSizeMultiplier={MAX_TILE_FONT_SCALE}
-        >
-          {mood.label}
-        </Animated.Text>
+            }}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
+            maxFontSizeMultiplier={MAX_TILE_FONT_SCALE}
+          >
+            {mood.label}
+          </Text>
+        </Animated.View>
       </HapticTab>
     </Animated.View>
   );
