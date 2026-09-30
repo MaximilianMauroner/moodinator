@@ -28,6 +28,7 @@ const EXPANDED_ROW_GAP = 8;
 const EXPANDED_H_MARGIN = 4; // mx-1 each side
 const EXPANDED_ICON_SIZE = 24;
 const NUMBER_LINE_HEIGHT = 20;
+/** Room for one line of the 11px label at font scale 1. */
 const LABEL_LINE_HEIGHT = 15;
 /** Tile text grows with the system font size up to this factor. */
 const MAX_TILE_FONT_SCALE = 1.5;
@@ -240,7 +241,8 @@ function MoodButton({
               color: get("textSubtle"),
               fontSize: 11,
               fontWeight: "500",
-              lineHeight: LABEL_LINE_HEIGHT,
+              // No lineHeight: with one, Android does not shrink long labels
+              // to fit (adjustsFontSizeToFit), so they are cut off.
               textAlign: "center",
               alignSelf: "stretch",
               paddingHorizontal: 2,
