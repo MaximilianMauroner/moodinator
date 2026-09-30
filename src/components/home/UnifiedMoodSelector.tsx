@@ -173,7 +173,7 @@ function MoodButton({
     height: interpolate(
       collapseProgress.value,
       [0, 0.45],
-      [16, 0],
+      [22, 0],
       Extrapolation.CLAMP
     ),
   }));
@@ -219,12 +219,13 @@ function MoodButton({
               color: get("textSubtle"),
               fontSize: 11,
               fontWeight: "500",
-              lineHeight: 15,
+              lineHeight: 20,
               textAlign: "center",
             },
             labelStyle,
           ]}
           numberOfLines={1}
+          maxFontSizeMultiplier={1.2}
         >
           {mood.label}
         </Animated.Text>

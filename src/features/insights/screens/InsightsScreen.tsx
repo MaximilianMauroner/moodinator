@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Platform,
   Pressable,
@@ -9,12 +9,10 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { Ionicons } from "@expo/vector-icons";
 import { useInsightsData } from "../hooks/useInsightsData";
 import { InsightCard, CompactInsightCard } from "../components/InsightCard";
 import { StreakBadge } from "../components/StreakBadge";
 import { InsightsHeader } from "../components/InsightsHeader";
-import { FindingCard } from "../components/FindingCard";
 import { TrendBand } from "../components/TrendBand";
 import { RhythmGrid } from "../components/RhythmGrid";
 import { DriverRow } from "../components/DriverRow";
@@ -26,19 +24,10 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { ScreenBackgroundAccent } from "@/components/layout/ScreenBackgroundAccent";
-import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { useThemeColors } from "@/constants/colors";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 
-type ViewMode = "findings" | "charts";
-const viewModes: {
-  id: ViewMode;
-  label: string;
-  icon: keyof typeof Ionicons.glyphMap;
-}[] = [
-  { id: "findings", label: "Findings", icon: "bulb-outline" },
-  { id: "charts", label: "Charts", icon: "analytics" },
-];
+const COMPARISON_PAGE_SIZE = 20;
 const ranges: { id: AnalysisRange; label: string }[] = [
   { id: "7", label: "7" },
   { id: "30", label: "30" },
@@ -63,7 +52,7 @@ function ChartCard({
 }
 export function InsightsScreen() {
   const { get } = useThemeColors();
-  const [viewMode, setViewMode] = useState<ViewMode>("findings");
+  const [visibleComparisonCount, setVisibleComparisonCount] = useState(COMPARISON_PAGE_SIZE);
   const {
     recentMoods,
     totalCount,
@@ -79,6 +68,9 @@ export function InsightsScreen() {
     setAnalysisRange,
     analysisMoods,
   } = useInsightsData();
+  useEffect(() => {
+    setVisibleComparisonCount(COMPARISON_PAGE_SIZE);
+  }, [analysisRange, analysisMoods]);
   const { refreshing, onRefresh } = usePullToRefresh(refresh);
   const stats = calculatePeriodStats(analysisMoods, []);
   const dailyValues = analysis.dailySeries.filter(
@@ -102,13 +94,6 @@ export function InsightsScreen() {
           moods={recentMoods}
           totalEntries={totalCount}
           onRefresh={onRefresh}
-        />
-        <SegmentedControl
-          value={viewMode}
-          items={viewModes}
-          onChange={setViewMode}
-          variant="primary"
-          padding={4}
         />
         <View className="mx-4 mb-3 flex-row gap-2">
           {ranges.map((range) => (
@@ -181,38 +166,40 @@ export function InsightsScreen() {
             {stats.entryCount > 0 && (
               <ClimateCard averageMood={stats.averageMood} entryCount={stats.entryCount} dayparts={daypartMeans(analysis.rhythm)} />
             )}
-            {viewMode === "findings" ? (
-              <>
-                {analysis.findings.map((finding) => (
-                  <FindingCard key={finding.id} finding={finding} />
-                ))}
-                <Text className="mb-4 text-xs text-paper-700 dark:text-sand-300">
-                  These are associations in your entries, not explanations.
-                  Logging habits and other circumstances can affect the
-                  patterns.
-                </Text>
-              </>
-            ) : (
-              <>
+            <>
                 <ChartCard title="Trend">
                   <TrendBand series={analysis.dailySeries} />
                 </ChartCard>
                 <ChartCard title="Rhythm">
                   <RhythmGrid cells={analysis.rhythm} />
                 </ChartCard>
-                <ChartCard title="Drivers">
+                <ChartCard title="Comparisons">
                   <Text className="text-xs text-paper-700 dark:text-sand-300">
-                    Mean with above · mean without below. Lower is better.
+                    Average with above · average without below. Lower is better.
+                    These are entries you recorded, not causes.
                   </Text>
                   {analysis.drivers.length ? (
-                    analysis.drivers.map((driver) => (
-                      <DriverRow key={driver.id} driver={driver} />
-                    ))
+                    <>
+                      {analysis.drivers.slice(0, visibleComparisonCount).map((driver) => (
+                        <DriverRow key={driver.id} driver={driver} />
+                      ))}
+                      {analysis.drivers.length > visibleComparisonCount && (
+                        <Pressable
+                          onPress={() => setVisibleComparisonCount((count) => count + COMPARISON_PAGE_SIZE)}
+                          accessibilityRole="button"
+                          accessibilityLabel="Show more comparisons"
+                          className="mt-2 rounded-xl px-4 py-3"
+                          style={{ minHeight: 44, backgroundColor: get("surfaceAlt") }}
+                        >
+                          <Text className="text-center font-semibold text-paper-800 dark:text-paper-200">
+                            Show more comparisons ({Math.min(COMPARISON_PAGE_SIZE, analysis.drivers.length - visibleComparisonCount)} of {analysis.drivers.length - visibleComparisonCount} remaining)
+                          </Text>
+                        </Pressable>
+                      )}
+                    </>
                   ) : (
                     <Text className="mt-3 text-sm text-paper-700 dark:text-sand-300">
-                      {analysis.inconclusiveDrivers.length
-                        ? "No clear difference yet. The tags and emotions with enough entries did not stand apart from the rest."
-                        : "A comparison needs 5 entries with a tag or emotion and 5 without it."}
+                      A comparison needs 5 entries with a tag or emotion and 5 without it.
                     </Text>
                   )}
                 </ChartCard>
@@ -278,8 +265,7 @@ export function InsightsScreen() {
                   current={streak.current}
                   longest={streak.longest}
                 />
-              </>
-            )}
+            </>
           </ScrollView>
         )}
       </SafeAreaView>

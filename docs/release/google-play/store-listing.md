@@ -48,9 +48,9 @@ fabricated data only.
 
 ## Short description
 
-Track moods privately, spot patterns, and keep your data on your device.
+Track moods privately, review your history, and keep data on your device.
 
-Character count: 72 of 80.
+Character count: 73 of 80.
 
 ## Full description
 
