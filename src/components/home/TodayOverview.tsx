@@ -21,6 +21,14 @@ function getGreeting(date: Date): string {
   return "Late night";
 }
 
+/** Emotions and context of an entry as one line, for example "Tired · #Work". */
+function getEntryDetail(entry: MoodEntry): string {
+  return [
+    entry.emotions.map((emotion) => emotion.name).join(", "),
+    entry.contextTags.map((tag) => `#${tag}`).join(" "),
+  ].filter(Boolean).join(" · ");
+}
+
 type TodayNowProps = {
   /** Today's newest entry, if any. */
   latest?: MoodEntry;
@@ -51,11 +59,13 @@ export function TodayNow({ latest, loaded, onOpen }: TodayNowProps) {
 
   const label = getMoodRatingDisplay(latest.mood, isDark, latest.moodScale).label;
   const time = getEntryLocalTimeLabel(latest);
+  const detail = getEntryDetail(latest);
+  const note = latest.note?.trim();
   return (
     <Pressable
       onPress={() => onOpen(latest)}
       accessibilityRole="button"
-      accessibilityLabel={`Last check-in: ${label} ${latest.mood} at ${time}`}
+      accessibilityLabel={[`Last check-in: ${label} ${latest.mood} at ${time}`, detail, note].filter(Boolean).join(". ")}
       accessibilityHint="Opens this entry's details"
       style={{ flexDirection: "row", alignItems: "center", gap: 14 }}
     >
@@ -65,6 +75,12 @@ export function TodayNow({ latest, loaded, onOpen }: TodayNowProps) {
           {label} <Text style={{ color: get("textSubtle") }}>{latest.mood}</Text>
         </Text>
         <Text style={[typography.bodySm, { color: get("textSubtle") }]}>Last check-in at {time}</Text>
+        {detail ? (
+          <Text numberOfLines={1} style={{ color: get("textSubtle"), fontSize: 13, marginTop: 4 }}>{detail}</Text>
+        ) : null}
+        {note ? (
+          <Text numberOfLines={1} style={{ color: get("text"), fontSize: 13, marginTop: 2, opacity: 0.9 }}>{note}</Text>
+        ) : null}
       </View>
     </Pressable>
   );
@@ -91,10 +107,7 @@ export function EarlierToday({ entries, onOpen, onShowAll }: EarlierTodayProps) 
       {shown.map((entry) => {
         const label = getMoodRatingDisplay(entry.mood, isDark, entry.moodScale).label;
         const time = getEntryLocalTimeLabel(entry);
-        const detail = [
-          entry.emotions.map((emotion) => emotion.name).join(", "),
-          entry.contextTags.map((tag) => `#${tag}`).join(" "),
-        ].filter(Boolean).join(" · ");
+        const detail = getEntryDetail(entry);
         const note = entry.note?.trim();
         return (
           <Pressable

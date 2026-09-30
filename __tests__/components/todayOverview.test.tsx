@@ -12,7 +12,7 @@ vi.mock("react-native", () => ({
 }));
 vi.mock("@expo/vector-icons", () => ({ Ionicons: "Ionicons" }));
 
-import { EarlierToday } from "@/components/home/TodayOverview";
+import { EarlierToday, TodayNow } from "@/components/home/TodayOverview";
 
 function entry(id: number, mood: number, extra: Partial<MoodEntry> = {}): MoodEntry {
   return {
@@ -73,5 +73,19 @@ describe("EarlierToday", () => {
       renderer = create(<EarlierToday entries={[]} onOpen={vi.fn()} onShowAll={vi.fn()} />);
     });
     expect(renderer.toJSON()).toBeNull();
+  });
+});
+
+describe("TodayNow", () => {
+  it("shows the newest entry with its detail and opens it", async () => {
+    const onOpen = vi.fn();
+    const latest = entry(4, 2, { emotions: [{ name: "Grateful", category: "positive" }], contextTags: ["Outside"], note: "Sun after the rain." });
+    await act(async () => {
+      renderer = create(<TodayNow latest={latest} loaded onOpen={onOpen} />);
+    });
+
+    expect(texts()).toEqual(expect.arrayContaining(["Grateful · #Outside", "Sun after the rain."]));
+    await act(async () => renderer.root.findByProps({ accessibilityHint: "Opens this entry's details" }).props.onPress());
+    expect(onOpen).toHaveBeenCalledWith(latest);
   });
 });
