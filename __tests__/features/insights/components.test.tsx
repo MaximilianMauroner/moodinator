@@ -51,7 +51,7 @@ vi.mock("../../../src/features/insights/components/InsightCard", () => ({
   CompactInsightCard: () => null,
 }));
 vi.mock("../../../src/features/insights/components/StreakBadge", () => ({ StreakBadge: () => null }));
-vi.mock("../../../src/features/insights/components/EntryDetailModal", () => ({ EntryDetailModal: () => null }));
+vi.mock("../../../src/features/insights/components/ClimateCard", () => ({ ClimateCard: () => React.createElement("Text", null, "Your climate") }));
 vi.mock("../../../src/features/insights/components/InsightsHeader", () => ({ InsightsHeader: () => null }));
 vi.mock("../../../src/features/insights/components/TrendBand", () => ({ TrendBand: () => null }));
 vi.mock("@/lib/moodPresentation", () => ({ getMoodHex: () => "#000" }));
@@ -193,7 +193,10 @@ describe("insight presentation", () => {
       .join(" ");
     const expected = `${count} ${count === 1 ? "entry" : "entries"}`;
     expect(rendered).toContain(expected);
-    expect(rendered).toContain("Charts · Calendar");
+    expect(rendered).toContain("Comparisons");
+    if (count > 0) expect(rendered).toContain("Your climate");
+    else expect(rendered).not.toContain("Your climate");
+    expect(rendered).not.toContain("Calendar");
     expect(rendered).not.toContain("Findings");
     expect(rendered).not.toContain(`${count} ${count === 1 ? "entries" : "entry"}`);
     await act(async () => renderer.unmount());

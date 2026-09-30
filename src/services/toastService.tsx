@@ -1,10 +1,11 @@
 import type { MoodEntry } from "@db/types";
 
-import { DeletedMoodToast, RestoredMoodToast } from "@/components/ui/DeletedMoodToast";
+import { DeletedMoodToast, KeptMoodToast, RestoredMoodToast } from "@/components/ui/DeletedMoodToast";
 import { toast } from "@/lib/toast";
 
 type ToastId = string | number;
 type UndoDeletedMoodHandler = (entry: MoodEntry) => Promise<void> | void;
+type UndoKeptMoodHandler = () => Promise<void> | void;
 
 const deletedMoodEntries = new Map<ToastId, MoodEntry>();
 
@@ -78,6 +79,31 @@ export const toastService = {
         onDismiss: () => cleanupDeletedMoodEntry(toastId),
         onAutoClose: () => cleanupDeletedMoodEntry(toastId),
       }
+    );
+  },
+
+  /** Confirms a one-tap entry and offers to remove it again. */
+  showKeptMood(entry: MoodEntry, onUndo: UndoKeptMoodHandler) {
+    const toastId = `kept-mood-${entry.id}-${entry.timestamp}`;
+
+    return toast.custom(
+      () => (
+        <KeptMoodToast
+          entry={entry}
+          onUndo={() => {
+            toast.dismiss(toastId);
+            void Promise.resolve()
+              .then(onUndo)
+              .catch((error: unknown) => {
+                console.error("[toastService] Failed to undo kept entry:", error);
+                toast.error("Undo failed", {
+                  description: "The entry could not be removed.",
+                });
+              });
+          }}
+        />
+      ),
+      { id: toastId, duration: 5000 }
     );
   },
 };

@@ -1,33 +1,33 @@
 /**
  * Centralized theme colors for the Moodinator app
- * Soft Organic palette - warm, natural, cozy tones
+ * Soft Sage palette: calm sage surfaces with low glare, warm light mode.
  */
 
 import { useColorScheme } from "@/hooks/useColorScheme";
 
 export const colors = {
   // Background colors
-  background: { light: "#FAF8F4", dark: "#08150F" },
-  surface: { light: "#FDFCFA", dark: "#14251C" },
-  surfaceAlt: { light: "#F5F1E8", dark: "#111F17" },
-  surfaceElevated: { light: "#F9F5ED", dark: "#182C20" },
+  background: { light: "#FBFAF6", dark: "#101411" },
+  surface: { light: "#FDFCFA", dark: "#181E1A" },
+  surfaceAlt: { light: "#F4F2EB", dark: "#141915" },
+  surfaceElevated: { light: "#F4F2EB", dark: "#1D2520" },
 
   // Text colors
-  text: { light: "#3D352A", dark: "#F0F7EA" },
-  textMuted: { light: "#5C4E3D", dark: "#C7D8BC" },
-  textSubtle: { light: "#7A6B55", dark: "#9EB894" },
+  text: { light: "#34362F", dark: "#ECEDE6" },
+  textMuted: { light: "#4F5148", dark: "#C4CABF" },
+  textSubtle: { light: "#6B6D63", dark: "#9EA89A" },
   textInverse: { light: "#FDFCFA", dark: "#FDFCFA" },
 
   // Primary accent (sage green)
-  primary: { light: "#5B8A5B", dark: "#A6E39B" },
-  onPrimary: { light: "#08150F", dark: "#08150F" },
+  primary: { light: "#557C57", dark: "#B9D3B2" },
+  onPrimary: { light: "#FFFFFF", dark: "#111A12" },
   primaryMuted: { light: "#7BA87B", dark: "#C8F5BE" },
-  primaryBg: { light: "#E8EFE8", dark: "#122A1A" },
-  primaryBgHover: { light: "#D1DFD1", dark: "#193622" },
+  primaryBg: { light: "#E8EFE8", dark: "#1F2A22" },
+  primaryBgHover: { light: "#D1DFD1", dark: "#26332A" },
 
   // Border colors
-  border: { light: "#E5D9BF", dark: "#2F513B" },
-  borderSubtle: { light: "#F2EBD9", dark: "#233D2D" },
+  border: { light: "#E5E1D6", dark: "#2E3A31" },
+  borderSubtle: { light: "#EFECE3", dark: "#232B25" },
 
   // Overlay
   overlay: "rgba(0,0,0,0.4)",
@@ -88,6 +88,18 @@ export const colors = {
     "#C75441", // 9 - Crisis (coral-600)
     "#9D3D30", // 10 - Emergency (coral-700)
   ],
+
+  /**
+   * Inner weather sign color per mood level 0 (sun) to 10 (storm). Every value
+   * keeps at least 3:1 contrast against `background` in its mode, so the sign
+   * reads as a graphic; the level word and number carry the meaning.
+   */
+  moodWeather: {
+    light: ["#649762", "#719A6E", "#81967C", "#8C82A7", "#948CA2", "#9E8E69",
+            "#AC8962", "#C88056", "#DE725A", "#CF594B", "#AB4239"],
+    dark: ["#649762", "#80B37E", "#ACCCA7", "#8C82A7", "#A99FBB", "#C3AD7E",
+           "#DBA976", "#E8905E", "#E5755C", "#CF594B", "#AB4239"],
+  },
 
   /**
    * Energy card (0 drained → 10 wired): higher is better.
@@ -168,36 +180,13 @@ export const colors = {
   dangerText: { light: "#A53F30", dark: "#F2B4A6" },
   dangerSurface: { light: "#FDE8E4", dark: "#3C1A14" },
   backgroundRaised: { light: "#FAF8F4", dark: "#1E2D26" },
+  // Primary action in the support sheet for severe ratings.
+  supportAction: { light: "#AE4E3E", dark: "#EFB0A2" },
+  onSupportAction: { light: "#FFFFFF", dark: "#2A0E08" },
 } as const;
 
 export type ColorKey = keyof typeof colors;
 export type ThemeMode = "light" | "dark";
-
-/**
- * Chart-specific color tokens for consistent chart styling.
- */
-export const chartColors = {
-  // Line/area chart colors
-  line: { light: "#5B8A5B", dark: "#A6E39B" },
-  lineSecondary: { light: "#847596", dark: "#D5CCDD" },
-  fill: { light: "#7BA87B", dark: "#A6E39B" },
-  fillOpacity: 0.14,
-
-  // Grid and axis
-  gridLine: { light: "#EDE7DA", dark: "#47414C" },
-  axisLabel: { light: "#7A6B55", dark: "#C7B895" },
-
-  // Background
-  chartBg: { light: "#FDFCFA", dark: "#14251C" },
-
-  // Dot styling
-  dotStroke: "#ffffff",
-  dotRadius: 4,
-
-  // Tooltip
-  tooltipBg: { light: "#3D352A", dark: "#F5F1E8" },
-  tooltipText: { light: "#F5F1E8", dark: "#3D352A" },
-} as const;
 
 export const semanticToneColors = {
   sage: {
@@ -244,20 +233,6 @@ export function getEnergySegmentColor(level: number, isDark: boolean): string {
     ? colors.energySegmentColors.dark
     : colors.energySegmentColors.light;
   return stops[i] ?? stops[stops.length - 1];
-}
-
-/**
- * Get chart color based on theme.
- */
-export function getChartColor(
-  key: keyof typeof chartColors,
-  isDark: boolean
-): string | number {
-  const value = chartColors[key];
-  if (typeof value === "object" && value !== null && "light" in value) {
-    return isDark ? value.dark : value.light;
-  }
-  return value;
 }
 
 /**

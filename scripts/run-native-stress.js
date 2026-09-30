@@ -243,13 +243,15 @@ async function importFixture(serial, fixtureName, size) {
 }
 
 async function settleImportedHistory(serial, expectedCount) {
-  await waitForNodeAndTap(serial, { contentDescription: "Home tab, log your mood" }, { timeoutMs: 5000 });
+  await waitForNodeAndTap(serial, { contentDescription: "History tab, view past days and months" }, { timeoutMs: 5000 });
   await waitForNode(serial, {
     allOf: [
       { testId: "history-count" },
       { text: `${expectedCount} total` },
     ],
   }, { timeoutMs: 30000 });
+  // History also loads the seven-day forecast; keep it out of the measured window.
+  await waitForNode(serial, { testId: "forecast-ready" }, { timeoutMs: 30000 });
 }
 
 function startTrace(serial, {

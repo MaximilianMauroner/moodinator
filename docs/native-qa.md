@@ -34,7 +34,7 @@ native control remained reachable.
 | Detailed entry | Emotions, context, energy, and notes remain optional/configurable; keyboard and draft-discard behavior are covered by source/tests. | Long-press opens the detailed form; notes remain reachable with the keyboard; save/reject/cancel preserve the correct draft. |
 | Recorded time | History, accessibility, detail, calendar, and related toasts use the recorded offset; original timestamps are not rewritten. | Verify cross-midnight positive, negative, and half-hour offsets, change device timezone, and confirm the displayed day/time stays stable. |
 | Read/edit/delete | History actions edit, change date/time, delete, and undo through the mood service/store. | Edit persists after restart; date/time changes are intentional; delete removes one row and Undo restores the same data. |
-| Insights | Charts is the default view; Calendar remains available. Zero, one, and multiple records have honest no-data/insufficient-sample states, descriptive comparisons, mood statistics, and streaks. | Check Charts, Calendar, all ranges, refresh, and populated fixtures on a clean QA install. Verify that no confidence dots or pattern-confidence sentences remain. |
+| Insights | Insights shows descriptive charts and the climate card; Calendar remains in History’s Month view. Zero, one, and multiple records have honest no-data/insufficient-sample states, descriptive comparisons, mood statistics, and streaks. | Check Insights charts, History Month, all ranges, refresh, and populated fixtures on a clean QA install. Verify that no confidence dots or pattern-confidence sentences remain. |
 | Settings and portability | Local privacy status and all Settings destinations remain available; presets affect the next entry; JSON import replacement is confirmed; export, backup, deletion, and external-copy limits are disclosed. | Verify privacy status, every Settings destination, therapy export, preset application, malformed import recovery, selected Android backup folder, manual backup, deletion scope, restart, and offline use. |
 | Protection and reminders | Optional app lock, biometrics, and local reminders are separate existing functionality. | Verify PIN/biometric recovery and reminder delivery after restart on the exact candidate; physical-device notification behavior remains separate. |
 
@@ -147,7 +147,7 @@ failures. Use fabricated data only.
 | Draft errors | Change a note, close the form, choose Keep editing, then close and discard. | Keep editing preserves the draft. Discard leaves the saved entry unchanged. |
 | Save errors | In an isolated test build, make the storage write reject through a local debugger or test harness. Submit a populated draft, restore storage, and retry. | Save failed appears. The form and draft remain. Retrying creates one entry. No production error switch is required. |
 | Load errors | In an isolated test build, make the history or Insights read reject, then restore it and refresh. | The error is visible. Loading ends. Retry recovers. Existing entries remain intact. |
-| Insights navigation | Open Insights from Home, change ranges, open Calendar, then return to Charts. | Charts opens by default. Calendar and all four ranges remain reachable; no Findings tab or pattern-confidence copy/dots appear. |
+| Insights navigation | Open Insights from Today, change ranges, then open History’s Month view. | Insights shows charts directly. History Month and all four Insights ranges remain reachable; no Findings tab or pattern-confidence copy/dots appear. |
 | Settings destinations | Open Settings and inspect Local privacy, then open each category and return. Export a fabricated therapy CSV. | Privacy status is visible, all existing destinations work, and the therapy export remains available. No redundant ProfileCard or subscription prompt appears. |
 | Import errors | Import malformed JSON through the normal Settings import action. | The error is visible and existing entries are unchanged. |
 
@@ -245,7 +245,7 @@ Check 7, 30, 90 and All ranges, including
 empty periods and isolated days. Missing dates must leave gaps in the trend; an
 isolated day with multiple ratings must still show its min/max range.
 
-On a narrow device and with large text, verify Charts/Calendar and all
+On a narrow device and with large text, verify Insights/History Month and all
 four ranges remain reachable without overlapping labels. Check both themes and
 reduced motion; capture 30 idle seconds on Charts after transitions settle.
 Verify that Average Mood, Entries, Mood Range, tag/emotion comparisons and streaks
@@ -302,9 +302,9 @@ Android encryption and notification quick-log delivery require their separately
 tracked migration rehearsal and physical-device spike. Emulator success does not
 establish terminated-process notification behavior on a physical device.
 
-The smoke opens Charts by default, then Calendar, and returns to Charts with
-its one-entry fixture. It checks the insufficient-sample message in the
-Comparisons section. It does not establish populated chart correctness or
+The smoke opens descriptive Insights directly with its one-entry fixture and
+checks the insufficient-sample message in Comparisons. The visual matrix covers
+Calendar through History’s Month view. It does not establish populated chart correctness or
 large-history performance; use the fabricated comparisons above for those.
 
 The Undo probe begins only after the final Maestro flow has completed at the

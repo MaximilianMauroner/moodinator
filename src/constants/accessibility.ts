@@ -32,16 +32,16 @@ export function getMoodButtonLabel(moodValue: number, moodLabel: string): string
  * Get accessibility hint for a mood button.
  */
 export function getMoodButtonHint(): string {
-  return "Tap to log this mood quickly, long press for detailed entry";
+  return "Tap to save this mood now, long press for detailed entry";
 }
 
 /**
  * Tab bar accessibility labels.
  */
 export const TAB_ACCESSIBILITY_LABELS = {
-  home: "Home tab, log your mood",
-  insights: "Insights tab, view mood history and summaries",
-  settings: "Settings tab, customize app preferences",
+  today: "Today tab, log your mood",
+  history: "History tab, view past days and months",
+  insights: "Insights tab, view mood patterns and summaries",
 } as const;
 
 /**
@@ -137,58 +137,3 @@ export const SETTINGS_ACCESSIBILITY = {
   toggleHint: (isEnabled: boolean) =>
     `Tap to ${isEnabled ? "disable" : "enable"} this setting`,
 } as const;
-
-/**
- * Chart accessibility labels and helpers.
- */
-export const CHART_ACCESSIBILITY = {
-  moodChart: {
-    label: (period: string, dataPointCount: number) =>
-      `Mood chart for ${period} with ${dataPointCount} data points`,
-    hint: "Shows mood trends over time",
-  },
-  dataPoint: {
-    label: (date: string, value: number, moodLabel?: string) =>
-      `${date}: mood ${value}${moodLabel ? `, ${moodLabel}` : ""}`,
-  },
-  trend: {
-    label: (direction: "improving" | "declining" | "stable", percentChange?: number) => {
-      if (direction === "stable") {
-        return "Mood trend is stable";
-      }
-      const changeText = percentChange !== undefined ? ` by ${Math.abs(percentChange).toFixed(1)}%` : "";
-      return `Mood is ${direction}${changeText}`;
-    },
-  },
-  weeklyComparison: {
-    label: (currentAvg: number, lastWeekAvg: number) =>
-      `This week average: ${currentAvg.toFixed(1)}, last week average: ${lastWeekAvg.toFixed(1)}`,
-  },
-  overview: {
-    label: (totalEntries: number, overallAvg: number) =>
-      `Overview: ${totalEntries} total entries with average mood of ${overallAvg.toFixed(1)} out of 10`,
-  },
-} as const;
-
-/**
- * Get accessibility label for a chart based on its data.
- */
-export function getChartAccessibilityLabel(
-  chartType: "daily" | "weekly" | "overview" | "raw",
-  dataPoints: number,
-  period?: string
-): string {
-  const periodText = period || "selected period";
-  switch (chartType) {
-    case "daily":
-      return `Daily mood chart showing ${dataPoints} days of data`;
-    case "weekly":
-      return `Weekly mood trends showing ${dataPoints} weeks of data`;
-    case "overview":
-      return `Mood overview chart for ${periodText}`;
-    case "raw":
-      return `Raw mood data timeline with ${dataPoints} entries`;
-    default:
-      return `Mood chart with ${dataPoints} data points`;
-  }
-}

@@ -7,6 +7,7 @@ import { colors, semanticToneColors } from "@/constants/colors";
 import { useMoodsStore } from "@/shared/state/moodsStore";
 import { moodService } from "@/services/moodService";
 import { calculateStreak } from "@/features/insights/utils/streaks";
+import { SettingsGearButton } from "@/components/ui/SettingsGearButton";
 
 function getGreeting(date: Date): string {
 	const h = date.getHours();
@@ -181,6 +182,7 @@ export function HomeHeader() {
 					</Text>
 				</View>
 			) : null}
+			<SettingsGearButton />
 		</View>
 	);
 }

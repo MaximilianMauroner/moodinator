@@ -23,6 +23,8 @@ export type CrisisSupportDependencies = {
   ) => void;
   openUrl: (url: string) => Promise<unknown>;
   getRegion?: () => string | null | undefined;
+  /** Runs when the person chooses "Not now" on the support prompt. */
+  onDecline?: () => void;
 };
 
 const LOCAL_EMERGENCY_GUIDANCE =
@@ -106,7 +108,7 @@ export function presentCrisisSupportAlert(
         text: action.label,
         onPress: () => openSupportAction(action, dependencies),
       })),
-      { text: "Not now", style: "cancel" },
+      { text: "Not now", style: "cancel", onPress: dependencies.onDecline },
     ]
   );
 }

@@ -800,22 +800,30 @@ test("visual matrix retains each screen before the next navigation", () => {
     new URL("../src/features/insights/screens/InsightsScreen.tsx", import.meta.url),
     "utf8",
   );
-  for (const screen of ["home", "charts", "calendar", "settings"]) {
+  for (const screen of ["today", "history", "calendar", "charts", "settings"]) {
     assert.match(source, new RegExp(`capture\\(\"${screen}\"\\)`));
   }
   assert.doesNotMatch(source, /capture\("findings"\)/);
   const flow = readFileSync(new URL("../.maestro/flows/native-visual-matrix.yaml", import.meta.url), "utf8");
   assert.equal(flow.includes("Insights tab"), false);
-  const openInsights = source.indexOf("Insights tab, view mood history and summaries");
+  const openToday = source.indexOf("Today tab, log your mood");
+  const todayCapture = source.indexOf('capture("today")', openToday);
+  const openHistory = source.indexOf("History tab, view past days and months", todayCapture);
+  const forecastReady = source.indexOf('testId: "forecast-ready"', openHistory);
+  const historyCapture = source.indexOf('capture("history")', forecastReady);
+  assert.ok(openToday >= 0 && todayCapture > openToday && openHistory > todayCapture);
+  assert.ok(forecastReady > openHistory && historyCapture > forecastReady);
+  const monthView = source.indexOf('contentDescription: "Month view"', openHistory);
+  const openInsights = source.indexOf("Insights tab, view mood patterns and summaries", monthView);
+  assert.ok(openHistory >= 0 && monthView > openHistory && openInsights > monthView);
   const selectAll = source.indexOf('contentDescription: "All history"', openInsights);
   const loadedSummary = source.indexOf('testId: "insights-loaded-summary"', selectAll);
-  assert.ok(openInsights >= 0 && selectAll > openInsights && loadedSummary > selectAll);
+  assert.ok(selectAll > openInsights && loadedSummary > selectAll);
   const trend = source.indexOf('text: "Trend"', loadedSummary);
   const chartsCapture = source.indexOf('capture("charts")', trend);
-  const calendarView = source.indexOf('contentDescription: "Calendar view"', chartsCapture);
-  assert.ok(trend > loadedSummary && chartsCapture > trend && calendarView > chartsCapture);
+  const openSettings = source.indexOf('testId: "open-settings"', chartsCapture);
+  assert.ok(trend > loadedSummary && chartsCapture > trend && openSettings > chartsCapture);
   assert.doesNotMatch(source, /contentDescription: "Findings view"/);
-  assert.doesNotMatch(source, /waitForNodeAndTap\(serial, \{ text: "(?:Charts|Calendar) view" \}\)/);
   assert.match(source, /testId: "insights-loaded-summary"/);
   assert.match(source, /text: `\$\{fixtureCount\} entries`/);
   assert.match(insightsSource, /testID=\{ready \? "insights-loaded-summary" : undefined\}/);
@@ -832,15 +840,11 @@ test("visual matrix retains each screen before the next navigation", () => {
   assert.match(insightsSource, /<ChartCard title="Comparisons">/);
 });
 
-test("one-entry Insights smoke checks Charts, comparisons, and Calendar without Findings", () => {
+test("one-entry Insights smoke checks comparisons without Findings", () => {
   const flow = readFileSync(new URL("../.maestro/flows/insights.yaml", import.meta.url), "utf8");
-  const charts = flow.indexOf('- assertVisible: "Charts view"');
-  const trend = flow.indexOf('- assertVisible: "Trend"', charts);
-  const shortfall = flow.indexOf('text: "A comparison needs 5 entries with a tag or emotion and 5 without it."', trend);
-  const calendar = flow.indexOf('- tapOn: "Calendar view"', shortfall);
-  const backToCharts = flow.indexOf('- tapOn: "Charts view"', calendar);
-  assert.ok(charts >= 0 && trend > charts && shortfall > trend && calendar > shortfall && backToCharts > calendar);
-  assert.doesNotMatch(flow, /Findings view|Not enough data yet/);
+  assert.match(flow, /assertVisible: "Trend"/);
+  assert.match(flow, /A comparison needs 5 entries with a tag or emotion and 5 without it/);
+  assert.doesNotMatch(flow, /Findings view|Calendar view|Charts view|Not enough data yet/);
 });
 
 test("visual matrix replaces app data with its complete retained fabricated fixture", () => {
@@ -955,7 +959,7 @@ test("Undo runner captures the row before opening its actions modal", () => {
   assert.doesNotMatch(source.slice(capture, openActions), /undoDumpTimeoutMs/);
 });
 
-test("stress settles imported Home history before performance reset", () => {
+test("stress settles imported History before performance reset", () => {
   assert.equal(typeof settleImportedHistory, "function");
   const source = readFileSync(new URL("../scripts/run-native-stress.js", import.meta.url), "utf8");
   const imported = source.indexOf("await importFixture(options.serial, fixtureName, options.size)");
@@ -966,6 +970,10 @@ test("stress settles imported Home history before performance reset", () => {
   assert.ok(imported >= 0 && launched > imported && settled > launched && reset > settled && baseline > settled);
   assert.match(source, /testId: "history-count"/);
   assert.match(source, /text: `\$\{expectedCount\} total`/);
+  const settleStart = source.indexOf("async function settleImportedHistory");
+  const count = source.indexOf('testId: "history-count"', settleStart);
+  const forecast = source.indexOf('testId: "forecast-ready"', count);
+  assert.ok(settleStart >= 0 && count > settleStart && forecast > count);
 });
 
 test("delete timing starts before the synchronous ADB tap", () => {

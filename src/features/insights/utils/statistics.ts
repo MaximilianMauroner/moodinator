@@ -20,3 +20,13 @@ export function subtractGroup(whole: GroupStats, part: GroupStats): GroupStats {
 export function groupMean(group: GroupStats): number {
   return group.count > 0 ? group.sum / group.count : 0;
 }
+
+/** Combine recorded totals without treating weekdays as equally sized groups. */
+export function mergeGroups(groups: Iterable<GroupStats>): GroupStats {
+  const total = emptyGroup();
+  for (const group of groups) {
+    total.count += group.count;
+    total.sum += group.sum;
+  }
+  return total;
+}
