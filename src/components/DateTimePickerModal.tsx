@@ -483,6 +483,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
                     <Text
                       className="text-sm font-medium ml-2 flex-1"
                       style={{ color: get("text") }}
+                      numberOfLines={1}
                     >
                       {selectedDate
                         ? selectedDate.toLocaleDateString([], {
@@ -519,9 +520,11 @@ export const DateTimePickerModal: React.FC<Props> = ({
                       size={18}
                       color={isDark ? colors.sand.text.dark : colors.sand.text.light}
                     />
+                    {/* Sized to its text; with flex-1 the time wrapped as "8:48 A M". */}
                     <Text
-                      className="text-sm font-medium ml-2 flex-1"
+                      className="text-sm font-medium mx-2"
                       style={{ color: get("text") }}
+                      numberOfLines={1}
                     >
                       {selectedDate
                         ? selectedDate.toLocaleTimeString([], {

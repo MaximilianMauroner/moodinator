@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { View, Text, StyleSheet, ScrollView } from "react-native";
+import { View, Text, StyleSheet, ScrollView, useWindowDimensions } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, {
   Extrapolation,
@@ -24,14 +24,29 @@ import { getMoodWeatherColor, getMoodWeatherIcon } from "@/constants/moodWeather
 // Expanded weather grid: rows of 4, 3, and 4 (clear, cloudy, rain). The middle
 // row is centered and uses the same tile width as the outer rows.
 const EXPANDED_HEADER_HEIGHT = 36; // divider row + spacing below
-const EXPANDED_ROW_HEIGHT = 64;
 const EXPANDED_ROW_GAP = 8;
 const EXPANDED_H_MARGIN = 4; // mx-1 each side
 const EXPANDED_ICON_SIZE = 24;
+const NUMBER_LINE_HEIGHT = 20;
+const LABEL_LINE_HEIGHT = 15;
+/** Tile text grows with the system font size up to this factor. */
+const MAX_TILE_FONT_SCALE = 1.5;
 
-/** Total height occupied by this component when fully expanded (compact mode). */
-export const UNIFIED_COMPACT_EXPANDED_HEIGHT =
-  EXPANDED_HEADER_HEIGHT + 3 * EXPANDED_ROW_HEIGHT + 2 * EXPANDED_ROW_GAP + 8;
+function getTileFontScale(fontScale: number) {
+  return Math.min(Math.max(fontScale, 1), MAX_TILE_FONT_SCALE);
+}
+
+/** Tile height that fits the icon, number, and label at this font scale. */
+function getExpandedRowHeight(fontScale: number) {
+  const scale = getTileFontScale(fontScale);
+  const content = EXPANDED_ICON_SIZE + 2 + (NUMBER_LINE_HEIGHT + 2 + LABEL_LINE_HEIGHT) * scale;
+  return Math.ceil(content + 8);
+}
+
+/** Total height of this component when fully expanded, at this font scale. */
+export function getUnifiedExpandedHeight(fontScale: number) {
+  return EXPANDED_HEADER_HEIGHT + 3 * getExpandedRowHeight(fontScale) + 2 * EXPANDED_ROW_GAP + 8;
+}
 
 // Collapsed pill row (must match constants in index.tsx)
 const COLLAPSED_HEIGHT = 60;
@@ -56,7 +71,7 @@ function collapsedPos(index: number) {
   };
 }
 
-function expandedPos(index: number, containerWidth: number) {
+function expandedPos(index: number, containerWidth: number, rowHeight: number) {
   "worklet";
   // Matches MOOD_WEATHER_ROWS: 0-3, 4-6 (centered), 7-10.
   const row = index < 4 ? 0 : index < 7 ? 1 : 2;
@@ -67,9 +82,9 @@ function expandedPos(index: number, containerWidth: number) {
   return {
     left: rowOffset + col * slot + EXPANDED_H_MARGIN,
     top:
-      EXPANDED_HEADER_HEIGHT + row * (EXPANDED_ROW_HEIGHT + EXPANDED_ROW_GAP),
+      EXPANDED_HEADER_HEIGHT + row * (rowHeight + EXPANDED_ROW_GAP),
     width: btnW,
-    height: EXPANDED_ROW_HEIGHT,
+    height: rowHeight,
     borderRadius: 16,
   };
 }
@@ -81,6 +96,7 @@ interface MoodButtonProps {
   index: number;
   collapseProgress: SharedValue<number>;
   expandedWidth: number;
+  fontScale: number;
   isDark: boolean;
   onMoodPress: (mood: number) => void;
   onLongPress: (mood: number) => void;
@@ -91,10 +107,13 @@ function MoodButton({
   index,
   collapseProgress,
   expandedWidth,
+  fontScale,
   isDark,
   onMoodPress,
   onLongPress,
 }: MoodButtonProps) {
+  const rowHeight = getExpandedRowHeight(fontScale);
+  const labelHeight = Math.ceil(LABEL_LINE_HEIGHT * getTileFontScale(fontScale));
   const { get } = useThemeColors();
   const tileBg = get("background");
   const tileBorder = get("border");
@@ -102,7 +121,7 @@ function MoodButton({
   const containerStyle = useAnimatedStyle(() => {
     const p = collapseProgress.value;
     const c = collapsedPos(index);
-    const e = expandedPos(index, expandedWidth);
+    const e = expandedPos(index, expandedWidth, rowHeight);
     return {
       position: "absolute" as const,
       left: interpolate(p, [0, 1], [e.left, c.left], Extrapolation.CLAMP),
@@ -173,7 +192,7 @@ function MoodButton({
     height: interpolate(
       collapseProgress.value,
       [0, 0.45],
-      [16, 0],
+      [labelHeight, 0],
       Extrapolation.CLAMP
     ),
   }));
@@ -205,11 +224,13 @@ function MoodButton({
             {
               fontWeight: "700",
               fontVariant: ["tabular-nums"],
+              lineHeight: NUMBER_LINE_HEIGHT,
               alignSelf: "stretch",
               textAlign: "center",
             },
             numberStyle,
           ]}
+          maxFontSizeMultiplier={MAX_TILE_FONT_SCALE}
         >
           {mood.value}
         </Animated.Text>
@@ -219,12 +240,17 @@ function MoodButton({
               color: get("textSubtle"),
               fontSize: 11,
               fontWeight: "500",
-              lineHeight: 15,
+              lineHeight: LABEL_LINE_HEIGHT,
               textAlign: "center",
+              alignSelf: "stretch",
+              paddingHorizontal: 2,
             },
             labelStyle,
           ]}
           numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.75}
+          maxFontSizeMultiplier={MAX_TILE_FONT_SCALE}
         >
           {mood.label}
         </Animated.Text>
@@ -252,6 +278,7 @@ export function UnifiedMoodSelector({
   const [isCollapsed, setIsCollapsed] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
   const { get } = useThemeColors();
+  const { fontScale } = useWindowDimensions();
 
   const trackBgColor = isDark ? colors.surface.dark : colors.surface.light;
   const trackBorderColor = isDark ? colors.border.dark : colors.border.light;
@@ -400,6 +427,7 @@ export function UnifiedMoodSelector({
                 index={index}
                 collapseProgress={collapseProgress}
                 expandedWidth={expandedContentWidth}
+                fontScale={fontScale}
                 isDark={isDark}
                 onMoodPress={onMoodPress}
                 onLongPress={onLongPress}

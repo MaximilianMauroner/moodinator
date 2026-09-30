@@ -239,6 +239,16 @@ async function pressLabel(accessibilityLabel: string) {
   await act(async () => { labeledButton(accessibilityLabel).props.onPress(); });
 }
 
+const NOTES_ONLY = { emotions: false, context: false, energy: false, notes: true };
+
+async function addNoteAndPressDone() {
+  await act(async () => button("entry-notes").props.onChangeText("a note"));
+  await act(async () => {
+    labeledButton("Done").props.onPress();
+    await Promise.resolve();
+  });
+}
+
 describe.each(["android", "ios"])("entry modal feedback on %s", (platform) => {
   beforeEach(() => {
     nativePlatform.OS = platform;
@@ -278,6 +288,29 @@ describe.each(["android", "ios"])("entry modal feedback on %s", (platform) => {
 });
 
 describe("kept entry detail", () => {
+  it("shows all fields on one page and closes on Done without changes", async () => {
+    const onClose = vi.fn();
+    const onSubmit = vi.fn(async () => {});
+    await render(
+      <SaveEntryModal
+        variant="kept"
+        fieldConfig={{ emotions: true, context: true, energy: false, notes: true }}
+        onClose={onClose}
+        onSubmit={onSubmit}
+      />,
+    );
+
+    expect(renderer.root.findAllByProps({ accessibilityLabel: "Next step" })).toHaveLength(0);
+    expect(button("emotion-option-Happy")).toBeTruthy();
+    expect(button("entry-notes")).toBeTruthy();
+
+    await pressLabel("Done");
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(entryFeedback.toastSuccess).not.toHaveBeenCalled();
+  });
+
   it("removes the kept entry on Undo without saving the form", async () => {
     const onUndo = vi.fn();
     const onSubmit = vi.fn(async () => {});
@@ -313,15 +346,18 @@ describe("entry save acknowledgement", () => {
     await render(
       <SaveEntryModal
         variant={variant}
+        fieldConfig={variant === "kept" ? NOTES_ONLY : undefined}
         onClose={onClose}
         onSubmit={onSubmit}
       />,
     );
 
-    await act(async () => {
-      renderer.root.findByProps({ accessibilityLabel: "Save entry" }).props.onPress();
-      await Promise.resolve();
-    });
+    // Done on the kept sheet only writes when something was added.
+    if (variant === "kept") {
+      await addNoteAndPressDone();
+    } else {
+      await pressLabel("Save entry");
+    }
 
     expect(onSubmit).toHaveBeenCalledTimes(1);
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -337,7 +373,7 @@ describe("entry save acknowledgement", () => {
     const onSubmit = vi.fn(() => pending);
     const onClose = vi.fn();
     await render(
-      <SaveEntryModal variant="kept" onClose={onClose} onSubmit={onSubmit} />,
+      <SaveEntryModal variant="detailed" onClose={onClose} onSubmit={onSubmit} />,
     );
 
     await act(async () => {
@@ -374,7 +410,7 @@ describe("entry save acknowledgement", () => {
     const notes = renderer.root.findByProps({ testID: "entry-notes" });
     await act(async () => notes.props.onChangeText("private draft"));
     await act(async () => {
-      renderer.root.findByProps({ accessibilityLabel: "Save entry" }).props.onPress();
+      renderer.root.findByProps({ accessibilityLabel: "Done" }).props.onPress();
       await Promise.resolve();
     });
 
@@ -396,7 +432,7 @@ describe("entry save acknowledgement", () => {
     });
 
     try {
-      await render(<SaveEntryModal variant="kept" onClose={onClose} onSubmit={onSubmit} />);
+      await render(<SaveEntryModal variant="detailed" onClose={onClose} onSubmit={onSubmit} />);
       await act(async () => {
         renderer.root.findByProps({ accessibilityLabel: "Save entry" }).props.onPress();
         await Promise.resolve();
@@ -426,7 +462,7 @@ describe("entry save acknowledgement", () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     try {
-      await render(<SaveEntryModal variant="kept" onClose={onClose} onSubmit={onSubmit} />);
+      await render(<SaveEntryModal variant="detailed" onClose={onClose} onSubmit={onSubmit} />);
       await act(async () => {
         renderer.root.findByProps({ accessibilityLabel: "Save entry" }).props.onPress();
         await Promise.resolve();
@@ -490,13 +526,10 @@ describe("entry save acknowledgement", () => {
     try {
       const onSubmit = vi.fn(async () => {});
       await render(
-        <SaveEntryModal variant="kept" mood={9} onClose={vi.fn()} onSubmit={onSubmit} />,
+        <SaveEntryModal variant="kept" mood={9} fieldConfig={NOTES_ONLY} onClose={vi.fn()} onSubmit={onSubmit} />,
       );
 
-      await act(async () => {
-        renderer.root.findByProps({ accessibilityLabel: "Save entry" }).props.onPress();
-        await Promise.resolve();
-      });
+      await addNoteAndPressDone();
       await act(async () => {
         await vi.advanceTimersByTimeAsync(250);
       });

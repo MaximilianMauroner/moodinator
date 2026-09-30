@@ -6,6 +6,7 @@ import {
   Pressable,
   RefreshControl,
   ScrollView as RNScrollView,
+  useWindowDimensions,
   type LayoutChangeEvent,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -34,7 +35,7 @@ import {
   HistoryListHeader,
   CollapsedMoodSelector,
   UnifiedMoodSelector,
-  UNIFIED_COMPACT_EXPANDED_HEIGHT,
+  getUnifiedExpandedHeight,
 } from "@/components/home";
 
 import { useRecentMoodEntries } from "@/features/history/useRecentMoodEntries";
@@ -79,6 +80,7 @@ function HomeScreenContent() {
   const isDark = colorScheme === "dark";
   const insets = useSafeAreaInsets();
   const tabBarHeight = useBottomTabBarHeight();
+  const { fontScale } = useWindowDimensions();
 
   const refreshMoods = useMoodsStore((state) => state.refreshMoods);
   const createMood = useMoodsStore((state) => state.create);
@@ -175,7 +177,7 @@ function HomeScreenContent() {
 
   const estimatedExpandedPanelHeight = entrySettings.showDetailedLabels
     ? DEFAULT_DETAILED_PANEL_HEIGHT
-    : UNIFIED_COMPACT_EXPANDED_HEIGHT;
+    : getUnifiedExpandedHeight(fontScale);
   const currentExpandedPanelHeight = expandedPanelHeight || estimatedExpandedPanelHeight;
   const currentHomeChromeHeight = homeChromeHeight || ESTIMATED_HOME_CHROME_HEIGHT;
   const currentHistoryChromeHeight = historyChromeHeight || ESTIMATED_HISTORY_CHROME_HEIGHT;
@@ -424,7 +426,7 @@ function HomeScreenContent() {
                 onLayout={handleHomeChromeLayout}
                 style={{ paddingTop: HEADER_TOP_PADDING }}
               >
-                <HomeHeader />
+                <HomeHeader latest={todayEntries[0]} />
               </View>
 
               <Animated.View style={panelAnimatedStyle}>

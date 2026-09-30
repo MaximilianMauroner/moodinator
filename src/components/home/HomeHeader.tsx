@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Image, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { typography } from "@/constants/typography";
@@ -8,6 +8,10 @@ import { useMoodsStore } from "@/shared/state/moodsStore";
 import { moodService } from "@/services/moodService";
 import { calculateStreak } from "@/features/insights/utils/streaks";
 import { SettingsGearButton } from "@/components/ui/SettingsGearButton";
+import { getMoodRatingDisplay } from "@/constants/moodScaleInterpretation";
+import { getMoodWeatherColor, getMoodWeatherIcon } from "@/constants/moodWeather";
+import { getEntryLocalTimeLabel } from "@/lib/entryTimezone";
+import type { MoodEntry } from "@db/types";
 
 function getGreeting(date: Date): string {
 	const h = date.getHours();
@@ -18,16 +22,19 @@ function getGreeting(date: Date): string {
 	return "Late night";
 }
 
-const APP_ICON_SIZE = 48;
-const HALO_PAD = 8;
+const WEATHER_ICON_SIZE = 44;
+
+type HomeHeaderProps = {
+	/** Today's newest entry. Its weather leads the header. */
+	latest?: MoodEntry;
+};
 
 /**
- * Home is the front door: the app icon carries brand identity, the serif
- * greeting carries the moment, and a single streak chip sits in the trailing
- * slot only when there's something to celebrate. Date moves under the greeting
- * as a quiet caption so we don't double-stamp "Today".
+ * The inner weather now: today's newest entry as its weather sign, word, and
+ * number. Before the first entry of the day, a greeting and the date. A
+ * streak chip sits in the trailing slot only when there is a streak.
  */
-export function HomeHeader() {
+export function HomeHeader({ latest }: HomeHeaderProps) {
 	const isDark = useColorScheme() === "dark";
 
 	const revision = useMoodsStore((s) => s.revision);
@@ -53,12 +60,8 @@ export function HomeHeader() {
 	const titleColor = isDark ? colors.text.dark : colors.text.light;
 	const captionColor = isDark ? colors.textSubtle.dark : colors.textMuted.light;
 	const accent = isDark ? colors.primary.dark : colors.primary.light;
-	const haloFill = isDark
-		? "rgba(166, 227, 155, 0.10)"
-		: "rgba(123, 168, 123, 0.10)";
-	const haloRing = isDark
-		? "rgba(166, 227, 155, 0.18)"
-		: "rgba(123, 168, 123, 0.20)";
+	const latestLabel = latest ? getMoodRatingDisplay(latest.mood, isDark).label : null;
+	const latestTime = latest ? getEntryLocalTimeLabel(latest) : null;
 
 	const streakPalette = isDark
 		? semanticToneColors.sage.dark
@@ -75,6 +78,10 @@ export function HomeHeader() {
 			}}
 		>
 			<View
+				accessible
+				accessibilityLabel={
+					latest ? `Last check-in: ${latestLabel} ${latest.mood} at ${latestTime}` : `${greeting}, ${dateLabel}`
+				}
 				style={{
 					flexDirection: "row",
 					alignItems: "center",
@@ -83,32 +90,12 @@ export function HomeHeader() {
 					paddingRight: 12,
 				}}
 			>
-				{/* Sage halo + app icon */}
-				<View
-					style={{
-						width: APP_ICON_SIZE + HALO_PAD * 2,
-						height: APP_ICON_SIZE + HALO_PAD * 2,
-						borderRadius: (APP_ICON_SIZE + HALO_PAD * 2) / 4,
-						backgroundColor: haloFill,
-						borderWidth: 1,
-						borderColor: haloRing,
-						alignItems: "center",
-						justifyContent: "center",
-						marginRight: 14,
-					}}
-				>
-					<Image
-						source={require("../../../assets/images/app-icons/app-icon.png")}
-						style={{
-							width: APP_ICON_SIZE,
-							height: APP_ICON_SIZE,
-							borderRadius: 14,
-						}}
-						resizeMode="cover"
-						accessible
-						accessibilityLabel="Moodinator"
-					/>
-				</View>
+				<Ionicons
+					name={latest ? getMoodWeatherIcon(latest.mood) : "partly-sunny-outline"}
+					size={WEATHER_ICON_SIZE}
+					color={latest ? getMoodWeatherColor(latest.mood, isDark) : captionColor}
+					style={{ marginRight: 14 }}
+				/>
 
 				<View style={{ flex: 1, minWidth: 0 }}>
 					<Text
@@ -125,7 +112,13 @@ export function HomeHeader() {
 							},
 						]}
 					>
-						{greeting}
+						{latest ? (
+							<>
+								{latestLabel} <Text style={{ color: captionColor }}>{latest.mood}</Text>
+							</>
+						) : (
+							greeting
+						)}
 					</Text>
 					<Text
 						numberOfLines={1}
@@ -141,7 +134,7 @@ export function HomeHeader() {
 							},
 						]}
 					>
-						{dateLabel}
+						{latest ? `Last check-in at ${latestTime}` : dateLabel}
 					</Text>
 				</View>
 			</View>
