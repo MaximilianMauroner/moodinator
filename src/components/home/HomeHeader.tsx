@@ -8,33 +8,12 @@ import { useMoodsStore } from "@/shared/state/moodsStore";
 import { moodService } from "@/services/moodService";
 import { calculateStreak } from "@/features/insights/utils/streaks";
 import { SettingsGearButton } from "@/components/ui/SettingsGearButton";
-import { getMoodRatingDisplay } from "@/constants/moodScaleInterpretation";
-import { getMoodWeatherColor, getMoodWeatherIcon } from "@/constants/moodWeather";
-import { getEntryLocalTimeLabel } from "@/lib/entryTimezone";
-import type { MoodEntry } from "@db/types";
-
-function getGreeting(date: Date): string {
-	const h = date.getHours();
-	if (h < 5) return "Still up";
-	if (h < 12) return "Good morning";
-	if (h < 17) return "Good afternoon";
-	if (h < 22) return "Good evening";
-	return "Late night";
-}
-
-const WEATHER_ICON_SIZE = 44;
-
-type HomeHeaderProps = {
-	/** Today's newest entry. Its weather leads the header. */
-	latest?: MoodEntry;
-};
 
 /**
- * The inner weather now: today's newest entry as its weather sign, word, and
- * number. Before the first entry of the day, a greeting and the date. A
- * streak chip sits in the trailing slot only when there is a streak.
+ * Today's title row: the day, a streak chip only when there is a streak, and
+ * the settings gear.
  */
-export function HomeHeader({ latest }: HomeHeaderProps) {
+export function HomeHeader() {
 	const isDark = useColorScheme() === "dark";
 
 	const revision = useMoodsStore((s) => s.revision);
@@ -49,9 +28,7 @@ export function HomeHeader({ latest }: HomeHeaderProps) {
 		return () => { cancelled = true; };
 	}, [revision]);
 
-	const now = new Date();
-	const greeting = getGreeting(now);
-	const dateLabel = now.toLocaleDateString([], {
+	const dateLabel = new Date().toLocaleDateString([], {
 		weekday: "long",
 		month: "short",
 		day: "numeric",
@@ -60,83 +37,25 @@ export function HomeHeader({ latest }: HomeHeaderProps) {
 	const titleColor = isDark ? colors.text.dark : colors.text.light;
 	const captionColor = isDark ? colors.textSubtle.dark : colors.textMuted.light;
 	const accent = isDark ? colors.primary.dark : colors.primary.light;
-	const latestLabel = latest ? getMoodRatingDisplay(latest.mood, isDark).label : null;
-	const latestTime = latest ? getEntryLocalTimeLabel(latest) : null;
-
 	const streakPalette = isDark
 		? semanticToneColors.sage.dark
 		: semanticToneColors.sage.light;
 
 	return (
-		<View
-			style={{
-				flexDirection: "row",
-				alignItems: "center",
-				justifyContent: "space-between",
-				paddingVertical: 4,
-				marginBottom: 4,
-			}}
-		>
-			<View
-				accessible
-				accessibilityLabel={
-					latest ? `Last check-in: ${latestLabel} ${latest.mood} at ${latestTime}` : `${greeting}, ${dateLabel}`
-				}
-				style={{
-					flexDirection: "row",
-					alignItems: "center",
-					flex: 1,
-					minWidth: 0,
-					paddingRight: 12,
-				}}
-			>
-				<Ionicons
-					name={latest ? getMoodWeatherIcon(latest.mood) : "partly-sunny-outline"}
-					size={WEATHER_ICON_SIZE}
-					color={latest ? getMoodWeatherColor(latest.mood, isDark) : captionColor}
-					style={{ marginRight: 14 }}
-				/>
-
-				<View style={{ flex: 1, minWidth: 0 }}>
-					<Text
-						numberOfLines={1}
-						adjustsFontSizeToFit
-						minimumFontScale={0.82}
-						style={[
-							typography.titleMd,
-							{
-								color: titleColor,
-								fontSize: 24,
-								lineHeight: 28,
-								flexShrink: 1,
-							},
-						]}
-					>
-						{latest ? (
-							<>
-								{latestLabel} <Text style={{ color: captionColor }}>{latest.mood}</Text>
-							</>
-						) : (
-							greeting
-						)}
-					</Text>
-					<Text
-						numberOfLines={1}
-						adjustsFontSizeToFit
-						minimumFontScale={0.9}
-						style={[
-							typography.bodySm,
-							{
-								color: captionColor,
-								marginTop: 2,
-								letterSpacing: 0.1,
-								flexShrink: 1,
-							},
-						]}
-					>
-						{latest ? `Last check-in at ${latestTime}` : dateLabel}
-					</Text>
-				</View>
+		<View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+			<View style={{ flex: 1, minWidth: 0 }}>
+				<Text
+					accessibilityRole="header"
+					style={[typography.titleMd, { color: titleColor, fontSize: 24, lineHeight: 28 }]}
+				>
+					Today
+				</Text>
+				<Text
+					numberOfLines={1}
+					style={[typography.bodySm, { color: captionColor, marginTop: 2 }]}
+				>
+					{dateLabel}
+				</Text>
 			</View>
 
 			{streak.current > 0 ? (

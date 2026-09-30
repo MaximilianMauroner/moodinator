@@ -648,7 +648,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     }, [createPresetModal, handleCreateContextTag, handleCreateEmotion]);
 
     // ── Step content renderers
-    const renderMoodStep = () => <WeatherMoodGrid value={mood} onChange={setMood} />;
+    const renderMoodStep = () => <WeatherMoodGrid selected={mood} onPress={setMood} />;
 
     const renderAddPresetButton = ({
         onPress,
