@@ -12,6 +12,11 @@ const mocks = vi.hoisted(() => ({
   addMissingFromHistory: vi.fn(),
   invalidate: vi.fn(),
   ensureFresh: vi.fn(),
+  reconcileRemindersAfterMoodChange: vi.fn(),
+}));
+
+vi.mock("../../src/services/reminderReconciliation", () => ({
+  reconcileRemindersAfterMoodChange: mocks.reconcileRemindersAfterMoodChange,
 }));
 
 vi.mock("@db/db", () => ({
@@ -123,6 +128,7 @@ describe("dataPortabilityService", () => {
       addedEmotions: [{ name: "Calm", category: "positive" }],
       addedContexts: ["Work"],
     });
+    expect(mocks.reconcileRemindersAfterMoodChange).toHaveBeenCalledTimes(1);
     expect(mocks.addMissingFromHistory).toHaveBeenCalledWith("all");
     expect(mocks.invalidate).toHaveBeenCalledTimes(1);
     expect(mocks.ensureFresh).toHaveBeenCalledTimes(1);
@@ -147,8 +153,44 @@ describe("dataPortabilityService", () => {
     await dataPortabilityService.deleteLocalMoodData();
 
     expect(mocks.clearMoodData).toHaveBeenCalledTimes(1);
+    expect(mocks.reconcileRemindersAfterMoodChange).toHaveBeenCalledTimes(1);
     expect(mocks.invalidate).toHaveBeenCalledTimes(1);
     expect(mocks.ensureFresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("reconciles a committed import even when subsequent preset sync fails", async () => {
+    mocks.importMoods.mockResolvedValue({ imported: 1, skipped: 0, errors: [] });
+    mocks.addMissingFromHistory.mockRejectedValue(new Error("preset sync failed"));
+
+    await expect(dataPortabilityService.importData("[]")).rejects.toThrow("preset sync failed");
+
+    expect(mocks.reconcileRemindersAfterMoodChange).toHaveBeenCalledTimes(1);
+    expect(mocks.importMoods.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.reconcileRemindersAfterMoodChange.mock.invocationCallOrder[0],
+    );
+    expect(mocks.reconcileRemindersAfterMoodChange.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.addMissingFromHistory.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("reconciles committed deletion even when subsequent history refresh fails", async () => {
+    mocks.clearMoodData.mockResolvedValue(undefined);
+    mocks.ensureFresh.mockRejectedValue(new Error("history refresh failed"));
+
+    await expect(dataPortabilityService.deleteLocalMoodData()).rejects.toThrow("history refresh failed");
+    expect(mocks.reconcileRemindersAfterMoodChange).toHaveBeenCalledTimes(1);
+    expect(mocks.clearMoodData.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.reconcileRemindersAfterMoodChange.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("does not change schedules after a rejected import or deletion", async () => {
+    mocks.importMoods.mockRejectedValue(new Error("invalid import"));
+    mocks.clearMoodData.mockRejectedValue(new Error("delete failed"));
+
+    await expect(dataPortabilityService.importData("bad JSON")).rejects.toThrow("invalid import");
+    await expect(dataPortabilityService.deleteLocalMoodData()).rejects.toThrow("delete failed");
+    expect(mocks.reconcileRemindersAfterMoodChange).not.toHaveBeenCalled();
   });
 
   it("returns manual backup outcomes", async () => {
