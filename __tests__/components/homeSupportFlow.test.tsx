@@ -6,6 +6,7 @@ import { createMockMoodEntry } from "../db/mockClient";
 import { SUPPORT_HANDOFF_MS, SUPPORT_SHEET_DELAY_MS } from "@/lib/keepMoodTap";
 
 const mocks = vi.hoisted(() => ({
+  detailedLabels: true,
   support: vi.fn<(options: { onDecline?: () => void }) => void>(),
   store: {
     create: vi.fn<(input: MoodEntryInput) => Promise<MoodEntry>>(),
@@ -50,7 +51,7 @@ vi.mock("@/shared/state/moodsStore", () => ({
 }));
 vi.mock("@/hooks/useEntrySettings", () => ({
   useEntrySettings: () => ({
-    showDetailedLabels: true,
+    showDetailedLabels: mocks.detailedLabels,
     quickEntryFieldConfig: { emotions: true, context: false, energy: false, notes: false },
     detailedFieldConfig: { emotions: true, context: false, energy: false, notes: false },
     emotionOptions: [], contextOptions: [], createEmotionOption: vi.fn(), createContextOption: vi.fn(),
@@ -80,13 +81,14 @@ afterEach(async () => {
   vi.useRealTimers();
 });
 
-it("does not reopen an old kept entry while a newer detailed form is being filled", async () => {
+it.each(["DetailedPicker", "WeatherPicker"])("does not reopen an old kept entry while a newer %s form is being filled", async (picker) => {
+  mocks.detailedLabels = picker === "DetailedPicker";
   await act(async () => { renderer = create(<HomeScreen />); });
-  await act(async () => host("DetailedPicker").props.onMoodPress(9));
+  await act(async () => host(picker).props[picker === "DetailedPicker" ? "onMoodPress" : "onPress"](9));
   await act(async () => { vi.advanceTimersByTime(SUPPORT_SHEET_DELAY_MS); });
   const oldDecline = mocks.support.mock.calls[0]![0].onDecline!;
 
-  await act(async () => host("DetailedPicker").props.onLongPress(4));
+  await act(async () => host(picker).props.onLongPress(4));
   expect(host("DetailedEntry").props.visible).toBe(true);
   await act(async () => {
     oldDecline();
