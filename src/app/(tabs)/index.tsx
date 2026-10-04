@@ -215,6 +215,11 @@ function HomeScreenContent() {
   );
 
   const tapStateRef = useRef({ inFlight: false, generation: 0 });
+  const { handleLongPress: openDetailedEntry } = modals;
+  const handleDetailedEntryOpen = useCallback((mood: number) => {
+    beginMoodEntryFlow(tapStateRef.current);
+    openDetailedEntry(mood);
+  }, [openDetailedEntry]);
   const handleEntrySave = useCallback(async (values: MoodEntryFormValues) => {
     beginMoodEntryFlow(tapStateRef.current);
     await commitThenRunPostCommitEffects(
@@ -438,7 +443,7 @@ function HomeScreenContent() {
                     >
                       <DetailedMoodButtonSelector
                         onMoodPress={handleMoodTap}
-                        onLongPress={modals.handleLongPress}
+                        onLongPress={handleDetailedEntryOpen}
                       />
                     </Animated.View>
                     <Animated.View
@@ -458,7 +463,7 @@ function HomeScreenContent() {
                       <CollapsedMoodSelector
                         isDark={isDark}
                         onMoodPress={handleMoodTap}
-                        onLongPress={modals.handleLongPress}
+                        onLongPress={handleDetailedEntryOpen}
                       />
                     </Animated.View>
                   </>
@@ -467,7 +472,7 @@ function HomeScreenContent() {
                     collapseProgress={collapseProgress}
                     isDark={isDark}
                     onMoodPress={handleMoodTap}
-                    onLongPress={modals.handleLongPress}
+                    onLongPress={handleDetailedEntryOpen}
                   />
                 )}
               </Animated.View>
