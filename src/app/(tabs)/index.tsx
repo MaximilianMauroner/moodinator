@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { Alert, Platform, RefreshControl, ScrollView, Text, View } from "react-native";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -75,7 +75,12 @@ function HomeScreenContent() {
   const { refreshing, onRefresh: handlePullToRefresh } = usePullToRefresh(refreshToday);
 
   const entrySettings = useEntrySettings();
-  const modals = useMoodModals();
+  const tapStateRef = useRef({ inFlight: false, generation: 0 });
+  const invalidateEntryFlow = useCallback(() => {
+    beginMoodEntryFlow(tapStateRef.current);
+  }, []);
+  const modals = useMoodModals(invalidateEntryFlow);
+  useFocusEffect(useCallback(() => invalidateEntryFlow, [invalidateEntryFlow]));
 
   const handleEditEntrySave = useCallback(
     async (values: MoodEntryFormValues) => {
@@ -114,12 +119,6 @@ function HomeScreenContent() {
     scrollRef.current?.scrollTo({ y: 0, animated: true });
   }, []);
 
-  const tapStateRef = useRef({ inFlight: false, generation: 0 });
-  const { handleLongPress: openDetailedEntry } = modals;
-  const handleDetailedEntryOpen = useCallback((mood: number) => {
-    beginMoodEntryFlow(tapStateRef.current);
-    openDetailedEntry(mood);
-  }, [openDetailedEntry]);
   const handleEntrySave = useCallback(async (values: MoodEntryFormValues) => {
     beginMoodEntryFlow(tapStateRef.current);
     await commitThenRunPostCommitEffects(
@@ -232,9 +231,9 @@ function HomeScreenContent() {
             </Text>
             <ScrollView style={{ flexGrow: 0, flexShrink: 1 }}>
               {entrySettings.showDetailedLabels ? (
-                <DetailedMoodButtonSelector onMoodPress={handleMoodTap} onLongPress={handleDetailedEntryOpen} />
+                <DetailedMoodButtonSelector onMoodPress={handleMoodTap} onLongPress={modals.handleLongPress} />
               ) : (
-                <WeatherMoodGrid size="dock" onPress={handleMoodTap} onLongPress={handleDetailedEntryOpen} />
+                <WeatherMoodGrid size="dock" onPress={handleMoodTap} onLongPress={modals.handleLongPress} />
               )}
             </ScrollView>
           </View>
