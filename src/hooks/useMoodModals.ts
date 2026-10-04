@@ -18,30 +18,32 @@ function toInitialValues(entry: MoodEntry | null): Partial<MoodEntryFormValues> 
 /**
  * Hook for managing modal visibility and related state.
  * Handles the detail sheet for a kept entry, detailed entry, editing, and the
- * date picker.
+ * date picker. Competing opens notify the caller before changing modal state;
+ * the kept-entry continuation and closing a modal retain their current flow.
  *
  * Mood selectors own their press feedback, so opening a modal does not add a
  * second haptic for the same gesture.
  */
-export function useMoodModals() {
+export function useMoodModals(onOpen?: () => void) {
   const [showDateModal, setShowDateModal] = useState(false);
   const [selectedMood, setSelectedMood] = useState<MoodEntry | null>(null);
   const [detailedEntryVisible, setDetailedEntryVisible] = useState(false);
   const [pendingMood, setPendingMood] = useState(5);
-  const [editingEntry, setEditingEntry] = useState<MoodEntry | null>(null);
+  const [editingEntry, updateEditingEntry] = useState<MoodEntry | null>(null);
   const [keptEntry, setKeptEntry] = useState<MoodEntry | null>(null);
 
   const handleLongPress = useCallback((mood: number) => {
+    onOpen?.();
     setPendingMood(mood);
     setDetailedEntryVisible(true);
-  }, []);
+  }, [onOpen]);
 
   const closeDetailedEntry = useCallback(() => {
     setDetailedEntryVisible(false);
   }, []);
 
   const closeEditEntry = useCallback(() => {
-    setEditingEntry(null);
+    updateEditingEntry(null);
   }, []);
 
   const closeKeptEntry = useCallback(() => {
@@ -49,9 +51,15 @@ export function useMoodModals() {
   }, []);
 
   const openDateModal = useCallback((mood: MoodEntry) => {
+    onOpen?.();
     setSelectedMood(mood);
     setShowDateModal(true);
-  }, []);
+  }, [onOpen]);
+
+  const setEditingEntry = useCallback((entry: MoodEntry) => {
+    onOpen?.();
+    updateEditingEntry(entry);
+  }, [onOpen]);
 
   const closeDateModal = useCallback(() => {
     setShowDateModal(false);

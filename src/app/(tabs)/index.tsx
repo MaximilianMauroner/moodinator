@@ -1,3 +1,4 @@
+import { useFocusEffect } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
@@ -50,7 +51,7 @@ import {
   useHomeHeaderCollapse,
 } from "@/hooks/useHomeHeaderCollapse";
 import { haptics } from "@/lib/haptics";
-import { keepMoodTap } from "@/lib/keepMoodTap";
+import { beginMoodEntryFlow, keepMoodTap } from "@/lib/keepMoodTap";
 import { showCrisisSupportAlert } from "@/lib/showCrisisSupportAlert";
 import { toastService } from "@/services/toastService";
 import { addHomeTabDoublePressListener } from "@/lib/homeTabEvents";
@@ -102,7 +103,12 @@ function HomeScreenContent() {
   const { refreshing, onRefresh: handlePullToRefresh } = usePullToRefresh(refreshToday);
 
   const entrySettings = useEntrySettings();
-  const modals = useMoodModals();
+  const tapStateRef = useRef({ inFlight: false, generation: 0 });
+  const invalidateEntryFlow = useCallback(() => {
+    beginMoodEntryFlow(tapStateRef.current);
+  }, []);
+  const modals = useMoodModals(invalidateEntryFlow);
+  useFocusEffect(useCallback(() => invalidateEntryFlow, [invalidateEntryFlow]));
   const itemActions = useMoodItemActions({
     setEditingEntry: modals.setEditingEntry,
   });
@@ -215,6 +221,7 @@ function HomeScreenContent() {
   );
 
   const handleEntrySave = useCallback(async (values: MoodEntryFormValues) => {
+    beginMoodEntryFlow(tapStateRef.current);
     await commitThenRunPostCommitEffects(
       () => createMood(getMoodEntryPersistenceValues(values)),
       [scrollHomeListToTop, schedulePostSaveTopResets],
@@ -225,11 +232,10 @@ function HomeScreenContent() {
   const offersDetailAfterKeep =
     quickFields.emotions || quickFields.context || quickFields.energy || quickFields.notes;
 
-  const tapInFlightRef = useRef(false);
   const handleMoodTap = useCallback(
     (mood: number) =>
       keepMoodTap(mood, {
-        inFlight: tapInFlightRef,
+        state: tapStateRef.current,
         create: createMood,
         afterCommit: [scrollHomeListToTop, schedulePostSaveTopResets],
         offersDetail: offersDetailAfterKeep,

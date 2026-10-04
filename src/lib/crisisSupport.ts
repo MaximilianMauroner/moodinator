@@ -80,7 +80,7 @@ function openSupportAction(
         onPress: () => openSupportAction(findAHelplineAction, dependencies),
       });
     }
-    fallbackButtons.push({ text: "Not now", style: "cancel" });
+    fallbackButtons.push({ text: "Not now", style: "cancel", onPress: dependencies.onDecline });
 
     dependencies.showAlert(
       "Unable to open support",

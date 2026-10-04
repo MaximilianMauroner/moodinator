@@ -2,11 +2,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { MoodEntry } from "@db/types";
 
 import { createMockMoodEntry } from "../db/mockClient";
-import { SUPPORT_HANDOFF_MS, SUPPORT_SHEET_DELAY_MS, keepMoodTap, type KeepMoodTapDeps } from "@/lib/keepMoodTap";
+import { SUPPORT_HANDOFF_MS, SUPPORT_SHEET_DELAY_MS, beginMoodEntryFlow, keepMoodTap, type KeepMoodTapDeps } from "@/lib/keepMoodTap";
 
 function setup(overrides: Partial<KeepMoodTapDeps> = {}) {
   const deps: KeepMoodTapDeps = {
-    inFlight: { current: false },
+    state: { inFlight: false, generation: 0 },
     create: vi.fn(async (input) => createMockMoodEntry({ id: 11, mood: input.mood })),
     afterCommit: [],
     offersDetail: true,
@@ -33,7 +33,7 @@ describe("keepMoodTap", () => {
       mood: 4, note: null, emotions: [], contextTags: [], energy: null, basedOnEntryId: null,
     });
     expect(deps.openDetail).toHaveBeenCalledWith(expect.objectContaining({ id: 11, mood: 4 }));
-    expect(deps.inFlight.current).toBe(false);
+    expect(deps.state.inFlight).toBe(false);
   });
 
   it("ignores a second tap while the first write is pending", async () => {
@@ -70,7 +70,7 @@ describe("keepMoodTap", () => {
     vi.advanceTimersByTime(SUPPORT_SHEET_DELAY_MS);
     expect(deps.showSupport).toHaveBeenCalledTimes(1);
     expect(deps[followUp]).not.toHaveBeenCalled();
-    expect(deps.inFlight.current).toBe(false);
+    expect(deps.state.inFlight).toBe(false);
 
     vi.mocked(deps.showSupport).mock.calls[0]![0]();
     expect(deps[followUp]).not.toHaveBeenCalled();
@@ -79,7 +79,7 @@ describe("keepMoodTap", () => {
 
     vi.advanceTimersByTime(SUPPORT_HANDOFF_MS);
     expect(deps[followUp]).toHaveBeenCalledTimes(1);
-    expect(deps.inFlight.current).toBe(false);
+    expect(deps.state.inFlight).toBe(false);
   });
 
   it("reports a failed write and allows another tap", async () => {
@@ -90,6 +90,75 @@ describe("keepMoodTap", () => {
     expect(deps.feedback.reject).toHaveBeenCalledTimes(1);
     expect(deps.onSaveError).toHaveBeenCalledTimes(1);
     expect(deps.openDetail).not.toHaveBeenCalled();
-    expect(deps.inFlight.current).toBe(false);
+    expect(deps.state.inFlight).toBe(false);
+  });
+});
+
+describe("delayed support flow ownership", () => {
+  it.each([true, false])("does not replace a newer quick entry's follow-up (detail: %s)", async (offersDetail) => {
+    vi.useFakeTimers();
+    const deps = setup({
+      offersDetail,
+      create: vi.fn(async (input) => createMockMoodEntry({ id: input.mood === 9 ? 11 : 12, mood: input.mood })),
+    });
+    await keepMoodTap(9, deps);
+    vi.advanceTimersByTime(SUPPORT_SHEET_DELAY_MS);
+    const olderDecline = vi.mocked(deps.showSupport).mock.calls[0]![0];
+
+    await keepMoodTap(4, deps);
+    olderDecline();
+    vi.advanceTimersByTime(SUPPORT_HANDOFF_MS);
+
+    const followUp = offersDetail ? deps.openDetail : deps.showUndoToast;
+    expect(followUp).toHaveBeenCalledTimes(1);
+    expect(followUp).toHaveBeenCalledWith(expect.objectContaining({ id: 12 }));
+    expect(deps.state.inFlight).toBe(false);
+  });
+
+  it("does not take or release the lock of a newer pending save", async () => {
+    vi.useFakeTimers();
+    const deps = setup();
+    await keepMoodTap(9, deps);
+    vi.advanceTimersByTime(SUPPORT_SHEET_DELAY_MS);
+    const olderDecline = vi.mocked(deps.showSupport).mock.calls[0]![0];
+    let finish!: (entry: MoodEntry) => void;
+    deps.create = vi.fn(() => new Promise<MoodEntry>((resolve) => { finish = resolve; }));
+    const newerSave = keepMoodTap(4, deps);
+
+    olderDecline();
+    vi.advanceTimersByTime(SUPPORT_HANDOFF_MS);
+    expect(deps.openDetail).not.toHaveBeenCalled();
+    expect(deps.state.inFlight).toBe(true);
+    finish(createMockMoodEntry({ id: 12, mood: 4 }));
+    await newerSave;
+    expect(deps.openDetail).toHaveBeenCalledWith(expect.objectContaining({ id: 12 }));
+  });
+
+  it("cancels a scheduled older handoff when a detailed save begins", async () => {
+    vi.useFakeTimers();
+    const deps = setup();
+    await keepMoodTap(9, deps);
+    vi.advanceTimersByTime(SUPPORT_SHEET_DELAY_MS);
+    vi.mocked(deps.showSupport).mock.calls[0]![0]();
+
+    beginMoodEntryFlow(deps.state);
+    deps.state.inFlight = true;
+    vi.advanceTimersByTime(SUPPORT_HANDOFF_MS);
+
+    expect(deps.openDetail).not.toHaveBeenCalled();
+    expect(deps.showUndoToast).not.toHaveBeenCalled();
+    expect(deps.state.inFlight).toBe(true);
+  });
+
+  it("ignores repeated declines for the same entry", async () => {
+    vi.useFakeTimers();
+    const deps = setup();
+    await keepMoodTap(9, deps);
+    vi.advanceTimersByTime(SUPPORT_SHEET_DELAY_MS);
+    const decline = vi.mocked(deps.showSupport).mock.calls[0]![0];
+    decline();
+    decline();
+    vi.advanceTimersByTime(SUPPORT_HANDOFF_MS);
+    expect(deps.openDetail).toHaveBeenCalledTimes(1);
   });
 });

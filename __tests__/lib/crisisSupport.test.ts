@@ -49,6 +49,23 @@ describe("crisis support", () => {
     expect(onDecline).toHaveBeenCalledTimes(1);
   });
 
+  it.each(CRISIS_SUPPORT_ACTIONS)("continues the kept-entry flow after failed $id support", async (action) => {
+    const onDecline = vi.fn();
+    const showAlert = vi.fn();
+    presentCrisisSupportAlert({
+      showAlert,
+      openUrl: vi.fn().mockRejectedValue(new Error("link unavailable")),
+      onDecline,
+    });
+    const initialButtons = showAlert.mock.calls[0][2] as CrisisSupportAlertButton[];
+    initialButtons.find((button) => button.text === action.label)?.onPress?.();
+    await vi.waitFor(() => expect(showAlert).toHaveBeenCalledTimes(2));
+    expect(onDecline).not.toHaveBeenCalled();
+    const fallbackButtons = showAlert.mock.calls[1][2] as CrisisSupportAlertButton[];
+    fallbackButtons.find((button) => button.text === "Not now")?.onPress?.();
+    expect(onDecline).toHaveBeenCalledTimes(1);
+  });
+
   it("provides U.S. 988 call/text and international helpline actions", () => {
     expect(CRISIS_SUPPORT_ACTIONS).toEqual([
       expect.objectContaining({ id: "call-988", url: "tel:988" }),
