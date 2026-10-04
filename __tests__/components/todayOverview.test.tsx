@@ -12,6 +12,7 @@ vi.mock("react-native", () => ({
 }));
 vi.mock("@expo/vector-icons", () => ({ Ionicons: "Ionicons" }));
 
+import { colors } from "@/constants/colors";
 import { EarlierToday, TodayNow } from "@/components/home/TodayOverview";
 
 function entry(id: number, mood: number, extra: Partial<MoodEntry> = {}): MoodEntry {
@@ -87,5 +88,29 @@ describe("TodayNow", () => {
     expect(texts()).toEqual(expect.arrayContaining(["Grateful · #Outside", "Sun after the rain."]));
     await act(async () => renderer.root.findByProps({ accessibilityHint: "Opens this entry's details" }).props.onPress());
     expect(onOpen).toHaveBeenCalledWith(latest);
+  });
+});
+
+describe("imported mood scales on Today", () => {
+  it.each(["latest", "earlier"] as const)("normalizes the %s entry's label, number, weather and accessible text", async (position) => {
+    const imported = entry(4, 10, {
+      moodScale: { version: 2, min: 0, max: 10, lowerIsBetter: false },
+    });
+    const onOpen = vi.fn();
+    await act(async () => {
+      renderer = create(position === "latest"
+        ? <TodayNow latest={imported} loaded onOpen={onOpen} />
+        : <EarlierToday entries={[imported]} onOpen={onOpen} onShowAll={vi.fn()} />);
+    });
+
+    expect(texts()).toEqual(expect.arrayContaining(["Elated ", "0"]));
+    expect(texts()).not.toContain("10");
+    const icon = renderer.root.findAll((node) => node.type === "Ionicons")[0]!;
+    expect(icon.props.name).toBe("sunny");
+    expect(icon.props.color).toBe(colors.moodWeather.dark[0]);
+    const button = renderer.root.findByProps({ accessibilityHint: "Opens this entry's details" });
+    expect(button.props.accessibilityLabel).toContain("Elated 0 at");
+    await act(async () => button.props.onPress());
+    expect(onOpen).toHaveBeenCalledWith(imported);
   });
 });

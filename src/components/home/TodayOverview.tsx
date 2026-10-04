@@ -57,7 +57,7 @@ export function TodayNow({ latest, loaded, onOpen }: TodayNowProps) {
     );
   }
 
-  const label = getMoodRatingDisplay(latest.mood, isDark, latest.moodScale).label;
+  const display = getMoodRatingDisplay(latest.mood, isDark, latest.moodScale);
   const time = getEntryLocalTimeLabel(latest);
   const detail = getEntryDetail(latest);
   const note = latest.note?.trim();
@@ -65,14 +65,14 @@ export function TodayNow({ latest, loaded, onOpen }: TodayNowProps) {
     <Pressable
       onPress={() => onOpen(latest)}
       accessibilityRole="button"
-      accessibilityLabel={[`Last check-in: ${label} ${latest.mood} at ${time}`, detail, note].filter(Boolean).join(". ")}
+      accessibilityLabel={[`Last check-in: ${display.label} ${display.value} at ${time}`, detail, note].filter(Boolean).join(". ")}
       accessibilityHint="Opens this entry's details"
       style={{ flexDirection: "row", alignItems: "center", gap: 14 }}
     >
-      <Ionicons name={getMoodWeatherIcon(latest.mood)} size={56} color={getMoodWeatherColor(latest.mood, isDark)} />
+      <Ionicons name={getMoodWeatherIcon(display.value)} size={56} color={getMoodWeatherColor(display.value, isDark)} />
       <View style={{ flex: 1 }}>
         <Text style={[typography.titleMd, { color: get("text"), fontSize: 28, lineHeight: 34 }]}>
-          {label} <Text style={{ color: get("textSubtle") }}>{latest.mood}</Text>
+          {display.label} <Text style={{ color: get("textSubtle") }}>{display.value}</Text>
         </Text>
         <Text style={[typography.bodySm, { color: get("textSubtle") }]}>Last check-in at {time}</Text>
         {detail ? (
@@ -105,7 +105,7 @@ export function EarlierToday({ entries, onOpen, onShowAll }: EarlierTodayProps) 
     <View>
       <Text style={[typography.eyebrow, { color: get("textSubtle"), marginBottom: 2 }]}>Earlier today</Text>
       {shown.map((entry) => {
-        const label = getMoodRatingDisplay(entry.mood, isDark, entry.moodScale).label;
+        const display = getMoodRatingDisplay(entry.mood, isDark, entry.moodScale);
         const time = getEntryLocalTimeLabel(entry);
         const detail = getEntryDetail(entry);
         const note = entry.note?.trim();
@@ -115,7 +115,7 @@ export function EarlierToday({ entries, onOpen, onShowAll }: EarlierTodayProps) 
             testID={`today-entry-${entry.timestamp}`}
             onPress={() => onOpen(entry)}
             accessibilityRole="button"
-            accessibilityLabel={[`${label} ${entry.mood} at ${time}`, detail, note].filter(Boolean).join(". ")}
+            accessibilityLabel={[`${display.label} ${display.value} at ${time}`, detail, note].filter(Boolean).join(". ")}
             accessibilityHint="Opens this entry's details"
             style={{
               flexDirection: "row",
@@ -125,11 +125,11 @@ export function EarlierToday({ entries, onOpen, onShowAll }: EarlierTodayProps) 
               borderBottomColor: get("border"),
             }}
           >
-            <Ionicons name={getMoodWeatherIcon(entry.mood)} size={24} color={getMoodWeatherColor(entry.mood, isDark)} />
+            <Ionicons name={getMoodWeatherIcon(display.value)} size={24} color={getMoodWeatherColor(display.value, isDark)} />
             <View style={{ flex: 1, minWidth: 0 }}>
               <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 8 }}>
                 <Text style={{ color: get("text"), fontSize: 15, fontWeight: "500" }}>
-                  {label} <Text style={{ color: get("textSubtle") }}>{entry.mood}</Text>
+                  {display.label} <Text style={{ color: get("textSubtle") }}>{display.value}</Text>
                 </Text>
                 <Text style={{ color: get("textSubtle"), fontSize: 13 }}>{time}</Text>
               </View>
