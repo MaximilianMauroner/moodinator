@@ -11,13 +11,24 @@ export const SUPPORT_SHEET_DELAY_MS = 250;
  */
 export const SUPPORT_HANDOFF_MS = 400;
 
+export type MoodEntryFlowState = {
+  inFlight: boolean;
+  generation: number;
+};
+
+/** A new quick or detailed save supersedes pending support follow-ups. */
+export function beginMoodEntryFlow(state: MoodEntryFlowState): number {
+  state.inFlight = false;
+  return ++state.generation;
+}
+
 export type KeepMoodTapDeps = {
   /**
    * Held from the tap until the follow-up shows; a second tap is ignored. It
    * is free while the support sheet is open, so other support actions do not
    * leave the picker locked.
    */
-  inFlight: { current: boolean };
+  state: MoodEntryFlowState;
   create: (entry: MoodEntryInput) => Promise<MoodEntry>;
   afterCommit: readonly (() => void)[];
   /** True when any quick-entry field is on. */
@@ -37,10 +48,12 @@ export type KeepMoodTapDeps = {
  * is off.
  */
 export async function keepMoodTap(mood: number, deps: KeepMoodTapDeps): Promise<void> {
-  if (deps.inFlight.current) return;
-  deps.inFlight.current = true;
+  if (deps.state.inFlight) return;
+  const generation = beginMoodEntryFlow(deps.state);
+  deps.state.inFlight = true;
+  const ownsFlow = () => deps.state.generation === generation;
   const release = () => {
-    deps.inFlight.current = false;
+    if (ownsFlow()) deps.state.inFlight = false;
   };
 
   let entry: MoodEntry;
@@ -56,15 +69,21 @@ export async function keepMoodTap(mood: number, deps: KeepMoodTapDeps): Promise<
     return;
   }
 
+  if (!ownsFlow()) return;
+
   const continueAfterKeep = () => {
+    if (!ownsFlow()) return;
     if (deps.offersDetail) deps.openDetail(entry);
     else deps.showUndoToast(entry);
   };
 
-  // The sheet covers the picker until "Not now". Hold taps again until the
-  // follow-up shows, so it cannot replace a newer entry's follow-up.
+  // A delayed link failure can outlive this entry. Only its current flow may
+  // hold taps and resume the follow-up.
+  let continuationStarted = false;
   const continueAfterSupport = () => {
-    deps.inFlight.current = true;
+    if (!ownsFlow() || continuationStarted) return;
+    continuationStarted = true;
+    deps.state.inFlight = true;
     setTimeout(() => {
       try {
         continueAfterKeep();
@@ -78,7 +97,7 @@ export async function keepMoodTap(mood: number, deps: KeepMoodTapDeps): Promise<
     deps.feedback.reject();
     setTimeout(() => {
       try {
-        deps.showSupport(continueAfterSupport);
+        if (ownsFlow()) deps.showSupport(continueAfterSupport);
       } finally {
         release();
       }

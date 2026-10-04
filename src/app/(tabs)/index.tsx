@@ -29,7 +29,7 @@ import { useEntrySettings } from "@/hooks/useEntrySettings";
 import { useMoodModals } from "@/hooks/useMoodModals";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { haptics } from "@/lib/haptics";
-import { keepMoodTap } from "@/lib/keepMoodTap";
+import { beginMoodEntryFlow, keepMoodTap } from "@/lib/keepMoodTap";
 import { showCrisisSupportAlert } from "@/lib/showCrisisSupportAlert";
 import { toastService } from "@/services/toastService";
 import { addHomeTabDoublePressListener } from "@/lib/homeTabEvents";
@@ -114,7 +114,9 @@ function HomeScreenContent() {
     scrollRef.current?.scrollTo({ y: 0, animated: true });
   }, []);
 
+  const tapStateRef = useRef({ inFlight: false, generation: 0 });
   const handleEntrySave = useCallback(async (values: MoodEntryFormValues) => {
+    beginMoodEntryFlow(tapStateRef.current);
     await commitThenRunPostCommitEffects(
       () => createMood(getMoodEntryPersistenceValues(values)),
       [scrollToTop],
@@ -125,11 +127,10 @@ function HomeScreenContent() {
   const offersDetailAfterKeep =
     quickFields.emotions || quickFields.context || quickFields.energy || quickFields.notes;
 
-  const tapInFlightRef = useRef(false);
   const handleMoodTap = useCallback(
     (mood: number) =>
       keepMoodTap(mood, {
-        inFlight: tapInFlightRef,
+        state: tapStateRef.current,
         create: createMood,
         afterCommit: [scrollToTop],
         offersDetail: offersDetailAfterKeep,
@@ -209,6 +210,8 @@ function HomeScreenContent() {
 
           <View
             style={{
+              maxHeight: "65%",
+              flexShrink: 1,
               backgroundColor: get("surface"),
               borderTopLeftRadius: 24,
               borderTopRightRadius: 24,
@@ -222,11 +225,13 @@ function HomeScreenContent() {
             <Text style={[typography.titleMd, { color: get("text"), fontSize: 18, lineHeight: 24, marginHorizontal: 8, marginBottom: 10 }]}>
               How is it now?
             </Text>
-            {entrySettings.showDetailedLabels ? (
-              <DetailedMoodButtonSelector onMoodPress={handleMoodTap} onLongPress={modals.handleLongPress} />
-            ) : (
-              <WeatherMoodGrid size="dock" onPress={handleMoodTap} onLongPress={modals.handleLongPress} />
-            )}
+            <ScrollView style={{ flexGrow: 0, flexShrink: 1 }}>
+              {entrySettings.showDetailedLabels ? (
+                <DetailedMoodButtonSelector onMoodPress={handleMoodTap} onLongPress={modals.handleLongPress} />
+              ) : (
+                <WeatherMoodGrid size="dock" onPress={handleMoodTap} onLongPress={modals.handleLongPress} />
+              )}
+            </ScrollView>
           </View>
         </SafeAreaView>
       </GestureHandlerRootView>
