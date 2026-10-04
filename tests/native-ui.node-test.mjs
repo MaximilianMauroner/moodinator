@@ -800,9 +800,10 @@ test("visual matrix retains each screen before the next navigation", () => {
     new URL("../src/features/insights/screens/InsightsScreen.tsx", import.meta.url),
     "utf8",
   );
-  for (const screen of ["today", "history", "calendar", "findings", "charts", "settings"]) {
+  for (const screen of ["today", "history", "calendar", "charts", "settings"]) {
     assert.match(source, new RegExp(`capture\\(\"${screen}\"\\)`));
   }
+  assert.doesNotMatch(source, /capture\("findings"\)/);
   const flow = readFileSync(new URL("../.maestro/flows/native-visual-matrix.yaml", import.meta.url), "utf8");
   assert.equal(flow.includes("Insights tab"), false);
   const openToday = source.indexOf("Today tab, log your mood");
@@ -818,10 +819,11 @@ test("visual matrix retains each screen before the next navigation", () => {
   const selectAll = source.indexOf('contentDescription: "All history"', openInsights);
   const loadedSummary = source.indexOf('testId: "insights-loaded-summary"', selectAll);
   assert.ok(selectAll > openInsights && loadedSummary > selectAll);
-  const chartsView = source.indexOf('contentDescription: "Charts view"', loadedSummary);
-  const openSettings = source.indexOf('testId: "open-settings"', chartsView);
-  assert.ok(chartsView > loadedSummary && openSettings > chartsView);
-  assert.doesNotMatch(source, /waitForNodeAndTap\(serial, \{ text: "(?:Charts|Month) view" \}\)/);
+  const trend = source.indexOf('text: "Trend"', loadedSummary);
+  const chartsCapture = source.indexOf('capture("charts")', trend);
+  const openSettings = source.indexOf('testId: "open-settings"', chartsCapture);
+  assert.ok(trend > loadedSummary && chartsCapture > trend && openSettings > chartsCapture);
+  assert.doesNotMatch(source, /contentDescription: "Findings view"/);
   assert.match(source, /testId: "insights-loaded-summary"/);
   assert.match(source, /text: `\$\{fixtureCount\} entries`/);
   assert.match(insightsSource, /testID=\{ready \? "insights-loaded-summary" : undefined\}/);
@@ -835,6 +837,14 @@ test("visual matrix retains each screen before the next navigation", () => {
   );
   assert.match(source, /Calendar legend: a dot marks a day with multiple entries/);
   assert.match(source, /Local privacy/);
+  assert.match(insightsSource, /<ChartCard title="Comparisons">/);
+});
+
+test("one-entry Insights smoke checks comparisons without Findings", () => {
+  const flow = readFileSync(new URL("../.maestro/flows/insights.yaml", import.meta.url), "utf8");
+  assert.match(flow, /assertVisible: "Trend"/);
+  assert.match(flow, /A comparison needs 5 entries with a tag or emotion and 5 without it/);
+  assert.doesNotMatch(flow, /Findings view|Calendar view|Charts view|Not enough data yet/);
 });
 
 test("visual matrix replaces app data with its complete retained fabricated fixture", () => {

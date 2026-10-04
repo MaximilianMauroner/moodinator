@@ -1,13 +1,15 @@
 import React from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { describe, expect, it, vi } from "vitest";
-import { FindingCard } from "../../../src/features/insights/components/FindingCard";
+import { DriverRow } from "../../../src/features/insights/components/DriverRow";
 import { RhythmGrid } from "../../../src/features/insights/components/RhythmGrid";
 import { rhythm } from "../../../src/features/insights/utils/rhythm";
 import { InsightsScreen } from "../../../src/features/insights/screens/InsightsScreen";
 
 const insightsScreenState = vi.hoisted(() => ({
   analysisMoods: [] as Array<Record<string, unknown>>,
+  analysisRange: "7" as "7" | "30",
+  drivers: [] as Array<Record<string, unknown>>,
   error: null as string | null,
 }));
 
@@ -35,13 +37,11 @@ vi.mock("../../../src/features/insights/hooks/useInsightsData", () => ({
     getMoodColor: () => "#000",
     refresh: vi.fn(async () => {}),
     analysis: {
-      findings: [],
       dailySeries: [],
       rhythm: [],
-      drivers: [],
-      inconclusiveDrivers: [],
+      drivers: insightsScreenState.drivers,
     },
-    analysisRange: "7",
+    analysisRange: insightsScreenState.analysisRange,
     setAnalysisRange: vi.fn(),
     analysisMoods: insightsScreenState.analysisMoods,
   }),
@@ -51,17 +51,18 @@ vi.mock("../../../src/features/insights/components/InsightCard", () => ({
   CompactInsightCard: () => null,
 }));
 vi.mock("../../../src/features/insights/components/StreakBadge", () => ({ StreakBadge: () => null }));
-vi.mock("../../../src/features/insights/components/ClimateCard", () => ({ ClimateCard: () => null }));
+vi.mock("../../../src/features/insights/components/ClimateCard", () => ({ ClimateCard: () => React.createElement("Text", null, "Your climate") }));
 vi.mock("../../../src/features/insights/components/InsightsHeader", () => ({ InsightsHeader: () => null }));
 vi.mock("../../../src/features/insights/components/TrendBand", () => ({ TrendBand: () => null }));
-vi.mock("../../../src/features/insights/components/DriverRow", () => ({
-  DriverRow: () => null,
-  ComparisonBars: () => null,
-}));
+vi.mock("@/lib/moodPresentation", () => ({ getMoodHex: () => "#000" }));
+vi.mock("@/components/calendar", () => ({ MoodCalendar: () => null }));
 vi.mock("@/components/ui/EmptyState", () => ({ EmptyState: () => null }));
 vi.mock("@/components/ui/LoadingSpinner", () => ({ LoadingSpinner: () => null }));
 vi.mock("@/components/layout/ScreenBackgroundAccent", () => ({ ScreenBackgroundAccent: () => null }));
-vi.mock("@/components/ui/SegmentedControl", () => ({ SegmentedControl: () => null }));
+vi.mock("@/components/ui/SegmentedControl", () => ({
+  SegmentedControl: ({ items }: { items: { label: string }[] }) =>
+    React.createElement("Text", null, items.map((item) => item.label).join(" · ")),
+}));
 vi.mock("@/hooks/usePullToRefresh", () => ({
   usePullToRefresh: () => ({ refreshing: false, onRefresh: vi.fn() }),
 }));
@@ -77,28 +78,47 @@ vi.mock("@/constants/colors", () => ({
 vi.mock("@/components/ui/SurfaceCard", () => ({
   SurfaceCard: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
-function textOf(renderer: ReactTestRenderer) {
-  return JSON.stringify(renderer.toJSON());
-}
 describe("insight presentation", () => {
-  it("renders the claim and both sample sizes visibly", async () => {
+  it("renders both recorded averages and sample sizes without a pattern claim", async () => {
     let renderer!: ReactTestRenderer;
     await act(async () => {
       renderer = create(
-        <FindingCard
-          finding={{
+        <DriverRow
+          driver={{
             id: "outside",
-            effect: -2,
-            text: "Outside entries average 2.0 better.",
-            sample: "5 with · 8 without",
-            means: [2, 4],
+            name: "Outside",
+            kind: "context",
+            withCount: 5,
+            withoutCount: 8,
+            withMean: 2,
+            withoutMean: 4,
           }}
         />,
       );
     });
-    expect(textOf(renderer)).toContain("Outside entries average 2.0 better.");
-    expect(textOf(renderer)).toContain("5 with · 8 without");
-    expect(textOf(renderer)).toContain("Lower is better");
+    const rendered = renderer.root.findAllByType("Text")
+      .map((node) => node.children.join(""))
+      .join(" ");
+    expect(rendered).toContain("2.0 average with (5) · 4.0 without (8)");
+    expect(rendered).toContain("Context tag: Outside");
+    expect(rendered).not.toContain("2.0 better");
+    await act(async () => renderer.unmount());
+  });
+  it("distinguishes a context tag from an emotion with the same name", async () => {
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(
+        <>
+          <DriverRow driver={{ id: "context:Calm", name: "Calm", kind: "context", withCount: 5, withoutCount: 5, withMean: 2, withoutMean: 6 }} />
+          <DriverRow driver={{ id: "emotion:Calm", name: "Calm", kind: "emotion", withCount: 5, withoutCount: 5, withMean: 7, withoutMean: 3 }} />
+        </>,
+      );
+    });
+    const labels = renderer.root.findAllByType("View")
+      .map((node) => node.props.accessibilityLabel)
+      .filter((label) => typeof label === "string");
+    expect(labels[0]).toContain("Context tag: Calm, average 2.0 with");
+    expect(labels[1]).toContain("Emotion: Calm, average 7.0 with");
     await act(async () => renderer.unmount());
   });
   it("exposes every empty rhythm cell and does not label it as a zero mood", async () => {
@@ -116,6 +136,38 @@ describe("insight presentation", () => {
       ),
     ).toBe(true);
     await act(async () => renderer.unmount());
+  });
+
+  it("bounds comparison rows and resets the batch when the range changes", async () => {
+    insightsScreenState.error = null;
+    insightsScreenState.drivers = Array.from({ length: 2000 }, (_, index) => ({
+      id: `context:Tag${index}`,
+      name: `Tag${index}`,
+      kind: "context",
+      withCount: 5,
+      withoutCount: 40,
+      withMean: 2,
+      withoutMean: 6,
+    }));
+    insightsScreenState.analysisRange = "7";
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(<InsightsScreen />);
+    });
+    const visibleRows = () => renderer.root.findAllByType("View").filter(
+      (node) => typeof node.props.accessibilityLabel === "string" &&
+        node.props.accessibilityLabel.startsWith("Context tag: Tag"),
+    );
+    expect(visibleRows()).toHaveLength(20);
+    const showMore = () => renderer.root.findByProps({ accessibilityLabel: "Show more comparisons" });
+    await act(async () => showMore().props.onPress());
+    expect(visibleRows()).toHaveLength(40);
+    insightsScreenState.analysisRange = "30";
+    await act(async () => renderer.update(<InsightsScreen />));
+    expect(visibleRows()).toHaveLength(20);
+    await act(async () => renderer.unmount());
+    insightsScreenState.drivers = [];
+    insightsScreenState.analysisRange = "7";
   });
 
   it.each([0, 1, 2])("renders the correct visible entry plural for %i records", async (count) => {
@@ -141,6 +193,11 @@ describe("insight presentation", () => {
       .join(" ");
     const expected = `${count} ${count === 1 ? "entry" : "entries"}`;
     expect(rendered).toContain(expected);
+    expect(rendered).toContain("Comparisons");
+    if (count > 0) expect(rendered).toContain("Your climate");
+    else expect(rendered).not.toContain("Your climate");
+    expect(rendered).not.toContain("Calendar");
+    expect(rendered).not.toContain("Findings");
     expect(rendered).not.toContain(`${count} ${count === 1 ? "entries" : "entry"}`);
     await act(async () => renderer.unmount());
   });

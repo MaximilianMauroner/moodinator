@@ -234,8 +234,6 @@ async function captureMatrixScreens(serial, outputDirectory, stateName, fixtureC
       { text: `${fixtureCount} entries`, contains: true },
     ],
   }, { timeoutMs: 15000 });
-  capture("findings");
-  await waitForNodeAndTap(serial, { contentDescription: "Charts view" });
   await waitForNode(serial, { text: "Trend" });
   capture("charts");
   // Settings is reached through the header gear, not a tab.

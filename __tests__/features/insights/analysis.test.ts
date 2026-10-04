@@ -7,7 +7,6 @@ import {
   rhythm,
   rhythmCellColor,
 } from "../../../src/features/insights/utils/rhythm";
-import { findings } from "../../../src/features/insights/utils/findings";
 import { trendGeometry } from "../../../src/features/insights/utils/trendGeometry";
 import { getThemedColor } from "../../../src/constants/colors";
 import { calculateStreak } from "../../../src/features/insights/utils/streaks";
@@ -27,25 +26,26 @@ const five = (mood: number, tags: string[] = []) =>
 describe("shared insights analysis", () => {
   it("compares interpreted means with deduplicated tags and 5/5 gates", () => {
     const data = [...five(2, ["Outside", "Outside"]), ...five(8)];
-    expect(drivers(data).drivers[0]).toMatchObject({
-      effect: -6,
+    expect(drivers(data)[0]).toMatchObject({
+      withMean: 2,
+      withoutMean: 8,
       withCount: 5,
       withoutCount: 5,
     });
-    expect(drivers(data.slice(1)).drivers).toEqual([]);
-    expect(drivers(data.slice(0, 9)).drivers).toEqual([]);
+    expect(drivers(data.slice(1))).toEqual([]);
+    expect(drivers(data.slice(0, 9))).toEqual([]);
     data.slice(0, 5).forEach((e) => {
       e.mood = 8;
       e.moodScale = { version: 2, min: 0, max: 10, lowerIsBetter: false };
     });
-    expect(drivers(data).drivers[0].effect).toBe(-6);
+    expect(drivers(data)[0]).toMatchObject({ withMean: 2, withoutMean: 8 });
   });
   it("keeps emotion and context names independent", () => {
     const data = [...five(2, ["Calm"]), ...five(8)];
     data.slice(5).forEach((e) => {
       e.emotions = [{ name: "Calm", category: "positive" }];
     });
-    expect(drivers(data).drivers.map((d) => d.id)).toEqual([
+    expect(drivers(data).map((d) => d.id)).toEqual([
       "context:Calm",
       "emotion:Calm",
     ]);
@@ -89,23 +89,11 @@ describe("shared insights analysis", () => {
         getThemedColor("surfaceAlt", dark),
       );
   });
-  it("ranks claims by effect, includes samples and excludes causal copy", () => {
-    const data = [...five(1, ["Outside"]), ...five(4, ["Work"]), ...five(9)];
-    const result = findings(drivers(data), rhythm(data), data.length);
-    const effects = result
-      .filter((f) => f.effect !== null)
-      .map((f) => Math.abs(f.effect!));
-    expect(effects).toEqual([...effects].sort((a, b) => b - a));
-    for (const finding of result) {
-      expect(finding.sample).toMatch(/\d/);
-      expect(finding.text).not.toMatch(/\b(because|caused?|makes? you)\b/i);
-    }
-    const empty = findings(drivers([]), rhythm([]), 0);
-    expect(empty).toHaveLength(1);
-    expect(empty[0].text).toContain("5 entries in each group");
-    expect(
-      findings(drivers(five(2, ["Outside"])), rhythm([]), 5)[0].text,
-    ).toContain("5 without");
+  it("shows equal and overlapping descriptive comparisons instead of selecting patterns", () => {
+    const data = [...five(4, ["Outside"]), ...five(4)];
+    expect(drivers(data)).toMatchObject([
+      { name: "Outside", withMean: 4, withoutMean: 4, withCount: 5, withoutCount: 5 },
+    ]);
   });
   it("draws stable geometry, breaks at gaps and preserves singleton points", () => {
     const series = dailySeries(
@@ -133,14 +121,15 @@ describe("shared insights analysis", () => {
     ]);
   });
 
-  it("averages each part of the day across weekdays", () => {
+  it("weights daypart averages by entries rather than weekdays", () => {
     const parts = daypartMeans(rhythm([
       entry(2, [], "2026-09-07T09:00:00"),
       entry(4, [], "2026-09-09T09:30:00"),
+      entry(6, [], "2026-09-09T10:30:00"),
       entry(6, [], "2026-09-08T13:00:00"),
     ]));
     expect(parts).toEqual([
-      { daypart: "Morning", count: 2, mean: 3 },
+      { daypart: "Morning", count: 3, mean: 4 },
       { daypart: "Midday", count: 1, mean: 6 },
       { daypart: "Evening", count: 0, mean: null },
       { daypart: "Night", count: 0, mean: null },
