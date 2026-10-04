@@ -1,20 +1,9 @@
-import { useFocusEffect } from "expo-router";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Alert,
-  Platform,
-  View,
-  Pressable,
-  RefreshControl,
-  ScrollView as RNScrollView,
-  type LayoutChangeEvent,
-} from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import React, { useCallback, useEffect, useMemo, useRef } from "react";
+import { Alert, Platform, RefreshControl, ScrollView, Text, View } from "react-native";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
-import { FlashList, type FlashListRef } from "@shopify/flash-list";
+import { useFocusEffect, useRouter } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import Animated from "react-native-reanimated";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { createScreenErrorFallback } from "@/components/ScreenErrorFallback";
@@ -25,37 +14,25 @@ import {
   KeptEntryDetailModal,
   MoodEntryFormValues,
 } from "@/components/MoodEntryModal";
-import { DisplayMoodItem } from "@/components/DisplayMoodItem";
+import { WeatherMoodGrid } from "@/components/entry/WeatherMoodGrid";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ScreenBackgroundAccent } from "@/components/layout/ScreenBackgroundAccent";
 import { TabSceneTransition } from "@/components/ui/TabSceneTransition";
-import {
-  DetailedMoodButtonSelector,
-  HomeHeader,
-  HistoryListHeader,
-  CollapsedMoodSelector,
-  UnifiedMoodSelector,
-  UNIFIED_COMPACT_EXPANDED_HEIGHT,
-} from "@/components/home";
+import { DetailedMoodButtonSelector, EarlierToday, HomeHeader, TodayNow } from "@/components/home";
+import { getThemedColor, useThemeColors } from "@/constants/colors";
+import { typography } from "@/constants/typography";
 
 import { useRecentMoodEntries } from "@/features/history/useRecentMoodEntries";
 import { buildForecastDays } from "@/features/history/forecast";
 import { useMoodsStore } from "@/shared/state/moodsStore";
 import { useEntrySettings } from "@/hooks/useEntrySettings";
 import { useMoodModals } from "@/hooks/useMoodModals";
-import { useMoodItemActions } from "@/hooks/useMoodItemActions";
-import { useColorScheme } from "@/hooks/useColorScheme";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
-import {
-  HOME_COLLAPSED_SELECTOR_HEIGHT,
-  useHomeHeaderCollapse,
-} from "@/hooks/useHomeHeaderCollapse";
 import { haptics } from "@/lib/haptics";
 import { beginMoodEntryFlow, keepMoodTap } from "@/lib/keepMoodTap";
 import { showCrisisSupportAlert } from "@/lib/showCrisisSupportAlert";
 import { toastService } from "@/services/toastService";
 import { addHomeTabDoublePressListener } from "@/lib/homeTabEvents";
-import { getHomeJumpButtonBottomOffset } from "@/lib/homeOverlayLayout";
 import {
   commitThenRunPostCommitEffects,
   getMoodEntryPersistenceValues,
@@ -63,22 +40,17 @@ import {
   updateMoodTimestampOrThrow,
 } from "@/lib/moodEntryPersistence";
 
-import type { MoodEntry } from "@db/types";
-import { getThemedColor } from "@/constants/colors";
-
 const HomeErrorFallback = createScreenErrorFallback("Home");
-const DEFAULT_DETAILED_PANEL_HEIGHT = 484;
-const HEADER_TOP_PADDING = 16;
-const HEADER_SECTION_GAP = 16;
 const CONTENT_HORIZONTAL_PADDING = 16;
-const ESTIMATED_HOME_CHROME_HEIGHT = 72;
-const ESTIMATED_HISTORY_CHROME_HEIGHT = 56;
-const HOME_LIST_DRAW_DISTANCE = 900;
 
+/**
+ * Today: where you are now and a short view of the day on top, and the
+ * weather picker docked above the tabs, within thumb reach. The full list
+ * of entries lives in History.
+ */
 function HomeScreenContent() {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
-  const insets = useSafeAreaInsets();
+  const { isDark, get } = useThemeColors();
+  const router = useRouter();
   const tabBarHeight = useBottomTabBarHeight();
 
   const refreshMoods = useMoodsStore((state) => state.refreshMoods);
@@ -88,14 +60,14 @@ function HomeScreenContent() {
   const updateMoodTimestamp = useMoodsStore((state) => state.updateTimestamp);
 
   const today = useRecentMoodEntries(1);
+  // Newest first.
   const todayEntries = useMemo(
     () => buildForecastDays(today.entries, today.asOf, 1)[0]!.entries.slice().reverse(),
     [today.entries, today.asOf]
   );
-  const [homeChromeHeight, setHomeChromeHeight] = useState(0);
-  const [expandedPanelHeight, setExpandedPanelHeight] = useState(0);
-  const [historyChromeHeight, setHistoryChromeHeight] = useState(0);
-  const listRef = useRef<FlashListRef<MoodEntry>>(null);
+  const [latest, ...earlier] = todayEntries;
+
+  const scrollRef = useRef<ScrollView>(null);
   const refreshToday = useCallback(async () => {
     today.reload();
     await refreshMoods();
@@ -109,18 +81,11 @@ function HomeScreenContent() {
   }, []);
   const modals = useMoodModals(invalidateEntryFlow);
   useFocusEffect(useCallback(() => invalidateEntryFlow, [invalidateEntryFlow]));
-  const itemActions = useMoodItemActions({
-    setEditingEntry: modals.setEditingEntry,
-  });
 
   const handleEditEntrySave = useCallback(
     async (values: MoodEntryFormValues) => {
       if (!modals.editingEntry) return;
-      await updateMoodEntryOrThrow(
-        updateMood,
-        modals.editingEntry.id,
-        values,
-      );
+      await updateMoodEntryOrThrow(updateMood, modals.editingEntry.id, values);
     },
     [modals.editingEntry, updateMood]
   );
@@ -145,88 +110,22 @@ function HomeScreenContent() {
 
   const handleDateTimeSave = useCallback(
     async (moodId: number, newTimestamp: number, utcOffsetMinutes?: number | null) => {
-      await updateMoodTimestampOrThrow(
-        updateMoodTimestamp,
-        moodId,
-        newTimestamp,
-        utcOffsetMinutes,
-      );
+      await updateMoodTimestampOrThrow(updateMoodTimestamp, moodId, newTimestamp, utcOffsetMinutes);
     },
     [updateMoodTimestamp]
   );
 
-  const handleMoodItemLongPress = useCallback(
-    (mood: MoodEntry) => {
-      modals.openDateModal(mood);
-    },
-    [modals]
-  );
-
-  const keyExtractor = useCallback((item: MoodEntry) => item.id.toString(), []);
-
-  const renderMoodItem = useCallback(
-    ({ item }: { item: MoodEntry }) => (
-      <DisplayMoodItem
-        mood={item}
-        onSwipeableWillOpen={itemActions.onSwipeableWillOpen}
-        onPress={modals.openDateModal}
-        onLongPress={handleMoodItemLongPress}
-        onEdit={modals.setEditingEntry}
-        onDelete={itemActions.handleDeleteMood}
-        swipeThreshold={itemActions.SWIPE_THRESHOLD}
-      />
-    ),
-    [handleMoodItemLongPress, itemActions, modals]
-  );
-
-  const estimatedExpandedPanelHeight = entrySettings.showDetailedLabels
-    ? DEFAULT_DETAILED_PANEL_HEIGHT
-    : UNIFIED_COMPACT_EXPANDED_HEIGHT;
-  const currentExpandedPanelHeight = expandedPanelHeight || estimatedExpandedPanelHeight;
-  const currentHomeChromeHeight = homeChromeHeight || ESTIMATED_HOME_CHROME_HEIGHT;
-  const currentHistoryChromeHeight = historyChromeHeight || ESTIMATED_HISTORY_CHROME_HEIGHT;
-  const totalExpandedHeaderHeight =
-    currentHomeChromeHeight + currentExpandedPanelHeight + currentHistoryChromeHeight;
-  const totalCollapsedHeaderHeight =
-    currentHomeChromeHeight +
-    HOME_COLLAPSED_SELECTOR_HEIGHT +
-    currentHistoryChromeHeight;
-
-  const {
-    selectorCollapsed,
-    jumpToTopVisible,
-    collapseProgress,
-    scrollToTop,
-    schedulePostSaveTopResets,
-    scrollHandlers,
-    panelAnimatedStyle,
-    overlayAnimatedStyle,
-    expandedSelectorAnimatedStyle,
-    collapsedSelectorAnimatedStyle,
-  } = useHomeHeaderCollapse({
-    listRef,
-    expandedPanelHeight: currentExpandedPanelHeight,
-    homeChromeHeight: currentHomeChromeHeight,
-    historyChromeHeight: currentHistoryChromeHeight,
-  });
-
-  const scrollHomeListToTop = useCallback(
-    (options?: { refresh?: boolean }) => {
-      scrollToTop();
-      if (options?.refresh) {
-        void handlePullToRefresh();
-      }
-    },
-    [handlePullToRefresh, scrollToTop]
-  );
+  const scrollToTop = useCallback(() => {
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+  }, []);
 
   const handleEntrySave = useCallback(async (values: MoodEntryFormValues) => {
     beginMoodEntryFlow(tapStateRef.current);
     await commitThenRunPostCommitEffects(
       () => createMood(getMoodEntryPersistenceValues(values)),
-      [scrollHomeListToTop, schedulePostSaveTopResets],
+      [scrollToTop],
     );
-  }, [createMood, schedulePostSaveTopResets, scrollHomeListToTop]);
+  }, [createMood, scrollToTop]);
 
   const quickFields = entrySettings.quickEntryFieldConfig;
   const offersDetailAfterKeep =
@@ -237,7 +136,7 @@ function HomeScreenContent() {
       keepMoodTap(mood, {
         state: tapStateRef.current,
         create: createMood,
-        afterCommit: [scrollHomeListToTop, schedulePostSaveTopResets],
+        afterCommit: [scrollToTop],
         offersDetail: offersDetailAfterKeep,
         openDetail: modals.setKeptEntry,
         showUndoToast: (entry) =>
@@ -251,277 +150,92 @@ function HomeScreenContent() {
           Alert.alert("Save failed", "Unable to save your entry. Please try again.");
         },
       }),
-    [createMood, modals.setKeptEntry, offersDetailAfterKeep, removeMood, schedulePostSaveTopResets, scrollHomeListToTop]
+    [createMood, modals.setKeptEntry, offersDetailAfterKeep, removeMood, scrollToTop]
   );
 
-  const handleJumpToTopPress = useCallback(() => {
-    haptics.tap();
-    scrollHomeListToTop();
-  }, [scrollHomeListToTop]);
-
-  const handleHomeTabDoublePress = useCallback(() => {
-    scrollHomeListToTop({ refresh: true });
-  }, [scrollHomeListToTop]);
-
-  useEffect(() => {
-    return addHomeTabDoublePressListener(handleHomeTabDoublePress);
-  }, [handleHomeTabDoublePress]);
-
-  const handleHomeChromeLayout = useCallback(
-    ({ nativeEvent }: LayoutChangeEvent) => {
-      const measuredHeight = Math.ceil(nativeEvent.layout.height);
-
-      setHomeChromeHeight((currentHeight) =>
-        currentHeight === measuredHeight ? currentHeight : measuredHeight
-      );
-    },
-    []
-  );
-
-  const handleExpandedSelectorLayout = useCallback(
-    ({ nativeEvent }: LayoutChangeEvent) => {
-      const measuredHeight = Math.ceil(nativeEvent.layout.height);
-
-      setExpandedPanelHeight((currentHeight) =>
-        currentHeight === measuredHeight ? currentHeight : measuredHeight
-      );
-    },
-    []
-  );
-
-  const handleHistoryChromeLayout = useCallback(
-    ({ nativeEvent }: LayoutChangeEvent) => {
-      const measuredHeight = Math.ceil(nativeEvent.layout.height);
-
-      setHistoryChromeHeight((currentHeight) =>
-        currentHeight === measuredHeight ? currentHeight : measuredHeight
-      );
-    },
-    []
-  );
-
-  const listEmptyComponent = useMemo(
+  useEffect(
     () =>
-      today.error ? (
-        <EmptyState
-          icon="warning-outline"
-          tone="coral"
-          title="Today's entries could not load"
-          description="Your local mood history is still on this device. Try loading it again."
-          actionLabel="Try Again"
-          onAction={today.reload}
-        />
-      ) : today.loaded ? (
-        <EmptyState
-          icon="partly-sunny-outline"
-          tone="sage"
-          title="No entries yet today"
-          description="Tap the weather you feel above. One tap saves it."
-        />
-      ) : null,
-    [today.error, today.loaded, today.reload]
+      addHomeTabDoublePressListener(() => {
+        scrollToTop();
+        void handlePullToRefresh();
+      }),
+    [handlePullToRefresh, scrollToTop]
   );
 
-  const listContentContainerStyle = useMemo(
-    () => ({
-      paddingHorizontal: CONTENT_HORIZONTAL_PADDING,
-      paddingTop: totalExpandedHeaderHeight,
-      paddingBottom: 100,
-    }),
-    [totalExpandedHeaderHeight]
-  );
-  const refreshIndicatorOffset = selectorCollapsed
-    ? totalCollapsedHeaderHeight
-    : totalExpandedHeaderHeight;
-  const jumpButtonBottomOffset = getHomeJumpButtonBottomOffset({
-    platform: Platform.OS,
-    safeAreaBottom: insets.bottom,
-    tabBarHeight,
-  });
-  const jumpButtonStyle = useMemo(
-    () => ({
-      alignItems: "center" as const,
-      backgroundColor: getThemedColor("primary", isDark),
-      borderColor: isDark
-        ? "rgba(8, 21, 15, 0.24)"
-        : "rgba(253, 252, 250, 0.72)",
-      borderRadius: 24,
-      borderWidth: 1,
-      elevation: 4,
-      height: 48,
-      justifyContent: "center" as const,
-      shadowColor: isDark ? "#000000" : "#9D8660",
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: isDark ? 0.28 : 0.16,
-      shadowRadius: 10,
-      width: 48,
-    }),
-    [isDark]
-  );
+  const showHistory = useCallback(() => router.navigate("/history"), [router]);
+
+  // iOS draws the tab bar over the scene, so the dock pads for it there.
+  const dockBottomPadding = 12 + (Platform.OS === "ios" ? tabBarHeight : 0);
 
   return (
     <>
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <SafeAreaView className="flex-1 bg-paper-100 dark:bg-paper-900">
-          <View className="flex-1">
-            <FlashList
-              ref={listRef}
-              // FlashList v2 defaults to Animated.ScrollView and then wraps it
-              // again in Animated.createAnimatedComponent. On the New
-              // Architecture that double-wrap leaves the internal scroll ref
-              // null, so every programmatic scroll (scrollToOffset/scrollToTop —
-              // the jump-to-top button and double-tap-home) silently no-ops.
-              // Supplying a plain ScrollView keeps it a single wrap and restores
-              // a working native scroll ref.
-              renderScrollComponent={RNScrollView}
-              data={todayEntries}
-              ListFooterComponent={
-                today.error && todayEntries.length > 0 ? (
-                  <EmptyState
-                    icon="warning-outline"
-                    tone="coral"
-                    title="Today's entries could not refresh"
-                    description={today.error}
-                    actionLabel="Try again"
-                    onAction={today.reload}
-                  />
-                ) : null
-              }
-              keyExtractor={keyExtractor}
-              renderItem={renderMoodItem}
-              ListEmptyComponent={listEmptyComponent}
-              refreshControl={
-                <RefreshControl
-                  refreshing={refreshing}
-                  onRefresh={handlePullToRefresh}
-                  progressViewOffset={refreshIndicatorOffset}
-                  tintColor={getThemedColor("primary", isDark)}
-                  colors={[getThemedColor("primary", isDark)]}
-                  progressBackgroundColor={getThemedColor("surface", isDark)}
-                />
-              }
-              style={{ flex: 1 }}
-              contentInsetAdjustmentBehavior="automatic"
-              showsVerticalScrollIndicator
-              contentContainerStyle={listContentContainerStyle}
-              drawDistance={HOME_LIST_DRAW_DISTANCE}
-              scrollEventThrottle={16}
-              {...scrollHandlers}
-            />
-
-            <Animated.View
-              pointerEvents="box-none"
-              style={[
-                overlayAnimatedStyle,
-                {
-                  backgroundColor: getThemedColor("background", isDark),
-                  left: 0,
-                  paddingHorizontal: CONTENT_HORIZONTAL_PADDING,
-                  position: "absolute",
-                  right: 0,
-                  top: 0,
-                  zIndex: 10,
-                },
-              ]}
-            >
-              <ScreenBackgroundAccent density="compact" />
-              <View
-                pointerEvents="box-none"
-                onLayout={handleHomeChromeLayout}
-                style={{ paddingTop: HEADER_TOP_PADDING }}
-              >
-                <HomeHeader />
-              </View>
-
-              <Animated.View style={panelAnimatedStyle}>
-                {entrySettings.showDetailedLabels ? (
-                  <>
-                    <Animated.View
-                      pointerEvents={selectorCollapsed ? "none" : "auto"}
-                      onLayout={handleExpandedSelectorLayout}
-                      style={expandedSelectorAnimatedStyle}
-                    >
-                      <DetailedMoodButtonSelector
-                        onMoodPress={handleMoodTap}
-                        onLongPress={modals.handleLongPress}
-                      />
-                    </Animated.View>
-                    <Animated.View
-                      pointerEvents={selectorCollapsed ? "auto" : "none"}
-                      style={[
-                        collapsedSelectorAnimatedStyle,
-                        {
-                          bottom: 0,
-                          height: HOME_COLLAPSED_SELECTOR_HEIGHT,
-                          justifyContent: "center",
-                          left: 0,
-                          position: "absolute",
-                          right: 0,
-                        },
-                      ]}
-                    >
-                      <CollapsedMoodSelector
-                        isDark={isDark}
-                        onMoodPress={handleMoodTap}
-                        onLongPress={modals.handleLongPress}
-                      />
-                    </Animated.View>
-                  </>
-                ) : (
-                  <UnifiedMoodSelector
-                    collapseProgress={collapseProgress}
-                    isDark={isDark}
-                    onMoodPress={handleMoodTap}
-                    onLongPress={modals.handleLongPress}
-                  />
-                )}
-              </Animated.View>
-
-              <View
-                pointerEvents="auto"
-                onLayout={handleHistoryChromeLayout}
-                style={{ paddingTop: HEADER_SECTION_GAP }}
-              >
-                <View className="mb-3">
-                  <HistoryListHeader
-                    title="Today"
-                    moodCount={todayEntries.length}
-                    countSuffix="today"
-                    countTestID="today-count"
-                  />
-                </View>
-              </View>
-            </Animated.View>
-
-            {jumpToTopVisible ? (
-              <View
-                style={{
-                  alignItems: "center",
-                  bottom: jumpButtonBottomOffset,
-                  elevation: 8,
-                  height: 56,
-                  justifyContent: "center",
-                  position: "absolute",
-                  right: 18,
-                  width: 56,
-                  zIndex: 20,
-                }}
-              >
-                <Pressable
-                  accessibilityHint="Scrolls the recent entries list back to the top"
-                  accessibilityLabel="Jump to top"
-                  accessibilityRole="button"
-                  onPress={handleJumpToTopPress}
-                  style={jumpButtonStyle}
-                >
-                  <Ionicons
-                    name="arrow-up"
-                    size={23}
-                    color="#08150F"
-                  />
-                </Pressable>
-              </View>
+        <SafeAreaView className="flex-1 bg-paper-100 dark:bg-paper-900" edges={["top", "left", "right"]}>
+          <ScreenBackgroundAccent density="compact" />
+          <ScrollView
+            ref={scrollRef}
+            style={{ flex: 1 }}
+            contentContainerStyle={{ paddingHorizontal: CONTENT_HORIZONTAL_PADDING, paddingTop: 16, paddingBottom: 16, gap: 18 }}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handlePullToRefresh}
+                tintColor={getThemedColor("primary", isDark)}
+                colors={[getThemedColor("primary", isDark)]}
+                progressBackgroundColor={getThemedColor("surface", isDark)}
+              />
+            }
+          >
+            <HomeHeader />
+            {today.error && !latest ? (
+              <EmptyState
+                icon="warning-outline"
+                tone="coral"
+                title="Today's entries could not load"
+                description="Your local mood history is still on this device. Try loading it again."
+                actionLabel="Try Again"
+                onAction={today.reload}
+              />
+            ) : (
+              <TodayNow latest={latest} loaded={today.loaded} onOpen={modals.openDateModal} />
+            )}
+            <EarlierToday entries={earlier} onOpen={modals.openDateModal} onShowAll={showHistory} />
+            {today.error && latest ? (
+              <EmptyState
+                icon="warning-outline"
+                tone="coral"
+                title="Today's entries could not refresh"
+                description={today.error}
+                actionLabel="Try again"
+                onAction={today.reload}
+              />
             ) : null}
+          </ScrollView>
+
+          <View
+            style={{
+              maxHeight: "65%",
+              flexShrink: 1,
+              backgroundColor: get("surface"),
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              borderTopWidth: 1,
+              borderColor: get("border"),
+              paddingTop: 14,
+              paddingHorizontal: 12,
+              paddingBottom: dockBottomPadding,
+            }}
+          >
+            <Text style={[typography.titleMd, { color: get("text"), fontSize: 18, lineHeight: 24, marginHorizontal: 8, marginBottom: 10 }]}>
+              How is it now?
+            </Text>
+            <ScrollView style={{ flexGrow: 0, flexShrink: 1 }}>
+              {entrySettings.showDetailedLabels ? (
+                <DetailedMoodButtonSelector onMoodPress={handleMoodTap} onLongPress={modals.handleLongPress} />
+              ) : (
+                <WeatherMoodGrid size="dock" onPress={handleMoodTap} onLongPress={modals.handleLongPress} />
+              )}
+            </ScrollView>
           </View>
         </SafeAreaView>
       </GestureHandlerRootView>

@@ -154,3 +154,17 @@ Work on a feature branch. I commit or open a pull request only when asked.
   build with this change ships, the Play listing copy and screenshots that
   describe "tap for a quick entry" on Home must be updated.
 - Not verified here: human product acceptance on a physical device.
+
+## Today layout (2026-09-30)
+
+Chosen in design rounds 15 to 17 (T2a, "thumb zone"):
+
+- The picker is docked above the tabs with larger tiles, so the input is
+  always visible and within thumb reach. It no longer collapses into a pill
+  row; the collapse animation, its snap logic, and the jump-to-top button are
+  removed (this replaces the collapse notes in phase 2 above).
+- The top shows the current weather (newest entry) and up to two earlier
+  entries with their emotions, context, and first note line. More entries
+  link to History, which keeps the full list and the entry actions.
+- One tap still keeps the entry and opens the full "Add detail" sheet.
+- The native smoke flow opens entry actions from History.
