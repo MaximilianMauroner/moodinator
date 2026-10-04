@@ -460,12 +460,12 @@ export const DateTimePickerModal: React.FC<Props> = ({
                   )}
                 </View>
 
-                <View className="flex-row gap-3">
+                <View className="flex-row flex-wrap gap-3">
                   {/* Date picker button */}
                   <Pressable
                     onPress={() => setShowDatePicker(true)}
                     disabled={saving}
-                    className="flex-1 flex-row items-center p-3 rounded-xl"
+                    className="grow shrink basis-[120px] max-w-full min-w-0 flex-row items-center p-3 rounded-xl"
                     style={{
                       backgroundColor: get("surfaceAlt"),
                       borderWidth: 1.5,
@@ -504,12 +504,11 @@ export const DateTimePickerModal: React.FC<Props> = ({
                   <Pressable
                     onPress={() => setShowTimePicker(true)}
                     disabled={saving}
-                    className="flex-row items-center p-3 rounded-xl"
+                    className="grow shrink basis-[120px] max-w-full min-w-0 flex-row items-center p-3 rounded-xl"
                     style={{
                       backgroundColor: get("surfaceAlt"),
                       borderWidth: 1.5,
                       borderColor: get("border"),
-                      minWidth: 110,
                     }}
                     accessibilityRole="button"
                     accessibilityLabel="Change entry time"
@@ -520,9 +519,8 @@ export const DateTimePickerModal: React.FC<Props> = ({
                       size={18}
                       color={isDark ? colors.sand.text.dark : colors.sand.text.light}
                     />
-                    {/* Sized to its text; with flex-1 the time wrapped as "8:48 A M". */}
                     <Text
-                      className="text-sm font-medium mx-2"
+                      className="text-sm font-medium mx-2 flex-1 min-w-0"
                       style={{ color: get("text") }}
                       numberOfLines={1}
                     >
