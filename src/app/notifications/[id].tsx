@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Switch,
   KeyboardAvoidingView,
+  Linking,
 } from "react-native";
 import type { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -30,6 +31,9 @@ import {
 } from "@/lib/reminderSchedulePresentation";
 import { formatReminderTime } from "@/lib/reminderTimePresentation";
 import { useCalendars, useLocales } from "expo-localization";
+import { ALL_REMINDER_DAYS, normalizeReminderDays, formatReminderDays } from "@/lib/reminderDays";
+import { DEFAULT_REMINDER_COPY } from "@/lib/reminderPresets";
+import { ReminderSetupChoices, ReminderDayChoices } from "@/features/reminders/ReminderScheduleFields";
 
 export default function NotificationDetailScreen() {
   const router = useRouter();
@@ -39,6 +43,8 @@ export default function NotificationDetailScreen() {
   const [{ uses24hourClock }] = useCalendars();
   const isNew = id === "new";
 
+  const [choiceMade, setChoiceMade] = useState(!isNew);
+  const [weekdays, setWeekdays] = useState<number[]>([...ALL_REMINDER_DAYS]);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [hour, setHour] = useState(20);
@@ -47,6 +53,7 @@ export default function NotificationDetailScreen() {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const saveInFlight = useRef(false);
 
   const loadNotification = useCallback(async () => {
     try {
@@ -59,6 +66,7 @@ export default function NotificationDetailScreen() {
         setHour(notification.hour);
         setMinute(notification.minute);
         setEnabled(notification.enabled);
+        setWeekdays(normalizeReminderDays(notification.weekdays));
       } else {
         Alert.alert("Error", "Notification not found");
         router.back();
@@ -89,7 +97,21 @@ export default function NotificationDetailScreen() {
     }
   };
 
+  const chooseSchedule = (nextHour: number, nextMinute: number, days: number[]) => {
+    setTitle(DEFAULT_REMINDER_COPY.title);
+    setBody(DEFAULT_REMINDER_COPY.body);
+    setHour(nextHour);
+    setMinute(nextMinute);
+    setWeekdays(days);
+    setChoiceMade(true);
+  };
+
   const handleSave = async () => {
+    if (!choiceMade || saveInFlight.current) return;
+    if (weekdays.length === 0) {
+      Alert.alert("Choose days", "Choose at least one day for this reminder.");
+      return;
+    }
     if (!title.trim()) {
       haptics.reject();
       Alert.alert("Missing Title", "Please enter a title for your reminder");
@@ -101,34 +123,46 @@ export default function NotificationDetailScreen() {
       return;
     }
 
+    saveInFlight.current = true;
+    let persisted = false;
     try {
       setSaving(true);
       let scheduleWarning: ReturnType<typeof getReminderScheduleWarning> = null;
+      let permissionDenied = false;
       if (isNew) {
         const createdNotification = await addNotification({
           title: title.trim(),
           body: body.trim(),
           hour,
           minute,
+          weekdays,
           enabled,
         });
         scheduleWarning = getReminderScheduleWarning(createdNotification);
+        permissionDenied = createdNotification.scheduleStatus === "permission-denied";
       } else {
         const result = await updateNotification(id, {
           title: title.trim(),
           body: body.trim(),
           hour,
           minute,
+          weekdays,
           enabled,
         });
         scheduleWarning = getReminderScheduleResultWarning(result);
+        permissionDenied = result.status === "permission-denied";
       }
 
+      persisted = true;
       haptics.commit();
 
       if (scheduleWarning) {
         Alert.alert(scheduleWarning.title, scheduleWarning.message, [
-          { text: "OK", onPress: () => router.back() },
+          { text: "Back to reminders", onPress: () => router.back() },
+          ...(permissionDenied ? [{ text: "Open settings", onPress: () => {
+            router.back();
+            void Linking.openSettings().catch(() => Alert.alert("Open device settings", "Allow notifications for Moodinator in your device settings."));
+          } }] : []),
         ]);
         return;
       }
@@ -138,7 +172,11 @@ export default function NotificationDetailScreen() {
       console.error("Failed to save notification:", error);
       Alert.alert("Error", "Failed to save reminder");
     } finally {
-      setSaving(false);
+      // A saved new reminder must not be created twice while its warning is open.
+      if (!persisted) {
+        saveInFlight.current = false;
+        setSaving(false);
+      }
     }
   };
 
@@ -209,6 +247,12 @@ export default function NotificationDetailScreen() {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
+            {!choiceMade && <ReminderSetupChoices languageTag={languageTag} uses24hourClock={uses24hourClock}
+              onChoose={chooseSchedule} />}
+            {choiceMade && <>
+            <Text className="text-sm mb-4" style={{ color: get("textMuted") }}>
+              {weekdays.length ? formatReminderDays(weekdays, languageTag) : "Choose days"} at {formatTime()} in your device’s local time. Review before saving. Times follow timezone changes when you reopen Moodinator; delivery may be delayed by your device.
+            </Text>
             {/* Preview Card */}
             <View
               className="rounded-2xl p-4 mb-6"
@@ -403,6 +447,7 @@ export default function NotificationDetailScreen() {
               )}
             </View>
 
+            <ReminderDayChoices weekdays={weekdays} languageTag={languageTag} onChange={setWeekdays} />
             {/* Enabled Toggle */}
             <View
               className="rounded-xl px-4 py-4 flex-row items-center justify-between"
@@ -451,10 +496,11 @@ export default function NotificationDetailScreen() {
                 accessibilityHint={enabled ? "Double tap to save this reminder paused" : "Double tap to save this reminder active"}
               />
             </View>
+            </>}
           </ScrollView>
 
           {/* Save Button */}
-          <View
+          {choiceMade && <View
             className="px-4 py-4"
             style={{
               backgroundColor: get("background"),
@@ -464,7 +510,7 @@ export default function NotificationDetailScreen() {
           >
             <Pressable
               onPress={handleSave}
-              disabled={saving}
+              disabled={saving || weekdays.length === 0}
               className="rounded-2xl py-4 px-4 items-center flex-row justify-center"
               style={{
                 backgroundColor: saving ? get("primaryMuted") : get("primary"),
@@ -475,7 +521,7 @@ export default function NotificationDetailScreen() {
                 elevation: 4,
               }}
               accessibilityRole="button"
-              accessibilityLabel={isNew ? "Create reminder" : "Save reminder changes"}
+              accessibilityLabel={enabled ? "Save and enable reminder" : "Save paused reminder"}
             >
               {saving ? (
                 <ActivityIndicator color={get("onPrimary")} />
@@ -487,12 +533,12 @@ export default function NotificationDetailScreen() {
                     color={get("onPrimary")}
                   />
                   <Text className="font-semibold text-base ml-2" style={{ color: get("onPrimary") }}>
-                    {isNew ? "Create Reminder" : "Save Changes"}
+                    {enabled ? "Save and enable" : "Save paused"}
                   </Text>
                 </>
               )}
             </Pressable>
-          </View>
+          </View>}
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
