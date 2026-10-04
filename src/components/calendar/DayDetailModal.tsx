@@ -89,7 +89,7 @@ export function DayDetailModal({
             <View className="flex-row items-center justify-between">
               <View>
                 <Text style={[typography.titleMd, { color: get("text"), fontSize: 24, lineHeight: 28 }]}>
-                  {format(date, "EEEE, MMM d")}
+                  {format(date, "EEEE, MMM d, yyyy")}
                 </Text>
                 <Text
                   className="text-sm"
