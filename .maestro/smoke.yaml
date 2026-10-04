@@ -10,7 +10,7 @@ name: Isolated Android entry lifecycle
 - tapOn: "Mood Rating 5 of 10, Neutral. Lower numbers are better."
 - assertVisible: "Add detail"
 - tapOn: "Undo this entry"
-- assertVisible: "No entries yet today"
+- assertVisible: "No check-in yet today"
 - longPressOn: "Mood Rating 5 of 10, Neutral. Lower numbers are better."
 - assertVisible: "(?i)What emotions are present[?]"
 - scrollUntilVisible:
@@ -40,12 +40,14 @@ name: Isolated Android entry lifecycle
 - inputText: "QA smoke original note"
 - hideKeyboard
 - tapOn: "Save entry"
+- tapOn: "History tab, view past days and months"
 - assertVisible:
     id: "mood-entry-actions-.*"
 - stopApp
 - launchApp:
     clearState: false
 # Reopen the stored record. These checks verify fields after process restart.
+- tapOn: "History tab, view past days and months"
 - tapOn:
     id: "mood-entry-actions-.*"
 - tapOn: "Edit entry"
@@ -94,4 +96,4 @@ name: Isolated Android entry lifecycle
 - tapOn: "History tab, view past days and months"
 - tapOn: "Month view"
 - assertVisible: "Calendar legend: a dot marks a day with multiple entries."
-- tapOn: "Today tab, log your mood"
+- tapOn: "Days view"
