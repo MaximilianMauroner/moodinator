@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { SettingsGearButton } from "@/components/ui/SettingsGearButton";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, {
   Easing,
@@ -159,6 +160,7 @@ export function InsightsHeader({ moods, totalEntries, onRefresh }: InsightsHeade
         >
           <Ionicons name="refresh" size={16} color={sage.fg} />
         </Pressable>
+        <SettingsGearButton />
       </View>
     </View>
   );

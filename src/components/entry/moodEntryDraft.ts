@@ -89,6 +89,14 @@ export function createMoodEntryFormValues(
   };
 }
 
+/**
+ * Values for an entry that holds only a mood, as one tap on the picker saves
+ * it. Unlike a new form draft, it leaves energy unanswered.
+ */
+export function createMoodOnlyEntryValues(mood: number): MoodEntryFormValues {
+  return { mood, emotions: [], contextTags: [], energy: null, note: "", basedOnEntryId: null };
+}
+
 export function buildMoodEntrySubmitValues(
   values: MoodEntryFormValues,
   fieldConfig: MoodEntryFieldConfig

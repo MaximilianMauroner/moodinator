@@ -5,6 +5,12 @@ name: Isolated Android entry lifecycle
 - launchApp:
     clearState: true
 - runFlow: flows/onboarding.yaml
+# Exercise the new one-tap path before the existing detailed-entry journey.
+# Undo leaves the fixture count at one after the detailed entry below.
+- tapOn: "Mood Rating 5 of 10, Neutral. Lower numbers are better."
+- assertVisible: "Add detail"
+- tapOn: "Undo this entry"
+- assertVisible: "No entries yet today"
 - longPressOn: "Mood Rating 5 of 10, Neutral. Lower numbers are better."
 - assertVisible: "(?i)What emotions are present[?]"
 - scrollUntilVisible:
@@ -80,9 +86,12 @@ name: Isolated Android entry lifecycle
 - tapOn: "Save entry"
 # Check Insights before deletion; the runner owns the synchronized native
 # delete/absence/Undo/restoration phase below.
-- tapOn: "Insights tab, view mood history and summaries"
+- tapOn: "Insights tab, view mood patterns and summaries"
 - assertVisible: "Your history · 1 entry"
 - tapOn: "Refresh insights"
 - assertVisible: "Your history · 1 entry"
 - runFlow: flows/insights.yaml
-- tapOn: "Home tab, log your mood"
+- tapOn: "History tab, view past days and months"
+- tapOn: "Month view"
+- assertVisible: "Calendar legend: a dot marks a day with multiple entries."
+- tapOn: "Today tab, log your mood"

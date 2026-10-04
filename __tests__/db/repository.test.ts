@@ -22,7 +22,6 @@ import {
   hasMoodBeenLoggedToday,
   updateEmotionCategoryInMoods,
 } from "../../db/moods/repository";
-import { linkEmotionsToMood } from "../../db/moods/emotions";
 import { toMoodEntry } from "../../db/moods/serialization";
 
 // Mock the database client module
@@ -31,16 +30,6 @@ const mockDb = createMockDb();
 vi.mock("../../db/client", () => ({
   getDb: vi.fn(() => Promise.resolve(mockDb)),
 }));
-
-// Keep real emotion SQL, with spies for orchestration assertions and failures.
-vi.mock("../../db/moods/emotions", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../db/moods/emotions")>();
-  return {
-    ...actual,
-    linkEmotionsToMood: vi.fn(actual.linkEmotionsToMood),
-    upsertEmotionCategory: vi.fn(actual.upsertEmotionCategory),
-  };
-});
 
 describe("Repository", () => {
   beforeEach(() => {
@@ -59,35 +48,22 @@ describe("Repository", () => {
       expect(mockDb.__getMoods()).toHaveLength(1);
     });
 
-    it("inserts mood with note", async () => {
-      const result = await insertMood(7, "Feeling great today");
-
-      expect(result.mood).toBe(7);
-      expect(result.note).toBe("Feeling great today");
-    });
-
-    it("inserts mood with metadata", async () => {
-      const result = await insertMood(8, "Test note", {
-        emotions: [{ name: "Happy", category: "positive" }],
+    it("persists forwarded note and metadata with emotion links", async () => {
+      const metadata = {
+        emotions: [{ name: "Happy", category: "positive" as const }],
         contextTags: ["work"],
         energy: 7,
         timestamp: 1705320000000,
-      });
+      };
+      const result = await insertMood(8, "Test note", metadata);
 
-      expect(result.mood).toBe(8);
-      expect(result.note).toBe("Test note");
-      expect(linkEmotionsToMood).toHaveBeenCalled();
-    });
-
-    it("links emotions when provided", async () => {
-      const emotions = [{ name: "Happy", category: "positive" as const }];
-      await insertMood(7, undefined, { emotions });
-
-      expect(linkEmotionsToMood).toHaveBeenCalledWith(
-        expect.anything(),
-        1,
-        emotions
-      );
+      expect(result).toMatchObject({ mood: 8, note: "Test note", ...metadata });
+      expect(mockDb.__getEmotions()).toEqual([
+        { id: 1, name: "Happy", category: "positive" },
+      ]);
+      expect(mockDb.__getMoodEmotions()).toEqual([
+        { mood_id: result.id, emotion_id: 1 },
+      ]);
     });
 
     it("rolls back on error", async () => {
@@ -100,7 +76,7 @@ describe("Repository", () => {
   });
 
   describe("insertMoodEntry", () => {
-    it("inserts complete mood entry", async () => {
+    it("persists a complete mood entry with its scale and emotion links", async () => {
       const entry = {
         mood: 6,
         note: "Test",
@@ -111,14 +87,19 @@ describe("Repository", () => {
 
       const result = await insertMoodEntry(entry);
 
-      expect(result.mood).toBe(6);
-      expect(result.id).toBe(1);
+      expect(result).toMatchObject({ id: 1, ...entry });
       expect(result.moodScale).toEqual({
         version: 1,
         min: 0,
         max: 10,
         lowerIsBetter: true,
       });
+      expect(mockDb.__getEmotions()).toEqual([
+        { id: 1, name: "Calm", category: "positive" },
+      ]);
+      expect(mockDb.__getMoodEmotions()).toEqual([
+        { mood_id: result.id, emotion_id: 1 },
+      ]);
     });
 
     it("does not create speculative media and location columns", async () => {
@@ -131,13 +112,6 @@ describe("Repository", () => {
       expect(row).not.toHaveProperty("photos_json");
       expect(row).not.toHaveProperty("location_json");
       expect(row).not.toHaveProperty("voice_memos_json");
-    });
-
-    it("links emotions when provided", async () => {
-      const emotions = [{ name: "Calm", category: "positive" as const }];
-      await insertMoodEntry({ mood: 5, emotions });
-
-      expect(linkEmotionsToMood).toHaveBeenCalled();
     });
   });
 
@@ -228,34 +202,34 @@ describe("Repository", () => {
       expect(result?.mood).toBe(5);
     });
 
-    it("updates mood value", async () => {
-      mockDb.__addMood({ mood: 5 });
-
-      const result = await updateMoodEntry(1, { mood: 8 });
-
-      expect(result?.mood).toBe(8);
-    });
-
-    it("updates multiple fields", async () => {
-      mockDb.__addMood({ mood: 5, note: "Original" });
-
-      const result = await updateMoodEntry(1, {
+    it("persists multiple updated fields and replaces old emotion links", async () => {
+      const original = await insertMoodEntry({
+        mood: 5,
+        note: "Original",
+        emotions: [{ name: "Calm", category: "neutral" }],
+      });
+      const updates = {
         mood: 7,
         note: "Updated",
         energy: 8,
-      });
+        emotions: [{ name: "Happy", category: "positive" as const }],
+      };
+      const result = await updateMoodEntry(original.id, updates);
 
-      expect(result).toBeDefined();
-    });
-
-    it("links emotions when emotions are updated", async () => {
-      mockDb.__addMood({ mood: 5 });
-
-      await updateMoodEntry(1, {
-        emotions: [{ name: "Happy", category: "positive" }],
-      });
-
-      expect(linkEmotionsToMood).toHaveBeenCalled();
+      expect(result).toMatchObject({ id: original.id, ...updates });
+      expect(mockDb.__getMoods()).toEqual([
+        expect.objectContaining({
+          ...updates,
+          emotions: JSON.stringify(updates.emotions),
+        }),
+      ]);
+      expect(mockDb.__getEmotions()).toEqual([
+        { id: 1, name: "Calm", category: "neutral" },
+        { id: 2, name: "Happy", category: "positive" },
+      ]);
+      expect(mockDb.__getMoodEmotions()).toEqual([
+        { mood_id: original.id, emotion_id: 2 },
+      ]);
     });
 
     it("uses transaction for updates", async () => {

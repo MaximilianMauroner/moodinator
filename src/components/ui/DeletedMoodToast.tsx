@@ -18,9 +18,11 @@ interface MoodChangeToastProps {
   title: string;
   icon?: keyof typeof Ionicons.glyphMap;
   iconColor?: string;
+  testID: string;
   action?: {
     label: string;
     accessibilityLabel: string;
+    testID: string;
     onPress: () => void;
   };
 }
@@ -30,6 +32,7 @@ function MoodChangeToast({
   title,
   icon,
   iconColor,
+  testID,
   action,
 }: MoodChangeToastProps) {
   const { get, isDark } = useThemeColors();
@@ -47,7 +50,7 @@ function MoodChangeToast({
   return (
     <View
       style={styles.frame}
-      testID={action ? "deleted-mood-toast" : "restored-mood-toast"}
+      testID={testID}
     >
       <View
         style={[
@@ -100,7 +103,7 @@ function MoodChangeToast({
               ]}
               accessibilityRole="button"
               accessibilityLabel={action.accessibilityLabel}
-              testID="undo-delete"
+              testID={action.testID}
             >
               <Text
                 style={[
@@ -127,9 +130,27 @@ export function DeletedMoodToast({ entry, onUndo }: DeletedMoodToastProps) {
     <MoodChangeToast
       entry={entry}
       title="Entry removed"
+      testID="deleted-mood-toast"
       action={{
         label: "Undo",
         accessibilityLabel: "Undo delete",
+        testID: "undo-delete",
+        onPress: onUndo,
+      }}
+    />
+  );
+}
+
+export function KeptMoodToast({ entry, onUndo }: DeletedMoodToastProps) {
+  return (
+    <MoodChangeToast
+      entry={entry}
+      title="Entry saved"
+      testID="kept-mood-toast"
+      action={{
+        label: "Undo",
+        accessibilityLabel: "Undo this entry",
+        testID: "undo-kept",
         onPress: onUndo,
       }}
     />
@@ -143,6 +164,7 @@ export function RestoredMoodToast({ entry }: { entry: MoodEntry }) {
     <MoodChangeToast
       entry={entry}
       title="Entry restored"
+      testID="restored-mood-toast"
       icon="leaf"
       iconColor={getThemedColor("iconAccent", isDark)}
     />

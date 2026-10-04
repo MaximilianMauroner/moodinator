@@ -214,8 +214,19 @@ async function captureMatrixScreens(serial, outputDirectory, stateName, fixtureC
     screenshot(serial, filePath);
     captures.push({ screen, screenshot: filePath });
   };
-  capture("home");
-  await waitForNodeAndTap(serial, { contentDescription: "Insights tab, view mood history and summaries" });
+  // verifyFabricatedFixture leaves History selected; return to Today first.
+  await waitForNodeAndTap(serial, { contentDescription: "Today tab, log your mood" });
+  await waitForNode(serial, { contentDescription: "Mood Rating 5 of 10, Neutral. Lower numbers are better." }, { timeoutMs: 15000 });
+  capture("today");
+  await waitForNodeAndTap(serial, { contentDescription: "History tab, view past days and months" });
+  await waitForNode(serial, { testId: "history-count" }, { timeoutMs: 15000 });
+  // The forecast reads its own range; wait until it has loaded.
+  await waitForNode(serial, { testId: "forecast-ready" }, { timeoutMs: 15000 });
+  capture("history");
+  await waitForNodeAndTap(serial, { contentDescription: "Month view" });
+  await waitForNode(serial, { contentDescription: "Calendar legend: a dot marks a day with multiple entries." }, { timeoutMs: 15000 });
+  capture("calendar");
+  await waitForNodeAndTap(serial, { contentDescription: "Insights tab, view mood patterns and summaries" });
   await waitForNodeAndTap(serial, { contentDescription: "All history" }, { timeoutMs: 15000 });
   await waitForNode(serial, {
     allOf: [
@@ -227,16 +238,15 @@ async function captureMatrixScreens(serial, outputDirectory, stateName, fixtureC
   await waitForNodeAndTap(serial, { contentDescription: "Charts view" });
   await waitForNode(serial, { text: "Trend" });
   capture("charts");
-  await waitForNodeAndTap(serial, { contentDescription: "Calendar view" });
-  await waitForNode(serial, { contentDescription: "Calendar legend: a dot marks a day with multiple entries." }, { timeoutMs: 15000 });
-  capture("calendar");
-  await waitForNodeAndTap(serial, { contentDescription: "Settings tab, customize app preferences" });
+  // Settings is reached through the header gear, not a tab.
+  await waitForNodeAndTap(serial, { testId: "open-settings" });
   await waitForNode(serial, { text: "Local privacy" }, { timeoutMs: 10000 });
   capture("settings");
   return captures;
 }
 
 async function verifyFabricatedFixture(serial, { fixtureNote, fixtureCount }) {
+  await waitForNodeAndTap(serial, { contentDescription: "History tab, view past days and months" }, { timeoutMs: 5000 });
   await waitForNode(serial, {
     allOf: [
       { testId: "history-count" },
@@ -312,7 +322,6 @@ async function main(argv = process.argv.slice(2)) {
     writeFileSync(fixturePath, fixture.serialized, { flag: "wx" });
     runAdb(options.serial, ["push", fixturePath, `/sdcard/Download/${fixtureName}`], { timeoutMs: 120000 });
     await importFabricatedFixture(options.serial, fixtureName, fixture.entries.length);
-    await waitForNodeAndTap(options.serial, { contentDescription: "Home tab, log your mood" }, { timeoutMs: 5000 });
     await verifyFabricatedFixture(options.serial, {
       fixtureNote: fixture.fixtureNote,
       fixtureCount: fixture.entries.length,

@@ -7,7 +7,7 @@ import { EnergySlider } from "@/components/entry/EnergySlider";
 import {
   DetailedMoodEntryModal,
   EditMoodEntryModal,
-  QuickMoodEntryModal,
+  KeptEntryDetailModal,
   type MoodEntryFormValues,
 } from "@/components/MoodEntryModal";
 import { setHapticsEnabled } from "@/lib/haptics";
@@ -185,8 +185,9 @@ describe.each(["android", "ios"])("entry field feedback on %s", (platform) => {
 
 function EntryModal() {
   return (
-    <QuickMoodEntryModal
+    <KeptEntryDetailModal
       visible
+      onUndo={() => {}}
       initialMood={4}
       emotionOptions={options}
       contextOptions={["Work", "Family"]}
@@ -198,7 +199,7 @@ function EntryModal() {
   );
 }
 
-type SaveVariant = "quick" | "detailed" | "edit";
+type SaveVariant = "kept" | "detailed" | "edit";
 
 function SaveEntryModal({
   variant,
@@ -213,24 +214,21 @@ function SaveEntryModal({
   onClose: () => void;
   onSubmit: (values: MoodEntryFormValues) => Promise<void>;
 }) {
-  const Modal = variant === "edit"
-    ? EditMoodEntryModal
-    : variant === "detailed"
-      ? DetailedMoodEntryModal
-      : QuickMoodEntryModal;
-
-  return (
-    <Modal
-      visible
-      initialMood={mood}
-      emotionOptions={options}
-      contextOptions={["Work", "Family"]}
-      fieldConfig={fieldConfig}
-      onClose={onClose}
-      onSubmit={onSubmit}
-      onCreateEmotion={() => null}
-    />
-  );
+  const shared = {
+    visible: true,
+    initialMood: mood,
+    emotionOptions: options,
+    contextOptions: ["Work", "Family"],
+    fieldConfig,
+    onClose,
+    onSubmit,
+    onCreateEmotion: () => null,
+  };
+  if (variant === "kept") {
+    return <KeptEntryDetailModal {...shared} onUndo={() => {}} />;
+  }
+  const Modal = variant === "edit" ? EditMoodEntryModal : DetailedMoodEntryModal;
+  return <Modal {...shared} />;
 }
 
 function labeledButton(accessibilityLabel: string) {
@@ -279,9 +277,34 @@ describe.each(["android", "ios"])("entry modal feedback on %s", (platform) => {
   });
 });
 
+describe("kept entry detail", () => {
+  it("removes the kept entry on Undo without saving the form", async () => {
+    const onUndo = vi.fn();
+    const onSubmit = vi.fn(async () => {});
+    await render(
+      <KeptEntryDetailModal
+        visible
+        initialMood={4}
+        emotionOptions={options}
+        contextOptions={["Work"]}
+        fieldConfig={{ emotions: true, context: false, energy: false, notes: false }}
+        onClose={() => {}}
+        onSubmit={onSubmit}
+        onUndo={onUndo}
+      />,
+    );
+
+    await pressLabel("Undo this entry");
+
+    expect(onUndo).toHaveBeenCalledTimes(1);
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(entryFeedback.toastSuccess).not.toHaveBeenCalled();
+  });
+});
+
 describe("entry save acknowledgement", () => {
   it.each([
-    ["quick", "Entry saved"],
+    ["kept", "Detail added"],
     ["detailed", "Entry saved"],
     ["edit", "Entry updated"],
   ] as const)("announces one committed %s result", async (variant, expectedTitle) => {
@@ -314,7 +337,7 @@ describe("entry save acknowledgement", () => {
     const onSubmit = vi.fn(() => pending);
     const onClose = vi.fn();
     await render(
-      <SaveEntryModal variant="quick" onClose={onClose} onSubmit={onSubmit} />,
+      <SaveEntryModal variant="kept" onClose={onClose} onSubmit={onSubmit} />,
     );
 
     await act(async () => {
@@ -341,7 +364,7 @@ describe("entry save acknowledgement", () => {
     });
     await render(
       <SaveEntryModal
-        variant="quick"
+        variant="kept"
         fieldConfig={{ emotions: false, context: false, energy: false, notes: true }}
         onClose={onClose}
         onSubmit={onSubmit}
@@ -373,7 +396,7 @@ describe("entry save acknowledgement", () => {
     });
 
     try {
-      await render(<SaveEntryModal variant="quick" onClose={onClose} onSubmit={onSubmit} />);
+      await render(<SaveEntryModal variant="kept" onClose={onClose} onSubmit={onSubmit} />);
       await act(async () => {
         renderer.root.findByProps({ accessibilityLabel: "Save entry" }).props.onPress();
         await Promise.resolve();
@@ -403,7 +426,7 @@ describe("entry save acknowledgement", () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     try {
-      await render(<SaveEntryModal variant="quick" onClose={onClose} onSubmit={onSubmit} />);
+      await render(<SaveEntryModal variant="kept" onClose={onClose} onSubmit={onSubmit} />);
       await act(async () => {
         renderer.root.findByProps({ accessibilityLabel: "Save entry" }).props.onPress();
         await Promise.resolve();
@@ -462,13 +485,37 @@ describe("entry save acknowledgement", () => {
     );
   });
 
+  it("does not repeat support when adding detail to a severe entry already shown support", async () => {
+    vi.useFakeTimers();
+    try {
+      const onSubmit = vi.fn(async () => {});
+      await render(
+        <SaveEntryModal variant="kept" mood={9} onClose={vi.fn()} onSubmit={onSubmit} />,
+      );
+
+      await act(async () => {
+        renderer.root.findByProps({ accessibilityLabel: "Save entry" }).props.onPress();
+        await Promise.resolve();
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(250);
+      });
+
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+      expect(entryFeedback.crisisSupport).not.toHaveBeenCalled();
+      expect(entryFeedback.toastSuccess).toHaveBeenCalledWith("Detail added");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("keeps crisis support primary after a successful high-distress write", async () => {
     vi.useFakeTimers();
     try {
       const onClose = vi.fn();
       const onSubmit = vi.fn(async () => {});
       await render(
-        <SaveEntryModal variant="quick" mood={9} onClose={onClose} onSubmit={onSubmit} />,
+        <SaveEntryModal variant="detailed" mood={9} onClose={onClose} onSubmit={onSubmit} />,
       );
 
       await act(async () => {

@@ -4,4 +4,4 @@ name: Start measured stress window
 - launchApp:
     clearState: false
     stopApp: false
-- tapOn: "Home tab, log your mood"
+- tapOn: "History tab, view past days and months"

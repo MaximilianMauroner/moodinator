@@ -1,17 +1,13 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import type { MoodEntry } from "@db/types";
-import {
-  getInterpretedMoodRating,
-  getMoodRatingBackgroundHex,
-} from "@/constants/moodScaleInterpretation";
+import { getInterpretedMoodRating } from "@/constants/moodScaleInterpretation";
 import { moodService } from "@/services/moodService";
+import { useMoodsStore } from "@/shared/state/moodsStore";
 
 export type CalendarDayData = {
   day: number;
   entries: MoodEntry[];
   averageMood: number | null;
-  moodColor: string;
-  moodColorDark: string;
   hasMultiple: boolean;
 };
 
@@ -36,6 +32,8 @@ export function useCalendarData(initialYear?: number, initialMonth?: number) {
   const year = displayDate.getFullYear();
   const month = displayDate.getMonth();
 
+  // Reload after any entry change so edits made elsewhere show in the month.
+  const revision = useMoodsStore((state) => state.revision);
   const loadMonthData = useCallback(async () => {
     const requestId = ++latestRequestIdRef.current;
     setLoading(true);
@@ -62,13 +60,10 @@ export function useCalendarData(initialYear?: number, initialMonth?: number) {
         );
         const averageMood = totalMood / entries.length;
 
-        // Get mood color from the scale
         days.set(day, {
           day,
           entries,
           averageMood,
-          moodColor: getMoodRatingBackgroundHex(averageMood),
-          moodColorDark: getMoodRatingBackgroundHex(averageMood, true),
           hasMultiple: entries.length > 1,
         });
       }
@@ -98,7 +93,7 @@ export function useCalendarData(initialYear?: number, initialMonth?: number) {
 
   useEffect(() => {
     loadMonthData();
-  }, [loadMonthData]);
+  }, [loadMonthData, revision]);
 
   const goToPreviousMonth = useCallback(() => {
     setDisplayDate((previousDate) => (
