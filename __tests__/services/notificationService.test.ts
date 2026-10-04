@@ -16,6 +16,7 @@ const notificationMocks = vi.hoisted(() => ({
   cancelAllScheduledNotificationsAsync: vi.fn(),
   SchedulableTriggerInputTypes: {
     DAILY: "daily",
+    WEEKLY: "weekly",
     TIME_INTERVAL: "timeInterval",
   },
   AndroidImportance: {
@@ -78,7 +79,7 @@ describe("notificationService scheduling persistence", () => {
     notificationMocks.getAllScheduledNotificationsAsync.mockResolvedValue([]);
     notificationMocks.cancelScheduledNotificationAsync.mockResolvedValue(undefined);
     notificationMocks.scheduleNotificationAsync.mockImplementation(async (payload) => {
-      return `scheduled-${payload.content.data.notificationId}`;
+      return `scheduled-${payload.content.data.notificationId}${payload.trigger.weekday ? `-${payload.trigger.weekday}` : ""}`;
     });
   });
 
@@ -97,6 +98,159 @@ describe("notificationService scheduling persistence", () => {
     });
     expect(input[0]).not.toHaveProperty("scheduledId");
     expect(await storedNotifications()).toEqual(result.notifications);
+  });
+
+  it.each([{ weekdays: undefined }, { weekdays: [7, 6, 5, 4, 3, 2, 1] }])("keeps all-day selections on the legacy daily trigger (%j)", async ({ weekdays }) => {
+    const { saveAllNotifications } = await loadService();
+    const result = await saveAllNotifications([{ ...reminder("a"), weekdays }]);
+    expect(notificationMocks.scheduleNotificationAsync).toHaveBeenCalledTimes(1);
+    expect(notificationMocks.scheduleNotificationAsync.mock.calls[0][0].trigger).toEqual({
+      type: "daily", channelId: "default", hour: 20, minute: 0,
+    });
+    expect(result.notifications[0].scheduledId).toBe("scheduled-a");
+    expect(result.notifications[0].scheduledIds).toBeUndefined();
+  });
+
+  it("maps Sunday and Saturday to weekly Expo triggers, deduplicates days and persists all IDs", async () => {
+    const { saveAllNotifications } = await loadService();
+    const result = await saveAllNotifications([{ ...reminder("a"), weekdays: [7, 1, 7] }]);
+    expect(notificationMocks.scheduleNotificationAsync.mock.calls.map(([payload]) => payload.trigger)).toEqual([
+      { type: "weekly", weekday: 1, channelId: "default", hour: 20, minute: 0 },
+      { type: "weekly", weekday: 7, channelId: "default", hour: 20, minute: 0 },
+    ]);
+    expect(result.notifications[0].scheduledIds).toEqual(["scheduled-a-1", "scheduled-a-7"]);
+    expect((await storedNotifications())[0].scheduledId).toBeUndefined();
+  });
+
+  it("leaves a complete weekly schedule alone after restart and rebuilds a missing day", async () => {
+    const { saveAllNotifications } = await loadService();
+    await saveAllNotifications([{ ...reminder("a"), weekdays: [2, 4, 6] }]);
+    const scheduled = [2, 4, 6].map((day) => ({
+      identifier: `scheduled-a-${day}`, content: { data: { type: "mood-reminder" } },
+    }));
+    notificationMocks.getAllScheduledNotificationsAsync.mockResolvedValue(scheduled);
+    notificationMocks.scheduleNotificationAsync.mockClear();
+    const restarted = await loadService();
+    expect(await restarted.ensureMoodReminderScheduled()).toBeNull();
+    expect(notificationMocks.scheduleNotificationAsync).not.toHaveBeenCalled();
+    notificationMocks.getAllScheduledNotificationsAsync.mockResolvedValue(scheduled.slice(1));
+    expect((await restarted.ensureMoodReminderScheduled())?.status).toBe("scheduled");
+    expect(notificationMocks.scheduleNotificationAsync).toHaveBeenCalledTimes(3);
+    expect(notificationMocks.requestPermissionsAsync).not.toHaveBeenCalled();
+  });
+
+  it("rebuilds weekly schedules after a timezone change", async () => {
+    const service = await loadService();
+    await service.saveAllNotifications([{ ...reminder("a"), weekdays: [2, 6] }]);
+    notificationMocks.getAllScheduledNotificationsAsync.mockResolvedValue([2, 6].map((day) => ({
+      identifier: `scheduled-a-${day}`, content: { data: { type: "mood-reminder" } },
+    })));
+    notificationMocks.scheduleNotificationAsync.mockClear();
+    localizationMock.timeZone = "Europe/Vienna";
+    expect((await service.ensureMoodReminderScheduled())?.status).toBe("scheduled");
+    expect(notificationMocks.scheduleNotificationAsync).toHaveBeenCalledTimes(2);
+    expect(await AsyncStorage.getItem("notificationScheduleTimeZone")).toBe("Europe/Vienna");
+  });
+
+  it("requires the expected number of weekly IDs even when stored IDs all exist", async () => {
+    await AsyncStorage.setItem("notificationsList", JSON.stringify([{
+      ...reminder("a"), weekdays: [2, 4], scheduledIds: ["only-one"], scheduleStatus: "scheduled",
+    }]));
+    await AsyncStorage.setItem("notificationScheduleTimeZone", "Etc/UTC");
+    notificationMocks.getAllScheduledNotificationsAsync.mockResolvedValue([
+      { identifier: "only-one", content: { data: { type: "mood-reminder" } } },
+    ]);
+    const { ensureMoodReminderScheduled } = await loadService();
+    expect((await ensureMoodReminderScheduled())?.status).toBe("scheduled");
+    expect(notificationMocks.scheduleNotificationAsync).toHaveBeenCalledTimes(2);
+  });
+
+  it("rolls back an incomplete week and recovers passively after restart", async () => {
+    notificationMocks.scheduleNotificationAsync.mockResolvedValueOnce("first-day")
+      .mockRejectedValueOnce(new Error("weekly limit"));
+    const { saveAllNotifications } = await loadService();
+    const result = await saveAllNotifications([{ ...reminder("a"), weekdays: [2, 4, 6] }]);
+    expect(result.status).toBe("failed");
+    expect(notificationMocks.cancelScheduledNotificationAsync).toHaveBeenCalledWith("first-day");
+    expect((await storedNotifications())[0]).toMatchObject({ scheduleStatus: "failed", weekdays: [2, 4, 6] });
+    expect((await storedNotifications())[0].scheduledIds).toBeUndefined();
+    const restarted = await loadService();
+    expect((await restarted.ensureMoodReminderScheduled())?.status).toBe("scheduled");
+    expect((await storedNotifications())[0].scheduledIds).toHaveLength(3);
+  });
+
+  it.each(["delete", "disable"])("retains an ID after rollback fails so %s can cancel it after restart", async (operation) => {
+    notificationMocks.scheduleNotificationAsync.mockResolvedValueOnce("first-day")
+      .mockRejectedValueOnce(new Error("weekly limit"));
+    notificationMocks.cancelScheduledNotificationAsync.mockRejectedValueOnce(new Error("cancel unavailable"));
+    const { saveAllNotifications } = await loadService();
+    const failedSave = await saveAllNotifications([{ ...reminder("a"), weekdays: [2, 4] }]);
+    expect(failedSave.message).toBe(
+      "Failed to schedule 1 reminder. Cleanup is pending. Some notifications may still arrive until cleanup succeeds."
+    );
+    expect((await storedNotifications())[0].scheduledIds).toEqual(["first-day"]);
+    expect((await storedNotifications())[0].unscheduledReason).toBe(
+      "weekly limit Cleanup is pending. Some notifications may still arrive until cleanup succeeds."
+    );
+    notificationMocks.cancelScheduledNotificationAsync.mockClear();
+    const restarted = await loadService();
+    const result = operation === "delete" ? await restarted.deleteNotification("a")
+      : await restarted.updateNotification("a", { enabled: false });
+    expect(result.status).toBe("disabled");
+    expect(notificationMocks.cancelScheduledNotificationAsync).toHaveBeenCalledWith("first-day");
+    expect(await storedNotifications()).toEqual(operation === "delete" ? [] : [expect.objectContaining({
+      enabled: false, scheduleStatus: "disabled",
+    })]);
+  });
+
+  it("retains weekly schedule references while permission is denied for later cleanup", async () => {
+    const service = await loadService();
+    await service.saveAllNotifications([{ ...reminder("a"), weekdays: [2, 4] }]);
+    notificationMocks.getPermissionsAsync.mockResolvedValue({ status: "denied" });
+    expect((await service.ensureMoodReminderScheduled())?.status).toBe("permission-denied");
+    expect((await storedNotifications())[0].scheduledIds).toEqual(["scheduled-a-2", "scheduled-a-4"]);
+    const restarted = await loadService();
+    expect((await restarted.deleteNotification("a")).status).toBe("disabled");
+    expect(notificationMocks.cancelScheduledNotificationAsync).toHaveBeenCalledWith("scheduled-a-2");
+    expect(notificationMocks.cancelScheduledNotificationAsync).toHaveBeenCalledWith("scheduled-a-4");
+    expect(notificationMocks.requestPermissionsAsync).not.toHaveBeenCalled();
+  });
+
+  it("preserves weekly IDs and changed days through a failed native cleanup", async () => {
+    const service = await loadService();
+    await service.saveAllNotifications([{ ...reminder("a"), weekdays: [2, 4] }]);
+    notificationMocks.cancelScheduledNotificationAsync.mockRejectedValueOnce(new Error("cancel unavailable"));
+    const result = await service.updateNotification("a", { weekdays: [6, 7], enabled: false });
+    expect(result.status).toBe("failed");
+    expect((await storedNotifications())[0]).toMatchObject({
+      weekdays: [6, 7], scheduledIds: ["scheduled-a-2", "scheduled-a-4"], pendingAction: "disable",
+    });
+    const restarted = await loadService();
+    expect((await restarted.ensureMoodReminderScheduled())?.status).toBe("disabled");
+    expect((await storedNotifications())[0].scheduledIds).toBeUndefined();
+  });
+
+  it.each([
+    { weekdays: [] }, { weekdays: [0] }, { weekdays: [8] }, { weekdays: [1.5] },
+    { hour: -1 }, { hour: 24 }, { hour: 1.5 }, { minute: -1 }, { minute: 60 }, { minute: NaN },
+  ])("rejects invalid schedule %j before changing native or stored schedules", async (invalid) => {
+    const existing = [{ ...reminder("a"), scheduledId: "existing", scheduleStatus: "scheduled" }];
+    await AsyncStorage.setItem("notificationsList", JSON.stringify(existing));
+    const service = await loadService();
+    await expect(service.updateNotification("a", invalid)).rejects.toThrow();
+    await expect(service.saveAllNotifications([{ ...reminder("a"), ...invalid }])).rejects.toThrow();
+    await expect(service.addNotification({ ...reminder("new"), ...invalid })).rejects.toThrow();
+    expect(await storedNotifications()).toEqual(existing);
+    expect(notificationMocks.cancelScheduledNotificationAsync).not.toHaveBeenCalled();
+    expect(notificationMocks.scheduleNotificationAsync).not.toHaveBeenCalled();
+    expect(notificationMocks.requestPermissionsAsync).not.toHaveBeenCalled();
+  });
+
+  it("validates legacy time saves before persisting settings", async () => {
+    const service = await loadService();
+    await expect(service.saveNotificationSettings(true, 25, 0)).rejects.toThrow();
+    expect(await AsyncStorage.getItem("notificationTime")).toBeNull();
+    expect(notificationMocks.cancelScheduledNotificationAsync).not.toHaveBeenCalled();
   });
 
   it("persists permission-denied state without scheduling enabled reminders", async () => {
@@ -406,7 +560,7 @@ describe("notificationService scheduling persistence", () => {
         unscheduledReason: "The Moodinator notification channel is disabled in system settings.",
       }),
     ]);
-    expect(stored[0]).not.toHaveProperty("scheduledId");
+    expect(stored[0].scheduledId).toBe("scheduled-a");
   });
 
   it("persists permission-denied state during startup recovery when permission was revoked", async () => {
@@ -438,7 +592,7 @@ describe("notificationService scheduling persistence", () => {
         unscheduledReason: "Notification permission was not granted.",
       }),
     ]);
-    expect(stored[0]).not.toHaveProperty("scheduledId");
+    expect(stored[0].scheduledId).toBe("missing-schedule");
   });
 
   it("does not churn valid schedules when access and timezone are unchanged", async () => {

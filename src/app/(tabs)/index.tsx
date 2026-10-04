@@ -115,6 +115,11 @@ function HomeScreenContent() {
   }, []);
 
   const tapStateRef = useRef({ inFlight: false, generation: 0 });
+  const { handleLongPress: openDetailedEntry } = modals;
+  const handleDetailedEntryOpen = useCallback((mood: number) => {
+    beginMoodEntryFlow(tapStateRef.current);
+    openDetailedEntry(mood);
+  }, [openDetailedEntry]);
   const handleEntrySave = useCallback(async (values: MoodEntryFormValues) => {
     beginMoodEntryFlow(tapStateRef.current);
     await commitThenRunPostCommitEffects(
@@ -227,9 +232,9 @@ function HomeScreenContent() {
             </Text>
             <ScrollView style={{ flexGrow: 0, flexShrink: 1 }}>
               {entrySettings.showDetailedLabels ? (
-                <DetailedMoodButtonSelector onMoodPress={handleMoodTap} onLongPress={modals.handleLongPress} />
+                <DetailedMoodButtonSelector onMoodPress={handleMoodTap} onLongPress={handleDetailedEntryOpen} />
               ) : (
-                <WeatherMoodGrid size="dock" onPress={handleMoodTap} onLongPress={modals.handleLongPress} />
+                <WeatherMoodGrid size="dock" onPress={handleMoodTap} onLongPress={handleDetailedEntryOpen} />
               )}
             </ScrollView>
           </View>
