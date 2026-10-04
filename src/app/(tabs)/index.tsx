@@ -1,3 +1,4 @@
+import { useFocusEffect } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
@@ -102,7 +103,12 @@ function HomeScreenContent() {
   const { refreshing, onRefresh: handlePullToRefresh } = usePullToRefresh(refreshToday);
 
   const entrySettings = useEntrySettings();
-  const modals = useMoodModals();
+  const tapStateRef = useRef({ inFlight: false, generation: 0 });
+  const invalidateEntryFlow = useCallback(() => {
+    beginMoodEntryFlow(tapStateRef.current);
+  }, []);
+  const modals = useMoodModals(invalidateEntryFlow);
+  useFocusEffect(useCallback(() => invalidateEntryFlow, [invalidateEntryFlow]));
   const itemActions = useMoodItemActions({
     setEditingEntry: modals.setEditingEntry,
   });
@@ -214,12 +220,6 @@ function HomeScreenContent() {
     [handlePullToRefresh, scrollToTop]
   );
 
-  const tapStateRef = useRef({ inFlight: false, generation: 0 });
-  const { handleLongPress: openDetailedEntry } = modals;
-  const handleDetailedEntryOpen = useCallback((mood: number) => {
-    beginMoodEntryFlow(tapStateRef.current);
-    openDetailedEntry(mood);
-  }, [openDetailedEntry]);
   const handleEntrySave = useCallback(async (values: MoodEntryFormValues) => {
     beginMoodEntryFlow(tapStateRef.current);
     await commitThenRunPostCommitEffects(
@@ -443,7 +443,7 @@ function HomeScreenContent() {
                     >
                       <DetailedMoodButtonSelector
                         onMoodPress={handleMoodTap}
-                        onLongPress={handleDetailedEntryOpen}
+                        onLongPress={modals.handleLongPress}
                       />
                     </Animated.View>
                     <Animated.View
@@ -463,7 +463,7 @@ function HomeScreenContent() {
                       <CollapsedMoodSelector
                         isDark={isDark}
                         onMoodPress={handleMoodTap}
-                        onLongPress={handleDetailedEntryOpen}
+                        onLongPress={modals.handleLongPress}
                       />
                     </Animated.View>
                   </>
@@ -472,7 +472,7 @@ function HomeScreenContent() {
                     collapseProgress={collapseProgress}
                     isDark={isDark}
                     onMoodPress={handleMoodTap}
-                    onLongPress={handleDetailedEntryOpen}
+                    onLongPress={modals.handleLongPress}
                   />
                 )}
               </Animated.View>

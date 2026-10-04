@@ -6,6 +6,7 @@ import { createMockMoodEntry } from "../db/mockClient";
 import { SUPPORT_HANDOFF_MS, SUPPORT_SHEET_DELAY_MS } from "@/lib/keepMoodTap";
 
 const mocks = vi.hoisted(() => ({
+  blur: undefined as (() => void) | undefined,
   support: vi.fn<(options: { onDecline?: () => void }) => void>(),
   store: {
     create: vi.fn<(input: MoodEntryInput) => Promise<MoodEntry>>(),
@@ -16,6 +17,9 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
+vi.mock("expo-router", () => ({
+  useFocusEffect: (effect: () => (() => void) | void) => { mocks.blur = effect() || undefined; },
+}));
 vi.mock("react-native", () => ({
   View: "View", Pressable: "Pressable", RefreshControl: "RefreshControl", ScrollView: "ScrollView",
   Alert: { alert: vi.fn() },
@@ -58,7 +62,6 @@ vi.mock("@/hooks/useEntrySettings", () => ({
     emotionOptions: [], contextOptions: [], createEmotionOption: vi.fn(), createContextOption: vi.fn(),
   }),
 }));
-vi.mock("@/hooks/useMoodItemActions", () => ({ useMoodItemActions: () => ({}) }));
 vi.mock("@/hooks/useColorScheme", () => ({ useColorScheme: () => "dark" }));
 vi.mock("@/hooks/usePullToRefresh", () => ({ usePullToRefresh: () => ({ refreshing: false, onRefresh: vi.fn() }) }));
 vi.mock("@/hooks/useHomeHeaderCollapse", () => ({
@@ -113,5 +116,49 @@ it("does not reopen an old kept entry while a newer detailed form is being fille
   });
   expect(mocks.store.create).toHaveBeenCalledTimes(2);
   expect(host("DetailedEntry").props.visible).toBe(false);
+  expect(host("KeptDetail").props.visible).toBe(false);
+});
+
+
+it.each(["date", "dateLongPress", "edit", "swipeEdit", "dateToEdit"])(
+  "does not reopen an old kept entry after the %s history flow opens",
+  async (flow) => {
+    await act(async () => { renderer = create(<HomeScreen />); });
+    await act(async () => host("DetailedPicker").props.onMoodPress(9));
+    await act(async () => { vi.advanceTimersByTime(SUPPORT_SHEET_DELAY_MS); });
+    const oldDecline = mocks.support.mock.calls[0]![0].onDecline!;
+    const entry = createMockMoodEntry({ id: 100, mood: 4 });
+    const item = host("FlashList").props.renderItem({ item: entry });
+    await act(async () => {
+      if (flow === "edit") item.props.onEdit(entry);
+      else if (flow === "swipeEdit") item.props.onSwipeableWillOpen("left", entry);
+      else if (flow === "dateLongPress") item.props.onLongPress(entry);
+      else item.props.onPress(entry);
+    });
+    if (flow === "dateToEdit") {
+      await act(async () => host("DateTimePicker").props.onEdit(entry));
+    }
+    const editing = flow === "edit" || flow === "swipeEdit" || flow === "dateToEdit";
+    expect(host(editing ? "EditEntry" : "DateTimePicker").props.visible).toBe(true);
+    await act(async () => {
+      oldDecline();
+      vi.advanceTimersByTime(SUPPORT_HANDOFF_MS * 2);
+    });
+    expect(host("KeptDetail").props.visible).toBe(false);
+    expect(host(editing ? "EditEntry" : "DateTimePicker").props.visible).toBe(true);
+  }
+);
+
+
+it("does not resume old support detail after Home loses focus", async () => {
+  await act(async () => { renderer = create(<HomeScreen />); });
+  await act(async () => host("DetailedPicker").props.onMoodPress(9));
+  await act(async () => { vi.advanceTimersByTime(SUPPORT_SHEET_DELAY_MS); });
+  const oldDecline = mocks.support.mock.calls[0]![0].onDecline!;
+  await act(async () => {
+    oldDecline();
+    mocks.blur!();
+    vi.advanceTimersByTime(SUPPORT_HANDOFF_MS * 2);
+  });
   expect(host("KeptDetail").props.visible).toBe(false);
 });
