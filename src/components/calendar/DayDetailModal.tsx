@@ -87,7 +87,7 @@ export function DayDetailModal({
             />
 
             <View className="flex-row items-center justify-between">
-              <View>
+              <View className="flex-1 min-w-0 mr-3">
                 <Text style={[typography.titleMd, { color: get("text"), fontSize: 24, lineHeight: 28 }]}>
                   {format(date, "EEEE, MMM d, yyyy")}
                 </Text>
@@ -100,7 +100,7 @@ export function DayDetailModal({
               </View>
               <Pressable
                 onPress={handleClose}
-                className="p-2 rounded-xl"
+                className="shrink-0 p-2 rounded-xl"
                 style={{
                   backgroundColor: isDark ? "rgba(42, 37, 32, 0.8)" : "rgba(245, 241, 232, 0.9)",
                 }}
