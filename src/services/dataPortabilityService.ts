@@ -16,6 +16,7 @@ import {
 import type { MoodDateRange } from "@db/moods/range";
 import type { Emotion } from "@db/types";
 import { presetSyncService } from "@/services/presetSyncService";
+import { reconcileRemindersAfterMoodChange } from "./reminderReconciliation";
 import { useMoodsStore } from "@/shared/state/moodsStore";
 
 export type ExportRange = "week" | "month" | "custom" | "full";
@@ -143,6 +144,7 @@ export const dataPortabilityService = {
 
   async importData(jsonData: string): Promise<DataImportResult> {
     const result = await importMoods(jsonData);
+    await reconcileRemindersAfterMoodChange();
     const syncResult = await presetSyncService.addMissingFromHistory("all");
     useMoodsStore.getState().invalidate();
     void useMoodsStore.getState().ensureFresh();
@@ -164,6 +166,7 @@ export const dataPortabilityService = {
 
   async deleteLocalMoodData(): Promise<void> {
     await clearMoodData();
+    await reconcileRemindersAfterMoodChange();
     useMoodsStore.getState().invalidate();
     await useMoodsStore.getState().ensureFresh();
   },

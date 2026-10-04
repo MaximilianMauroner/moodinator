@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { NotificationResponse } from "../../src/services/notificationService";
 import {
   startNotificationLifecycle,
@@ -39,7 +39,7 @@ vi.mock("@/services/notificationService", () => ({
       return false;
     }
     const data = content.data;
-    return typeof data === "object" && data !== null && "type" in data && data.type === "mood-reminder";
+    return typeof data === "object" && data !== null && "type" in data && (data.type === "mood-reminder" || data.type === "no-entry-reminder");
   },
   getNotificationResponseIdentity: (response: NotificationResponse) =>
     `${response.notification.request.identifier}:${response.notification.date}:${response.actionIdentifier}`,
@@ -84,9 +84,15 @@ function response(type: string, date = 123): NotificationResponse {
 
 describe("notification lifecycle", () => {
   beforeEach(() => {
+    vi.useFakeTimers();
     vi.clearAllMocks();
     serviceMocks.getLastNotificationResponse.mockResolvedValue(null);
     serviceMocks.clearLastNotificationResponse.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
   });
 
   it("recovers scheduled reminders and removes listeners on cleanup", async () => {
@@ -226,6 +232,59 @@ describe("notification lifecycle", () => {
 
     expect(onMoodReminderResponse).toHaveBeenCalledTimes(1);
     expect(serviceMocks.clearLastNotificationResponse).toHaveBeenCalled();
+  });
+
+  it("routes and deduplicates a conditional cold-start/live response", async () => {
+    const conditional = response("no-entry-reminder");
+    let listener: ((response: NotificationResponse) => void) | undefined;
+    const navigate = vi.fn();
+    const cleanup = startNotificationLifecycle({
+      ensureMoodReminderScheduled: vi.fn().mockResolvedValue(undefined),
+      addNotificationResponseReceivedListener: vi.fn((next) => {
+        listener = next;
+        return Promise.resolve({ remove: vi.fn() });
+      }),
+      getLastNotificationResponse: vi.fn().mockResolvedValue(conditional),
+      onMoodReminderResponse: navigate,
+      addAppStateChangeListener: vi.fn().mockReturnValue({ remove: vi.fn() }),
+    });
+    await Promise.resolve();
+    listener?.(conditional);
+    expect(navigate).toHaveBeenCalledTimes(1);
+    cleanup();
+  });
+
+  it("refreshes calendar changes while active and disposes the timer in background/cleanup", () => {
+    let context = "2026-09-26:Etc/UTC";
+    let appStateListener: ((state: "active" | "background" | "inactive") => void) | undefined;
+    const recover = vi.fn().mockResolvedValue(undefined);
+    const cleanup = startNotificationLifecycle({
+      ensureMoodReminderScheduled: recover,
+      addNotificationResponseReceivedListener: vi.fn().mockResolvedValue(null),
+      addAppStateChangeListener: (listener) => { appStateListener = listener; return { remove: vi.fn() }; },
+      getCalendarContext: () => context,
+      getAppState: () => "active",
+    });
+    vi.advanceTimersByTime(60_000);
+    expect(recover).toHaveBeenCalledTimes(1);
+    context = "2026-09-27:Etc/UTC";
+    vi.advanceTimersByTime(60_000);
+    expect(recover).toHaveBeenCalledTimes(2);
+    context = "2026-09-27:Europe/Berlin";
+    vi.advanceTimersByTime(60_000);
+    expect(recover).toHaveBeenCalledTimes(3);
+    appStateListener?.("background");
+    expect(vi.getTimerCount()).toBe(0);
+    context = "2026-09-28:Europe/Berlin";
+    vi.advanceTimersByTime(60_000);
+    expect(recover).toHaveBeenCalledTimes(3);
+    appStateListener?.("active");
+    expect(recover).toHaveBeenCalledTimes(4);
+    expect(vi.getTimerCount()).toBe(1);
+    cleanup();
+    expect(vi.getTimerCount()).toBe(0);
+    appStateListener?.("active");
+    expect(recover).toHaveBeenCalledTimes(4);
   });
 
   it("ignores unrelated notification responses", async () => {
