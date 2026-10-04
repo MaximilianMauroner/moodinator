@@ -132,7 +132,8 @@ export const useMoodsStore = create<MoodsStore>((set, get) => {
       set((state) => ({
         moods: Object.keys(state.filters).length
           ? moods.filter((entry) =>
-              state.moods.some((existing) => existing.id === entry.id),
+              // Keep only unchanged query results until SQL confirms membership.
+              state.moods.some((existing) => existing === entry),
             )
           : moods.slice(0, HISTORY_PAGE_SIZE),
         revision: state.revision + 1,

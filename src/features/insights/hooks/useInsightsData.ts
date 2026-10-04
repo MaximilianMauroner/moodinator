@@ -51,7 +51,7 @@ async function queryLocalDays(range: AnalysisRange, today: number) {
   return entries.filter((entry) => {
     const day = getEntryLocalDayKey(entry);
     if (!day) return false;
-    return day >= firstDay && day <= lastDay;
+    return range === "all" || (day >= firstDay && day <= lastDay);
   });
 }
 export function useInsightsData(): InsightsData {
@@ -177,7 +177,13 @@ export function useInsightsData(): InsightsData {
       analysisRange === "all"
         ? new Date(`${oldestDay}T00:00:00`)
         : analysisStart(analysisRange, new Date(localDay));
-    return analyzeMoods(analysisMoods, start, new Date(localDay));
+    const lastDay = analysisRange === "all"
+      ? analysisMoods.reduce((latest, entry) => {
+          const day = getEntryLocalDayKey(entry);
+          return day && day > latest ? day : latest;
+        }, format(new Date(localDay), "yyyy-MM-dd"))
+      : format(new Date(localDay), "yyyy-MM-dd");
+    return analyzeMoods(analysisMoods, start, new Date(`${lastDay}T00:00:00`));
   }, [analysisMoods, analysisRange, localDay]);
   const getMoodLabel = useCallback(
     (value: number, sourceScale?: MoodScaleSnapshot) =>

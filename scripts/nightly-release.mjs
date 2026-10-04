@@ -98,6 +98,7 @@ async function buildRelease() {
   let outcome = 'failed';
   let stage = 'checks';
   let failure;
+  let releaseError;
   try {
     output = resolve(process.env.RELEASE_ARTIFACTS_DIR ?? join(homedir(), 'Downloads/lab4code-releases'), app,
       `${reservation.version}-${reservation.versionCode}-${sha.slice(0, 12)}`);
@@ -147,13 +148,28 @@ async function buildRelease() {
     console.log(`Internal release ready: ${output}`);
   } catch (error) {
     failure = releaseFailure(stage);
+    releaseError = error;
     throw error;
   } finally {
     // Record the attempt even when dependency installation, checks, build, or upload fails.
     // If SSH itself fails here, the active reservation safely blocks another upload.
     try {
-      if (output) writeFileSync(join(output, 'release.json'), `${JSON.stringify({ ...reservation, status: outcome, ...(failure ? { failure } : {}), finishedAt: new Date().toISOString() }, null, 2)}\n`);
-      ledger('finish', [reservation.id, outcome]);
+      const errors = [];
+      try {
+        if (output) writeFileSync(join(output, 'release.json'), `${JSON.stringify({ ...reservation, status: outcome, ...(failure ? { failure } : {}), finishedAt: new Date().toISOString() }, null, 2)}\n`);
+      } catch (error) {
+        errors.push(error);
+      }
+      try {
+        ledger('finish', [reservation.id, outcome]);
+      } catch (error) {
+        errors.push(error);
+      }
+      if (errors.length) {
+        if (releaseError) errors.unshift(releaseError);
+        if (errors.length === 1) throw errors[0];
+        throw new AggregateError(errors, errors.map((error) => error.message).join('; '));
+      }
     } finally {
       if (worktreeAdded) run('git', ['worktree', 'remove', '--force', sourceRoot]);
       if (temporary) rmSync(temporary, { recursive: true, force: true });

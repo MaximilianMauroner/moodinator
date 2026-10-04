@@ -166,6 +166,52 @@ describe("DateTimePickerModal timestamp round trips", () => {
     expect(onSave).not.toHaveBeenCalled();
   });
 
+  it.each(["ios", "android"])(
+    "shows an unchanged recorded wall time inside a device DST gap on %s",
+    async (platform) => {
+      nativePlatform.OS = platform;
+      process.env.TZ = "America/New_York";
+      const timestamp = Date.parse("2026-03-08T02:30:56.789Z");
+      const { onSave } = await renderModal(entry(timestamp, 0));
+
+      expect(textValues()).toContain(new Intl.DateTimeFormat(undefined, {
+        timeZone: "UTC", hour: "2-digit", minute: "2-digit",
+      }).format(new Date(timestamp)));
+      await act(async () => button("Change entry time").props.onPress());
+      expect(picker("time").props.timeZoneName).toBe("UTC");
+      expect(picker("time").props.value.toISOString()).toBe("2026-03-08T02:30:56.789Z");
+      await act(async () => setPickerValue("time", new Date("2026-03-08T02:30:00.000Z")));
+      await act(async () => button("Save date and time changes").props.onPress());
+
+      expect(button("Save date and time changes").props.accessibilityState.disabled).toBe(true);
+      expect(onSave).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([0, -345])(
+    "keeps recorded date and time edits in offset %s across a device DST gap",
+    async (offset) => {
+      process.env.TZ = "America/New_York";
+      const timestamp = Date.parse("2026-03-07T02:30:56.789Z") + offset * 60_000;
+      const { onSave } = await renderModal(entry(timestamp, offset));
+
+      await act(async () => button("Change entry date").props.onPress());
+      expect(picker("date").props.timeZoneName).toBe("UTC");
+      await act(async () => setPickerValue("date", new Date("2026-03-08T02:30:00.000Z")));
+      expect(picker("date").props.value.toISOString()).toBe("2026-03-08T02:30:56.789Z");
+      await act(async () => button("Change entry time").props.onPress());
+      await act(async () => setPickerValue("time", new Date("2026-03-08T02:45:00.000Z")));
+      expect(textValues()).toContain(new Intl.DateTimeFormat(undefined, {
+        timeZone: "UTC", hour: "2-digit", minute: "2-digit",
+      }).format(new Date("2026-03-08T02:45:00.000Z")));
+      await act(async () => button("Save date and time changes").props.onPress());
+
+      expect(onSave).toHaveBeenCalledWith(
+        7, Date.parse("2026-03-08T02:45:56.789Z") + offset * 60_000, offset,
+      );
+    },
+  );
+
   it("keeps the Home date flow open when the workflow target disappeared", async () => {
     process.env.TZ = "UTC";
     const original = entry(Date.parse("2026-03-31T23:30:56.123Z"), -120);
