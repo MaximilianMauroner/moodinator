@@ -7,6 +7,7 @@ import { SUPPORT_HANDOFF_MS, SUPPORT_SHEET_DELAY_MS } from "@/lib/keepMoodTap";
 
 const mocks = vi.hoisted(() => ({
   detailedLabels: true,
+  blur: undefined as (() => void) | undefined,
   support: vi.fn<(options: { onDecline?: () => void }) => void>(),
   store: {
     create: vi.fn<(input: MoodEntryInput) => Promise<MoodEntry>>(),
@@ -17,12 +18,15 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
+vi.mock("expo-router", () => ({
+  useRouter: () => ({ navigate: vi.fn() }),
+  useFocusEffect: (effect: () => (() => void) | void) => { mocks.blur = effect() || undefined; },
+}));
 vi.mock("react-native", () => ({
   View: "View", Pressable: "Pressable", RefreshControl: "RefreshControl", ScrollView: "ScrollView", Text: "Text",
   Alert: { alert: vi.fn() },
   Platform: { OS: "android", select: (values: Record<string, unknown>) => values.android ?? values.default },
 }));
-vi.mock("expo-router", () => ({ useRouter: () => ({ navigate: vi.fn() }) }));
 vi.mock("@/components/entry/WeatherMoodGrid", () => ({ WeatherMoodGrid: "WeatherPicker" }));
 vi.mock("@expo/vector-icons", () => ({ Ionicons: "Ionicons" }));
 vi.mock("@react-navigation/bottom-tabs", () => ({ useBottomTabBarHeight: () => 56 }));
@@ -71,6 +75,7 @@ const host = (type: string) => renderer.root.findAll((node) => node.type === typ
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   vi.useFakeTimers();
+  mocks.detailedLabels = true;
   mocks.store.create.mockImplementation(async (input) => createMockMoodEntry({
     id: mocks.store.create.mock.calls.length, mood: input.mood,
   }));
@@ -105,5 +110,41 @@ it.each(["DetailedPicker", "WeatherPicker"])("does not reopen an old kept entry 
   });
   expect(mocks.store.create).toHaveBeenCalledTimes(2);
   expect(host("DetailedEntry").props.visible).toBe(false);
+  expect(host("KeptDetail").props.visible).toBe(false);
+});
+
+
+it.each(["TodayNow", "EarlierToday"])(
+  "does not reopen old detail after a %s date or edit flow opens",
+  async (overview) => {
+    await act(async () => { renderer = create(<HomeScreen />); });
+    await act(async () => host("DetailedPicker").props.onMoodPress(9));
+    await act(async () => { vi.advanceTimersByTime(SUPPORT_SHEET_DELAY_MS); });
+    const oldDecline = mocks.support.mock.calls[0]![0].onDecline!;
+    const entry = createMockMoodEntry({ id: 100, mood: 4 });
+    await act(async () => host(overview).props.onOpen(entry));
+    expect(host("DateTimePicker").props.visible).toBe(true);
+    await act(async () => {
+      oldDecline();
+      vi.advanceTimersByTime(SUPPORT_HANDOFF_MS * 2);
+    });
+    expect(host("KeptDetail").props.visible).toBe(false);
+    expect(host("DateTimePicker").props.visible).toBe(true);
+    await act(async () => host("DateTimePicker").props.onEdit(entry));
+    expect(host("EditEntry").props.visible).toBe(true);
+    expect(host("KeptDetail").props.visible).toBe(false);
+  }
+);
+
+it("does not resume old support detail after Home loses focus", async () => {
+  await act(async () => { renderer = create(<HomeScreen />); });
+  await act(async () => host("DetailedPicker").props.onMoodPress(9));
+  await act(async () => { vi.advanceTimersByTime(SUPPORT_SHEET_DELAY_MS); });
+  const oldDecline = mocks.support.mock.calls[0]![0].onDecline!;
+  await act(async () => {
+    oldDecline();
+    mocks.blur!();
+    vi.advanceTimersByTime(SUPPORT_HANDOFF_MS * 2);
+  });
   expect(host("KeptDetail").props.visible).toBe(false);
 });
