@@ -128,10 +128,10 @@ export function EarlierToday({ entries, onOpen, onShowAll }: EarlierTodayProps) 
             <Ionicons name={getMoodWeatherIcon(display.value)} size={24} color={getMoodWeatherColor(display.value, isDark)} />
             <View style={{ flex: 1, minWidth: 0 }}>
               <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 8 }}>
-                <Text style={{ color: get("text"), fontSize: 15, fontWeight: "500" }}>
+                <Text className="flex-1 min-w-0" style={{ color: get("text"), fontSize: 15, fontWeight: "500" }}>
                   {display.label} <Text style={{ color: get("textSubtle") }}>{display.value}</Text>
                 </Text>
-                <Text style={{ color: get("textSubtle"), fontSize: 13 }}>{time}</Text>
+                <Text className="shrink-0 max-w-[50%]" style={{ color: get("textSubtle"), fontSize: 13 }}>{time}</Text>
               </View>
               {detail ? (
                 <Text numberOfLines={1} style={{ color: get("textSubtle"), fontSize: 13, marginTop: 1 }}>
