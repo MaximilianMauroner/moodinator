@@ -404,3 +404,17 @@ test("a filtered deletion stays removed if the subsequent refresh fails", async 
   expect(useMoodsStore.getState().error).toBe("read failed");
   log.mockRestore();
 });
+
+test("a changed filtered row stays hidden when membership cannot be refreshed", async () => {
+  resetStore();
+  const edited = makeMood(1, 100, { note: "match" });
+  const unchanged = makeMood(2, 200, { note: "match too" });
+  useMoodsStore.setState({ moods: [unchanged, edited], filters: { text: "match" } });
+  moodServiceMock.update.mockResolvedValue({ ...edited, note: "does not qualify" });
+  moodServiceMock.getPaginated.mockRejectedValue(new Error("read failed"));
+  await useMoodsStore.getState().update(1, { note: "does not qualify" });
+  await useMoodsStore.getState().ensureFresh();
+  expect(useMoodsStore.getState().moods).toEqual([unchanged]);
+  expect(useMoodsStore.getState().filters).toEqual({ text: "match" });
+  expect(useMoodsStore.getState().error).toBe("read failed");
+});

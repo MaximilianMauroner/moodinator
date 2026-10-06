@@ -17,6 +17,7 @@ export function HomeHeader() {
 	const isDark = useColorScheme() === "dark";
 
 	const revision = useMoodsStore((s) => s.revision);
+	const lastLoadedAt = useMoodsStore((s) => s.lastLoadedAt);
 	const [streak, setStreak] = useState({ current: 0, longest: 0 });
 	useEffect(() => {
 		let cancelled = false;
@@ -26,7 +27,7 @@ export function HomeHeader() {
 			if (!cancelled) setStreak({ current: 0, longest: 0 });
 		});
 		return () => { cancelled = true; };
-	}, [revision]);
+	}, [revision, lastLoadedAt]);
 
 	const dateLabel = new Date().toLocaleDateString([], {
 		weekday: "long",

@@ -83,6 +83,22 @@ describe("notificationService scheduling persistence", () => {
     });
   });
 
+  it.each([[], [{ ...reminder("disabled", false), scheduleStatus: "disabled" }]])(
+    "cleans orphan native reminders when no stored reminder is enabled: %j",
+    async (stored) => {
+      await AsyncStorage.setItem("notificationsList", JSON.stringify(stored));
+      notificationMocks.getAllScheduledNotificationsAsync.mockResolvedValue([
+        { identifier: "orphan", content: { data: { type: "mood-reminder" } } },
+        { identifier: "conditional", content: { data: { type: "conditional-reminder" } } },
+      ]);
+      const service = await loadService();
+      expect((await service.ensureMoodReminderScheduled())?.status).toBe("disabled");
+      expect(notificationMocks.cancelScheduledNotificationAsync.mock.calls).toEqual([["orphan"]]);
+      expect(notificationMocks.requestPermissionsAsync).not.toHaveBeenCalled();
+      expect(notificationMocks.scheduleNotificationAsync).not.toHaveBeenCalled();
+    },
+  );
+
   it("returns scheduled outcomes, persists scheduled IDs, and does not mutate the caller array", async () => {
     const { saveAllNotifications } = await loadService();
     const input = [reminder("a")];
