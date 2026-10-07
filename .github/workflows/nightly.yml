@@ -47,7 +47,6 @@ jobs:
       contents: write # Required for ledger reservation.
     outputs:
       build: ${{ steps.reserve.outputs.build }}
-      reservation: ${{ steps.reserve.outputs.reservation }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -80,11 +79,19 @@ jobs:
           RELEASE_CHECKED_SHA: ${{ needs.checks.outputs.source_sha }}
           GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/hosted-release.mjs reserve
-      - name: Build and verify with Expo credentials only
+      - name: Transfer public reservation receipt before building
+        id: receipt
         if: steps.reserve.outputs.build == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: moodinator-reservation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/release-artifacts/reservation.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Build and verify with Expo credentials only
+        if: success() && steps.reserve.outputs.build == 'true' && steps.receipt.outcome == 'success'
         env:
           RELEASE_CHECKED_SHA: ${{ needs.checks.outputs.source_sha }}
-          RELEASE_RESERVATION_JSON: ${{ steps.reserve.outputs.reservation }}
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: node scripts/nightly-release.mjs build
       - name: Remove raw EAS logs
@@ -121,6 +128,12 @@ jobs:
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: '24.13.1'
+      - name: Download public reservation receipt even after ordinary build failure
+        if: always() && !cancelled()
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: moodinator-reservation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/release-artifacts
       - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         if: needs.build.result == 'success'
         with:
@@ -138,7 +151,6 @@ jobs:
         if: always() && !cancelled()
         env:
           RELEASE_CHECKED_SHA: ${{ needs.checks.outputs.source_sha }}
-          RELEASE_RESERVATION_JSON: ${{ needs.build.outputs.reservation }}
           RELEASE_BUILD_RESULT: ${{ needs.build.result }}
           PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
           GITHUB_TOKEN: ${{ github.token }}

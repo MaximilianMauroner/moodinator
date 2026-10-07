@@ -1,19 +1,28 @@
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import test from 'node:test';
-import { callHostedLedger, publishHostedRelease, readHostedReservation, reserveHostedRelease, uploadHostedInternal, verifyHostedArtifacts } from '../scripts/hosted-release.mjs';
+import test, { after } from 'node:test';
+import { callHostedLedger, publishHostedRelease, readHostedReservation, reserveHostedRelease, saveHostedReservation, uploadHostedInternal, verifyHostedArtifacts } from '../scripts/hosted-release.mjs';
 import { preparePlayKey, validateHostedSecrets } from '../scripts/prepare-hosted-release.mjs';
 
 const sha = 'a'.repeat(40);
 const reservation = { build: true, id: 'reservation-id', sha, version: '0.1.6', versionCode: 41 };
 
+const directories = [];
+after(() => { for (const directory of directories) rmSync(directory, { recursive: true, force: true }); });
+function receiptDirectory(receipt = reservation) {
+  const directory = mkdtempSync(join(tmpdir(), 'hosted-receipt-'));
+  directories.push(directory);
+  writeFileSync(join(directory, 'reservation.json'), JSON.stringify(receipt));
+  return directory;
+}
+
 function fixture(overrides = {}) {
   const calls = [];
   const records = [];
-  const env = { RELEASE_CHECKED_SHA: sha, RELEASE_RESERVATION_JSON: JSON.stringify(reservation),
-    RELEASE_BUILD_RESULT: 'success', RELEASE_ARTIFACTS_DIR: '/artifacts', ...overrides };
+  const env = { RELEASE_CHECKED_SHA: sha,
+    RELEASE_BUILD_RESULT: 'success', RELEASE_ARTIFACTS_DIR: receiptDirectory(), ...overrides };
   const effects = {
     git(args) { calls.push(['git', ...args]); return sha; },
     constraint: () => '>= 20.5.1',
@@ -125,7 +134,7 @@ test('shared reservation gate rejects a different checkout or identity', () => {
   const state = fixture();
   assert.deepEqual(readHostedReservation(state.env, sha), reservation);
   for (const altered of [{ sha: 'b'.repeat(40) }, { versionCode: 0 }, { id: '../path' }, { build: false }]) {
-    assert.throws(() => readHostedReservation({ ...state.env, RELEASE_RESERVATION_JSON: JSON.stringify({ ...reservation, ...altered }) }, sha));
+    assert.throws(() => readHostedReservation({ ...state.env, RELEASE_ARTIFACTS_DIR: receiptDirectory({ ...reservation, ...altered }) }, sha));
   }
   assert.throws(() => readHostedReservation(state.env, 'b'.repeat(40)));
 });
@@ -187,8 +196,69 @@ test('uncertain finish is not retried, retains sanitized evidence, and reports r
   assert.doesNotMatch(JSON.stringify(state.records), /PRIVATE/);
 });
 
-test('duplicate reservation does not publish or finalize', async () => {
-  const state = fixture({ RELEASE_RESERVATION_JSON: '{"build":false}' });
+test('a malformed receipt cannot finalize an identity', async () => {
+  for (const receipt of [{ build: false, id: 'unexpected' }, null, { ...reservation, sha: 'b'.repeat(40) }, { ...reservation, id: '../invalid' }]) {
+    const state = fixture({ RELEASE_ARTIFACTS_DIR: receiptDirectory(receipt) });
+    await assert.rejects(publishHostedRelease(state.env, state.effects), /reconcile active ledger/);
+    assert.equal(state.calls.some(([kind]) => ['ledger', 'upload'].includes(kind)), false);
+  }
+});
+
+test('missing or invalid JSON receipt fails closed without ledger finalization', async () => {
+  for (const missing of [true, false]) {
+    const state = fixture();
+    const path = join(state.env.RELEASE_ARTIFACTS_DIR, 'reservation.json');
+    if (missing) rmSync(path); else writeFileSync(path, 'PRIVATE invalid JSON');
+    await assert.rejects(publishHostedRelease(state.env, state.effects), /reconcile active ledger/);
+    assert.equal(state.calls.some(([kind]) => kind === 'ledger'), false);
+    assert.equal(state.records[0].failure.stage, 'reservation');
+    assert.equal(state.records[0].id, undefined);
+  }
+});
+
+test('public filesystem receipt survives brace masking of GitHub outputs and excludes credentials', async () => {
+  const state = fixture();
+  const path = join(state.env.RELEASE_ARTIFACTS_DIR, 'reservation.json');
+  rmSync(path);
+  state.env.GITHUB_OUTPUT = join(state.env.RELEASE_ARTIFACTS_DIR, 'output');
+  state.effects.saveReservation = saveHostedReservation;
+  state.effects.ledger = (action, args) => {
+    state.calls.push(['ledger', action, ...args]);
+    return { ...reservation, PLAY_SERVICE_ACCOUNT_JSON: 'PRIVATE', token: 'PRIVATE' };
+  };
+  reserveHostedRelease(state.env, state.effects);
+  const outputs = readFileSync(state.env.GITHUB_OUTPUT, 'utf8').split('\n').filter((line) => !['{', '}'].some((mask) => line.includes(mask)));
+  assert.deepEqual(outputs, ['build=true', '']);
+  assert.deepEqual(JSON.parse(readFileSync(path, 'utf8')), reservation);
+  assert.throws(() => saveHostedReservation(state.env, reservation), /EEXIST/);
+  // No JSON output is available or required on the destination runner.
+  const destination = fixture({ RELEASE_ARTIFACTS_DIR: receiptDirectory(JSON.parse(readFileSync(path, 'utf8'))) });
+  assert.deepEqual(readHostedReservation(destination.env, sha), reservation);
+  assert.deepEqual(await publishHostedRelease(destination.env, destination.effects), { status: 'succeeded' });
+  destination.env.RELEASE_BUILD_RESULT = 'failure';
+  destination.calls.length = 0;
+  assert.deepEqual(await publishHostedRelease(destination.env, destination.effects), { status: 'failed' });
+  assert.deepEqual(destination.calls.filter(([kind]) => kind === 'ledger'), [['ledger', 'finish', 'reservation-id', 'failed']]);
+});
+
+
+test('workflow transfers an immutable receipt before EAS and downloads it on ordinary build failure', () => {
+  const workflow = readFileSync(new URL('../.github/workflows/nightly.yml', import.meta.url), 'utf8');
+  assert.doesNotMatch(workflow, /RELEASE_RESERVATION_JSON|outputs\.reservation/);
+  const receiptUpload = workflow.indexOf('name: Transfer public reservation receipt before building');
+  const easBuild = workflow.indexOf('name: Build and verify with Expo');
+  assert.ok(receiptUpload > 0 && receiptUpload < easBuild);
+  assert.match(workflow.slice(receiptUpload, easBuild), /if-no-files-found: error/);
+  assert.match(workflow.slice(easBuild, workflow.indexOf('name: Remove raw EAS logs')), /if: success\(\) && steps.reserve.outputs.build == 'true' && steps.receipt.outcome == 'success'/);
+  const download = workflow.slice(workflow.indexOf('name: Download public reservation receipt'), workflow.indexOf('name: Prepare artifact verification tools'));
+  assert.match(download, /if: always\(\) && !cancelled\(\)/);
+  assert.match(download, /name: moodinator-reservation-\$\{\{ github.run_id \}\}-\$\{\{ github.run_attempt \}\}/);
+  assert.equal((workflow.match(/name: moodinator-reservation-\$\{\{ github.run_id \}\}-\$\{\{ github.run_attempt \}\}/g) ?? []).length, 2);
+});
+
+
+test('explicit duplicate receipt remains a no-op without finalization', async () => {
+  const state = fixture({ RELEASE_ARTIFACTS_DIR: receiptDirectory({ build: false }) });
   assert.equal(await publishHostedRelease(state.env, state.effects), undefined);
-  assert.deepEqual(state.calls, []);
+  assert.equal(state.calls.some(([kind]) => ['ledger', 'key', 'upload', 'evidence'].includes(kind)), false);
 });
