@@ -16,7 +16,7 @@ function fixture(run) {
     const key = join(root, 'key.json');
     writeFileSync(jar, 'jar');
     writeFileSync(key, JSON.stringify({ type: 'service_account', client_email: 'test@example.com', private_key: 'test' }));
-    run({ root, env: { PATH: process.env.PATH, ANDROID_HOME: sdk, ANDROID_BUNDLETOOL_JAR: jar, PLAY_SERVICE_ACCOUNT_KEY_PATH: key } });
+    run({ root, env: { GITHUB_ACTIONS: 'true', EXPO_TOKEN: 'fixture-token', PATH: process.env.PATH, ANDROID_HOME: sdk, ANDROID_BUNDLETOOL_JAR: jar, PLAY_SERVICE_ACCOUNT_KEY_PATH: key } });
   } finally { rmSync(root, { recursive: true, force: true }); }
 }
 
@@ -27,8 +27,15 @@ test('SDK aliases normalize and conflicting roots fail', () => fixture(({ env })
   assert.throws(() => releaseEnvironment({ ...env, ANDROID_SDK_ROOT: '/other' }), /must match/);
 }));
 
+test('local EAS sessions do not require a token; hosted releases do', () => fixture(({ env }) => {
+  for (const GITHUB_ACTIONS of ['false', undefined]) {
+    assert.equal(releaseEnvironment({ ...env, GITHUB_ACTIONS, EXPO_TOKEN: '' }).EAS_BIN, 'eas');
+  }
+  assert.throws(() => releaseEnvironment({ ...env, GITHUB_ACTIONS: 'true', EXPO_TOKEN: '' }), /EXPO_TOKEN is required on GitHub Actions/);
+}));
+
 test('required environment and unreadable paths fail before build', () => fixture(({ env }) => {
-  for (const name of ['PATH', 'ANDROID_HOME', 'ANDROID_BUNDLETOOL_JAR', 'PLAY_SERVICE_ACCOUNT_KEY_PATH']) {
+  for (const name of ['EXPO_TOKEN', 'PATH', 'ANDROID_HOME', 'ANDROID_BUNDLETOOL_JAR', 'PLAY_SERVICE_ACCOUNT_KEY_PATH']) {
     assert.throws(() => releaseEnvironment({ ...env, [name]: '' }));
   }
   assert.throws(() => releaseEnvironment({ ...env, ANDROID_BUNDLETOOL_JAR: '/missing.jar' }), /missing or unreadable/);
@@ -76,7 +83,7 @@ test('nightly preflight failure writes evidence without touching the ledger', as
     mkdirSync(bin);
     writeFileSync(join(bin, 'git'), '#!/bin/sh\nif [ "$1" = rev-parse ]; then echo abcdef1234567890; fi\nif [ "$1" = show ]; then echo \'{"cli":{"version":">= 20.5.1"}}\'; fi\n', { mode: 0o700 });
     const marker = join(root, 'ledger-called');
-    writeFileSync(join(bin, 'ssh'), `#!/bin/sh\ntouch '${marker}'\nexit 1\n`, { mode: 0o700 });
+    writeFileSync(join(bin, 'python3'), `#!/bin/sh\ntouch '${marker}'\nexit 1\n`, { mode: 0o700 });
     const eas = join(bin, 'eas');
     writeFileSync(eas, '#!/bin/sh\necho eas-cli/16.28.0 test\n', { mode: 0o700 });
     for (const overrides of [{ ANDROID_HOME: '' }, { EAS_BIN: eas }]) {
@@ -92,26 +99,5 @@ test('nightly preflight failure writes evidence without touching the ledger', as
       assert.equal(record.failure.stage, 'preflight');
       assert.equal(record.versionCode, undefined);
     }
-  });
-});
-
-test('LaunchAgent rejects missing values and writes both SDK aliases', async (t) => {
-  if (process.platform !== 'darwin' || Intl.DateTimeFormat().resolvedOptions().timeZone !== 'Europe/Vienna') return t.skip('Mac Vienna LaunchAgent only');
-  const { spawnSync } = await import('node:child_process');
-  const { fileURLToPath } = await import('node:url');
-  fixture(({ root, env }) => {
-    mkdirSync(join(root, 'scripts'));
-    for (const name of ['write-nightly-launch-agent.mjs', 'release-environment.mjs']) {
-      requireFs.copyFileSync(fileURLToPath(new URL(`../scripts/${name}`, import.meta.url)), join(root, 'scripts', name));
-    }
-    const script = join(root, 'scripts/write-nightly-launch-agent.mjs');
-    const target = join(root, '.agents/artifacts/net.lab4code.nightly.plist');
-    const args = [script, root, root];
-    assert.equal(spawnSync(process.execPath, args, { env: { ...env, ANDROID_BUNDLETOOL_JAR: '' }, stdio: 'ignore' }).status, 1);
-    assert.equal(requireFs.existsSync(target), false);
-    assert.equal(spawnSync(process.execPath, args, { env, stdio: 'ignore' }).status, 0);
-    const plist = requireFs.readFileSync(target, 'utf8');
-    for (const key of ['ANDROID_HOME', 'ANDROID_SDK_ROOT']) assert.ok(plist.includes(`<key>${key}</key><string>${env.ANDROID_HOME}</string>`));
-    assert.equal(spawnSync('plutil', ['-lint', target], { stdio: 'ignore' }).status, 0);
   });
 });

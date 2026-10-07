@@ -15,9 +15,10 @@ const finalization = source.slice(start + '  } '.length, end);
 function finalize({ outcome = 'failed', releaseError, evidenceError, ledgerError } = {}) {
   const calls = [];
   const context = {
-    output: '/mock-output', reservation: { id: 'mock-reservation' }, outcome,
+    hosted: false, output: '/mock-output', app: 'moodinator', sha: 'a'.repeat(40), reservation: { id: 'mock-reservation', build: true }, outcome,
     failure: outcome === 'failed' ? { stage: 'checks' } : undefined, releaseError,
     worktreeAdded: true, sourceRoot: '/mock-source', temporary: '/mock-temporary', join,
+    mkdirSync() {},
     writeFileSync(path, value) {
       calls.push(['evidence', path, JSON.parse(value)]);
       if (evidenceError) throw evidenceError;
@@ -53,10 +54,10 @@ for (const outcome of ['failed', 'succeeded']) {
 
 test('evidence and ledger failures retain both errors and still clean up', () => {
   const evidenceError = new Error('ENOSPC: release.json');
-  const ledgerError = new Error('SSH ledger unavailable');
+  const ledgerError = new Error('GitHub ledger unavailable');
   const { error } = finalize({ evidenceError, ledgerError });
   assert.deepEqual(Array.from(error.errors), [evidenceError, ledgerError]);
-  assert.match(error.message, /ENOSPC: release.json; SSH ledger unavailable/);
+  assert.match(error.message, /ENOSPC: release.json; GitHub ledger unavailable/);
 });
 
 test('finalization failure retains the original release error', () => {

@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
-"""Atomic release reservations shared by the Mac and coding host."""
-import fcntl
+"""Release reservations persisted with GitHub Contents API compare-and-swap."""
+import base64
+import binascii
+import copy
+import http.client
 import json
 import os
-from pathlib import Path
 import re
 import sys
-import tempfile
+import subprocess
+import urllib.error
+import urllib.request
 from datetime import datetime, timezone
 from uuid import uuid4
 from zoneinfo import ZoneInfo
@@ -81,36 +85,138 @@ def validate_sha(sha):
         raise ValueError("Expected a full Git SHA")
 
 
+API_URL = "https://api.github.com/repos/MaximilianMauroner/moodinator/contents/ledger.json"
+BRANCH = "release-state"
+
+
+class StorageError(Exception):
+    """Safe diagnostics for storage failures, without response bodies or tokens."""
+
+
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, request, response, code, message, headers, new_url):
+        return None
+
+
+def auth_token():
+    token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+    if not token:
+        try:
+            result = subprocess.run(["gh", "auth", "token", "--hostname", "github.com"],
+                                    capture_output=True, text=True, timeout=15, check=False)
+        except (OSError, subprocess.SubprocessError):
+            raise StorageError("GitHub authentication unavailable") from None
+        if result.returncode == 0:
+            token = result.stdout.strip()
+    if not token or any(character.isspace() for character in token):
+        raise StorageError("GitHub authentication unavailable")
+    return token
+
+
+class GitHubStorage:
+    def __init__(self, token):
+        self.token = token
+        self.opener = urllib.request.build_opener(NoRedirect())
+
+    def request(self, method, body=None):
+        url = API_URL + ("?ref=" + BRANCH if method == "GET" else "")
+        headers = {"Authorization": "Bearer " + self.token,
+                   "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28",
+                   "Content-Type": "application/json"}
+        request = urllib.request.Request(url, data=json.dumps(body).encode() if body else None,
+                                         headers=headers, method=method)
+        uncertainty = "; reconcile ledger before another release" if method == "PUT" else ""
+        try:
+            with self.opener.open(request, timeout=30) as response:
+                payload = response.read()
+        except urllib.error.HTTPError as error:
+            code = error.code
+            error.close()
+            raise StorageError(f"GitHub ledger {method} failed (HTTP {code})" + uncertainty) from None
+        except (OSError, urllib.error.URLError, http.client.HTTPException, ValueError):
+            raise StorageError(f"GitHub ledger {method} failed" + uncertainty) from None
+        try:
+            return json.loads(payload)
+        except (ValueError, UnicodeError):
+            raise StorageError(f"Invalid GitHub ledger {method} response" + uncertainty) from None
+
+    def read(self):
+        response = self.request("GET")
+        try:
+            if response["type"] != "file" or response["encoding"] != "base64":
+                raise ValueError()
+            sha = response["sha"]
+            validate_sha(sha)
+            content = base64.b64decode("".join(response["content"].split()), validate=True)
+            state = json.loads(content)
+            validate_state(state)
+        except (KeyError, TypeError, ValueError, UnicodeError, AttributeError, binascii.Error):
+            raise StorageError("Ledger is missing, empty, or invalid; explicit reconciliation required") from None
+        return state, sha
+
+    def write(self, state, sha):
+        content = base64.b64encode((json.dumps(state, indent=2) + "\n").encode()).decode()
+        response = self.request("PUT", {"message": "Update nightly release ledger", "branch": BRANCH,
+                                        "sha": sha, "content": content})
+        try:
+            validate_sha(response["content"]["sha"])
+        except (KeyError, TypeError, ValueError):
+            raise StorageError("Ledger persistence unconfirmed; reconcile before another release") from None
+
+
+def validate_state(state):
+    if not isinstance(state, dict) or not state:
+        raise ValueError()
+    for field in ("lastReserved", "latest"):
+        value = state[field]
+        identity(value["version"], value["versionCode"])
+    validate_sha(state["latest"]["sha"])
+    datetime.strptime(state["lastAttemptDay"], "%Y-%m-%d")
+    attempts = state["attempts"]
+    if not isinstance(attempts, dict) or not attempts:
+        raise ValueError()
+    running = []
+    for sha, attempt in attempts.items():
+        validate_sha(sha)
+        if attempt["sha"] != sha or attempt["status"] not in ("running", "failed", "succeeded"):
+            raise ValueError()
+        identity(attempt["version"], attempt["versionCode"])
+        datetime.strptime(attempt["day"], "%Y-%m-%d")
+        if attempt["status"] == "running":
+            if not isinstance(attempt["id"], str) or not attempt["id"]:
+                raise ValueError()
+            running.append(attempt["id"])
+    if running != ([state["active"]] if state["active"] else []):
+        raise ValueError()
+
+
+def execute(storage, action, args, now=None):
+    if action not in ("status", "reserve", "finish"):
+        raise ValueError("Expected status, reserve, or finish; live seed is forbidden")
+    if len(args) != {"status": 0, "reserve": 1, "finish": 2}[action]:
+        raise ValueError("Invalid ledger action arguments")
+    state, sha = storage.read()
+    previous = copy.deepcopy(state)
+    state, result = transition(state, action, args, now)
+    if state != previous:
+        storage.write(state, sha)
+    return result
+
+
 def main():
-    app, action, *args = sys.argv[1:]
-    if app not in ("moodinator", "zen-mode"):
-        raise ValueError("Unknown app")
-    directory = Path.home() / ".local/state/lab4code-releases"
-    directory.mkdir(parents=True, exist_ok=True, mode=0o700)
-    os.chmod(directory, 0o700)
-    path = directory / (app + ".json")
-    with open(directory / (app + ".lock"), "a") as lock:
-        os.chmod(lock.name, 0o600)
-        fcntl.flock(lock, fcntl.LOCK_EX)
-        state = json.loads(path.read_text()) if path.exists() else None
-        state, result = transition(state, action, args)
-        if action != "status" and state is not None:
-            descriptor, temporary = tempfile.mkstemp(dir=directory)
-            try:
-                with os.fdopen(descriptor, "w") as output:
-                    json.dump(state, output, indent=2)
-                    output.write("\n")
-                    output.flush()
-                    os.fsync(output.fileno())
-                os.replace(temporary, path)
-            finally:
-                if os.path.exists(temporary):
-                    os.unlink(temporary)
-        print(json.dumps(result))
+    if len(sys.argv) < 3 or sys.argv[1] != "moodinator":
+        raise ValueError("Expected moodinator and a ledger action")
+    action, *args = sys.argv[2:]
+    if action not in ("status", "reserve", "finish"):
+        raise ValueError("Expected status, reserve, or finish; live seed is forbidden")
+    result = execute(GitHubStorage(auth_token()), action, args)
+    print(json.dumps(result))
 
 
 if __name__ == "__main__":
     try:
         main()
-    except (ValueError, TypeError) as error:
+    except (StorageError, ValueError) as error:
         sys.exit(str(error))
+    except Exception:
+        sys.exit("Ledger operation failed; explicit reconciliation required")
