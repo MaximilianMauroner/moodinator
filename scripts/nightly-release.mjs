@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawn, spawnSync } from 'node:child_process';
-import { chmodSync, closeSync, existsSync, openSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, closeSync, existsSync, openSync, copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,10 +11,8 @@ import { preflightRelease, releaseFailure } from './release-environment.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const app = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).name;
-const coordinator = process.env.RELEASE_COORDINATOR ?? 'coding';
-const eas = process.env.EAS_BIN ?? 'eas';
+const eas = process.env.EAS_BIN || 'eas';
 const command = process.argv[2] ?? 'run';
-const quote = (value) => "'" + value.replaceAll("'", "'\\''") + "'";
 
 function run(program, args, cwd = root, capture = false, input) {
   const result = spawnSync(program, args, { cwd, encoding: 'utf8', input,
@@ -46,13 +44,7 @@ async function runEas(args, cwd, logPath) {
 }
 
 function ledger(action, args = []) {
-  if (coordinator === 'local' && process.platform === 'darwin') throw new Error('The Mac must use the shared coding release ledger');
-  const source = readFileSync(join(root, 'scripts/nightly-ledger.py'), 'utf8');
-  const parameters = [app, action, ...args].map(quote).join(' ');
-  const response = coordinator === 'local'
-    ? run('python3', ['-', app, action, ...args], root, true, source)
-    : run('ssh', ['-o', 'BatchMode=yes', coordinator, `python3 - ${parameters}`], root, true, source);
-  return JSON.parse(response);
+  return JSON.parse(run('python3', [join(root, 'scripts/nightly-ledger.py'), app, action, ...args], root, true));
 }
 
 function checkResources() {
@@ -79,51 +71,35 @@ function assertProfiles(sourceRoot) {
 async function buildRelease() {
   run('git', ['fetch', 'origin', 'main']);
   const sha = run('git', ['rev-parse', 'origin/main'], root, true);
-  try {
-    const config = JSON.parse(run('git', ['show', `${sha}:eas.json`], root, true));
-    Object.assign(process.env, preflightRelease(root, process.env, config.cli.version));
-  } catch (error) {
-    const output = resolve(process.env.RELEASE_ARTIFACTS_DIR ?? join(homedir(), 'Downloads/lab4code-releases'), app, `preflight-${sha.slice(0, 12)}`);
-    mkdirSync(output, { recursive: true });
-    writeFileSync(join(output, 'release.json'), `${JSON.stringify({ app, sha, status: 'failed', failure: releaseFailure('preflight'), finishedAt: new Date().toISOString() }, null, 2)}\n`);
-    throw error;
-  }
-  const credentialPath = process.env.PLAY_SERVICE_ACCOUNT_KEY_PATH;
-  const reservation = ledger('reserve', [sha]);
-  console.log(JSON.stringify({ app, ...reservation }));
-  if (!reservation.build) return;
   let temporary;
   let sourceRoot;
   let worktreeAdded = false;
+  let reservation;
   let output;
   let outcome = 'failed';
-  let stage = 'checks';
+  let stage = 'preflight';
   let failure;
   let releaseError;
   try {
-    output = resolve(process.env.RELEASE_ARTIFACTS_DIR ?? join(homedir(), 'Downloads/lab4code-releases'), app,
-      `${reservation.version}-${reservation.versionCode}-${sha.slice(0, 12)}`);
-    mkdirSync(output, { recursive: true });
-    writeFileSync(join(output, 'release.json'), `${JSON.stringify(reservation, null, 2)}\n`);
+    const fetchedConfig = JSON.parse(run('git', ['show', `${sha}:eas.json`], root, true));
+    Object.assign(process.env, preflightRelease(root, process.env, fetchedConfig.cli.version));
     temporary = mkdtempSync(join(tmpdir(), `${app}-nightly-`));
     sourceRoot = join(temporary, 'source');
     run('git', ['worktree', 'add', '--detach', sourceRoot, sha]);
     worktreeAdded = true;
+    stage = 'checks';
     checkResources();
-    if (existsSync(join(sourceRoot, 'bun.lock'))) {
-      run('bun', ['install', '--frozen-lockfile'], sourceRoot);
-      run('bun', ['run', 'test:run'], sourceRoot);
-      run('bun', ['run', 'test:nightly'], sourceRoot);
-      run('bun', ['run', 'lint'], sourceRoot);
-      run('bun', ['run', 'typecheck'], sourceRoot);
-      run('bun', ['run', 'verify:android-release-config'], sourceRoot);
-    } else {
-      run('npm', ['ci'], sourceRoot);
-      run('npm', ['test'], sourceRoot);
-      run('npm', ['run', 'test:nightly'], sourceRoot);
-      run('npm', ['run', 'lint'], sourceRoot);
-      run('npx', ['tsc', '--noEmit'], sourceRoot);
-    }
+    run('bun', ['install', '--frozen-lockfile'], sourceRoot);
+    run('bun', ['run', 'verify'], sourceRoot);
+    run('bun', ['run', 'test:nightly'], sourceRoot);
+    // Checks must pass on the fetched source before consuming a release identity.
+    reservation = ledger('reserve', [sha]);
+    console.log(JSON.stringify({ app, ...reservation }));
+    if (!reservation.build) return;
+    output = resolve(process.env.RELEASE_ARTIFACTS_DIR ?? join(homedir(), 'Downloads/lab4code-releases'), app,
+      `${reservation.version}-${reservation.versionCode}-${sha.slice(0, 12)}`);
+    mkdirSync(output, { recursive: true });
+    writeFileSync(join(output, 'release.json'), `${JSON.stringify(reservation, null, 2)}\n`);
     stampRelease(sourceRoot, reservation.version, reservation.versionCode);
     const easPath = join(sourceRoot, 'eas.json');
     const config = JSON.parse(readFileSync(easPath, 'utf8'));
@@ -143,8 +119,12 @@ async function buildRelease() {
     stage = 'artifact-verify';
     const stamped = JSON.parse(readFileSync(join(sourceRoot, 'app.json'), 'utf8')).expo;
     verifyReleaseArtifacts(apk, aab, { package: stamped.android.package, version: reservation.version, versionCode: reservation.versionCode }, app);
+    const verified = join(output, 'verified');
+    mkdirSync(verified);
+    copyFileSync(apk, join(verified, `${app}-${reservation.version}.apk`));
+    copyFileSync(aab, join(verified, `${app}-${reservation.version}.aab`));
     stage = 'play-upload';
-    await uploadPlayInternal({ app, aabPath: aab, version: reservation.version, versionCode: reservation.versionCode, keyPath: credentialPath });
+    await uploadPlayInternal({ app, aabPath: aab, version: reservation.version, versionCode: reservation.versionCode, keyPath: process.env.PLAY_SERVICE_ACCOUNT_KEY_PATH });
     outcome = 'succeeded';
     console.log(`Internal release ready: ${output}`);
   } catch (error) {
@@ -153,16 +133,18 @@ async function buildRelease() {
     throw error;
   } finally {
     // Record the attempt even when dependency installation, checks, build, or upload fails.
-    // If SSH itself fails here, the active reservation safely blocks another upload.
+    // If GitHub persistence fails here, the active reservation safely blocks another upload.
     try {
       const errors = [];
       try {
-        if (output) writeFileSync(join(output, 'release.json'), `${JSON.stringify({ ...reservation, status: outcome, ...(failure ? { failure } : {}), finishedAt: new Date().toISOString() }, null, 2)}\n`);
+        const recordDirectory = output ?? resolve(process.env.RELEASE_ARTIFACTS_DIR ?? join(homedir(), 'Downloads/lab4code-releases'), app, `preflight-${sha.slice(0, 12)}`);
+        if (!reservation || reservation.build) mkdirSync(recordDirectory, { recursive: true });
+        if (!reservation || reservation.build) writeFileSync(join(recordDirectory, 'release.json'), `${JSON.stringify({ app, sha, ...reservation, status: outcome, ...(failure ? { failure } : {}), finishedAt: new Date().toISOString() }, null, 2)}\n`);
       } catch (error) {
         errors.push(error);
       }
       try {
-        ledger('finish', [reservation.id, outcome]);
+        if (reservation?.build) ledger('finish', [reservation.id, outcome]);
       } catch (error) {
         errors.push(error);
       }
@@ -184,8 +166,8 @@ try {
     if (locked.error) throw locked.error;
     process.exitCode = locked.status ?? 1;
   } else if (command === 'run') await buildRelease();
-  else if (['status', 'seed', 'finish'].includes(command)) console.log(JSON.stringify(ledger(command, process.argv.slice(3)), null, 2));
-  else throw new Error('Usage: node scripts/nightly-release.mjs [run|status|seed VERSION CODE SHA|finish ID failed|succeeded]');
+  else if (['status', 'finish'].includes(command)) console.log(JSON.stringify(ledger(command, process.argv.slice(3)), null, 2));
+  else throw new Error('Usage: node scripts/nightly-release.mjs [run|status|finish ID failed|succeeded]');
 } catch (error) {
   console.error(error.message);
   process.exitCode = 1;
