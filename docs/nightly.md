@@ -99,16 +99,13 @@ The uploader protects existing Play review state with
 
 ## Remaining local compatibility
 
-Hosted runs require `EXPO_TOKEN` before reservation. Local manual builds and the
-retained launcher can use an existing authenticated EAS CLI session without this
+Hosted runs require `EXPO_TOKEN` before reservation. Local manual builds can use an existing authenticated EAS CLI session without this
 token, or set `EXPO_TOKEN`. Local runs still require the Android tools, Play key
 file, resource gates, and GitHub ledger access.
 
-The Mac LaunchAgent generator is removed. `run-nightlies.mjs` remains only for
-an installed old LaunchAgent that calls it until the cutover owner retires that
-schedule. It invokes the same GitHub-backed entrypoints and cannot access the old
-ledger. Remove it and its caller test after retirement is confirmed. The host
-lock remains for supported local manual builds and is not persistent ledger state.
+The Mac scheduler helpers and their launcher test are removed after the cutover
+owner confirmed that the legacy Mac and VM schedules are retired. The host lock
+remains for supported local manual builds and is not persistent ledger state.
 
 ## Verification
 
