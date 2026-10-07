@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
 import { runInNewContext } from 'node:vm';
@@ -20,9 +21,11 @@ async function release({ hosted = false, checkFailure, reservationFailure, verif
     statfsSync(path) { calls.push(['resources', path, diskGiB]); return { bavail: diskGiB * 1024 ** 3, bsize: 1 }; },
     totalmem: () => memoryGiB * 1024 ** 3,
   });
+  const receiptDirectory = mkdtempSync(join(tmpdir(), 'hosted-build-receipt-'));
+  writeFileSync(join(receiptDirectory, 'reservation.json'), JSON.stringify({ build: true, id: 'reservation', sha: 'a'.repeat(40), version: '0.1.6', versionCode: 41 }));
   const context = {
     command: hosted ? 'build' : 'run', app: 'moodinator', root: '/checkout', join, resolve,
-    process: { env: { GITHUB_ACTIONS: 'true', EXPO_TOKEN: 'fixture', RELEASE_ARTIFACTS_DIR: '/artifacts', RELEASE_CHECKED_SHA: 'a'.repeat(40), RELEASE_RESERVATION_JSON: JSON.stringify({ build: true, id: 'reservation', sha: 'a'.repeat(40), version: '0.1.6', versionCode: 41 }) } },
+    process: { env: { GITHUB_ACTIONS: 'true', EXPO_TOKEN: 'fixture', RELEASE_ARTIFACTS_DIR: receiptDirectory, RELEASE_CHECKED_SHA: 'a'.repeat(40) } },
     homedir: () => '/home', tmpdir: () => '/tmp', mkdtempSync: () => '/temporary',
     console: { log() {} },
     run(program, args, cwd) {
@@ -55,6 +58,7 @@ async function release({ hosted = false, checkFailure, reservationFailure, verif
   const execute = runInNewContext(`(${functionSource})`, context);
   let error;
   try { await execute(); } catch (caught) { error = caught; }
+  finally { rmSync(receiptDirectory, { recursive: true, force: true }); }
   return { calls, records, error };
 }
 

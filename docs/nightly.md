@@ -90,7 +90,18 @@ certificate verification before upload to the fixed Play `internal` track.
 The workflow retains verified APK/AAB copies and sanitized `release.json` for
 30 days, including verified bundles from a failed upload. Build evidence and final
 publish evidence have distinct artifact names containing both `run_id` and
-`run_attempt`. The publisher rechecks artifacts against the reservation and
+`run_attempt`. Immediately after reserve, the build runner uploads a separate
+immutable `moodinator-reservation-RUN_ID-RUN_ATTEMPT` artifact before EAS starts.
+Its `reservation.json` contains only the public reservation ID, checked source
+SHA, version and versionCode. Build reads this file locally; publish downloads
+it even after an ordinary build failure. JSON identity is never a job output:
+GitHub can suppress JSON outputs when multiline secret masking includes braces.
+Only the scalar build gate crosses as an output. Missing, malformed or mismatched
+receipts fail closed and leave the ledger active for explicit reconciliation;
+there is no inferred identity or current-ledger fallback. The receipt is transfer
+evidence, not authoritative state. A failed receipt upload prevents EAS from
+starting and requires reconciliation if publish cannot obtain that receipt.
+The publisher rechecks artifacts against the reservation and
 approved certificates before using the Play key. Unverified build
 outputs and raw EAS logs are excluded. EAS logs remain private mode-0600 files
 until cleanup; they can contain credentials and must never become Actions output

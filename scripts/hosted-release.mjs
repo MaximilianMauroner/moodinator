@@ -65,13 +65,20 @@ function reservationIdentity(reservation, sha) {
   return { build: true, id: reservation.id, sha, ...releaseIdentity(reservation.version, reservation.versionCode) };
 }
 
-export function readHostedReservation(env, actualSHA) {
+function readReservationReceipt(env, actualSHA) {
   const sha = checkedSha(env);
   if (sha !== actualSHA) throw new Error('Checked release SHA differs from checkout');
   let parsed;
-  try { parsed = JSON.parse(env.RELEASE_RESERVATION_JSON); }
+  try { parsed = JSON.parse(readFileSync(join(artifactsDirectory(env), 'reservation.json'), 'utf8')); }
   catch { throw new Error('Invalid checked release reservation'); }
+  if (parsed?.build === false && Object.keys(parsed).length === 1) return { build: false };
   return reservationIdentity(parsed, sha);
+}
+
+export function readHostedReservation(env, actualSHA) {
+  const reservation = readReservationReceipt(env, actualSHA);
+  if (!reservation.build) throw new Error('Expected an active checked release reservation');
+  return reservation;
 }
 
 function evidence(env, record) {
@@ -96,6 +103,16 @@ export function uploadHostedInternal(options, env = process.env, spawn = spawnSy
   if (result.error || result.status !== 0) throw new Error('Internal upload failed; reconcile an uncertain upload');
 }
 
+// Only the normalized public release identity is transferred between runners.
+export function saveHostedReservation(env, reservation) {
+  reservation = reservation.build === false ? { build: false } : reservationIdentity(reservation, checkedSha(env));
+  const directory = artifactsDirectory(env);
+  mkdirSync(directory, { recursive: true });
+  writeFileSync(join(directory, 'reservation.json'), `${JSON.stringify(reservation)}\n`, { flag: 'wx' });
+  if (!env.GITHUB_OUTPUT) throw new Error('GITHUB_OUTPUT is required');
+  appendFileSync(env.GITHUB_OUTPUT, `build=${reservation.build}\n`);
+}
+
 const services = {
   git,
   ledger: callHostedLedger,
@@ -105,13 +122,7 @@ const services = {
   upload: uploadHostedInternal,
   evidence,
   removeKey: (path) => rmSync(path, { force: true }),
-  saveReservation(env, reservation) {
-    const directory = artifactsDirectory(env);
-    mkdirSync(directory, { recursive: true });
-    writeFileSync(join(directory, 'reservation.json'), `${JSON.stringify(reservation)}\n`);
-    if (!env.GITHUB_OUTPUT) throw new Error('GITHUB_OUTPUT is required');
-    appendFileSync(env.GITHUB_OUTPUT, `build=${reservation.build}\nreservation=${JSON.stringify(reservation)}\n`);
-  },
+  saveReservation: saveHostedReservation,
   constraint: () => JSON.parse(readFileSync(join(root, 'eas.json'), 'utf8')).cli.version,
 };
 
@@ -137,11 +148,14 @@ export function reserveHostedRelease(env = process.env, effects = services) {
 export async function publishHostedRelease(env = process.env, effects = services) {
   let reservation;
   try {
-    const parsed = JSON.parse(env.RELEASE_RESERVATION_JSON);
-    if (parsed.build === false) return;
-    reservation = readHostedReservation(env, effects.git(['rev-parse', 'HEAD'], env));
+    reservation = readReservationReceipt(env, effects.git(['rev-parse', 'HEAD'], env));
+    if (!reservation.build) return;
     if (!['success', 'failure'].includes(env.RELEASE_BUILD_RESULT)) throw new Error();
-  } catch { throw new Error('Invalid publish source, reservation, or build result; reconcile active ledger'); }
+  } catch {
+    try { effects.evidence(env, { status: 'failed', failure: { stage: 'reservation', message: 'Invalid publish source, reservation, or build result; reconcile active ledger' } }); }
+    catch { /* Missing receipt must remain fail closed even if evidence cannot be saved. */ }
+    throw new Error('Invalid publish source, reservation, or build result; reconcile active ledger');
+  }
   let outcome = 'failed';
   let stage = 'build';
   let keyPath;
