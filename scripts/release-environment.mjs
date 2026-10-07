@@ -17,7 +17,7 @@ function readablePath(value, name, directory = false) {
 }
 
 export function releaseEnvironment(env = process.env) {
-  if (!env.EXPO_TOKEN?.trim()) throw new Error('EXPO_TOKEN is required');
+  if (env.GITHUB_ACTIONS === 'true' && !env.EXPO_TOKEN?.trim()) throw new Error('EXPO_TOKEN is required on GitHub Actions');
   if (!env.PATH?.trim()) throw new Error('PATH is required');
   const sdk = readablePath(env.ANDROID_HOME || env.ANDROID_SDK_ROOT, 'Android SDK', true);
   if (env.ANDROID_HOME && env.ANDROID_SDK_ROOT && resolve(env.ANDROID_HOME) !== resolve(env.ANDROID_SDK_ROOT)) {
@@ -34,6 +34,12 @@ export function releaseEnvironment(env = process.env) {
   return { ...env, ANDROID_HOME: sdk, ANDROID_SDK_ROOT: sdk,
     ANDROID_BUNDLETOOL_JAR: bundletool, PLAY_SERVICE_ACCOUNT_KEY_PATH: keyPath,
     EAS_BIN: env.EAS_BIN || 'eas' };
+}
+
+export function checkReleaseResources(root) {
+  const disk = statfsSync(root);
+  if (disk.bavail * disk.bsize < 15 * 1024 ** 3) throw new Error('Local builds require at least 15 GiB free disk space');
+  if (totalmem() < 8 * 1024 ** 3) throw new Error('Local builds require at least 8 GiB RAM');
 }
 
 export function preflightRelease(root, env = process.env, cliVersion) {
@@ -68,9 +74,7 @@ export function preflightRelease(root, env = process.env, cliVersion) {
     const result = spawnSync(program, args, { cwd: root, env: environment, stdio: 'ignore', timeout: 30000 });
     if (result.error || result.status !== 0) throw new Error(`${name} is unavailable`);
   }
-  const disk = statfsSync(root);
-  if (disk.bavail * disk.bsize < 15 * 1024 ** 3) throw new Error('Local builds require at least 15 GiB free disk space');
-  if (totalmem() < 8 * 1024 ** 3) throw new Error('Local builds require at least 8 GiB RAM');
+  checkReleaseResources(root);
   return environment;
 }
 

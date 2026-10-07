@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { stampRelease } from './stamp-nightly-version.mjs';
 import { verifyReleaseArtifacts } from './verify-release-artifacts.mjs';
 import { uploadPlayInternal } from './upload-play-internal.mjs';
-import { preflightRelease, releaseFailure } from './release-environment.mjs';
+import { checkReleaseResources, preflightRelease, releaseFailure } from './release-environment.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const app = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).name;
@@ -47,17 +47,6 @@ function ledger(action, args = []) {
   return JSON.parse(run('python3', [join(root, 'scripts/nightly-ledger.py'), app, action, ...args], root, true));
 }
 
-function checkResources() {
-  run('df', ['-h', root]);
-  if (process.platform === 'darwin') {
-    run('vm_stat', []);
-    const total = Number(run('sysctl', ['-n', 'hw.memsize'], root, true));
-    if (total < 8 * 1024 ** 3) throw new Error('Local builds require at least 8 GiB RAM');
-  } else {
-    run('free', ['-h']);
-  }
-}
-
 function assertProfiles(sourceRoot) {
   const config = JSON.parse(readFileSync(join(sourceRoot, 'eas.json'), 'utf8'));
   for (const name of ['nightly', 'nightly-apk']) {
@@ -88,10 +77,12 @@ async function buildRelease() {
     run('git', ['worktree', 'add', '--detach', sourceRoot, sha]);
     worktreeAdded = true;
     stage = 'checks';
-    checkResources();
+    checkReleaseResources(sourceRoot);
     run('bun', ['install', '--frozen-lockfile'], sourceRoot);
     run('bun', ['run', 'verify'], sourceRoot);
     run('bun', ['run', 'test:nightly'], sourceRoot);
+    // Dependencies and checks can reduce free disk space on the fetched source filesystem.
+    checkReleaseResources(sourceRoot);
     // Checks must pass on the fetched source before consuming a release identity.
     reservation = ledger('reserve', [sha]);
     console.log(JSON.stringify({ app, ...reservation }));
@@ -114,7 +105,7 @@ async function buildRelease() {
     stage = 'apk-build';
     await runEas(['build', '--platform', 'android', '--profile', 'nightly-apk', '--local', '--non-interactive', '--freeze-credentials', '--output', apk], sourceRoot, join(logs, 'apk-build.log'));
     stage = 'aab-build';
-    checkResources();
+    checkReleaseResources(sourceRoot);
     await runEas(['build', '--platform', 'android', '--profile', 'nightly', '--local', '--non-interactive', '--freeze-credentials', '--output', aab], sourceRoot, join(logs, 'aab-build.log'));
     stage = 'artifact-verify';
     const stamped = JSON.parse(readFileSync(join(sourceRoot, 'app.json'), 'utf8')).expo;

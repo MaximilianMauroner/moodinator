@@ -48,7 +48,9 @@ node scripts/nightly-release.mjs status
 The runner fetches `origin/main`, checks the chosen EAS stable version against
 that SHA's `eas.json`, then prepares an isolated worktree of the same SHA.
 Locked dependency installation, full `bun run verify`, and `bun run test:nightly`
-run there before reservation. Local work is preserved. Use the coordinated
+run there before reservation. The runner checks actual free disk and total RAM on
+that worktree after these checks and before reservation, and checks again before
+the AAB build. Local work is preserved. Use the coordinated
 entrypoint for tester releases; direct EAS/Play uploads bypass the ledger.
 
 All entrypoints, including local status and manual finish, use the same authority:
@@ -96,6 +98,11 @@ The uploader protects existing Play review state with
 `changesInReviewBehavior=ERROR_IF_IN_REVIEW`; no production track is touched.
 
 ## Remaining local compatibility
+
+Hosted runs require `EXPO_TOKEN` before reservation. Local manual builds and the
+retained launcher can use an existing authenticated EAS CLI session without this
+token, or set `EXPO_TOKEN`. Local runs still require the Android tools, Play key
+file, resource gates, and GitHub ledger access.
 
 The Mac LaunchAgent generator is removed. `run-nightlies.mjs` remains only for
 an installed old LaunchAgent that calls it until the cutover owner retires that

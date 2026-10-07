@@ -16,7 +16,7 @@ function fixture(run) {
     const key = join(root, 'key.json');
     writeFileSync(jar, 'jar');
     writeFileSync(key, JSON.stringify({ type: 'service_account', client_email: 'test@example.com', private_key: 'test' }));
-    run({ root, env: { EXPO_TOKEN: 'fixture-token', PATH: process.env.PATH, ANDROID_HOME: sdk, ANDROID_BUNDLETOOL_JAR: jar, PLAY_SERVICE_ACCOUNT_KEY_PATH: key } });
+    run({ root, env: { GITHUB_ACTIONS: 'true', EXPO_TOKEN: 'fixture-token', PATH: process.env.PATH, ANDROID_HOME: sdk, ANDROID_BUNDLETOOL_JAR: jar, PLAY_SERVICE_ACCOUNT_KEY_PATH: key } });
   } finally { rmSync(root, { recursive: true, force: true }); }
 }
 
@@ -25,6 +25,13 @@ test('SDK aliases normalize and conflicting roots fail', () => fixture(({ env })
   const { ANDROID_HOME, ...other } = env;
   assert.equal(releaseEnvironment({ ...other, ANDROID_SDK_ROOT: ANDROID_HOME }).ANDROID_HOME, ANDROID_HOME);
   assert.throws(() => releaseEnvironment({ ...env, ANDROID_SDK_ROOT: '/other' }), /must match/);
+}));
+
+test('local EAS sessions do not require a token; hosted releases do', () => fixture(({ env }) => {
+  for (const GITHUB_ACTIONS of ['false', undefined]) {
+    assert.equal(releaseEnvironment({ ...env, GITHUB_ACTIONS, EXPO_TOKEN: '' }).EAS_BIN, 'eas');
+  }
+  assert.throws(() => releaseEnvironment({ ...env, GITHUB_ACTIONS: 'true', EXPO_TOKEN: '' }), /EXPO_TOKEN is required on GitHub Actions/);
 }));
 
 test('required environment and unreadable paths fail before build', () => fixture(({ env }) => {
