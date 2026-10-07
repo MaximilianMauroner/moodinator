@@ -10,15 +10,24 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: moodinator-${{ github.event_name == 'pull_request' && github.ref || 'android-nightly' }}
+  cancel-in-progress: false
+
 jobs:
   checks:
-    if: github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    outputs:
+      source_sha: ${{ steps.source.outputs.sha }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
+          ref: ${{ github.event_name == 'pull_request' && github.ref || 'main' }}
           persist-credentials: false
+      - name: Capture exact source before checks
+        id: source
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: '24.13.1'
@@ -29,30 +38,23 @@ jobs:
       - run: bun run verify
       - run: bun run test:nightly
 
-  release:
+  build:
+    needs: checks
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && github.repository == 'MaximilianMauroner/moodinator'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     permissions:
-      contents: write
-    concurrency:
-      group: moodinator-android-nightly
-      cancel-in-progress: false
+      contents: write # Required for ledger reservation.
+    outputs:
+      build: ${{ steps.reserve.outputs.build }}
+      reservation: ${{ steps.reserve.outputs.reservation }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          ref: main
+          ref: ${{ needs.checks.outputs.source_sha }}
           persist-credentials: false
-      - name: Set ephemeral paths
-        run: |
-          echo "RELEASE_ARTIFACTS_DIR=$RUNNER_TEMP/release-artifacts" >> "$GITHUB_ENV"
-          echo "PLAY_SERVICE_ACCOUNT_KEY_PATH=$RUNNER_TEMP/play-service-account.json" >> "$GITHUB_ENV"
-          echo "ANDROID_BUNDLETOOL_JAR=$RUNNER_TEMP/bundletool.jar" >> "$GITHUB_ENV"
-      - name: Check secrets and prepare private Play key
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-        run: node scripts/prepare-hosted-release.mjs
+      - name: Set ephemeral artifact path
+        run: echo "RELEASE_ARTIFACTS_DIR=$RUNNER_TEMP/release-artifacts" >> "$GITHUB_ENV"
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: '24.13.1'
@@ -63,40 +65,92 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Prepare Android tools and runner resources
-        shell: bash
-        run: |
-          set -euo pipefail
-          # Remove only unused tool bundles on this disposable hosted runner.
-          if [ "$(df --output=avail -B1 . | tail -1)" -lt 21474836480 ]; then
-            sudo rm -rf /usr/share/dotnet /usr/local/.ghcup /usr/local/share/boost /opt/hostedtoolcache/CodeQL
-          fi
-          df -h .
-          free -h
-          test "$(df --output=avail -B1 . | tail -1)" -ge 16106127360
-          test "$(awk '/MemTotal/ {print $2}' /proc/meminfo)" -ge 8388608
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platform-tools' 'platforms;android-36' 'build-tools;36.0.0'
-          curl --fail --silent --show-error --location https://github.com/google/bundletool/releases/download/1.18.2/bundletool-all-1.18.2.jar --output "$ANDROID_BUNDLETOOL_JAR"
-          echo "378b5434cd1378bef6b2bc527b8c7f0ff2584b273830335bce54d6d0813c8584  $ANDROID_BUNDLETOOL_JAR" | sha256sum --check
-          npm install --global eas-cli@20.5.1
-      - name: Check fetched main, reserve, build, verify and upload Internal
+      - name: Install locked dependencies without lifecycle scripts or release credentials
+        run: bun install --frozen-lockfile --ignore-scripts
+      - name: Prepare tools without release credentials
+        run: bash scripts/setup-hosted-android.sh build
+      - name: Validate both user secrets without creating a Play file
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: node scripts/prepare-hosted-release.mjs validate
+      - name: Require current main to equal checked SHA and persist reservation
+        id: reserve
+        env:
+          RELEASE_CHECKED_SHA: ${{ needs.checks.outputs.source_sha }}
           GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/nightly-release.mjs run
-      - name: Remove private key and raw EAS logs
+        run: node scripts/hosted-release.mjs reserve
+      - name: Build and verify with Expo credentials only
+        if: steps.reserve.outputs.build == 'true'
+        env:
+          RELEASE_CHECKED_SHA: ${{ needs.checks.outputs.source_sha }}
+          RELEASE_RESERVATION_JSON: ${{ steps.reserve.outputs.reservation }}
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: node scripts/nightly-release.mjs build
+      - name: Remove raw EAS logs
         if: always()
-        run: |
-          rm -f "$PLAY_SERVICE_ACCOUNT_KEY_PATH"
-          rm -rf "$HOME/.local/state/lab4code-releases/logs/moodinator"
-      - name: Retain verified bundles and sanitized release records
+        run: rm -rf "$HOME/.local/state/lab4code-releases/logs/moodinator"
+      - name: Retain verified bundles and sanitized build records
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: moodinator-internal-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            ${{ runner.temp }}/release-artifacts/**/verified/*.apk
-            ${{ runner.temp }}/release-artifacts/**/verified/*.aab
-            ${{ runner.temp }}/release-artifacts/**/release.json
+            ${{ runner.temp }}/release-artifacts/verified/*.apk
+            ${{ runner.temp }}/release-artifacts/verified/*.aab
+            ${{ runner.temp }}/release-artifacts/release.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+  publish:
+    needs: [checks, build]
+    if: always() && !cancelled() && needs.checks.result == 'success' && needs.build.outputs.build == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write # Required for ledger finalization.
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.checks.outputs.source_sha }}
+          persist-credentials: false
+      - name: Set ephemeral paths
+        run: |
+          echo "RELEASE_ARTIFACTS_DIR=$RUNNER_TEMP/release-artifacts" >> "$GITHUB_ENV"
+          echo "PLAY_SERVICE_ACCOUNT_KEY_PATH=$RUNNER_TEMP/play-service-account.json" >> "$GITHUB_ENV"
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.13.1'
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        if: needs.build.result == 'success'
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Prepare artifact verification tools without credentials
+        if: needs.build.result == 'success'
+        run: bash scripts/setup-hosted-android.sh verify
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        if: needs.build.result == 'success'
+        with:
+          name: moodinator-internal-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/release-artifacts
+      - name: Reverify, upload Internal and finish the ledger
+        if: always() && !cancelled()
+        env:
+          RELEASE_CHECKED_SHA: ${{ needs.checks.outputs.source_sha }}
+          RELEASE_RESERVATION_JSON: ${{ needs.build.outputs.reservation }}
+          RELEASE_BUILD_RESULT: ${{ needs.build.result }}
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/hosted-release.mjs publish
+      - name: Remove private key
+        if: always()
+        run: rm -f "$PLAY_SERVICE_ACCOUNT_KEY_PATH"
+      - name: Retain sanitized final release record
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: moodinator-internal-result-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/release-artifacts/release.json
           if-no-files-found: ignore
           retention-days: 30

@@ -2,8 +2,10 @@
 
 Moodinator builds an APK and AAB on a public `ubuntu-24.04` GitHub runner at
 midnight Europe/Vienna, including daylight-saving changes. Manual dispatch is
-available on `main` only. The job has a 90-minute limit and per-app concurrency
-with `cancel-in-progress: false`. Production promotion remains manual.
+available on `main` only. The EAS build job has a 90-minute limit, checks have 15 minutes, and publishing
+has 20 minutes. These phases have a 125-minute combined budget; hosted timing is
+not benchmarked. Workflow concurrency covers the whole app with
+`cancel-in-progress: false`. Production promotion remains manual.
 The historical combined APK/AAB time was about 17–32 minutes on the earlier
 host. There is no hosted benchmark yet.
 
@@ -15,8 +17,13 @@ The repository needs exactly two user secrets:
 - `PLAY_SERVICE_ACCOUNT_JSON`: the full authorized Play service-account JSON.
 
 The workflow uses its normal `GITHUB_TOKEN`, with `contents: write` only in the
-release job. It writes the Play key to a mode-0600 temporary file, removes it in
-an always-run cleanup step, and never prints it. Runner destruction also removes
+build/publish jobs for ledger reservation/finalization. Project checks run in a
+separate read-only job with no release secrets. The build runner executes no
+project tests or package lifecycle scripts before reservation. EAS receives Expo
+auth but no GitHub-write or Play credentials. Publishing uses a different runner
+with no project dependencies or tests. After artifact verification, it writes the
+Play key to a mode-0600 temporary file, removes it in an always-run cleanup step,
+and never prints it. Runner destruction also removes
 temporary files after cancellation. The key is used for direct Google upload;
 it is not passed as a file to Expo. Signing uses existing remote EAS credentials
 and `--freeze-credentials`. No new signing keys are created.
@@ -47,10 +54,16 @@ node scripts/nightly-release.mjs status
 
 The runner fetches `origin/main`, checks the chosen EAS stable version against
 that SHA's `eas.json`, then prepares an isolated worktree of the same SHA.
-Locked dependency installation, full `bun run verify`, and `bun run test:nightly`
-run there before reservation. The runner checks actual free disk and total RAM on
-that worktree after these checks and before reservation, and checks again before
-the AAB build. Local work is preserved. Use the coordinated
+Hosted checks run locked dependency installation, full `bun run verify`, and
+`bun run test:nightly` on a separate credential-free runner. The build job checks
+out that exact SHA and installs dependencies with `--ignore-scripts` before
+credential-bearing steps. Reservation fetches main again and requires checked
+SHA, checkout HEAD and current main to agree; a moved main fails before reserve.
+Tool/disk/RAM checks run after dependency installation and before reservation,
+then again before AAB. The persisted reservation binds the EAS build and publisher
+to the checked source. Local manual commands still prepare an isolated worktree,
+run checks before reserve, and preserve local work. Their child environments are
+narrowed, but a trusted local host is not hostile same-user process isolation. Use the coordinated
 entrypoint for tester releases; direct EAS/Play uploads bypass the ledger.
 
 All entrypoints, including local status and manual finish, use the same authority:
@@ -75,15 +88,19 @@ fixture construction and historical transition compatibility.
 Both artifacts must pass the existing package/version/versionCode/approved
 certificate verification before upload to the fixed Play `internal` track.
 The workflow retains verified APK/AAB copies and sanitized `release.json` for
-30 days, including verified bundles from a failed upload. Unverified build
+30 days, including verified bundles from a failed upload. Build evidence and final
+publish evidence have distinct artifact names containing both `run_id` and
+`run_attempt`. The publisher rechecks artifacts against the reservation and
+approved certificates before using the Play key. Unverified build
 outputs and raw EAS logs are excluded. EAS logs remain private mode-0600 files
 until cleanup; they can contain credentials and must never become Actions output
 or uploaded artifacts. Local artifacts default to
 `~/Downloads/lab4code-releases/moodinator/`; `RELEASE_ARTIFACTS_DIR` changes the base.
 Pre-reservation failures record a sanitized stage without a reserved identity.
 
-Cancellation or timeout does not finish an active reservation automatically.
-A lost finish response can also leave it active. Inspect GitHub state, job status,
+Workflow cancellation does not finish an active reservation automatically. A
+failed or timed-out build is finalized as failed if the isolated publisher can
+run. Interrupted publishing or a lost finish response can leave it active. Inspect GitHub state, job status,
 and Play Internal before reconciling. Confirm that no build/upload is running,
 then record the outcome that actually occurred:
 
@@ -118,6 +135,8 @@ Tests use fixtures and mocked storage, never live ledgers or uploads. They cover
 transition gates, version limits, compare-and-swap conflicts, uncertain writes,
 missing state, cancellation, secret preparation, check-before-reserve ordering,
 artifact verification, Internal-only upload and sanitized diagnostics.
-PR CI runs the same full project and release checks without secrets. CI success
+The checks job runs the same full project and release checks for PRs and main
+releases without secrets. [Credential boundaries](decisions/hosted-release-credentials.md)
+records why checks and Play upload need separate runner boundaries. CI success
 does not prove live Expo/Play access or hosted build performance. The first
 hosted release and secret verification belong to the cutover owner.

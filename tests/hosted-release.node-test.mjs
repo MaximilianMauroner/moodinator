@@ -1,18 +1,18 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
 import { runInNewContext } from 'node:vm';
-import { prepareHostedRelease } from '../scripts/prepare-hosted-release.mjs';
+import { readHostedReservation } from '../scripts/hosted-release.mjs';
+import { releaseChildEnvironment } from '../scripts/release-environment.mjs';
 
 const source = readFileSync(new URL('../scripts/nightly-release.mjs', import.meta.url), 'utf8');
 const environmentSource = readFileSync(new URL('../scripts/release-environment.mjs', import.meta.url), 'utf8');
-const resourceSource = environmentSource.slice(environmentSource.indexOf('export function checkReleaseResources('), environmentSource.indexOf('export function preflightRelease(')).replace('export ', '');
+const resourceSource = environmentSource.slice(environmentSource.indexOf('export function checkReleaseResources('), environmentSource.indexOf('export function preflightBuild(')).replace('export ', '');
 const functionSource = source.slice(source.indexOf('async function buildRelease()'), source.indexOf('\ntry {\n  if (command'));
 
 // Execute the complete runner lifecycle with all external effects replaced.
-async function release({ checkFailure, reservationFailure, verifyFailure, uploadFailure, diskAfterInstallGiB = 16, memoryGiB = 8, skip = false } = {}) {
+async function release({ hosted = false, checkFailure, reservationFailure, verifyFailure, uploadFailure, diskAfterInstallGiB = 16, memoryGiB = 8, skip = false } = {}) {
   const calls = [];
   const records = [];
   let diskGiB = 16;
@@ -21,8 +21,8 @@ async function release({ checkFailure, reservationFailure, verifyFailure, upload
     totalmem: () => memoryGiB * 1024 ** 3,
   });
   const context = {
-    app: 'moodinator', root: '/checkout', join, resolve,
-    process: { env: { GITHUB_ACTIONS: 'true', RELEASE_ARTIFACTS_DIR: '/artifacts' } },
+    command: hosted ? 'build' : 'run', app: 'moodinator', root: '/checkout', join, resolve,
+    process: { env: { GITHUB_ACTIONS: 'true', EXPO_TOKEN: 'fixture', RELEASE_ARTIFACTS_DIR: '/artifacts', RELEASE_CHECKED_SHA: 'a'.repeat(40), RELEASE_RESERVATION_JSON: JSON.stringify({ build: true, id: 'reservation', sha: 'a'.repeat(40), version: '0.1.6', versionCode: 41 }) } },
     homedir: () => '/home', tmpdir: () => '/tmp', mkdtempSync: () => '/temporary',
     console: { log() {} },
     run(program, args, cwd) {
@@ -32,6 +32,8 @@ async function release({ checkFailure, reservationFailure, verifyFailure, upload
       if (program === 'bun' && args[0] === 'install') diskGiB = diskAfterInstallGiB;
       if (program === 'bun' && args[1] === 'verify' && checkFailure) throw new Error('Checks failed');
     },
+    readHostedReservation,
+    preflightBuild(root, env) { checkReleaseResources(root); return env; },
     preflightRelease(root, env, version) { calls.push(['preflight', version]); checkReleaseResources(root); return env; },
     checkReleaseResources, stampRelease() {}, assertProfiles() {}, chmodSync() {}, mkdirSync() {},
     readFileSync(path) { return path.endsWith('eas.json') ? '{"cli":{}}' : '{"expo":{"android":{"package":"com.lab4code.moodinator"},"version":"0.1.6"}}'; },
@@ -120,16 +122,34 @@ test('bad certificates are never retained or uploaded; upload failure retains ve
   }
 });
 
-test('hosted secret preparation fails without writing; valid JSON has restrictive permissions', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'hosted-key-'));
-  const path = join(directory, 'play.json');
-  const env = { GITHUB_ACTIONS: 'true', EXPO_TOKEN: 'fixture', PLAY_SERVICE_ACCOUNT_JSON: '{"type":"service_account","client_email":"test@example.com","private_key":"fixture"}', PLAY_SERVICE_ACCOUNT_KEY_PATH: path };
-  try {
-    for (const name of ['EXPO_TOKEN', 'PLAY_SERVICE_ACCOUNT_JSON']) assert.throws(() => prepareHostedRelease({ ...env, [name]: '' }), /required/);
-    assert.throws(() => prepareHostedRelease({ ...env, PLAY_SERVICE_ACCOUNT_JSON: 'PRIVATE not JSON' }), /Expected a Play/);
-    prepareHostedRelease(env);
-    assert.equal(statSync(path).mode & 0o777, 0o600);
-    assert.equal(readFileSync(path, 'utf8'), env.PLAY_SERVICE_ACCOUNT_JSON);
-    assert.throws(() => prepareHostedRelease(env), /EEXIST/);
-  } finally { rmSync(directory, { recursive: true, force: true }); }
+test('hosted build uses its checked persisted identity without project checks, ledger auth, or Play upload', async () => {
+  const { calls, records, error } = await release({ hosted: true });
+  assert.equal(error, undefined);
+  assert.equal(calls.some(([kind]) => ['bun', 'ledger', 'upload'].includes(kind)), false);
+  assert.equal(records.at(-1).status, 'built');
+  assert.equal(records.at(-1).sha, 'a'.repeat(40));
+  assert.equal(calls.filter(([kind]) => kind === 'eas').length, 2);
+});
+
+test('actual dependency and EAS child calls receive only their operation credentials', async () => {
+  const env = { PATH: '/bin', HOME: '/home', EXPO_TOKEN: 'expo', GITHUB_TOKEN: 'github', GH_TOKEN: 'gh', PLAY_SERVICE_ACCOUNT_JSON: 'play', PLAY_SERVICE_ACCOUNT_KEY_PATH: '/key' };
+  const captured = [];
+  const runSource = source.slice(source.indexOf('function run('), source.indexOf('async function runEas('));
+  const run = runInNewContext(`(${runSource})`, {
+    root: '/checkout', process: { env },
+    releaseChildEnvironment: (operation) => releaseChildEnvironment(operation, env),
+    spawnSync(program, args, options) { captured.push(options.env); return { status: 0, stdout: '' }; },
+  });
+  run('bun', ['install', '--frozen-lockfile']);
+  run('bun', ['run', 'verify']);
+  run('bun', ['run', 'test:nightly']);
+  const easSource = source.slice(source.indexOf('async function runEas('), source.indexOf('function ledger('));
+  const runEas = runInNewContext(`(${easSource})`, {
+    eas: 'eas', process: { env }, releaseChildEnvironment: (operation) => releaseChildEnvironment(operation, env),
+    openSync: () => 1, closeSync() {}, setInterval: () => 1, clearInterval() {},
+    spawn(program, args, options) { captured.push(options.env); return { once(event, callback) { if (event === 'close') callback(0); } }; },
+  });
+  await runEas(['build'], '/checkout', '/private-log');
+  assert.deepEqual(captured.slice(0, 3), Array.from({ length: 3 }, () => ({ PATH: '/bin', HOME: '/home' })));
+  assert.deepEqual(captured[3], { PATH: '/bin', HOME: '/home', EXPO_TOKEN: 'expo' });
 });

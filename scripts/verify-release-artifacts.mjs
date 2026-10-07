@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { releaseChildEnvironment } from './release-environment.mjs';
 
 const approvedCertificates = {
   moodinator: '73bc862a96d8768bb44fb152a7ada91f7d91c04013b72ca756ef3e0cd2a98132',
@@ -8,7 +9,7 @@ const approvedCertificates = {
 };
 
 function output(program, args) {
-  const result = spawnSync(program, args, { encoding: 'utf8', maxBuffer: 4 * 1024 * 1024 });
+  const result = spawnSync(program, args, { env: releaseChildEnvironment('tools'), encoding: 'utf8', maxBuffer: 4 * 1024 * 1024 });
   if (result.error) throw result.error;
   if (result.status !== 0) throw new Error(`${program} artifact verification failed: ${result.stderr}`);
   return result.stdout.trim();

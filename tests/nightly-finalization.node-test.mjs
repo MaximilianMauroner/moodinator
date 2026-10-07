@@ -15,7 +15,7 @@ const finalization = source.slice(start + '  } '.length, end);
 function finalize({ outcome = 'failed', releaseError, evidenceError, ledgerError } = {}) {
   const calls = [];
   const context = {
-    output: '/mock-output', app: 'moodinator', sha: 'a'.repeat(40), reservation: { id: 'mock-reservation', build: true }, outcome,
+    hosted: false, output: '/mock-output', app: 'moodinator', sha: 'a'.repeat(40), reservation: { id: 'mock-reservation', build: true }, outcome,
     failure: outcome === 'failed' ? { stage: 'checks' } : undefined, releaseError,
     worktreeAdded: true, sourceRoot: '/mock-source', temporary: '/mock-temporary', join,
     mkdirSync() {},
