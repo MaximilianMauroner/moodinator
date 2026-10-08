@@ -108,3 +108,27 @@ test("resubscribing during a refresh after successful hydration cannot leave loa
   expect(query.getSnapshot()).toEqual({ data: [3], loading: false, stale: false, error: null });
   leaveAgain();
 });
+
+test("a settled query resubscribes with fresh data after a write while unsubscribed", async () => {
+  let entries = [1];
+  const load = vi.fn(async () => entries);
+  const family = createMoodQueryFamily(() => "settled", load);
+  const query = family(undefined);
+  const leave = query.subscribe(() => {});
+  await query.refresh();
+  expect(query.getSnapshot().data).toEqual([1]);
+
+  leave();
+  entries = [2];
+  invalidateMoodQueries();
+  const leaveAgain = query.subscribe(() => {});
+  try {
+    await vi.waitFor(() => {
+      expect(query.getSnapshot()).toEqual({ data: [2], loading: false, stale: false, error: null });
+    });
+    expect(family(undefined)).toBe(query);
+    expect(load).toHaveBeenCalledTimes(2);
+  } finally {
+    leaveAgain();
+  }
+});

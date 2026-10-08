@@ -67,7 +67,7 @@ export function createMoodQueryFamily<P, T>(
           listeners.delete(listener);
           if (listeners.size) return;
           generation += 1;
-          if (pending) snapshot = { ...snapshot, loading: false, stale: true };
+          snapshot = { ...snapshot, loading: false, stale: true };
           pending = null;
           invalidators.delete(invalidate);
           // React can unsubscribe and immediately subscribe again in StrictMode.
