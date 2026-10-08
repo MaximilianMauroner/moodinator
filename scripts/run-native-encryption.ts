@@ -93,9 +93,14 @@ try {
   // Cold process restarts also read native SecureStore instead of a JS cache.
   await result({ proof: "resume", case: "plaintext" });
   await result({ proof: "resume", case: "legacy-passphrase" });
+  await result({ proof: "resume", case: "legacy-orphans" });
   await result({ proof: "resume", case: "fresh" });
   await result({ proof: "lose-key" });
   await result({ proof: "verify-lost-key" });
+  await launch({ proof: "wal-crash" });
+  await waitForNode(serial, { contentDescription: "encryption-proof:paused:wal-source:committed-wal" }, { adbPath: adb, timeoutMs: 60000, dumpTimeoutMs: 5000, pollIntervalMs: 500 });
+  runAdb(["shell", "am", "force-stop", QA_ID]);
+  await result({ proof: "resume", case: "wal-source" });
   for (const [index, phase] of STARTUP_PHASES.entries()) {
     const caseName = `crash-${index}`;
     await launch({ proof: "crash", case: caseName, phase });

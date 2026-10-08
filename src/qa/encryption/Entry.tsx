@@ -4,7 +4,7 @@ import Constants from "expo-constants";
 import * as Linking from "expo-linking";
 import { App as RouterApp } from "expo-router/build/qualified-entry";
 import { STARTUP_PHASES } from "@db/encryption/startup";
-import { crashEncryptionProof, loseProofKey, prepareAppUpgrade, resumeEncryptionProof, runEncryptionProof, verifyAppUpgrade, verifyLostProofKey } from "./proof";
+import { crashEncryptionProof, loseProofKey, prepareAppUpgrade, prepareWalCrash, resumeEncryptionProof, runEncryptionProof, verifyAppUpgrade, verifyLostProofKey } from "./proof";
 
 // Activated only for a sealed, separate QA variant. Every storage operation also
 // checks the installed package identifier before touching fabricated test files.
@@ -26,6 +26,7 @@ export default function EncryptionProofEntry() {
         case "verify-app": result = await verifyAppUpgrade(); break;
         case "lose-key": result = await loseProofKey(); break;
         case "verify-lost-key": result = await verifyLostProofKey(); break;
+        case "wal-crash": await prepareWalCrash(setProgress); return;
         case "resume":
           if (typeof caseName !== "string") throw new Error("A native recovery case is required");
           result = await resumeEncryptionProof(caseName); break;

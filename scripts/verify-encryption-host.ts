@@ -4,7 +4,7 @@ import { copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync, unlinkSync
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { legacyKeyPragma } from "../db/encryption/keys";
+import { legacyKeyPragma, rawKeyPragma, validateRawKey } from "../db/encryption/keys";
 import { captureSnapshot, requireMatchingSnapshot, type EncryptionDatabase } from "../db/encryption/snapshot";
 import { DATABASE_FILES, STARTUP_PHASES, openEncryptedDatabase, type EncryptionStorage } from "../db/encryption/startup";
 
@@ -88,7 +88,7 @@ class CipherDatabase implements EncryptionDatabase {
     if (!this.failed) this.process.stdin.end(".quit\n");
     await this.exited;
   }
-  crash() { this.process.kill("SIGKILL"); }
+  crash() { this.failed = true; this.process.kill("SIGKILL"); }
 }
 
 function storageAt(root: string): EncryptionStorage<CipherDatabase> {
@@ -108,22 +108,31 @@ function storageAt(root: string): EncryptionStorage<CipherDatabase> {
   };
 }
 
-async function seed(storage: EncryptionStorage<CipherDatabase>, legacy = false) {
+async function seed(storage: EncryptionStorage<CipherDatabase>, legacy = false, orphans = false) {
   const db = await storage.open(DATABASE_FILES.original);
   try {
     if (legacy) await db.execAsync(legacyKeyPragma((await storage.loadLegacyKey())!));
     await db.execAsync(fixtureSql);
+    if (orphans) await db.execAsync(`PRAGMA foreign_keys = OFF;
+      DELETE FROM mood_emotions WHERE mood_id = 1;
+      INSERT INTO mood_emotions VALUES (777, 1);
+      DELETE FROM emotions WHERE id = 3;`);
     return await captureSnapshot(db);
   } finally { await db.closeAsync(); }
 }
 
 async function verifyRoundtrip(storage: EncryptionStorage<CipherDatabase>, db: CipherDatabase) {
   const expected = await captureSnapshot(db);
-  await db.runAsync("ATTACH DATABASE ? AS roundtrip KEY '';", storage.path("roundtrip.db"));
-  await db.execAsync(`SELECT sqlcipher_export('roundtrip');
-    PRAGMA roundtrip.user_version = ${expected.userVersion};
-    PRAGMA roundtrip.application_id = ${expected.applicationId};
-    DETACH DATABASE roundtrip;`);
+  const exporter = await storage.open(DATABASE_FILES.active);
+  try {
+    await exporter.execAsync(rawKeyPragma(validateRawKey(await storage.loadKey())));
+    await exporter.execAsync("PRAGMA foreign_keys = OFF;");
+    await exporter.runAsync("ATTACH DATABASE ? AS roundtrip KEY '';", storage.path("roundtrip.db"));
+    await exporter.execAsync(`SELECT sqlcipher_export('roundtrip');
+      PRAGMA roundtrip.user_version = ${expected.userVersion};
+      PRAGMA roundtrip.application_id = ${expected.applicationId};
+      DETACH DATABASE roundtrip;`);
+  } finally { await exporter.closeAsync(); }
   const plain = await storage.open("roundtrip.db");
   try { requireMatchingSnapshot(await captureSnapshot(plain), expected); }
   finally { await plain.closeAsync(); }
@@ -147,10 +156,22 @@ const freshStorage = () => {
 };
 const passed: string[] = [];
 try {
-  for (const source of ["plaintext", "legacy-passphrase", "fresh"]) {
+  for (const source of ["plaintext", "legacy-passphrase", "legacy-orphans", "fresh"]) {
     const { storage } = freshStorage();
-    if (source !== "fresh") await seed(storage, source === "legacy-passphrase");
+    if (source !== "fresh") await seed(storage, source === "legacy-passphrase", source === "legacy-orphans");
     const db = await openEncryptedDatabase(storage);
+    assert.equal((await db.getFirstAsync<{ foreign_keys: number }>("PRAGMA foreign_keys;"))?.foreign_keys, 1);
+    if (source === "legacy-orphans") {
+      assert.equal((await db.getAllAsync("PRAGMA foreign_key_check;")).length, 2);
+      await assert.rejects(db.execAsync("INSERT INTO mood_emotions VALUES (888, 1);"), /FOREIGN KEY/i);
+      // The CLI's .bail policy closes a failed statement session; reopen below.
+      await db.closeAsync();
+      const retained = await openEncryptedDatabase(storage);
+      await verifyRoundtrip(storage, retained);
+      await retained.closeAsync();
+      passed.push("legacy-orphans:exact-retention-and-enforcement");
+      continue;
+    }
     await verifyRoundtrip(storage, db);
     await db.execAsync("INSERT INTO fresh_install VALUES (1);");
     await db.closeAsync();
@@ -160,6 +181,23 @@ try {
     assert.equal(await storage.exists(DATABASE_FILES.original), false);
     assert.equal(await storage.exists(DATABASE_FILES.copy), false);
     passed.push(source);
+  }
+  {
+    const { storage } = freshStorage();
+    const original = await storage.open(DATABASE_FILES.original);
+    await original.execAsync("PRAGMA journal_mode = WAL;");
+    await original.execAsync(fixtureSql);
+    const expected = await captureSnapshot(original);
+    original.crash();
+    await original.closeAsync();
+    assert.ok(await storage.exists(DATABASE_FILES.original + "-wal"), "A committed WAL must remain after the abrupt native stop");
+    const recovered = await openEncryptedDatabase(storage);
+    const actual = await captureSnapshot(recovered);
+    delete actual.content.fresh_install;
+    actual.schema = actual.schema.filter((row) => row.name !== "fresh_install");
+    requireMatchingSnapshot(actual, expected);
+    await recovered.closeAsync();
+    passed.push("crashed-plaintext-wal:committed-data-retained");
   }
   for (const phase of STARTUP_PHASES) {
     const { root, storage } = freshStorage();

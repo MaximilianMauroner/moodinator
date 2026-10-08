@@ -26,6 +26,16 @@ and wrong/keyless schema-read failure. Normal initialization uses an unpublished
 handle. A keyed cold reopen must match the initialized database before completion
 commits. Required source/copy cleanup completes before app access.
 
+Pre-enforcement installs can contain orphan `mood_emotions` links after normal
+deletion. Conversion retains those rows and compares the known legacy constraint
+violations together with exact schema/content. Hidden SQLite rowids can change
+during export and are not relationship identity. Unrelated violations remain
+fatal. Published target connections enable and verify foreign-key enforcement
+after export and on each keyed reopen, so new deletes cascade without creating
+more orphans. This compatibility remains while supported databases can hold
+those stored legacy rows; its removal requires a reviewed data-repair policy or
+proof that supported stored databases no longer need it.
+
 A positively pending attempt can rebuild staging only after source/key/runtime
 verification. Completed state requires the existing V2 key and active database;
 it cannot generate a replacement key or fall back to an old original after new
@@ -85,10 +95,15 @@ Build before emulator execution; do not overlap them or bypass busy admission.
    only that owned test package's data. It verifies actual Expo SQLCipher version
    and storage factory execution, exact export/roundtrip, fresh app schema,
    later writes and cold keystore reopen, wrong/lost keys, missing/unknown state,
-   missing active file with stale original, independent native lock exclusion,
+   missing active file with stale original, retained legacy orphan links and
+   active FK enforcement, a crashed plaintext source with committed WAL data,
+   independent native lock exclusion,
    abrupt Android process stops at all ten phases, repeated recovery, and actual
    `getDb` first-open/shared-handle initialization. JSON reports contain results,
    not mood contents or keys. Each crash case uses its own fixture namespace.
+   The ten callbacks test phase boundaries. Do not report an interruption inside
+   native export or native disk-full handling as proved by that boundary matrix;
+   each needs a focused actual native failure case and retained/reopened data.
 6. Inspect the native app screenshot. Complete onboarding, inspect fabricated
    history and details, add/edit/delete a new fabricated mood, and cold-open again
    to confirm retained changes. Run the existing native smoke/sync journeys to
@@ -109,9 +124,10 @@ phase. It does not exercise the Expo bridge, SecureStore or mobile filesystem.
 
 ## Evidence status
 
-On 2026-10-08, local focused state/bootstrap/layout/legal/config checks and
-targeted lint passed. Real host SQLCipher 4.5.6 passed all 14 production-state-
-machine cases, including ten abrupt phase interruptions. Earlier foundation
+On 2026-10-08, 23 focused state/error tests and 23 bootstrap/layout/legal/config
+tests passed, as did targeted lint. Real host SQLCipher 4.5.6 passed all 16
+production-state-machine cases, including preserved legacy orphan links,
+committed-WAL recovery and ten abrupt phase interruptions. Earlier foundation
 native CLI proof also passed. Expo build/emulator execution and native product
 journeys remain pending shared resource admission. Full feature acceptance and
 activation are not established by these results. Record current-head CI,

@@ -167,6 +167,7 @@ async function exportOriginal<Db extends EncryptionDatabase>(context: Context<Db
   await context.phase("copy-closed");
   const copy = await context.open(DATABASE_FILES.copy, legacyKey, legacy);
   try {
+    await copy.execAsync("PRAGMA foreign_keys = OFF;");
     await copy.runAsync("ATTACH DATABASE ? AS encrypted KEY ?;", storage.path(DATABASE_FILES.active), `x'${key}'`);
     await context.phase("export-started");
     await copy.execAsync(`PRAGMA encrypted.synchronous = EXTRA;
@@ -207,6 +208,14 @@ async function verifyEncrypted<Db extends EncryptionDatabase>(context: Context<D
   return snapshot;
 }
 
+async function enableForeignKeys(db: EncryptionDatabase) {
+  await db.execAsync("PRAGMA foreign_keys = ON;");
+  const enabled = await db.getFirstAsync<{ foreign_keys: number }>("PRAGMA foreign_keys;");
+  if (enabled?.foreign_keys !== 1) {
+    throw new Error("Native foreign-key enforcement is unavailable. The database was not published.");
+  }
+}
+
 async function initializeTarget<Db extends EncryptionDatabase>(context: Context<Db>, state: State) {
   const { storage } = context;
   const key = await persistKey(context);
@@ -220,6 +229,9 @@ async function initializeTarget<Db extends EncryptionDatabase>(context: Context<
     expected = await exportOriginal(context, state.source, key);
   }
   const target = await context.open(DATABASE_FILES.active, key);
+  // Export connections stay FK-off so existing legacy orphan rows are copied.
+  // Only keyed app handles enforce future writes and cascading deletions.
+  await enableForeignKeys(target);
   await target.execAsync("PRAGMA synchronous = EXTRA;");
   if (expected) {
     await verifyEncrypted(context, target, key, expected);
@@ -231,6 +243,7 @@ async function initializeTarget<Db extends EncryptionDatabase>(context: Context<
   if (!expected) await context.phase("target-verified");
   await context.close(target);
   const active = await context.open(DATABASE_FILES.active, key);
+  await enableForeignKeys(active);
   await verifyEncrypted(context, active, key, initialized);
   await context.phase("active-reopened");
   await context.coordinator.runAsync("UPDATE encryption_state SET status = 'completed' WHERE id = 1;");
@@ -243,6 +256,7 @@ async function completedDatabase<Db extends EncryptionDatabase>(context: Context
   }
   const key = validateRawKey(await context.storage.loadKey());
   const active = await context.open(DATABASE_FILES.active, key);
+  await enableForeignKeys(active);
   await verifyEncrypted(context, active, key);
   await context.storage.initialize(active);
   return active;

@@ -36,7 +36,7 @@ function fixture(caseName: string, initialize = async (_db: SQLite.SQLiteDatabas
   return { directory, namespace, storage, file };
 }
 
-async function seed(f: ReturnType<typeof fixture>, legacy = false) {
+async function seed(f: ReturnType<typeof fixture>, legacy = false, orphans = false) {
   for (const name of Object.values(DATABASE_FILES)) {
     check(!await f.storage.exists(name), "Proof case already contains a database. Use a fresh owned QA install.");
   }
@@ -47,6 +47,10 @@ async function seed(f: ReturnType<typeof fixture>, legacy = false) {
       await db.execAsync(legacyKeyPragma(LEGACY_KEY));
     }
     await db.execAsync(ENCRYPTION_PROOF_FIXTURE);
+    if (orphans) await db.execAsync(`PRAGMA foreign_keys = OFF;
+      DELETE FROM mood_emotions WHERE mood_id = 1;
+      INSERT INTO mood_emotions VALUES (777, 1);
+      DELETE FROM emotions WHERE id = 3;`);
     const snapshot = await captureSnapshot(db);
     f.file("expected.json").write(JSON.stringify(snapshot));
     return snapshot;
@@ -55,11 +59,16 @@ async function seed(f: ReturnType<typeof fixture>, legacy = false) {
 
 async function roundtrip(f: ReturnType<typeof fixture>, db: SQLite.SQLiteDatabase) {
   const expected = await captureSnapshot(db);
-  await db.runAsync("ATTACH DATABASE ? AS roundtrip KEY '';", f.storage.path("roundtrip.db"));
-  await db.execAsync(`SELECT sqlcipher_export('roundtrip');
-    PRAGMA roundtrip.user_version = ${expected.userVersion};
-    PRAGMA roundtrip.application_id = ${expected.applicationId};
-    DETACH DATABASE roundtrip;`);
+  const exporter = await f.storage.open(DATABASE_FILES.active);
+  try {
+    await exporter.execAsync(rawKeyPragma(validateRawKey(await f.storage.loadKey())));
+    await exporter.execAsync("PRAGMA foreign_keys = OFF;");
+    await exporter.runAsync("ATTACH DATABASE ? AS roundtrip KEY '';", f.storage.path("roundtrip.db"));
+    await exporter.execAsync(`SELECT sqlcipher_export('roundtrip');
+      PRAGMA roundtrip.user_version = ${expected.userVersion};
+      PRAGMA roundtrip.application_id = ${expected.applicationId};
+      DETACH DATABASE roundtrip;`);
+  } finally { await exporter.closeAsync(); }
   const plain = await f.storage.open("roundtrip.db");
   try { requireMatchingSnapshot(await captureSnapshot(plain), expected); }
   finally { await plain.closeAsync(); }
@@ -84,13 +93,26 @@ export async function runEncryptionProof(progress: Progress) {
   requireQaPackage();
   const passed: string[] = [];
   let cipherVersion = "";
-  for (const source of ["plaintext", "legacy-passphrase"]) {
+  for (const source of ["plaintext", "legacy-passphrase", "legacy-orphans"]) {
     progress(`running:${source}`);
     const f = fixture(source);
-    const expected = await seed(f, source === "legacy-passphrase");
+    const expected = await seed(f, source === "legacy-passphrase", source === "legacy-orphans");
     const db = await openEncryptedDatabase(f.storage);
     try {
       requireMatchingSnapshot(await captureSnapshot(db), expected);
+      check((await db.getFirstAsync<{ foreign_keys: number }>("PRAGMA foreign_keys;"))?.foreign_keys === 1, "Published native handle has foreign keys disabled");
+      if (source === "legacy-orphans") {
+        check((await db.getAllAsync("PRAGMA foreign_key_check;")).length === 2, "Legacy orphan link rows were changed");
+        let rejected = false;
+        try { await db.execAsync("INSERT INTO mood_emotions VALUES (888, 1);"); }
+        catch (error) { rejected = error instanceof Error && /FOREIGN KEY/i.test(error.message); }
+        check(rejected, "Published handle accepted a new orphan link");
+        await db.execAsync(`INSERT INTO moods (id, mood) VALUES (101, 3);
+          INSERT INTO mood_emotions VALUES (101, 1);
+          DELETE FROM moods WHERE id = 101;
+          UPDATE sqlite_sequence SET seq = 99 WHERE name = 'moods';`);
+        check((await db.getFirstAsync<{ count: number }>("SELECT count(*) AS count FROM mood_emotions WHERE mood_id = 101;"))?.count === 0, "Native parent deletion did not cascade");
+      }
       cipherVersion = (await db.getFirstAsync<{ cipher_version: string }>("PRAGMA cipher_version;"))!.cipher_version;
       await roundtrip(f, db);
       await db.execAsync("INSERT INTO moods (mood, note) VALUES (3, 'Fabricated after cutover');");
@@ -215,6 +237,7 @@ export async function verifyAppUpgrade() {
   // Exercise the actual shared getDb startup path and actual app initializer.
   const [first, second] = await Promise.all([getDb(), getDb()]);
   check(first === second, "App startup published different handles to concurrent callers");
+  check((await first.getFirstAsync<{ foreign_keys: number }>("PRAGMA foreign_keys;"))?.foreign_keys === 1, "Actual app handle has foreign keys disabled");
   check((await first.getFirstAsync<{ count: number }>("SELECT count(*) AS count FROM moods;"))?.count === 5, "App first-open migration lost mood records");
   check((await first.getFirstAsync<{ value: string }>("SELECT CAST(large_integer AS TEXT) AS value FROM fixture_values;"))?.value === "9007199254740993", "Native app migration lost exact int64 data");
   const storage = createNativeEncryptionStorage(initializeDatabase);
@@ -232,6 +255,21 @@ export async function loseProofKey() {
   f.file("before-key-loss.bin").write(await f.file(DATABASE_FILES.active).bytes());
   await SecureStore.deleteItemAsync(`${f.namespace}.${RAW_KEY_STORAGE_NAME}`);
   return { status: "passed", evidence: "fabricated namespace key deleted; cold verification still required" };
+}
+
+export async function prepareWalCrash(progress: Progress) {
+  const f = fixture("wal-source");
+  check(!await f.storage.exists(DATABASE_FILES.original), "WAL proof already contains a source");
+  const original = await f.storage.open(DATABASE_FILES.original);
+  const mode = await original.getFirstAsync<{ journal_mode: string }>("PRAGMA journal_mode = WAL;");
+  check(mode?.journal_mode === "wal", "Native source did not enter WAL mode");
+  await original.execAsync(ENCRYPTION_PROOF_FIXTURE);
+  f.file("expected.json").write(JSON.stringify(await captureSnapshot(original)));
+  check(await f.storage.exists(`${DATABASE_FILES.original}-wal`), "Committed native WAL is missing before interruption");
+  check((await f.file(`${DATABASE_FILES.original}-wal`).bytes()).length > 32, "Native WAL has no committed frames");
+  progress("paused:wal-source:committed-wal");
+  // Leave a committed WAL and its open connection for an abrupt Android stop.
+  await new Promise<void>(() => {});
 }
 
 export async function verifyLostProofKey() {

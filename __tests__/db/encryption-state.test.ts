@@ -8,6 +8,7 @@ import { captureSnapshot, requireMatchingSnapshot, type EncryptionDatabase } fro
 import { DATABASE_FILES, openEncryptedDatabase, type EncryptionStorage } from "../../db/encryption/startup";
 
 const KEY = "ab".repeat(32); // Fabricated test material only.
+const LEGACY_FIXTURE = readFileSync(new URL("../../scripts/encryption-rehearsal/fixture.sql", import.meta.url), "utf8");
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
 
@@ -68,12 +69,20 @@ function fixture({ key = null, version = "4.7.0 community" }: { key?: string | n
     db.prepare("INSERT INTO encryption_state VALUES (1, ?, ?, ?)").run(stateVersion, status, source);
     db.close();
   }
+  function seedLegacyLinks(name: string, schema = LEGACY_FIXTURE) {
+    const db = new DatabaseSync(file(name));
+    try {
+      db.exec(schema);
+      // Same deletes as the pre-encryption app, with its FK-off connection.
+      db.exec("PRAGMA foreign_keys = OFF; DELETE FROM moods WHERE id = 1; DELETE FROM emotions WHERE name = 'Tired';");
+    } finally { db.close(); }
+  }
   function recordedState() {
     const db = new DatabaseSync(file(DATABASE_FILES.coordinator));
     try { return { ...db.prepare("SELECT version, status, source FROM encryption_state").get() }; }
     finally { db.close(); }
   }
-  return { root, file, storage, handles, opened, seed, state, recordedState };
+  return { root, file, storage, handles, opened, seed, seedLegacyLinks, state, recordedState };
 }
 
 describe("database key and SQLCipher admission", () => {
@@ -118,7 +127,99 @@ it("snapshot comparison retains int64, NUL text, BLOBs, close real values and se
   expect(handles.size).toBe(0);
 });
 
+describe("legacy relationship preservation", () => {
+  it("retains known orphan rows from FK-off mood and emotion deletion", async () => {
+    const f = fixture();
+    f.seedLegacyLinks("relations.db");
+    const db = await f.storage.open("relations.db");
+    try {
+      const snapshot = await captureSnapshot(db);
+      expect(snapshot.legacyForeignKeyViolations.map(({ parent, count }) => ({ parent, count }))).toEqual([
+        { parent: "emotions", count: 1 }, { parent: "moods", count: 1 },
+      ]);
+      expect(await db.getAllAsync("SELECT mood_id, emotion_id FROM mood_emotions ORDER BY mood_id;")).toEqual([
+        { mood_id: 1, emotion_id: 1 }, { mood_id: 2, emotion_id: 3 }, { mood_id: 3, emotion_id: 2 },
+      ]);
+      expect(snapshot.content.mood_emotions).toHaveLength(3);
+    } finally { await db.closeAsync(); }
+  });
+
+  it("compares equivalent relationship rows despite reassigned hidden rowids", async () => {
+    const f = fixture();
+    f.seedLegacyLinks("relations.db");
+    const db = await f.storage.open("relations.db");
+    try {
+      const original = await captureSnapshot(db);
+      const before = await db.getAllAsync("PRAGMA foreign_key_check;");
+      await db.execAsync("UPDATE mood_emotions SET rowid = rowid + 100;");
+      expect(await db.getAllAsync("PRAGMA foreign_key_check;")).not.toEqual(before);
+      const compacted = await captureSnapshot(db);
+      expect(() => requireMatchingSnapshot(compacted, original)).not.toThrow();
+    } finally { await db.closeAsync(); }
+  });
+
+  it.each([
+    { loss: "missing", sql: "DELETE FROM mood_emotions WHERE mood_id = 1;" },
+    { loss: "changed", sql: "UPDATE mood_emotions SET mood_id = 9876 WHERE mood_id = 1;" },
+  ])("rejects $loss orphan row contents even when physical integrity remains valid", async ({ sql, loss }) => {
+    const f = fixture();
+    f.seedLegacyLinks("relations.db");
+    const db = await f.storage.open("relations.db");
+    try {
+      const original = await captureSnapshot(db);
+      await db.execAsync(`PRAGMA foreign_keys = OFF; ${sql}`);
+      const damaged = await captureSnapshot(db);
+      if (loss === "changed") expect(damaged.legacyForeignKeyViolations).toEqual(original.legacyForeignKeyViolations);
+      expect(() => requireMatchingSnapshot(damaged, original)).toThrow("preserve all stored data");
+    } finally { await db.closeAsync(); }
+  });
+
+  it("keeps unrelated foreign-key violations fatal", async () => {
+    const f = fixture();
+    f.seedLegacyLinks("relations.db");
+    const db = await f.storage.open("relations.db");
+    try {
+      await db.execAsync(`PRAGMA foreign_keys = OFF;
+        CREATE TABLE unknown_relationship (parent_id INTEGER REFERENCES moods(id) ON DELETE CASCADE);
+        INSERT INTO unknown_relationship VALUES (9999);`);
+      await expect(captureSnapshot(db)).rejects.toThrow("relationship verification failed");
+    } finally { await db.closeAsync(); }
+  });
+
+  it.each([
+    { change: "cascade", replacement: "FOREIGN KEY (mood_id) REFERENCES moods(id) ON DELETE NO ACTION" },
+    { change: "column", replacement: "FOREIGN KEY (mood_id) REFERENCES emotions(id) ON DELETE CASCADE" },
+  ])("does not admit a same-named junction with a changed $change constraint", async ({ replacement }) => {
+    const f = fixture();
+    f.seedLegacyLinks("relations.db", LEGACY_FIXTURE.replace(
+      "FOREIGN KEY (mood_id) REFERENCES moods(id) ON DELETE CASCADE", replacement
+    ));
+    const db = await f.storage.open("relations.db");
+    try { await expect(captureSnapshot(db)).rejects.toThrow("relationship verification failed"); }
+    finally { await db.closeAsync(); }
+  });
+});
+
 describe("fail-closed startup state", () => {
+  it("rejects an unavailable FK enforcement setting before initializing or publishing a target", async () => {
+    const f = fixture();
+    f.state("pending", "fresh");
+    const open = f.storage.open;
+    f.storage.open = async (name) => {
+      const db = await open(name);
+      if (name === DATABASE_FILES.active) {
+        // Real SQLite ignores FK=ON inside a transaction. No successful
+        // encryption is simulated to reach this early startup failure.
+        await db.execAsync("PRAGMA foreign_keys = OFF; BEGIN;");
+      }
+      return db;
+    };
+    await expect(openEncryptedDatabase(f.storage)).rejects.toThrow("foreign-key enforcement is unavailable");
+    expect(f.storage.initialize).not.toHaveBeenCalled();
+    expect(f.recordedState().status).toBe("pending");
+    expect(f.handles.size).toBe(0);
+  });
+
   it("refuses orphan encrypted data before creating a missing coordinator or a key", async () => {
     const f = fixture();
     writeFileSync(f.file(DATABASE_FILES.active), "Fabricated orphan encrypted bytes");
