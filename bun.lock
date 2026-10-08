@@ -70,6 +70,9 @@
       },
     },
   },
+  "patchedDependencies": {
+    "expo-secure-store@55.0.18": "patches/expo-secure-store@55.0.18.patch",
+  },
   "overrides": {
     "expo-image-loader": "55.0.1",
   },

@@ -19,7 +19,7 @@ export default function TermsOfServiceScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Text className="text-xs text-paper-700 dark:text-sand-400 mb-4">
-          Last Updated: September 15, 2026
+          Last Updated: October 8, 2026
         </Text>
 
         <Section title="Agreement to Terms">
@@ -49,6 +49,9 @@ export default function TermsOfServiceScreen() {
         <Section title="Your Data">
           <Paragraph>
             Entry timestamps may include a recorded UTC offset, which is also included in JSON exports and backups. Comparisons describe your recorded entries and do not establish causes. You retain your rights in mood entries, notes, tags, settings, exports, and backups you create. Moodinator has no developer-operated account or server copy. You are responsible for device security and protecting plaintext JSON mood exports/backups and plaintext CSV therapy exports.
+          </Paragraph>
+          <Paragraph>
+            The working mood database is encrypted with SQLCipher, with its key held in operating-system secure storage. The updated app migrates existing databases automatically on first open. A failed or interrupted attempt keeps saved files and blocks mood screens until safe opening succeeds. Losing the encryption key can make data unreadable; there is no developer-side recovery key. Settings outside the mood database and plaintext exports/backups are not protected by database encryption.
           </Paragraph>
           <Paragraph>
             Delete Mood Data removes mood history, including mood rows, mood–emotion link records, and database emotion records used by that history. It retains the user-visible Emotion List presets, context-tag presets, other settings, reminders, app-lock data, and external files.

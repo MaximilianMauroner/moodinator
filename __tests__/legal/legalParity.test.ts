@@ -30,7 +30,9 @@ describe("legal document parity", () => {
       const source = withoutMarkdownEmphasis(rawSource);
       expect(source).toContain("no developer-operated server");
       expect(source).toContain("recorded UTC offset");
-      expect(source).toContain("does not apply database-level encryption");
+      expect(source).toContain("encrypts its working mood database with SQLCipher on Android and iOS");
+      expect(source).toContain("automatically migrates an existing database on its first open");
+      expect(source).toContain("no developer-side recovery key");
       expect(source).toContain("salted hash");
       expect(source).toContain("plaintext JSON");
       expect(source).toContain("plaintext CSV");
@@ -44,7 +46,7 @@ describe("legal document parity", () => {
       expect(source).toContain("prefilled");
       expect(source).toContain("GitHub");
       expect(source).toContain("Do not include private mood entries");
-      expect(source).not.toContain("Android database is encrypted");
+      expect(source).not.toContain("does not apply database-level encryption");
     }
   });
 
@@ -58,6 +60,8 @@ describe("legal document parity", () => {
       expect(source).toContain("database emotion records");
       expect(source).toContain("Emotion List presets");
       expect(source).toContain("plaintext CSV");
+      expect(source).toContain("migrates existing databases automatically on first open");
+      expect(source).toContain("Losing the encryption key");
       expect(source).toContain("at most once per week");
       expect(source).toContain("eight newest app-managed");
       expect(source).toContain("MIT License");

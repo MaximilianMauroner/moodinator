@@ -1,0 +1,16 @@
+diff --git a/android/src/main/java/expo/modules/securestore/SecureStoreModule.kt b/android/src/main/java/expo/modules/securestore/SecureStoreModule.kt
+index 0fef884af8f4c8a201d4a9c9e7e6ecd6bfe45bfb..fcefbb98535a2d157c03fa9c9ffd625826a67218 100644
+--- a/android/src/main/java/expo/modules/securestore/SecureStoreModule.kt
++++ b/android/src/main/java/expo/modules/securestore/SecureStoreModule.kt
+@@ -237,7 +237,10 @@ open class SecureStoreModule : Module() {
+       throw WriteException("Could not JSON-encode the encrypted item for SecureStore - the string $encryptedItemString is null or empty", key, keychainService)
+     }
+ 
+-    return prefs.edit().putString(key, encryptedItemString).commit()
++    if (!prefs.edit().putString(key, encryptedItemString).commit()) {
++      throw WriteException("Could not persist the encrypted item", key, keychainService)
++    }
++    return true
+   }
+ 
+   private fun deleteItemImpl(key: String, options: SecureStoreOptions) {

@@ -2,13 +2,17 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { BOOTSTRAP_MIGRATIONS_STATE_KEY } from "../../src/shared/storage/keys";
+import { runAppBootstrap } from "../../src/services/bootstrapService";
 
 const mocks = vi.hoisted(() => ({
+  getDb: vi.fn(),
   migrateEmotionsToCategories: vi.fn(),
   toastError: vi.fn(),
   invalidate: vi.fn(),
   ensureFresh: vi.fn(() => Promise.resolve()),
 }));
+
+vi.mock("@db/client", () => ({ getDb: mocks.getDb }));
 
 vi.mock("@db/moods/migrations", () => ({
   migrateEmotionsToCategories: mocks.migrateEmotionsToCategories,
@@ -28,8 +32,6 @@ vi.mock("@/shared/state/moodsStore", () => ({
     }),
   },
 }));
-
-import { runAppBootstrap } from "../../src/services/bootstrapService";
 
 const LEGACY_EMOTION_CATEGORY_MIGRATION_ID = "legacy-emotion-categories";
 
@@ -58,11 +60,37 @@ async function writeMigrationRecord(record: Record<string, unknown>) {
 describe("runAppBootstrap", () => {
   beforeEach(async () => {
     await AsyncStorage.clear();
+    mocks.getDb.mockReset();
+    mocks.getDb.mockResolvedValue({});
     mocks.migrateEmotionsToCategories.mockReset();
     mocks.toastError.mockReset();
     mocks.invalidate.mockReset();
     mocks.ensureFresh.mockReset();
     mocks.ensureFresh.mockResolvedValue(undefined);
+  });
+
+  it("waits for database startup before migrations and readiness", async () => {
+    let finishOpening!: () => void;
+    mocks.getDb.mockReturnValue(new Promise<void>((resolve) => {
+      finishOpening = resolve;
+    }));
+    mocks.migrateEmotionsToCategories.mockResolvedValue({ migrated: 0, skipped: 0 });
+    const startup = runAppBootstrap();
+    await Promise.resolve();
+    expect(mocks.migrateEmotionsToCategories).not.toHaveBeenCalled();
+    expect(await readMigrationState()).toBeNull();
+    finishOpening();
+    expect(await startup).toEqual({ status: "ready" });
+    expect(mocks.migrateEmotionsToCategories).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects a failed database open even when the legacy migration completed", async () => {
+    await writeMigrationRecord({ status: "completed", attempts: 1 });
+    const failure = new Error("Database unavailable");
+    mocks.getDb.mockRejectedValue(failure);
+    await expect(runAppBootstrap()).rejects.toBe(failure);
+    expect(mocks.migrateEmotionsToCategories).not.toHaveBeenCalled();
+    expect(mocks.invalidate).not.toHaveBeenCalled();
   });
 
   it("runs the legacy emotion-category migration on first run", async () => {
