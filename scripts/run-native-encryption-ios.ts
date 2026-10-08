@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { execFileSync, spawn } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -14,6 +14,7 @@ assert.equal(process.env.MOODINATOR_VARIANT, "qa");
 assert.equal(process.env.MOODINATOR_QA_ENCRYPTION_PROOF, "1");
 const require = createRequire(import.meta.url);
 const { readPreparedSourceSha } = require("./qa-source-provenance.js");
+const { runIosProofLifecycle, runOwnedBuild, selectSimulatorProfile } = require("./native-encryption-ios.js");
 const sourceSha: string = readPreparedSourceSha(process.cwd(), process.env, "ios");
 const args = process.argv.slice(2);
 const outputArg = args.find((arg) => arg.startsWith("--out="));
@@ -24,7 +25,12 @@ assert.ok(path.isAbsolute(outputArg.slice("--out=".length)));
 assert.ok(output !== process.cwd() && !output.startsWith(`${process.cwd()}${path.sep}`), "Evidence must be outside prepared source");
 assert.ok(!existsSync(output), "Evidence directory already exists; retain it and choose a fresh directory");
 const QA_ID = "com.lab4code.moodinator.qa";
-const xcrun = (arguments_: string[], timeout = 15000) => execFileSync("xcrun", arguments_, { encoding: "utf8", timeout, maxBuffer: 8 * 1024 * 1024 });
+let cancellationSignal: AbortSignal | undefined;
+const rawXcrun = (arguments_: string[], timeout = 15000) => execFileSync("xcrun", arguments_, { encoding: "utf8", timeout, maxBuffer: 8 * 1024 * 1024 });
+const xcrun = (arguments_: string[], timeout?: number) => {
+  cancellationSignal?.throwIfAborted();
+  return rawXcrun(arguments_, timeout);
+};
 const plist = (file: string, key: string) => execFileSync("/usr/libexec/PlistBuddy", ["-c", `Print :${key}`, file], { encoding: "utf8", timeout: 5000 }).trim();
 const workspaceNames = readdirSync("ios").filter((name) => name.endsWith(".xcworkspace"));
 assert.equal(workspaceNames.length, 1, "Expected one CocoaPods-generated iOS workspace");
@@ -52,31 +58,14 @@ function resourceSample() {
   })}\n`);
 }
 
-async function build() {
-  resourceSample();
+async function build(signal: AbortSignal) {
   const log = openSync(path.join(output, "xcodebuild.log"), "w");
-  const child = spawn("/usr/bin/time", ["-l", "xcodebuild", "-workspace", workspace, "-scheme", scheme,
-    "-configuration", "Release", "-sdk", "iphonesimulator", "-destination", "generic/platform=iOS Simulator",
-    "-derivedDataPath", path.join(output, "DerivedData"), "-jobs", "1", "CODE_SIGNING_ALLOWED=NO", "build"],
-  { detached: true, stdio: ["ignore", log, log] });
-  const stopOwnedBuild = () => { if (child.pid) { try { process.kill(-child.pid, "SIGTERM"); } catch { /* Already exited. */ } } };
-  const timer = setInterval(() => {
-    try { resourceSample(); }
-    catch (error) { evidence.failure = `Resource monitoring failed: ${String(error)}`; stopOwnedBuild(); }
-  }, 15000);
-  const timeout = setTimeout(() => { evidence.failure = "Owned Xcode build exceeded 45 minutes"; stopOwnedBuild(); }, 45 * 60000);
-  process.once("SIGINT", stopOwnedBuild);
-  process.once("SIGTERM", stopOwnedBuild);
   try {
-    const code = await new Promise<number | null>((resolve, reject) => {
-      child.once("error", reject);
-      child.once("close", resolve);
-    });
-    assert.equal(code, 0, evidence.failure || `Xcode build failed (${code}); return the first error from xcodebuild.log`);
-    resourceSample();
+    await runOwnedBuild("/usr/bin/time", ["-l", "xcodebuild", "-workspace", workspace, "-scheme", scheme,
+      "-configuration", "Release", "-sdk", "iphonesimulator", "-destination", "generic/platform=iOS Simulator",
+      "-derivedDataPath", path.join(output, "DerivedData"), "-jobs", "1", "CODE_SIGNING_ALLOWED=NO", "build"],
+    { stdio: ["ignore", log, log], sample: resourceSample, signal });
   } finally {
-    clearInterval(timer); clearTimeout(timeout);
-    process.removeListener("SIGINT", stopOwnedBuild); process.removeListener("SIGTERM", stopOwnedBuild);
     closeSync(log);
   }
   readPreparedSourceSha(process.cwd(), process.env, "ios");
@@ -115,6 +104,7 @@ type ProofStatus = { sourceSha: unknown; runId: unknown; progress: string; resul
 async function wait(runId: string, predicate: (status: ProofStatus) => boolean) {
   const deadline = Date.now() + 180000;
   while (Date.now() < deadline) {
+    cancellationSignal?.throwIfAborted();
     const statusFile = path.join(container, "Documents/encryption-proof-status.json");
     if (existsSync(statusFile)) {
       let status: ProofStatus;
@@ -159,25 +149,18 @@ async function abruptStop() {
     }
   };
   const deadline = Date.now() + 10000;
-  while (alive() && Date.now() < deadline) await delay(100);
+  while (alive() && Date.now() < deadline) {
+    cancellationSignal?.throwIfAborted();
+    await delay(100);
+  }
   assert.equal(alive(), false, "Owned QA process did not exit after SIGKILL");
   launched = false;
 }
 
-try {
-  const { app, executable } = await build(); // Compilation and simulator never overlap.
-  const inventory: {
-    runtimes: { identifier: string; name: string; version: string; isAvailable: boolean }[];
-    devicetypes: { identifier: string; name: string }[];
-    devices: Record<string, { deviceTypeIdentifier?: string; isAvailable: boolean }[]>;
-  } = JSON.parse(xcrun(["simctl", "list", "--json"]));
-  const runtime = inventory.runtimes.filter((item) => item.isAvailable && item.identifier.includes(".iOS-"))
-    .sort((a, b) => b.version.localeCompare(a.version, undefined, { numeric: true }))[0];
-  assert.ok(runtime, "An installed available iOS Simulator runtime is required; no runtime is installed by this runner");
-  const compatibleTypes = (inventory.devices[runtime.identifier] ?? []).filter((item) => item.isAvailable).map((item) => item.deviceTypeIdentifier);
-  const deviceType = [...inventory.devicetypes].reverse().find((item) => item.name.startsWith("iPhone") && compatibleTypes.includes(item.identifier))
-    ?? [...inventory.devicetypes].reverse().find((item) => item.name.startsWith("iPhone"));
-  assert.ok(deviceType, "An installed iPhone simulator device type is required");
+async function runProof(signal: AbortSignal) {
+  cancellationSignal = signal;
+  const { app, executable } = await build(signal); // Compilation and simulator never overlap.
+  const { runtime, deviceType } = selectSimulatorProfile(JSON.parse(xcrun(["simctl", "list", "--json"])));
   simulator = xcrun(["simctl", "create", `Moodinator-118-${sourceSha.slice(0, 8)}-${Date.now()}`, deviceType.identifier, runtime.identifier]).trim();
   assert.match(simulator, /^[0-9A-F-]{36}$/i);
   evidence.simulator = { id: simulator, runtime: runtime.name, deviceType: deviceType.name };
@@ -211,21 +194,15 @@ try {
   const journeyRun = await launch({ proof: "journey" });
   await wait(journeyRun, (value) => value.progress === "launch");
   simctl(["io", "screenshot", path.join(output, "initial-launch.png")]);
-  evidence.status = "passed";
   console.log("iOS Expo lifecycle cases passed. Manual app journey, inside-export interruption and disk/write-failure proof remain separate.");
-  if (args.includes("--keep-simulator")) {
-    evidence.simulatorRetained = true;
-    console.log(`Owned simulator: ${simulator}\nEvidence: ${output}/report.json\nComplete the fabricated-data UI journey, then shutdown/delete only this simulator.`);
-    execFileSync("open", ["-a", "Simulator", "--args", "-CurrentDeviceUDID", simulator], { timeout: 15000 });
-  }
-} catch (error) {
-  evidence.status = "failed";
-  evidence.failure = error instanceof Error ? error.message : String(error);
-  throw error;
-} finally {
-  save();
-  if (simulator && !evidence.simulatorRetained) {
-    try { simctl(["shutdown"]); } catch { /* This runner owns only this UUID. */ }
-    simctl(["delete"]);
-  }
+}
+
+await runIosProofLifecycle({
+  evidence, save, run: runProof, keepSimulator: args.includes("--keep-simulator"),
+  shutdown: (id: string) => rawXcrun(["simctl", "shutdown", id]),
+  deleteSimulator: (id: string) => rawXcrun(["simctl", "delete", id]),
+  openSimulator: (id: string) => execFileSync("open", ["-a", "Simulator", "--args", "-CurrentDeviceUDID", id], { timeout: 15000 }),
+});
+if (evidence.simulatorRetained) {
+  console.log(`Owned simulator: ${simulator}\nEvidence: ${output}/report.json\nComplete the fabricated-data UI journey, then shutdown/delete only this simulator.`);
 }

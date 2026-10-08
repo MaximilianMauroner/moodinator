@@ -48,7 +48,10 @@ The runner builds Release for `iphonesimulator` with signing disabled, one Xcode
 job and a bundled app, so no Metro server is needed. It records Mac/Xcode,
 source/app identity, resource samples and `/usr/bin/time` build memory in the
 evidence folder. Build and simulator execution do not overlap. Only its owned
-build process group receives cancellation signals.
+build process group receives cancellation signals. Cancellation, timeout or
+failed resource monitoring fails the run even if the build exits successfully.
+The runner uses only an installed runtime and a compatible iPhone profile; it
+fails if compatibility cannot be established and does not install a runtime.
 
 The suite creates five fabricated original moods, exact int64/NUL/BLOB values,
 legacy columns, links, sequences and schema objects. It verifies plaintext and
@@ -87,4 +90,6 @@ separate unexecuted gates; phase-boundary results do not waive them.
 After retaining evidence, shutdown/delete only the printed owned simulator with
 `xcrun simctl shutdown <ID>` and `xcrun simctl delete <ID>`. Remove only the two
 printed disposable workspace paths when their evidence is saved. Failure runs
-automatically dispose their owned simulator and retain their evidence.
+attempt to dispose their owned simulator even if report writing fails. A cleanup
+failure reports its owned UUID for manual removal. Only a successful run and
+successful Simulator launch can retain the simulator for the visible app check.
