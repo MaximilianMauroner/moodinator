@@ -54,10 +54,13 @@ success is not evidence for the Expo bridge or an Android upgrade.
 
 The fixture includes current mood fields, retained legacy attachment columns,
 legacy scale metadata, recorded UTC offsets, entry references, nullable values,
-emotions and junction rows, indexes, a view, a trigger, an empty table, BLOBs,
-int64 values and an AUTOINCREMENT sequence above the maximum current ID. The
-verifier compares schema, typed values in every table, sequence state, encoding,
-`user_version`, `application_id`, `integrity_check` and `foreign_key_check`.
+current emotion objects with and without optional energy, a legacy emotion name
+array, normalized positive/negative/neutral categories, case-insensitive unique
+emotion names, cascading junction foreign keys, indexes, a view, a trigger, an
+empty table, BLOBs, int64 values and an AUTOINCREMENT sequence above the maximum
+current ID. The verifier compares schema, typed values in every table, sequence
+state, encoding, `user_version`, `application_id`, `integrity_check` and
+`foreign_key_check`.
 
 | Phase after which the child process exits | Files available for reopen |
 | --- | --- |
