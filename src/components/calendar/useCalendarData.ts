@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useCallback, useMemo } from "react";
 import type { MoodEntry } from "@db/types";
 import { getInterpretedMoodRating } from "@/constants/moodScaleInterpretation";
-import { moodService } from "@/services/moodService";
-import { useMoodsStore } from "@/shared/state/moodsStore";
+import { moodQueries } from "@/services/moodQueries";
+import { useMoodQuery } from "@/hooks/useMoodQuery";
 
 export type CalendarDayData = {
   day: number;
@@ -24,76 +24,24 @@ export function useCalendarData(initialYear?: number, initialMonth?: number) {
   const [displayDate, setDisplayDate] = useState(() => (
     new Date(initialYear ?? now.getFullYear(), initialMonth ?? now.getMonth(), 1)
   ));
-  const [monthData, setMonthData] = useState<CalendarMonthData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const latestRequestIdRef = useRef(0);
-
   const year = displayDate.getFullYear();
   const month = displayDate.getMonth();
-
-  // Reload after any entry change so edits made elsewhere show in the month.
-  const revision = useMoodsStore((state) => state.revision);
-  const loadMonthData = useCallback(async () => {
-    const requestId = ++latestRequestIdRef.current;
-    setLoading(true);
-    setError(null);
-    try {
-      const moodsByDay = await moodService.getByMonth(year, month);
-
-      // Calculate days in month and first day of week
-      const firstDay = new Date(year, month, 1);
-      const lastDay = new Date(year, month + 1, 0);
-      const daysInMonth = lastDay.getDate();
-      const firstDayOfWeek = firstDay.getDay();
-
-      // Process each day with moods
-      const days = new Map<number, CalendarDayData>();
-
-      for (const [day, entries] of moodsByDay) {
-        if (entries.length === 0) continue;
-
-        // Calculate average mood
-        const totalMood = entries.reduce(
-          (sum, entry) => sum + getInterpretedMoodRating(entry),
-          0
-        );
-        const averageMood = totalMood / entries.length;
-
-        days.set(day, {
-          day,
-          entries,
-          averageMood,
-          hasMultiple: entries.length > 1,
-        });
-      }
-
-      if (requestId !== latestRequestIdRef.current) {
-        return;
-      }
-
-      setMonthData({
-        year,
-        month,
-        days,
-        daysInMonth,
-        firstDayOfWeek,
-      });
-    } catch (loadError) {
-      console.error("Failed to load calendar data:", loadError);
-      if (requestId === latestRequestIdRef.current) {
-        setError("Calendar data could not load. Your existing entries are still safe.");
-      }
-    } finally {
-      if (requestId === latestRequestIdRef.current) {
-        setLoading(false);
-      }
+  const query = useMemo(() => moodQueries.month({ year, month }), [year, month]);
+  const result = useMoodQuery(query);
+  const monthData = useMemo<CalendarMonthData | null>(() => {
+    if (!result.data) return null;
+    const days = new Map<number, CalendarDayData>();
+    for (const [day, entries] of result.data) {
+      if (!entries.length) continue;
+      const totalMood = entries.reduce((sum, entry) => sum + getInterpretedMoodRating(entry), 0);
+      days.set(day, { day, entries, averageMood: totalMood / entries.length, hasMultiple: entries.length > 1 });
     }
-  }, [year, month]);
-
-  useEffect(() => {
-    loadMonthData();
-  }, [loadMonthData, revision]);
+    return {
+      year, month, days,
+      daysInMonth: new Date(year, month + 1, 0).getDate(),
+      firstDayOfWeek: new Date(year, month, 1).getDay(),
+    };
+  }, [result.data, year, month]);
 
   const goToPreviousMonth = useCallback(() => {
     setDisplayDate((previousDate) => (
@@ -139,13 +87,13 @@ export function useCalendarData(initialYear?: number, initialMonth?: number) {
     month,
     monthName,
     monthData,
-    loading,
-    error,
+    loading: result.loading,
+    error: result.error,
     goToPreviousMonth,
     goToNextMonth,
     goToToday,
     isCurrentMonth,
     canGoNext,
-    refresh: loadMonthData,
+    refresh: result.refresh,
   };
 }

@@ -289,6 +289,15 @@ On Home, open Filter history and apply note text, mood 7 or worse, an emotion,
 a context and a date range separately, then combine them. Verify empty results,
 Clear filters and a failed refresh after deleting a filtered row. Scroll past two
 50-entry pages, refresh, then edit/delete/undo: no duplicate or skipped rows.
+After a mutation or pull-to-refresh, the loaded window must retain its size.
+Delete a row from the second page and tap Undo within five seconds: the same
+timestamp, note and fields must return exactly once without navigation or restart.
+Repeat with menu deletion, swipe deletion and active filters. Rapid Undo taps
+must create only one restored entry. Open the same day detail before a change;
+its entry count and rows must follow the current day query, including an empty
+day. Check forecast, calendar and Insights after each confirmed write. A failed
+read must show stale/error state and must not turn a committed Undo into a failed
+write. Retry after the read recovers and confirm rows and counts agree.
 Home's streak and the Insights history total must ignore Home's filters.
 
 For timezone checks, create an entry near midnight, note its calendar date and

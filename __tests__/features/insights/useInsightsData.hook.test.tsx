@@ -203,7 +203,7 @@ describe("useInsightsData hook", () => {
           resolveAll = resolve;
         }),
     );
-    act(() => result.setAnalysisRange("all"));
+    await act(async () => result.setAnalysisRange("all"));
 
     expect(result.analysisRange).toBe("all");
     expect(result.ready).toBe(false);

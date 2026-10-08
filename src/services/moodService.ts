@@ -42,7 +42,7 @@ export interface MoodServiceInterface {
   // CRUD operations
   create: (entry: MoodEntryInput) => Promise<MoodEntry>;
   update: (id: number, updates: Partial<MoodEntryInput>) => Promise<MoodEntry | undefined>;
-  delete: (id: number) => Promise<void>;
+  delete: (id: number) => Promise<boolean>;
 
   // Queries
   getAll: () => Promise<MoodEntry[]>;
@@ -111,9 +111,10 @@ export const moodService: MoodServiceInterface = {
     return updated;
   },
 
-  async delete(id: number): Promise<void> {
-    await deleteMood(id);
+  async delete(id: number): Promise<boolean> {
+    const result = await deleteMood(id);
     await reconcileRemindersAfterMoodChange();
+    return result.changes > 0;
   },
 
   async getAll(): Promise<MoodEntry[]> {

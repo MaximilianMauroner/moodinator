@@ -93,7 +93,7 @@ describe("useMoodsStore", () => {
     expect(useMoodsStore.getState().moods).toEqual([updated, original]);
     await useMoodsStore.getState().ensureFresh();
     moodServiceMock.getAll.mockResolvedValue([original]);
-    moodServiceMock.delete.mockResolvedValue(undefined);
+    moodServiceMock.delete.mockResolvedValue(true);
     expect(await useMoodsStore.getState().remove(2)).toEqual(updated);
     expect(useMoodsStore.getState().moods).toEqual([original]);
     await useMoodsStore.getState().ensureFresh();
@@ -397,7 +397,7 @@ test("a filtered deletion stays removed if the subsequent refresh fails", async 
   await useMoodsStore.getState().setFilters({ text: "work" });
   const log = vi.spyOn(console, "error").mockImplementation(() => {});
   moodServiceMock.getPaginated.mockRejectedValue(new Error("read failed"));
-  moodServiceMock.delete.mockResolvedValue(undefined);
+  moodServiceMock.delete.mockResolvedValue(true);
   expect(await useMoodsStore.getState().remove(1)).toEqual(entry);
   await useMoodsStore.getState().ensureFresh();
   expect(useMoodsStore.getState().moods).toEqual([]);
@@ -417,4 +417,64 @@ test("a changed filtered row stays hidden when membership cannot be refreshed", 
   expect(useMoodsStore.getState().moods).toEqual([unchanged]);
   expect(useMoodsStore.getState().filters).toEqual({ text: "match" });
   expect(useMoodsStore.getState().error).toBe("read failed");
+});
+
+test("Undo keeps an entry from the loaded second page visible while refresh is pending", async () => {
+  resetStore();
+  moodServiceMock.getPaginated.mockReset();
+  const loaded = Array.from({ length: 100 }, (_, i) => makeMood(i + 1, 1000 - i));
+  useMoodsStore.getState().setLocal(loaded);
+  let resolveRefresh!: (page: { data: MoodEntry[]; total: number; hasMore: boolean }) => void;
+  moodServiceMock.getPaginated.mockImplementationOnce(() => new Promise((resolve) => { resolveRefresh = resolve; }));
+  moodServiceMock.delete.mockResolvedValue(true);
+  const original = loaded[75];
+  await useMoodsStore.getState().remove(original.id);
+  const restored = { ...original, id: 101 };
+  moodServiceMock.create.mockResolvedValue(restored);
+  await useMoodsStore.getState().restore(original);
+  expect(useMoodsStore.getState().moods).toContainEqual(restored);
+  expect(useMoodsStore.getState().moods).toHaveLength(100);
+  expect(useMoodsStore.getState().total).toBe(100);
+  expect(moodServiceMock.getPaginated).toHaveBeenCalledWith({ limit: 100, offset: 0, filters: {} });
+  moodServiceMock.getPaginated.mockResolvedValue({ data: useMoodsStore.getState().moods, total: 100, hasMore: false });
+  resolveRefresh({ data: loaded, total: 100, hasMore: false });
+  await useMoodsStore.getState().ensureFresh();
+  expect(useMoodsStore.getState().moods.filter((entry) => entry.id === restored.id)).toHaveLength(1);
+  expect(useMoodsStore.getState().moods.some((entry) => entry.id === original.id)).toBe(false);
+});
+
+test("confirmed unfiltered writes publish their count even when the follow-up read fails", async () => {
+  resetStore();
+  moodServiceMock.getPaginated.mockReset();
+  const original = makeMood(1, 100);
+  useMoodsStore.getState().setLocal([original]);
+  const log = vi.spyOn(console, "error").mockImplementation(() => {});
+  moodServiceMock.getPaginated.mockRejectedValue(new Error("native read failed"));
+  moodServiceMock.delete.mockResolvedValue(true);
+  await useMoodsStore.getState().remove(1);
+  await useMoodsStore.getState().ensureFresh();
+  expect(useMoodsStore.getState().total).toBe(0);
+  const restored = makeMood(2, 100);
+  moodServiceMock.create.mockResolvedValue(restored);
+  await useMoodsStore.getState().restore(original);
+  await useMoodsStore.getState().ensureFresh();
+  expect(useMoodsStore.getState().moods).toEqual([restored]);
+  expect(useMoodsStore.getState().total).toBe(1);
+  expect(useMoodsStore.getState().isStale).toBe(true);
+  expect(useMoodsStore.getState().hasMore).toBe(false);
+  log.mockRestore();
+});
+
+test("a no-op delete does not reduce the confirmed count when refresh fails", async () => {
+  resetStore();
+  moodServiceMock.getPaginated.mockReset();
+  useMoodsStore.getState().setLocal([makeMood(1, 100)]);
+  moodServiceMock.delete.mockResolvedValue(false);
+  moodServiceMock.getPaginated.mockRejectedValue(new Error("read failed"));
+  const log = vi.spyOn(console, "error").mockImplementation(() => {});
+  await useMoodsStore.getState().remove(999);
+  await useMoodsStore.getState().ensureFresh();
+  expect(useMoodsStore.getState().total).toBe(1);
+  expect(useMoodsStore.getState().moods).toHaveLength(1);
+  log.mockRestore();
 });

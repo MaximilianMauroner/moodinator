@@ -131,7 +131,7 @@ describe("dataPortabilityService", () => {
     expect(mocks.reconcileRemindersAfterMoodChange).toHaveBeenCalledTimes(1);
     expect(mocks.addMissingFromHistory).toHaveBeenCalledWith("all");
     expect(mocks.invalidate).toHaveBeenCalledTimes(1);
-    expect(mocks.ensureFresh).toHaveBeenCalledTimes(1);
+    expect(mocks.ensureFresh).not.toHaveBeenCalled(); // invalidate owns the refresh.
   });
 
   it("previews imports for the destructive replacement prompt", () => {
