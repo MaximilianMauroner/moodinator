@@ -27,6 +27,18 @@ export function keyLiteral(hex) {
   return `"x'${hex}'"`;
 }
 
+export function requireCipherIntegritySupport(version) {
+  const match = typeof version === 'string'
+    ? /^(\d+)\.(\d+)\.(\d+)(?: [a-z]+)?$/i.exec(version) : null;
+  assert.ok(match && match[0] === version, 'Malformed SQLCipher version');
+  const [major, minor, patch] = match.slice(1).map(Number);
+  // An unsupported PRAGMA also returns [], indistinguishable from a successful check.
+  assert.ok([major, minor, patch].every(Number.isSafeInteger)
+    && (major > 4 || (major === 4 && minor >= 2)),
+  'SQLCipher 4.2.0 or newer required for cipher_integrity_check');
+  return version;
+}
+
 export function createEngine(mode, binary = 'sqlcipher') {
   assert.ok(['synthetic', 'sqlcipher'].includes(mode), 'Unknown rehearsal engine');
   function run(file, key, sql, query = false) {
@@ -193,9 +205,8 @@ export function runRehearsal({ mode = 'synthetic', binary = 'sqlcipher' } = {}) 
     let cipherVersion = null;
     if (mode === 'sqlcipher') {
       const version = engine.query(seed, null, 'PRAGMA cipher_version;');
-      assert.ok(version.length === 1 && typeof version[0].cipher_version === 'string'
-        && version[0].cipher_version.length > 0, 'Native SQLCipher runtime required');
-      cipherVersion = version[0].cipher_version;
+      assert.equal(version.length, 1, 'Native SQLCipher runtime required');
+      cipherVersion = requireCipherIntegritySupport(version[0].cipher_version);
     }
     const cases = [];
     for (const stopAt of [...PHASES, null]) {

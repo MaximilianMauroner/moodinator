@@ -4,7 +4,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import {
-  createEngine, keyLiteral, PHASES, recoverFixture, runRehearsal, seedFixture, snapshot,
+  createEngine, keyLiteral, PHASES, recoverFixture, requireCipherIntegritySupport,
+  runRehearsal, seedFixture, snapshot,
 } from '../scripts/encryption-rehearsal.mjs';
 
 const KEY = 'ab'.repeat(32); // Fabricated, never an app or user key.
@@ -91,4 +92,17 @@ test('key SQL accepts only a fixed 32-byte hex shape', () => {
 
 test('SQLCipher mode fails rather than substituting synthetic encryption when runtime is missing', () => {
   assert.throws(() => runRehearsal({ mode: 'sqlcipher', binary: '/nonexistent/moodinator-sqlcipher' }), /SQLCipher command failed: ENOENT/);
+});
+
+test('SQLCipher version admission requires numeric 4.2.0 or newer and retains its edition suffix', () => {
+  for (const version of ['4.2.0', '4.2.1', '4.7.0 community', '4.10.0', '5.0.0']) {
+    assert.equal(requireCipherIntegritySupport(version), version);
+  }
+  for (const version of [
+    '3.4.2', '3.4.2 community', '4.0.0', '4.1.0', '4.1.10 community',
+    '', undefined, null, 42, 'unknown', '4.2', '4.two.0', '4.2.0.1',
+    '4.2.0-beta', '4.2.0\n', '9007199254740992.2.0',
+  ]) {
+    assert.throws(() => requireCipherIntegritySupport(version), /SQLCipher/);
+  }
 });

@@ -41,8 +41,11 @@ With an independently provisioned SQLCipher CLI on PATH:
 node scripts/encryption-rehearsal.mjs --engine sqlcipher
 ```
 
-This mode requires `PRAGMA cipher_version` and a CLI with `-json` and `-readonly`
-support. It never falls back to ordinary SQLite. The CLI receives fabricated
+This mode requires SQLCipher 4.2.0 or newer, reported by `PRAGMA cipher_version`,
+and a CLI with `-json` and `-readonly` support. Unknown, malformed or older
+versions fail before export: `cipher_integrity_check` is unavailable before
+4.2.0, and an unsupported PRAGMA can return the same empty result as a successful
+check. It never falls back to ordinary SQLite. The CLI receives fabricated
 keys through stdin, not command arguments or files. It exports a plaintext copy
 through `ATTACH ... KEY` and `sqlcipher_export`, sets `user_version` and
 `application_id` explicitly, and closes the connection before verification.
@@ -173,7 +176,7 @@ Acceptance requirements for the future startup integration:
 
 ### Existing evidence and missing first-open coverage
 
-The eight focused tests in `tests/encryption-rehearsal.node-test.mjs` support
+The recovery tests in `tests/encryption-rehearsal.node-test.mjs` support
 schema/content preservation, every listed process-exit boundary, repeatable
 recovery, rejection of damaged/divergent candidates and original preservation.
 They start from a fabricated existing database. They do not invoke app startup,
