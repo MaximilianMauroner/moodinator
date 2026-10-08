@@ -13,6 +13,8 @@ const GENERATED_PREFIXES = [
   "android/build/",
   "android/app/build/",
   "android/app/.cxx/",
+  "ios/Pods/",
+  "ios/build/",
 ];
 
 function isGeneratedPath(relativePath) {
@@ -62,18 +64,26 @@ function writePreparedSourceMetadata(workspace, sourceSha, trackedFiles) {
   return filePath;
 }
 
-function sealPreparedNativeSource(workspace) {
+function platformLabel(platform) {
+  if (platform !== "android" && platform !== "ios") {
+    throw new Error(`Unsupported native QA platform: ${platform}`);
+  }
+  return platform === "ios" ? "iOS" : "Android";
+}
+
+function sealPreparedNativeSource(workspace, platform = "android") {
+  const label = platformLabel(platform);
   const filePath = metadataPath(workspace);
   const metadata = JSON.parse(readFileSync(filePath, "utf8"));
   validateMetadata(filePath, metadata);
   if (metadata.nativeSealed) throw new Error("Prepared native source is already sealed.");
+  readPreparedSourceSha(workspace, { MOODINATOR_QA_PREPARE_NATIVE: "1" }, platform);
   const allFiles = workspaceFiles(workspace);
-  const unexpected = allFiles.filter((file) => !Object.hasOwn(metadata.files, file) && !file.startsWith("android/"));
-  if (unexpected.length) throw new Error(`Prepared QA workspace contains unexpected input ${unexpected[0]}.`);
-  const nativeFiles = allFiles.filter((file) => file.startsWith("android/"));
-  if (!nativeFiles.length) throw new Error("No generated Android source found; run the documented clean prebuild first.");
+  const nativeFiles = allFiles.filter((file) => file.startsWith(`${platform}/`));
+  if (!nativeFiles.length) throw new Error(`No generated ${label} source found; run the documented clean prebuild first.`);
   for (const file of nativeFiles) metadata.files[file] = fileSha256(path.join(workspace, file));
   metadata.nativeSealed = true;
+  metadata.nativePlatform = platform;
   chmodSync(filePath, 0o644);
   writeFileSync(filePath, `${JSON.stringify(metadata, null, 2)}\n`, { mode: 0o444 });
   chmodSync(filePath, 0o444);
@@ -82,12 +92,21 @@ function sealPreparedNativeSource(workspace) {
 function validateMetadata(filePath, metadata) {
   if (metadata?.version !== 3 || !FULL_SHA.test(metadata?.sourceSha ?? "")
     || !metadata.files || Array.isArray(metadata.files) || typeof metadata.files !== "object"
-    || typeof metadata.nativeSealed !== "boolean") {
+    || typeof metadata.nativeSealed !== "boolean"
+    || (metadata.nativePlatform !== undefined && !["android", "ios"].includes(metadata.nativePlatform))) {
     throw new Error(`Prepared source metadata at ${filePath} is invalid.`);
+  }
+  if (metadata.nativeSealed) {
+    const platform = metadata.nativePlatform ?? "android";
+    const nativeFiles = Object.keys(metadata.files).filter((file) => /^(android|ios)\//.test(file));
+    if (!nativeFiles.length || nativeFiles.some((file) => !file.startsWith(`${platform}/`))) {
+      throw new Error(`Prepared source metadata at ${filePath} contains invalid native platform inputs.`);
+    }
   }
 }
 
-function readPreparedSourceSha(workspace, env = process.env) {
+function readPreparedSourceSha(workspace, env = process.env, platform = "android") {
+  const label = platformLabel(platform);
   const filePath = metadataPath(workspace);
   let metadata;
   try {
@@ -96,12 +115,17 @@ function readPreparedSourceSha(workspace, env = process.env) {
     throw new Error(`QA builds require prepared source metadata at ${filePath}: ${error.message}`);
   }
   validateMetadata(filePath, metadata);
+  // Version 3 Android manifests existed before seals recorded their platform.
+  const sealedPlatform = metadata.nativePlatform ?? "android";
+  if (metadata.nativeSealed && sealedPlatform !== platform) {
+    throw new Error(`Prepared native source is sealed for ${sealedPlatform}, requested ${platform}.`);
+  }
   const prebuilding = env.MOODINATOR_QA_PREPARE_NATIVE === "1";
   if (metadata.nativeSealed && prebuilding) {
-    throw new Error("MOODINATOR_QA_PREPARE_NATIVE may only be used before Android source is sealed.");
+    throw new Error(`MOODINATOR_QA_PREPARE_NATIVE may only be used before ${label} source is sealed.`);
   }
   if (!metadata.nativeSealed && !prebuilding) {
-    throw new Error("Prepared Android source is not sealed; run the documented clean prebuild and qa:seal-native first.");
+    throw new Error(`Prepared ${label} source is not sealed; run the documented clean prebuild and qa:seal-native first.`);
   }
   for (const [relativePath, expectedHash] of Object.entries(metadata.files)) {
     if (!relativePath || path.isAbsolute(relativePath) || relativePath.split(/[\\/]/).includes("..")) {
@@ -120,7 +144,7 @@ function readPreparedSourceSha(workspace, env = process.env) {
     }
   }
   const unexpected = workspaceFiles(workspace).find((relativePath) => !Object.hasOwn(metadata.files, relativePath)
-    && !(!metadata.nativeSealed && prebuilding && relativePath.startsWith("android/")));
+    && !(!metadata.nativeSealed && prebuilding && relativePath.startsWith(`${platform}/`)));
   if (unexpected) throw new Error(`Prepared QA workspace contains unexpected input ${unexpected}.`);
   const requestedSha = env.MOODINATOR_SOURCE_SHA;
   if (requestedSha !== undefined && requestedSha !== metadata.sourceSha) {

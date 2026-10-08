@@ -73,6 +73,8 @@ Build before emulator execution; do not overlap them or bypass busy admission.
    and build. Run the documented clean Android prebuild with
    `MOODINATOR_QA_PREPARE_NATIVE=1`, then unset that prebuild-only flag and run
    `bun run qa:seal-native`. Do not change copied/generated source after sealing.
+   iOS uses its own native seal. Older version-3 Android seals without a platform
+   field remain Android-only compatibility until old prepared workspaces retire.
 4. Build the non-debuggable local QA release without release credentials, with
    one Gradle worker, one native compiler job, bounded JVM/Metro memory, no
    persistent Gradle/Kotlin daemon, and the effective 3 GiB/zero-swap group guard.
@@ -108,9 +110,12 @@ Build before emulator execution; do not overlap them or bypass busy admission.
    history and details, add/edit/delete a new fabricated mood, and cold-open again
    to confirm retained changes. Run the existing native smoke/sync journeys to
    check the merged #114 behavior. Keep UI journey results separate from SQL proof.
-7. On a disposable iOS simulator/native build, verify plaintext and existing V1
-   passphrase-key upgrades, Keychain cold reopen and the same interrupted-startup
-   behavior. Linux Android evidence does not establish iOS acceptance.
+7. Max runs the [local Mac handoff](ios-encryption-check.md) on a new owned iOS
+   simulator. It reuses this QA fixture/proof engine for plaintext and V1
+   passphrase upgrades, Keychain cold reopen and interrupted startup. iOS
+   acceptance remains user-owned and unexecuted until Max returns results.
+   No agent Mac access or device/settings changes are needed. Linux Android
+   evidence does not establish iOS acceptance.
 
 As an early diagnostic, the same production TypeScript state machine can run
 against real SQLCipher 4.2+ CLI processes:

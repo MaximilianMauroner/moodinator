@@ -7,13 +7,13 @@ module.exports = ({ config }) => {
   }
   if (process.env.MOODINATOR_VARIANT !== "qa") return config;
 
-  // The sealed manifest covers generated Android inputs. iOS QA configuration
-  // must remain usable without requiring an unrelated Android prebuild first.
+  // Ordinary iOS QA can run without a seal. Encryption proof binds both native
+  // platforms to the prepared source and their own generated inputs.
   const isIosConfig =
     process.env.EAS_BUILD_PLATFORM === "ios" || process.env.EXPO_OS === "ios";
-  const sourceSha = isIosConfig
+  const sourceSha = isIosConfig && process.env.MOODINATOR_QA_ENCRYPTION_PROOF !== "1"
     ? undefined
-    : readPreparedSourceSha(__dirname, process.env);
+    : readPreparedSourceSha(__dirname, process.env, isIosConfig ? "ios" : "android");
 
   return {
     ...config,

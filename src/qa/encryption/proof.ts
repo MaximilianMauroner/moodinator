@@ -16,7 +16,14 @@ type Progress = (message: string) => void;
 
 function requireQaPackage() {
   if (Application.applicationId !== QA_ID) throw new Error("Encryption proof requires the isolated QA package.");
-  if (Platform.OS !== "android") throw new Error("This automated proof covers Android; iOS acceptance requires its own native journey.");
+  if (Platform.OS !== "android" && Platform.OS !== "ios") throw new Error("Encryption proof requires a native QA build.");
+}
+
+// The simulator driver reads only this QA status file, never databases or keys.
+export function writeEncryptionProofStatus(status: { sourceSha: unknown; runId: string | null; progress: string; result?: unknown }) {
+  requireQaPackage();
+  check(typeof status.sourceSha === "string" && /^[0-9a-f]{40}$/.test(status.sourceSha), "Prepared QA source identity is missing");
+  new File(Paths.document, "encryption-proof-status.json").write(JSON.stringify(status));
 }
 function check(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -194,7 +201,7 @@ export async function runEncryptionProof(progress: Progress) {
   await owner.closeAsync();
   check(lockRejected, "A second native connection acquired startup ownership during migration");
   passed.push("native-lock:independent-connection-excluded");
-  return { status: "passed", cipherVersion, passed, platform: "Android Expo native", crashProof: "separate cold-process cases required" };
+  return { status: "passed", cipherVersion, passed, platform: `${Platform.OS} Expo native`, crashProof: "separate cold-process cases required" };
 }
 
 export async function crashEncryptionProof(caseName: string, phase: StartupPhase, progress: Progress) {
