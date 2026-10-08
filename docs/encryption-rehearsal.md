@@ -122,6 +122,82 @@ or browser evidence cannot close these requirements.
 
 ## Future migration integration, subject to a separate authorization
 
+### Required first-open behavior
+
+Max's 2026-10-08 requirement, relayed by the coordinator, is: "it should auto
+migrate the first time you open the app with the new info". For the eventual
+authorized encryption release, this means the first launch after the updated
+app/native configuration is installed detects an existing plaintext database
+and migrates it automatically. No manual export/import or migration button is
+part of the normal upgrade. This PR records that contract; it does not ship it.
+
+The startup owner must inspect database files, recovery artifacts, key state and
+actual native SQLCipher support before publishing a handle. File absence alone
+does not establish a fresh install when an original, target, journal or other
+recovery artifact exists. An unreadable database or missing key must never be
+classified as a fresh install or replaced with an empty database.
+
+Acceptance requirements for the future startup integration:
+
+1. **Existing plaintext:** on first open, positively verify the plaintext source,
+   quiesce/checkpoint it, and perform the separate-target export and verification
+   described above without user action. Preserve all schema, typed contents,
+   relationships, metadata and sequence state, including legacy records.
+2. **Fresh install:** only when no existing/recovery database remains, persist
+   and read back a new key, create the database with that key before schema/data
+   writes, and run normal schema/default initialization. Do not create an
+   intermediate app plaintext database or seed fabricated rehearsal records.
+3. **Completed migration:** mark completion durably only after the promoted
+   active database reopens with its existing key and passes native/schema/content
+   verification. A completion flag alone is not proof. Subsequent launches verify
+   the current keyed database and skip conversion and replacement. New app writes
+   are valid; they must not be compared with the old original as though the
+   database had to remain unchanged forever.
+4. **Interrupted migration:** before normal reads/writes, verify the surviving
+   candidates and preserved original. Reopen a verified completed target, or
+   recover the intact original while retaining its bytes and pending status.
+   Retry only after the source, key/runtime, closed handles and a separate safe
+   target path are confirmed. Reject uncertain/corrupt candidates and preserve
+   all files when recovery cannot be verified; do not loop on failing startup.
+5. **After app writes are released:** never silently fall back to a pre-migration
+   original that would discard later entries. Original fallback/retry is allowed
+   only during incomplete migration, before app writes are admitted. Lost keys or
+   damaged completed databases require a visible recoverable failure and retained
+   files, not an automatic empty database or stale-data rollback.
+6. **Concurrent startup callers:** one startup owner and shared pending result
+   cover queries, bootstrap, reminders and background entry points. No caller
+   receives a handle until recovery/conversion, reopen and normal initialization
+   finish. Failure rejects waiting callers without publishing partial success.
+   Cross-runtime/process coordination must be proven natively; a JavaScript
+   promise alone does not establish that protection.
+
+### Existing evidence and missing first-open coverage
+
+The eight focused tests in `tests/encryption-rehearsal.node-test.mjs` support
+schema/content preservation, every listed process-exit boundary, repeatable
+recovery, rejection of damaged/divergent candidates and original preservation.
+They start from a fabricated existing database. They do not invoke app startup,
+initialize a fresh app install, detect an encrypted database, skip an already
+completed conversion, retry a recovered migration, or gate concurrent callers.
+`migrateFixture` is deliberately a one-shot worker: it rejects an existing target
+or preserved-original path rather than acting as a retry coordinator.
+
+The current `db/client.ts` has a shared initialization promise and publishes its
+handle after initialization. That is an integration point, not first-open
+migration evidence: Android still skips encryption, no staged export/recovery is
+wired into it, and the existing iOS rekey path must not be reused for conversion.
+Neither that module nor app configuration is changed by this preparation.
+
+The next isolated synthetic startup layer must exercise automatic detection of a
+fabricated pre-change database, an empty fresh install, a second successful open
+with zero additional exports/replacements, reopening and safe retry after each
+interruption with leftover staging files, refusal of missing-key/corrupt states,
+and simultaneous callers held behind successful verification or shared failure.
+Those lifecycle scenarios are specified but not implemented or executed here.
+Even successful synthetic lifecycle tests would not prove encryption; the native
+proof gate above must exercise the same first-open and upgrade journeys through
+actual SQLCipher/Expo on disposable mobile storage before rollout.
+
 Persist and read back a fresh random 32-byte key in the native keystore before
 creating a keyed target. Failure or a missing key must preserve the plaintext
 original. Never generate a replacement key for an existing encrypted file.
