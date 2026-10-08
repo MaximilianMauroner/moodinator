@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  invalidateMoods: vi.fn(),
   withNotificationReset: vi.fn(),
   getNoEntryReminderSettings: vi.fn(),
   saveNoEntryReminderSettings: vi.fn(),
@@ -10,6 +11,9 @@ const mocks = vi.hoisted(() => ({
   clearAll: vi.fn(),
 }));
 
+vi.mock("@/shared/state/moodsStore", () => ({
+  useMoodsStore: { getState: () => ({ invalidate: mocks.invalidateMoods }) },
+}));
 vi.mock("../../src/services/notificationService", () => ({ notificationService: mocks }));
 vi.mock("../../src/services/moodService", () => ({ moodService: { clearAll: mocks.clearAll } }));
 

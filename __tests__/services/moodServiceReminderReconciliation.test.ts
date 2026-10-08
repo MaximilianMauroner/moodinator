@@ -41,6 +41,7 @@ describe("mood changes and conditional reminders", () => {
     mocks.updateMoodEntry.mockResolvedValue(entry);
     mocks.updateMoodNote.mockResolvedValue(entry);
     mocks.updateMoodTimestamp.mockResolvedValue(entry);
+    mocks.deleteMood.mockResolvedValue({ changes: 1 });
     mocks.seedMoods.mockResolvedValue(20);
     mocks.updateEmotionCategoryInMoods.mockResolvedValue({ updated: 1 });
     mocks.reconcileNoEntryReminder.mockResolvedValue({ status: "scheduled" });
@@ -50,7 +51,7 @@ describe("mood changes and conditional reminders", () => {
     const events: string[] = [];
     write.mockImplementation(async () => {
       events.push("commit");
-      return { ...entry, updated: 1 };
+      return { ...entry, updated: 1, changes: 1 };
     });
     mocks.reconcileNoEntryReminder.mockImplementation(async () => { events.push("reconcile"); });
     await mutate();

@@ -867,9 +867,16 @@ export function ensureMoodReminderScheduled(): Promise<ReminderScheduleResult | 
             const needsCleanup = notifications.some(
                 (notification) => getReminderScheduledIds(notification).length > 0 || notification.scheduleStatus !== 'disabled'
             );
-            return needsCleanup
-                ? rescheduleAllNotificationsUnlocked(notifications, 'check-only')
-                : null;
+            if (needsCleanup) return rescheduleAllNotificationsUnlocked(notifications, 'check-only');
+            const nativeNotifications = await getNotificationsModule();
+            if (!nativeNotifications) return null;
+            try {
+                const scheduledIds = await listScheduledMoodReminderIds(nativeNotifications);
+                if (scheduledIds.length === 0) return null;
+            } catch (error) {
+                return persistCleanupFailedResult(notifications, error, 'Moodinator could not verify the existing reminders.');
+            }
+            return rescheduleAllNotificationsUnlocked(notifications, 'check-only');
         }
 
         const access = await getNotificationAccess('check-only');

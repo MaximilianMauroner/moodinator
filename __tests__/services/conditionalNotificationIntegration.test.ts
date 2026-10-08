@@ -13,7 +13,8 @@ const mocks = vi.hoisted(() => ({
     SchedulableTriggerInputTypes: { DAILY: 'daily', WEEKLY: 'weekly', DATE: 'date', TIME_INTERVAL: 'timeInterval' },
     IosAuthorizationStatus: { AUTHORIZED: 2, PROVISIONAL: 3, EPHEMERAL: 4 },
 }));
-const moods = vi.hoisted(() => ({ getInRange: vi.fn(), clearAll: vi.fn() }));
+const moods = vi.hoisted(() => ({ getInRange: vi.fn(), clearAll: vi.fn(), invalidate: vi.fn() }));
+vi.mock('../../src/shared/state/moodsStore', () => ({ useMoodsStore: { getState: () => ({ invalidate: moods.invalidate }) } }));
 vi.mock('expo-notifications', () => mocks);
 vi.mock('expo-localization', () => ({ getCalendars: () => [{ timeZone: 'Etc/UTC' }] }));
 vi.mock('react-native', () => ({ Platform: { OS: 'ios' } }));
@@ -221,6 +222,7 @@ describe('conditional notification service integration', () => {
         releasePin();
         await reset;
         expect(moods.clearAll).toHaveBeenCalledOnce();
+        expect(moods.invalidate).toHaveBeenCalledOnce();
         expect(requests.size).toBe(0);
         expect(await AsyncStorage.getItem('noEntryReminderSettings')).toBeNull();
         expect(await service.scheduleTestNotification()).toBe(true);

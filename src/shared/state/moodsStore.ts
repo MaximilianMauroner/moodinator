@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { invalidateMoodQueries } from "@/services/moodQueryCache";
 import type { MoodEntry, MoodEntryInput } from "@db/types";
 import {
   createMoodEntryWorkflow,
@@ -49,6 +50,7 @@ let activeHydrationPromise: Promise<void> | null = null;
 
 export const useMoodsStore = create<MoodsStore>((set, get) => {
   let collectionRevision = 0;
+  let windowLimit = HISTORY_PAGE_SIZE;
   let pagePromise: Promise<void> | null = null;
 
   const hydrateAll = (
@@ -73,7 +75,7 @@ export const useMoodsStore = create<MoodsStore>((set, get) => {
           const revision = collectionRevision;
           try {
             page = await moodService.getPaginated({
-              limit: HISTORY_PAGE_SIZE,
+              limit: windowLimit,
               offset: 0,
               filters: get().filters,
             });
@@ -127,17 +129,23 @@ export const useMoodsStore = create<MoodsStore>((set, get) => {
 
   const workflow = createMoodEntryWorkflow(moodService, {
     getMoods: () => get().moods,
-    applyMutation: (moods) => {
+    applyMutation: (moods, mutation) => {
       collectionRevision += 1;
       set((state) => ({
+        total: Object.keys(state.filters).length
+          ? state.total
+          : Math.max(0, state.total + (mutation.type === "insert" ? 1 : mutation.type === "delete" && mutation.deleted ? -1 : 0)),
+        hasMore: false, // Offset paging resumes only after SQL confirms the new window.
         moods: Object.keys(state.filters).length
           ? moods.filter((entry) =>
-              state.moods.some((existing) => existing.id === entry.id),
+              // Keep only unchanged query results until SQL confirms membership.
+              state.moods.some((existing) => existing === entry),
             )
-          : moods.slice(0, HISTORY_PAGE_SIZE),
+          : moods.slice(0, windowLimit),
         revision: state.revision + 1,
         isStale: true,
       }));
+      invalidateMoodQueries();
       if (get().isStale && !activeHydrationPromise) {
         void get().ensureFresh();
       }
@@ -154,6 +162,7 @@ export const useMoodsStore = create<MoodsStore>((set, get) => {
 
     setFilters: async (filters) => {
       collectionRevision += 1;
+      windowLimit = HISTORY_PAGE_SIZE;
       set({ filters, moods: [], hasMore: false, total: 0, isStale: true });
       await hydrateAll("loading", { clearError: true });
     },
@@ -174,6 +183,7 @@ export const useMoodsStore = create<MoodsStore>((set, get) => {
             filters: get().filters,
           });
           if (revision !== collectionRevision || activeHydrationPromise) return;
+          windowLimit = offset + page.data.length;
           set((state) => {
             const existingIds = new Set(state.moods.map((entry) => entry.id));
             return {
@@ -208,6 +218,7 @@ export const useMoodsStore = create<MoodsStore>((set, get) => {
 
     setLocal: (moods) => {
       collectionRevision += 1;
+      windowLimit = Math.max(HISTORY_PAGE_SIZE, moods.length);
       set({
         status: "idle",
         error: null,
@@ -217,15 +228,21 @@ export const useMoodsStore = create<MoodsStore>((set, get) => {
         total: moods.length,
         moods,
       });
+      invalidateMoodQueries();
     },
 
-    loadAll: () => hydrateAll("loading", { clearError: true }),
+    loadAll: () => {
+      windowLimit = HISTORY_PAGE_SIZE;
+      return hydrateAll("loading", { clearError: true });
+    },
 
     refreshMoods: () => hydrateAll("refreshing"),
 
     invalidate: () => {
       collectionRevision += 1;
-      set((state) => ({ isStale: true, revision: state.revision + 1 }));
+      set((state) => ({ isStale: true, hasMore: false, revision: state.revision + 1 }));
+      invalidateMoodQueries();
+      void get().ensureFresh();
     },
 
     ensureFresh: async () => {

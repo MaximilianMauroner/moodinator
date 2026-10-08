@@ -29,14 +29,31 @@ interface Props {
   onEdit?: (mood: MoodEntry) => void;
 }
 
-function getPickerDate(parts: EntryLocalDateParts): Date {
+function getPickerDate(parts: EntryLocalDateParts, recordedOffset = false): Date {
+  // A UTC surrogate keeps recorded wall times out of the device's DST gaps.
+  if (recordedOffset) {
+    return new Date(getTimestampFromEntryLocalDateParts(parts, 0));
+  }
+
   const date = new Date(0);
   date.setFullYear(parts.year, parts.month, parts.day);
   date.setHours(parts.hour, parts.minute, parts.second, parts.millisecond);
   return date;
 }
 
-function getDeviceDateParts(date: Date): EntryLocalDateParts {
+function getPickerDateParts(date: Date, recordedOffset: boolean): EntryLocalDateParts {
+  if (recordedOffset) {
+    return {
+      year: date.getUTCFullYear(),
+      month: date.getUTCMonth(),
+      day: date.getUTCDate(),
+      hour: date.getUTCHours(),
+      minute: date.getUTCMinutes(),
+      second: date.getUTCSeconds(),
+      millisecond: date.getUTCMilliseconds(),
+    };
+  }
+
   return {
     year: date.getFullYear(),
     month: date.getMonth(),
@@ -63,12 +80,19 @@ function sameWallClock(
   );
 }
 
+function getRecordedOffset(mood: MoodEntry): number | undefined {
+  const offset = mood.utcOffsetMinutes;
+  return typeof offset === "number" && Number.isInteger(offset) && Math.abs(offset) <= 840
+    ? offset
+    : undefined;
+}
+
 function getEditableDate(
   mood: MoodEntry,
   wallClockParts: EntryLocalDateParts,
 ): { timestamp: number; utcOffsetMinutes: number } {
-  const offset = mood.utcOffsetMinutes;
-  if (typeof offset === "number" && Number.isInteger(offset) && Math.abs(offset) <= 840) {
+  const offset = getRecordedOffset(mood);
+  if (offset !== undefined) {
     return {
       timestamp: getTimestampFromEntryLocalDateParts(wallClockParts, offset),
       utcOffsetMinutes: offset,
@@ -90,6 +114,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
   onEdit,
 }) => {
   const { isDark, get, getCategoryColors } = useThemeColors();
+  const recordedOffset = mood ? getRecordedOffset(mood) !== undefined : false;
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [wallClockParts, setWallClockParts] = useState<EntryLocalDateParts | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -122,8 +147,8 @@ export const DateTimePickerModal: React.FC<Props> = ({
 
     const parts = getEntryLocalDateParts(mood);
     setWallClockParts(parts);
-    setSelectedDate(parts ? getPickerDate(parts) : null);
-  }, [mood, visible]);
+    setSelectedDate(parts ? getPickerDate(parts, recordedOffset) : null);
+  }, [mood, visible, recordedOffset]);
 
   const moodData = useMemo(() => {
     if (!mood) return null;
@@ -148,15 +173,16 @@ export const DateTimePickerModal: React.FC<Props> = ({
       setShowDatePicker(false);
     }
     if (event.type === "set" && date) {
-      const current = wallClockParts ?? getDeviceDateParts(date);
+      const selected = getPickerDateParts(date, recordedOffset);
+      const current = wallClockParts ?? selected;
       const next = {
         ...current,
-        year: date.getFullYear(),
-        month: date.getMonth(),
-        day: date.getDate(),
+        year: selected.year,
+        month: selected.month,
+        day: selected.day,
       };
       setWallClockParts(next);
-      setSelectedDate(getPickerDate(next));
+      setSelectedDate(getPickerDate(next, recordedOffset));
     }
   };
 
@@ -166,16 +192,17 @@ export const DateTimePickerModal: React.FC<Props> = ({
       setShowTimePicker(false);
     }
     if (event.type === "set" && time) {
-      const current = wallClockParts ?? getDeviceDateParts(time);
+      const selected = getPickerDateParts(time, recordedOffset);
+      const current = wallClockParts ?? selected;
       const next = {
         ...current,
-        hour: time.getHours(),
-        minute: time.getMinutes(),
+        hour: selected.hour,
+        minute: selected.minute,
         second: current.second,
         millisecond: current.millisecond,
       };
       setWallClockParts(next);
-      setSelectedDate(getPickerDate(next));
+      setSelectedDate(getPickerDate(next, recordedOffset));
     }
   };
 
@@ -487,6 +514,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
                     >
                       {selectedDate
                         ? selectedDate.toLocaleDateString([], {
+                            timeZone: recordedOffset ? "UTC" : undefined,
                             month: "short",
                             day: "numeric",
                             year: "numeric",
@@ -526,6 +554,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
                     >
                       {selectedDate
                         ? selectedDate.toLocaleTimeString([], {
+                            timeZone: recordedOffset ? "UTC" : undefined,
                             hour: "2-digit",
                             minute: "2-digit",
                           })
@@ -616,6 +645,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
               <DateTimePicker
                 disabled={saving}
                 value={selectedDate ?? new Date()}
+                timeZoneName={recordedOffset ? "UTC" : undefined}
                 mode="date"
                 display={Platform.OS === "ios" ? "spinner" : "default"}
                 onChange={handleDateChange}
@@ -627,6 +657,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
               <DateTimePicker
                 disabled={saving}
                 value={selectedDate ?? new Date()}
+                timeZoneName={recordedOffset ? "UTC" : undefined}
                 mode="time"
                 display={Platform.OS === "ios" ? "spinner" : "default"}
                 onChange={handleTimeChange}

@@ -8,6 +8,7 @@ type UndoDeletedMoodHandler = (entry: MoodEntry) => Promise<void> | void;
 type UndoKeptMoodHandler = () => Promise<void> | void;
 
 const deletedMoodEntries = new Map<ToastId, MoodEntry>();
+const restoringMoodEntries = new Set<ToastId>();
 
 function cleanupDeletedMoodEntry(toastId: ToastId) {
   deletedMoodEntries.delete(toastId);
@@ -17,6 +18,7 @@ async function restoreDeletedMood(
   toastId: ToastId,
   onUndo: UndoDeletedMoodHandler
 ) {
+  if (restoringMoodEntries.has(toastId)) return;
   const deletedEntry = deletedMoodEntries.get(toastId);
 
   if (!deletedEntry) {
@@ -26,6 +28,7 @@ async function restoreDeletedMood(
     return;
   }
 
+  restoringMoodEntries.add(toastId);
   try {
     await onUndo(deletedEntry);
     cleanupDeletedMoodEntry(toastId);
@@ -38,6 +41,8 @@ async function restoreDeletedMood(
     toast.error("Restore failed", {
       description: "The deleted entry could not be restored.",
     });
+  } finally {
+    restoringMoodEntries.delete(toastId);
   }
 }
 

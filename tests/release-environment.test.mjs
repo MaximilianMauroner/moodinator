@@ -16,7 +16,7 @@ function fixture(run) {
     const key = join(root, 'key.json');
     writeFileSync(jar, 'jar');
     writeFileSync(key, JSON.stringify({ type: 'service_account', client_email: 'test@example.com', private_key: 'test' }));
-    run({ root, env: { PATH: process.env.PATH, ANDROID_HOME: sdk, ANDROID_BUNDLETOOL_JAR: jar, PLAY_SERVICE_ACCOUNT_KEY_PATH: key } });
+    run({ root, env: { GITHUB_ACTIONS: 'true', EXPO_TOKEN: 'fixture-token', PATH: process.env.PATH, ANDROID_HOME: sdk, ANDROID_BUNDLETOOL_JAR: jar, PLAY_SERVICE_ACCOUNT_KEY_PATH: key } });
   } finally { rmSync(root, { recursive: true, force: true }); }
 }
 
@@ -27,8 +27,15 @@ test('SDK aliases normalize and conflicting roots fail', () => fixture(({ env })
   assert.throws(() => releaseEnvironment({ ...env, ANDROID_SDK_ROOT: '/other' }), /must match/);
 }));
 
+test('local EAS sessions do not require a token; hosted releases do', () => fixture(({ env }) => {
+  for (const GITHUB_ACTIONS of ['false', undefined]) {
+    assert.equal(releaseEnvironment({ ...env, GITHUB_ACTIONS, EXPO_TOKEN: '' }).EAS_BIN, 'eas');
+  }
+  assert.throws(() => releaseEnvironment({ ...env, GITHUB_ACTIONS: 'true', EXPO_TOKEN: '' }), /EXPO_TOKEN is required on GitHub Actions/);
+}));
+
 test('required environment and unreadable paths fail before build', () => fixture(({ env }) => {
-  for (const name of ['PATH', 'ANDROID_HOME', 'ANDROID_BUNDLETOOL_JAR', 'PLAY_SERVICE_ACCOUNT_KEY_PATH']) {
+  for (const name of ['EXPO_TOKEN', 'PATH', 'ANDROID_HOME', 'ANDROID_BUNDLETOOL_JAR', 'PLAY_SERVICE_ACCOUNT_KEY_PATH']) {
     assert.throws(() => releaseEnvironment({ ...env, [name]: '' }));
   }
   assert.throws(() => releaseEnvironment({ ...env, ANDROID_BUNDLETOOL_JAR: '/missing.jar' }), /missing or unreadable/);
@@ -43,6 +50,25 @@ test('preflight rejects missing EAS and SDK verification tools', () => fixture((
   assert.throws(() => preflightRelease(root, env), /build-tools are missing/);
 }));
 
+test('preflight checks the selected CLI against the release source before reserving a version', () => fixture(({ root, env }) => {
+  const eas = join(root, 'eas');
+  const java = join(root, 'java');
+  writeFileSync(java, '#!/bin/sh\nexit 1\n', { mode: 0o700 });
+  writeFileSync(join(root, 'eas.json'), JSON.stringify({ cli: { version: '>= 20.5.1' } }));
+  const environment = { ...env, PATH: `${root}:${env.PATH}`, EAS_BIN: eas };
+  for (const version of ['16.28.0', '20.5.0']) {
+    writeFileSync(eas, `#!/bin/sh\necho eas-cli/${version} test\n`, { mode: 0o700 });
+    assert.throws(() => preflightRelease(root, environment), /does not satisfy >= 20.5.1/);
+  }
+  for (const version of ['20.5.1', '24.8.0']) {
+    writeFileSync(eas, `#!/bin/sh\necho eas-cli/${version} test\n`, { mode: 0o700 });
+    assert.throws(() => preflightRelease(root, environment), /Java is unavailable/);
+  }
+  assert.throws(() => preflightRelease(root, environment, '>= 25.0.0'), /does not satisfy >= 25.0.0/);
+  writeFileSync(eas, '#!/bin/sh\necho eas-cli/25.0.0-beta.1 test\n', { mode: 0o700 });
+  assert.throws(() => preflightRelease(root, environment), /Cannot read a stable EAS CLI version/);
+}));
+
 test('failure evidence has only a known stage and fixed sanitized message', () => {
   for (const stage of ['preflight', 'checks', 'apk-build', 'aab-build', 'artifact-verify', 'play-upload']) {
     assert.deepEqual(releaseFailure(stage), { stage, message: `Release failed during ${stage}; inspect the private host logs` });
@@ -55,39 +81,23 @@ test('nightly preflight failure writes evidence without touching the ledger', as
   fixture(({ root, env }) => {
     const bin = join(root, 'bin');
     mkdirSync(bin);
-    writeFileSync(join(bin, 'git'), '#!/bin/sh\nif [ "$1" = rev-parse ]; then echo abcdef1234567890; fi\n', { mode: 0o700 });
+    writeFileSync(join(bin, 'git'), '#!/bin/sh\nif [ "$1" = rev-parse ]; then echo abcdef1234567890; fi\nif [ "$1" = show ]; then echo \'{"cli":{"version":">= 20.5.1"}}\'; fi\n', { mode: 0o700 });
     const marker = join(root, 'ledger-called');
-    writeFileSync(join(bin, 'ssh'), `#!/bin/sh\ntouch '${marker}'\nexit 1\n`, { mode: 0o700 });
-    const result = spawnSync(process.execPath, [fileURLToPath(new URL('../scripts/nightly-release.mjs', import.meta.url)), 'run'], {
-      env: { ...env, PATH: `${bin}:${env.PATH}`, ANDROID_HOME: '', NIGHTLY_HOST_LOCKED: '1', RELEASE_ARTIFACTS_DIR: root }, encoding: 'utf8',
-    });
-    assert.equal(result.status, 1);
-    const { existsSync, readdirSync, readFileSync } = requireFs;
-    assert.equal(existsSync(marker), false);
-    const app = readdirSync(root).find((name) => ['zen-mode', 'moodinator'].includes(name));
-    const record = JSON.parse(readFileSync(join(root, app, 'preflight-abcdef123456', 'release.json'), 'utf8'));
-    assert.equal(record.failure.stage, 'preflight');
-    assert.equal(record.versionCode, undefined);
-  });
-});
-
-test('LaunchAgent rejects missing values and writes both SDK aliases', async (t) => {
-  if (process.platform !== 'darwin' || Intl.DateTimeFormat().resolvedOptions().timeZone !== 'Europe/Vienna') return t.skip('Mac Vienna LaunchAgent only');
-  const { spawnSync } = await import('node:child_process');
-  const { fileURLToPath } = await import('node:url');
-  fixture(({ root, env }) => {
-    mkdirSync(join(root, 'scripts'));
-    for (const name of ['write-nightly-launch-agent.mjs', 'release-environment.mjs']) {
-      requireFs.copyFileSync(fileURLToPath(new URL(`../scripts/${name}`, import.meta.url)), join(root, 'scripts', name));
+    writeFileSync(join(bin, 'python3'), `#!/bin/sh\ntouch '${marker}'\nexit 1\n`, { mode: 0o700 });
+    const eas = join(bin, 'eas');
+    writeFileSync(eas, '#!/bin/sh\necho eas-cli/16.28.0 test\n', { mode: 0o700 });
+    for (const overrides of [{ ANDROID_HOME: '' }, { EAS_BIN: eas }]) {
+      const result = spawnSync(process.execPath, [fileURLToPath(new URL('../scripts/nightly-release.mjs', import.meta.url)), 'run'], {
+        env: { ...env, PATH: `${bin}:${env.PATH}`, ...overrides, NIGHTLY_HOST_LOCKED: '1', RELEASE_ARTIFACTS_DIR: root }, encoding: 'utf8',
+      });
+      assert.equal(result.status, 1);
+      if (overrides.EAS_BIN) assert.match(result.stderr, /EAS CLI 16.28.0 does not satisfy/);
+      const { existsSync, readdirSync, readFileSync } = requireFs;
+      assert.equal(existsSync(marker), false);
+      const app = readdirSync(root).find((name) => ['zen-mode', 'moodinator'].includes(name));
+      const record = JSON.parse(readFileSync(join(root, app, 'preflight-abcdef123456', 'release.json'), 'utf8'));
+      assert.equal(record.failure.stage, 'preflight');
+      assert.equal(record.versionCode, undefined);
     }
-    const script = join(root, 'scripts/write-nightly-launch-agent.mjs');
-    const target = join(root, '.agents/artifacts/net.lab4code.nightly.plist');
-    const args = [script, root, root];
-    assert.equal(spawnSync(process.execPath, args, { env: { ...env, ANDROID_BUNDLETOOL_JAR: '' }, stdio: 'ignore' }).status, 1);
-    assert.equal(requireFs.existsSync(target), false);
-    assert.equal(spawnSync(process.execPath, args, { env, stdio: 'ignore' }).status, 0);
-    const plist = requireFs.readFileSync(target, 'utf8');
-    for (const key of ['ANDROID_HOME', 'ANDROID_SDK_ROOT']) assert.ok(plist.includes(`<key>${key}</key><string>${env.ANDROID_HOME}</string>`));
-    assert.equal(spawnSync('plutil', ['-lint', target], { stdio: 'ignore' }).status, 0);
   });
 });

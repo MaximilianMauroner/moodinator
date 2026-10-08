@@ -57,7 +57,7 @@ describe("createMoodEntryWorkflow", () => {
     await expect(workflow().create({ mood: 4 })).resolves.toEqual(created);
 
     expect(moods).toEqual([created]);
-    expect(applyMutation).toHaveBeenCalledWith([created]);
+    expect(applyMutation).toHaveBeenCalledWith([created], { type: "insert" });
   });
 
   it.each(["create", "restore"] as const)("keeps a backdated %s in timestamp order", async (action) => {
@@ -104,7 +104,7 @@ describe("createMoodEntryWorkflow", () => {
   it("deletes a Mood Entry and returns the removed snapshot for undo", async () => {
     const existing = makeMood(1, 100);
     moods = [existing];
-    vi.mocked(repository.delete).mockResolvedValue(undefined);
+    vi.mocked(repository.delete).mockResolvedValue(true);
 
     await expect(workflow().delete(1)).resolves.toEqual(existing);
 

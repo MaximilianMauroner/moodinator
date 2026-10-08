@@ -104,7 +104,12 @@ function CommentBlock({
   );
 }
 
-export const DisplayMoodItem = React.memo(function DisplayMoodItem(
+export const DisplayMoodItem = React.memo(function DisplayMoodItem(props: Props) {
+  // FlashList can reuse its cell. Native animation state belongs to one entry.
+  return <MoodEntryCard key={props.mood.id} {...props} />;
+});
+
+function MoodEntryCard(
   { mood, onSwipeableWillOpen, onLongPress, onPress, onEdit, onDelete, swipeThreshold }: Props
 ) {
     const swipeActionPendingRef = useRef(false);
@@ -119,19 +124,6 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
     const deleteCollapse = useSharedValue(1);
     const isDeleting = useSharedValue(false);
     const measuredHeight = useSharedValue(0);
-
-    // FlashList recycles this component across different entries. Reset the
-    // exit-animation state synchronously when the underlying entry changes so a
-    // recycled row never inherits a previous row's mid-delete (collapsed/faded)
-    // values.
-    const lastIdRef = useRef(mood.id);
-    if (lastIdRef.current !== mood.id) {
-      lastIdRef.current = mood.id;
-      isDeleting.value = false;
-      deleteFade.value = 1;
-      deleteCollapse.value = 1;
-      translateX.value = 0;
-    }
 
     const moodData = useMemo(() => {
       const moodInfo = getMoodRatingDisplay(mood.mood, isDark, mood.moodScale);
@@ -591,4 +583,3 @@ export const DisplayMoodItem = React.memo(function DisplayMoodItem(
       </Animated.View>
     );
   }
-);

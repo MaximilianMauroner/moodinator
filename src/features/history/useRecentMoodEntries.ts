@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppState } from "react-native";
 import { useFocusEffect } from "expo-router";
 import type { MoodEntry } from "@db/types";
 
-import { moodService } from "@/services/moodService";
-import { useMoodsStore } from "@/shared/state/moodsStore";
+import { moodQueries } from "@/services/moodQueries";
+import { useMoodQuery } from "@/hooks/useMoodQuery";
 
 const HOUR_MS = 60 * 60 * 1000;
 /**
@@ -40,53 +40,36 @@ function msUntilNextLocalMidnight(now: Date): number {
  * to the foreground, and at local midnight.
  */
 export function useRecentMoodEntries(days: number) {
-  const revision = useMoodsStore((state) => state.revision);
-  const [reloadCount, setReloadCount] = useState(0);
-  const [entries, setEntries] = useState<MoodEntry[]>([]);
   const [asOf, setAsOf] = useState(() => new Date());
-  /** True only while the latest read has completed. */
-  const [loaded, setLoaded] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
+  const query = useMemo(() => {
+    const dayEnd = new Date(asOf.getFullYear(), asOf.getMonth(), asOf.getDate(), 23, 59, 59, 999);
+    return moodQueries.range(getRecentQueryRange(dayEnd, days));
+  }, [asOf, days]);
+  const result = useMoodQuery(query);
   const reload = useCallback(() => {
-    setReloadCount((count) => count + 1);
-  }, []);
+    setAsOf(new Date());
+    void query.refresh();
+  }, [query]);
 
   useFocusEffect(reload);
-
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (state) => {
       if (state === "active") reload();
     });
-    return () => subscription.remove();
-  }, [reload]);
-
-  useEffect(() => {
-    let active = true;
-    const now = new Date();
-    setLoaded(false);
-    setAsOf(now);
-
-    moodService
-      .getInRange(getRecentQueryRange(now, days))
-      .then((result) => {
-        if (!active) return;
-        setEntries(result);
-        setError(null);
-        setLoaded(true);
-      })
-      .catch((cause: unknown) => {
-        if (!active) return;
-        console.error("[useRecentMoodEntries] Failed to load recent entries:", cause);
-        setError("Recent entries could not load.");
-      });
-
-    const midnight = setTimeout(reload, msUntilNextLocalMidnight(now) + 1000);
+    const midnight = setTimeout(reload, msUntilNextLocalMidnight(asOf) + 1000);
     return () => {
-      active = false;
+      subscription.remove();
       clearTimeout(midnight);
     };
-  }, [days, revision, reloadCount, reload]);
+  }, [asOf, reload]);
 
-  return { entries, asOf, loaded, error, reload };
+  return {
+    entries: result.data ?? EMPTY_ENTRIES,
+    asOf,
+    loaded: !result.loading && !result.stale,
+    error: result.error,
+    reload,
+  };
 }
+
+const EMPTY_ENTRIES: MoodEntry[] = [];

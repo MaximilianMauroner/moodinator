@@ -16,13 +16,20 @@ function readablePath(value, name, directory = false) {
   return resolve(value);
 }
 
-export function releaseEnvironment(env = process.env) {
+export function buildEnvironment(env = process.env) {
   if (!env.PATH?.trim()) throw new Error('PATH is required');
   const sdk = readablePath(env.ANDROID_HOME || env.ANDROID_SDK_ROOT, 'Android SDK', true);
   if (env.ANDROID_HOME && env.ANDROID_SDK_ROOT && resolve(env.ANDROID_HOME) !== resolve(env.ANDROID_SDK_ROOT)) {
     throw new Error('ANDROID_HOME and ANDROID_SDK_ROOT must match');
   }
   const bundletool = readablePath(env.ANDROID_BUNDLETOOL_JAR, 'ANDROID_BUNDLETOOL_JAR');
+  return { ...env, ANDROID_HOME: sdk, ANDROID_SDK_ROOT: sdk,
+    ANDROID_BUNDLETOOL_JAR: bundletool, EAS_BIN: env.EAS_BIN || 'eas' };
+}
+
+export function releaseEnvironment(env = process.env) {
+  if (env.GITHUB_ACTIONS === 'true' && !env.EXPO_TOKEN?.trim()) throw new Error('EXPO_TOKEN is required on GitHub Actions');
+  const environment = buildEnvironment(env);
   const keyPath = readablePath(env.PLAY_SERVICE_ACCOUNT_KEY_PATH, 'PLAY_SERVICE_ACCOUNT_KEY_PATH');
   try {
     const key = JSON.parse(readFileSync(keyPath, 'utf8'));
@@ -30,13 +37,29 @@ export function releaseEnvironment(env = process.env) {
   } catch {
     throw new Error('Expected a Play service-account JSON key');
   }
-  return { ...env, ANDROID_HOME: sdk, ANDROID_SDK_ROOT: sdk,
-    ANDROID_BUNDLETOOL_JAR: bundletool, PLAY_SERVICE_ACCOUNT_KEY_PATH: keyPath,
-    EAS_BIN: env.EAS_BIN || 'eas' };
+  return { ...environment, PLAY_SERVICE_ACCOUNT_KEY_PATH: keyPath };
 }
 
-export function preflightRelease(root, env = process.env) {
-  const environment = releaseEnvironment(env);
+// Narrow child credentials on trusted local hosts. Hosted checks use a separate runner.
+export function releaseChildEnvironment(operation, env = process.env) {
+  const { EXPO_TOKEN, GH_TOKEN, GITHUB_TOKEN, PLAY_SERVICE_ACCOUNT_JSON,
+    PLAY_SERVICE_ACCOUNT_KEY_PATH, ...environment } = env;
+  if (operation === 'eas' && EXPO_TOKEN) environment.EXPO_TOKEN = EXPO_TOKEN;
+  if (operation === 'ledger') {
+    if (GH_TOKEN) environment.GH_TOKEN = GH_TOKEN;
+    else if (GITHUB_TOKEN) environment.GITHUB_TOKEN = GITHUB_TOKEN;
+  }
+  return environment;
+}
+
+export function checkReleaseResources(root) {
+  const disk = statfsSync(root);
+  if (disk.bavail * disk.bsize < 15 * 1024 ** 3) throw new Error('Local builds require at least 15 GiB free disk space');
+  if (totalmem() < 8 * 1024 ** 3) throw new Error('Local builds require at least 8 GiB RAM');
+}
+
+export function preflightBuild(root, env = process.env, cliVersion) {
+  const environment = buildEnvironment(env);
   const versions = readdirSync(join(environment.ANDROID_HOME, 'build-tools'), { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && /^\d/.test(entry.name))
     .map((entry) => entry.name).sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
@@ -45,17 +68,34 @@ export function preflightRelease(root, env = process.env) {
     try { accessSync(join(environment.ANDROID_HOME, 'build-tools', versions[0], tool), constants.X_OK); }
     catch { throw new Error(`Android SDK ${tool} is unavailable`); }
   }
+  const eas = spawnSync(environment.EAS_BIN, ['--version'], {
+    cwd: root, env: releaseChildEnvironment('tools', environment), encoding: 'utf8', timeout: 30000,
+  });
+  if (eas.error || eas.status !== 0) throw new Error('EAS is unavailable');
+  const constraint = cliVersion ?? JSON.parse(readFileSync(join(root, 'eas.json'), 'utf8')).cli.version;
+  // Both release configurations require a minimum stable CLI version.
+  const minimum = /^>=\s*(\d+)\.(\d+)\.(\d+)$/.exec(constraint);
+  if (!minimum) throw new Error('Expected eas.json cli.version to specify >= MAJOR.MINOR.PATCH');
+  const installed = /eas-cli\/(\d+)\.(\d+)\.(\d+)(?=\s|$)/.exec(eas.stdout);
+  if (!installed) throw new Error('Cannot read a stable EAS CLI version');
+  const comparison = installed.slice(1).map(Number)
+    .map((part, index) => part - Number(minimum[index + 1])).find((part) => part !== 0) ?? 0;
+  if (comparison < 0) {
+    throw new Error(`EAS CLI ${installed.slice(1).join('.')} does not satisfy ${constraint}; update EAS_BIN before releasing`);
+  }
   for (const [program, args, name] of [
-    [environment.EAS_BIN, ['--version'], 'EAS'], ['java', ['-version'], 'Java'],
+    ['java', ['-version'], 'Java'],
     ['jarsigner', ['-help'], 'jarsigner'], ['keytool', ['-help'], 'keytool'],
   ]) {
-    const result = spawnSync(program, args, { cwd: root, env: environment, stdio: 'ignore', timeout: 30000 });
+    const result = spawnSync(program, args, { cwd: root, env: releaseChildEnvironment('tools', environment), stdio: 'ignore', timeout: 30000 });
     if (result.error || result.status !== 0) throw new Error(`${name} is unavailable`);
   }
-  const disk = statfsSync(root);
-  if (disk.bavail * disk.bsize < 15 * 1024 ** 3) throw new Error('Local builds require at least 15 GiB free disk space');
-  if (totalmem() < 8 * 1024 ** 3) throw new Error('Local builds require at least 8 GiB RAM');
+  checkReleaseResources(root);
   return environment;
+}
+
+export function preflightRelease(root, env = process.env, cliVersion) {
+  return preflightBuild(root, releaseEnvironment(env), cliVersion);
 }
 
 export function releaseFailure(stage) {

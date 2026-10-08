@@ -1,6 +1,6 @@
 {
   "cli": {
-    "version": ">= 16.3.2",
+    "version": ">= 20.5.1",
     "appVersionSource": "local"
   },
   "build": {
@@ -37,6 +37,7 @@
     },
     "nightly": {
       "extends": "production",
+      "credentialsSource": "remote",
       "autoIncrement": false,
       "env": {
         "CMAKE_BUILD_PARALLEL_LEVEL": "2",

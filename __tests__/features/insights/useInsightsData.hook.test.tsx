@@ -203,7 +203,7 @@ describe("useInsightsData hook", () => {
           resolveAll = resolve;
         }),
     );
-    act(() => result.setAnalysisRange("all"));
+    await act(async () => result.setAnalysisRange("all"));
 
     expect(result.analysisRange).toBe("all");
     expect(result.ready).toBe(false);
@@ -224,6 +224,20 @@ describe("useInsightsData hook", () => {
       result.analysis.dailySeries.find((point) => point.day === "2026-09-06")
         ?.count,
     ).toBe(1);
+  });
+
+  it("All history includes a past instant recorded across the date line and extends its chart", async () => {
+    vi.setSystemTime(new Date("2026-06-01T12:30:00Z"));
+    const data = createMockMoodEntry({
+      timestamp: Date.parse("2026-06-01T12:00:00Z"),
+      utcOffsetMinutes: -840,
+    });
+    useMoodsStore.getState().setLocal([data]);
+    await mount();
+    expect(result.analysisMoods).toEqual([]);
+    await act(async () => result.setAnalysisRange("all"));
+    expect(result.analysisMoods).toEqual([data]);
+    expect(result.analysis.dailySeries.find((point) => point.day === "2026-06-02")?.count).toBe(1);
   });
 
   it("keeps a newer history summary when an older refresh resolves last", async () => {
