@@ -157,6 +157,42 @@ test("SIGINT and SIGTERM stay fatal during proof and GUI handoff and release the
   }
 });
 
+test("late pre-handoff cancellation disposes once before writing failed evidence", async () => {
+  for (const turn of [1, 2]) {
+    for (const deletionFails of [false, true]) {
+      const fixture = lifecycleFixture({ keepSimulator: true });
+      const reports = [];
+      fixture.options.save = () => {
+        fixture.calls.push("save");
+        reports.push(structuredClone(fixture.evidence));
+        if (reports.length !== 1) return;
+        const cancel = () => fixture.signals.emit("SIGTERM");
+        if (turn === 1) setImmediate(cancel);
+        else setImmediate(() => setImmediate(cancel));
+      };
+      if (deletionFails) {
+        fixture.options.deleteSimulator = (id) => {
+          fixture.calls.push(["delete", id]);
+          throw new Error("synthetic deletion failure");
+        };
+      }
+      await assert.rejects(runIosProofLifecycle(fixture.options), (error) => {
+        assert.match(error.message, /^iOS proof cancelled by SIGTERM/);
+        if (deletionFails) {
+          assert.equal(error.errors[0].message, "iOS proof cancelled by SIGTERM");
+          assert.ok(error.errors[1].message.includes(SIMULATOR));
+        }
+        return true;
+      });
+      assert.deepEqual(fixture.calls, ["proof", ["open", SIMULATOR], "save", ["shutdown", SIMULATOR], ["delete", SIMULATOR], "save"]);
+      assert.equal(reports[0].status, "passed");
+      assert.equal(reports.at(-1).status, "failed");
+      assert.equal(reports.at(-1).simulatorRetained, false);
+      assert.equal(fixture.signals.listenerCount("SIGTERM"), 0);
+    }
+  }
+});
+
 test("OS cancellation during synchronous proof, GUI, report and cleanup calls fails and disposes", { skip: process.platform === "win32" }, async () => {
   for (const action of ["run", "open", "save", "shutdown", "delete", "proof-error"]) {
     const directory = mkdtempSync(join(tmpdir(), "moodinator-ios-signal-test-"));

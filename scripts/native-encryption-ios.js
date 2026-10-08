@@ -161,6 +161,9 @@ async function runIosProofLifecycle({
     // A signal queued during a synchronous report write can arrive after that
     // write saved "passed". Reconcile it before handing off or removing handlers.
     if (reportStatus === "passed" && cancellation.signal.aborted) {
+      // Cancellation can also arrive at the checkpoint after the earlier guard.
+      try { await dispose(); }
+      catch (error) { fail(error); }
       try { await save(); }
       catch (error) { fail(error); }
       await eventLoopCheckpoint();
