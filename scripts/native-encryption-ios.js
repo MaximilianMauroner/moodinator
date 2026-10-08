@@ -1,5 +1,5 @@
 const { execFileSync, spawn } = require("node:child_process");
-const { setTimeout: delay } = require("node:timers/promises");
+const { setImmediate: eventLoopCheckpoint, setTimeout: delay } = require("node:timers/promises");
 
 function groupHasLiveMembers(pid) {
   const processes = execFileSync("ps", ["-axo", "pid=,pgid=,stat="], { encoding: "utf8", timeout: 5000 });
@@ -130,24 +130,40 @@ async function runIosProofLifecycle({
   try {
     try {
       await run(cancellation.signal);
+      // Awaiting a synchronous native command only drains microtasks. Yield to
+      // the event loop so queued OS signals run while our handlers are installed.
+      await eventLoopCheckpoint();
       cancellation.signal.throwIfAborted();
       if (keepSimulator) {
         await openSimulator(evidence.simulator.id);
+        await eventLoopCheckpoint();
         cancellation.signal.throwIfAborted();
         evidence.simulatorRetained = true;
       }
       evidence.status = "passed";
     } catch (error) { fail(error); }
+    await eventLoopCheckpoint();
     if (!evidence.simulatorRetained) {
       try { await dispose(); }
       catch (error) { fail(error); }
     }
+    await eventLoopCheckpoint();
+    const reportStatus = evidence.status;
     try { await save(); }
     catch (error) { fail(error); }
+    await eventLoopCheckpoint();
     // A report failure or cancellation must also release a proposed GUI handoff.
     if (!evidence.simulatorRetained) {
       try { await dispose(); }
       catch (error) { fail(error); }
+    }
+    await eventLoopCheckpoint();
+    // A signal queued during a synchronous report write can arrive after that
+    // write saved "passed". Reconcile it before handing off or removing handlers.
+    if (reportStatus === "passed" && cancellation.signal.aborted) {
+      try { await save(); }
+      catch (error) { fail(error); }
+      await eventLoopCheckpoint();
     }
     if (failures.length === 1) throw failures[0];
     if (failures.length) throw new AggregateError(failures, failures.map((error) => error.message).join(" "));

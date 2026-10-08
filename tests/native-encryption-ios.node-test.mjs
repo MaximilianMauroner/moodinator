@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -153,6 +153,83 @@ test("SIGINT and SIGTERM stay fatal during proof and GUI handoff and release the
       assert.equal(fixture.evidence.simulatorRetained, false);
       assert.ok(fixture.calls.some((call) => Array.isArray(call) && call[0] === "delete"));
       assert.equal(fixture.signals.listenerCount(signalName), 0);
+    }
+  }
+});
+
+test("OS cancellation during synchronous proof, GUI, report and cleanup calls fails and disposes", { skip: process.platform === "win32" }, async () => {
+  for (const action of ["run", "open", "save", "shutdown", "delete", "proof-error"]) {
+    const directory = mkdtempSync(join(tmpdir(), "moodinator-ios-signal-test-"));
+    const report = join(directory, "report.json");
+    const outcome = join(directory, "outcome.json");
+    const script = join(directory, "fixture.cjs");
+    const helper = require.resolve("../scripts/native-encryption-ios.js");
+    writeFileSync(script, `
+      const { execFileSync } = require('node:child_process');
+      const { writeFileSync } = require('node:fs');
+      const { runIosProofLifecycle } = require(${JSON.stringify(helper)});
+      const evidence = { status: 'running' };
+      const calls = [];
+      let blocked = false;
+      const block = (action) => {
+        if (action !== ${JSON.stringify(action)} || blocked) return;
+        blocked = true;
+        process.stdout.write('blocked\\n');
+        execFileSync(process.execPath, ['-e', 'setTimeout(() => {}, 600)']);
+      };
+      runIosProofLifecycle({
+        evidence, keepSimulator: ${!["shutdown", "delete"].includes(action)},
+        run() {
+          evidence.simulator = { id: ${JSON.stringify(SIMULATOR)} };
+          block('run'); block('proof-error');
+          ${action === "proof-error" ? "throw new Error('original proof failure');" : ""}
+        },
+        openSimulator() { calls.push('open'); block('open'); },
+        shutdown() { calls.push('shutdown'); block('shutdown'); },
+        deleteSimulator() { calls.push('delete'); block('delete'); },
+        save() { calls.push('save'); block('save'); writeFileSync(${JSON.stringify(report)}, JSON.stringify(evidence)); },
+      }).then(() => {
+        writeFileSync(${JSON.stringify(outcome)}, JSON.stringify({ calls, evidence }));
+      }, (error) => {
+        writeFileSync(${JSON.stringify(outcome)}, JSON.stringify({ calls, evidence, error: error.message }));
+        process.exitCode = 1;
+      });
+    `);
+    const child = spawn(process.execPath, [script], { stdio: ["ignore", "pipe", "pipe"] });
+    let output = "";
+    let errors = "";
+    let signalSent = false;
+    let signalTimer;
+    child.stdout.on("data", (chunk) => {
+      output += chunk;
+      if (!signalSent && output.includes("blocked\n")) {
+        signalSent = true;
+        signalTimer = setTimeout(() => child.kill("SIGTERM"), 50);
+      }
+    });
+    child.stderr.on("data", (chunk) => { errors += chunk; });
+    const deadline = setTimeout(() => child.kill("SIGKILL"), 5000);
+    try {
+      const exit = await new Promise((resolve, reject) => {
+        child.once("error", reject);
+        child.once("close", (code, signal) => resolve({ code, signal }));
+      });
+      assert.equal(signalSent, true, `${action}: fixture never reached its synchronous call`);
+      assert.deepEqual(exit, { code: 1, signal: null }, `${action}: ${errors}`);
+      const result = JSON.parse(readFileSync(outcome, "utf8"));
+      assert.match(result.error, /cancelled by SIGTERM/, action);
+      if (action === "proof-error") assert.match(result.error, /^original proof failure/, action);
+      assert.ok(result.calls.includes("shutdown"), `${action}: ${JSON.stringify(result)}`);
+      assert.ok(result.calls.includes("delete"), `${action}: ${JSON.stringify(result)}`);
+      const saved = JSON.parse(readFileSync(report, "utf8"));
+      assert.equal(saved.status, "failed", action);
+      assert.equal(saved.simulatorRetained, false, action);
+      if (action === "save") assert.equal(result.calls.filter((call) => call === "save").length, 2, "Reconcile a report saved before signal delivery.");
+    } finally {
+      clearTimeout(deadline);
+      clearTimeout(signalTimer);
+      if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+      rmSync(directory, { recursive: true, force: true });
     }
   }
 });
