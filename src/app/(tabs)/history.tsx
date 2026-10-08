@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import { RefreshControl, ScrollView as RNScrollView, Text, View } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { FlashList } from "@shopify/flash-list";
@@ -23,8 +23,7 @@ import { typography } from "@/constants/typography";
 import { ActiveFilterChips } from "@/features/history/ActiveFilterChips";
 import { ForecastCard } from "@/features/history/ForecastCard";
 import { HistoryFilterSheet } from "@/features/history/HistoryFilterSheet";
-import { buildForecastDays, type ForecastDay } from "@/features/history/forecast";
-import { useRecentMoodEntries } from "@/features/history/useRecentMoodEntries";
+import { useHistoryForecast } from "@/features/history/useHistoryForecast";
 import { useEntrySettings } from "@/hooks/useEntrySettings";
 import { useMoodItemActions } from "@/hooks/useMoodItemActions";
 import { useMoodModals } from "@/hooks/useMoodModals";
@@ -44,10 +43,10 @@ const VIEWS: { id: HistoryView; label: string; icon: "partly-sunny-outline" | "c
 function HistoryScreenContent() {
   const { get, isDark } = useThemeColors();
   const [view, setView] = useState<HistoryView>("days");
-  const [selectedDay, setSelectedDay] = useState<ForecastDay | null>(null);
 
   const moods = useMoodsStore((state) => state.moods);
   const total = useMoodsStore((state) => state.total);
+  const isStale = useMoodsStore((state) => state.isStale);
   const filters = useMoodsStore((state) => state.filters);
   const clearFilters = useMoodsStore((state) => state.clearFilters);
   const status = useMoodsStore((state) => state.status);
@@ -60,11 +59,7 @@ function HistoryScreenContent() {
   const updateMood = useMoodsStore((state) => state.update);
   const updateMoodTimestamp = useMoodsStore((state) => state.updateTimestamp);
 
-  const recent = useRecentMoodEntries(FORECAST_DAYS);
-  const forecastDays = useMemo(
-    () => buildForecastDays(recent.entries, recent.asOf, FORECAST_DAYS),
-    [recent.entries, recent.asOf]
-  );
+  const { recent, days: forecastDays, selectedDay, selectDay, closeDay } = useHistoryForecast(FORECAST_DAYS);
 
   const entrySettings = useEntrySettings();
   const modals = useMoodModals();
@@ -134,12 +129,12 @@ function HistoryScreenContent() {
           {recent.error ? (
             <EmptyState icon="warning-outline" tone="coral" title="The last 7 days could not load" description={recent.error} actionLabel="Try Again" onAction={recent.reload} />
           ) : (
-            <ForecastCard days={forecastDays} ready={recent.loaded} onSelectDay={setSelectedDay} />
+            <ForecastCard days={forecastDays} ready={recent.loaded} onSelectDay={selectDay} />
           )}
           <View>
             <View className="mb-3 flex-row items-center justify-between gap-2">
               <View className="flex-1">
-                <HistoryListHeader title="All entries" moodCount={total} countSuffix="total" countTestID="history-count" />
+                <HistoryListHeader title="All entries" moodCount={total} countSuffix={isStale ? "pending refresh" : "total"} countTestID="history-count" />
               </View>
               <HistoryFilterSheet />
             </View>
@@ -210,9 +205,9 @@ function HistoryScreenContent() {
           visible
           date={selectedDay.date}
           entries={selectedDay.entries}
-          onClose={() => setSelectedDay(null)}
+          onClose={closeDay}
           onEditEntry={(entry) => {
-            setSelectedDay(null);
+            closeDay();
             modals.setEditingEntry(entry);
           }}
         />

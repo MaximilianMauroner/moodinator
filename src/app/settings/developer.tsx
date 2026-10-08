@@ -61,6 +61,7 @@ export function DeveloperSettingsScreen() {
       Alert.alert("Sample Data Added", `Successfully added ${result} sample mood entries.`);
     } catch {
       Alert.alert("Error", "Failed to add sample data");
+      invalidateMoods(); // A failed later seed batch can leave earlier writes committed.
     }
   }, [ensureFreshMoods, invalidateMoods]);
 

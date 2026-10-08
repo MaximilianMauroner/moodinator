@@ -6,7 +6,7 @@ export interface MoodEntryWorkflowRepository {
     id: number,
     updates: Partial<MoodEntryInput & { mood: number }>
   ) => Promise<MoodEntry | undefined>;
-  delete: (id: number) => Promise<void>;
+  delete: (id: number) => Promise<boolean>;
   updateTimestamp: (
     id: number,
     timestamp: number,
@@ -14,9 +14,14 @@ export interface MoodEntryWorkflowRepository {
   ) => Promise<MoodEntry | undefined>;
 }
 
+export type MoodMutation =
+  | { type: "insert" }
+  | { type: "update" }
+  | { type: "delete"; deleted: boolean };
+
 export interface MoodEntryWorkflowStoreAdapter {
   getMoods: () => MoodEntry[];
-  applyMutation: (moods: MoodEntry[]) => void;
+  applyMutation: (moods: MoodEntry[], mutation: MoodMutation) => void;
 }
 
 function withoutExistingEntry(moods: MoodEntry[], id: number): MoodEntry[] {
@@ -24,14 +29,15 @@ function withoutExistingEntry(moods: MoodEntry[], id: number): MoodEntry[] {
 }
 
 function sortNewestFirst(moods: MoodEntry[]): MoodEntry[] {
-  return [...moods].sort((a, b) => b.timestamp - a.timestamp);
+  return [...moods].sort((a, b) => b.timestamp - a.timestamp || b.id - a.id);
 }
 
 function commitMutation(
   store: MoodEntryWorkflowStoreAdapter,
-  moods: MoodEntry[]
+  moods: MoodEntry[],
+  mutation: MoodMutation
 ) {
-  store.applyMutation(sortNewestFirst(moods));
+  store.applyMutation(sortNewestFirst(moods), mutation);
 }
 
 export function createMoodEntryWorkflow(
@@ -41,7 +47,7 @@ export function createMoodEntryWorkflow(
   return {
     async create(entry: MoodEntryInput): Promise<MoodEntry> {
       const created = await repository.create(entry);
-      commitMutation(store, [created, ...withoutExistingEntry(store.getMoods(), created.id)]);
+      commitMutation(store, [created, ...withoutExistingEntry(store.getMoods(), created.id)], { type: "insert" });
       return created;
     },
 
@@ -56,7 +62,8 @@ export function createMoodEntryWorkflow(
 
       commitMutation(
         store,
-        store.getMoods().map((mood) => (mood.id === id ? updated : mood))
+        store.getMoods().map((mood) => (mood.id === id ? updated : mood)),
+        { type: "update" }
       );
       return updated;
     },
@@ -73,21 +80,22 @@ export function createMoodEntryWorkflow(
 
       commitMutation(
         store,
-        store.getMoods().map((mood) => (mood.id === id ? updated : mood))
+        store.getMoods().map((mood) => (mood.id === id ? updated : mood)),
+        { type: "update" }
       );
       return updated;
     },
 
     async delete(id: number): Promise<MoodEntry | null> {
       const existing = store.getMoods().find((mood) => mood.id === id) ?? null;
-      await repository.delete(id);
-      commitMutation(store, withoutExistingEntry(store.getMoods(), id));
+      const deleted = await repository.delete(id);
+      commitMutation(store, withoutExistingEntry(store.getMoods(), id), { type: "delete", deleted });
       return existing;
     },
 
     async restore(entry: MoodEntryInput): Promise<MoodEntry> {
       const restored = await repository.create(entry);
-      commitMutation(store, [restored, ...withoutExistingEntry(store.getMoods(), restored.id)]);
+      commitMutation(store, [restored, ...withoutExistingEntry(store.getMoods(), restored.id)], { type: "insert" });
       return restored;
     },
   };

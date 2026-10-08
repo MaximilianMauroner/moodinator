@@ -827,14 +827,7 @@ test("visual matrix retains each screen before the next navigation", () => {
   assert.match(source, /testId: "insights-loaded-summary"/);
   assert.match(source, /text: `\$\{fixtureCount\} entries`/);
   assert.match(insightsSource, /testID=\{ready \? "insights-loaded-summary" : undefined\}/);
-  const hookSource = readFileSync(
-    new URL("../src/features/insights/hooks/useInsightsData.ts", import.meta.url),
-    "utf8",
-  );
-  assert.match(
-    hookSource,
-    /loadedSelection === `\$\{analysisRange\}:\$\{localDay\}`/,
-  );
+  // Rendered hook tests verify readiness after range changes and stale replies.
   assert.match(source, /Calendar legend: a dot marks a day with multiple entries/);
   assert.match(source, /Local privacy/);
   assert.match(insightsSource, /<ChartCard title="Comparisons">/);

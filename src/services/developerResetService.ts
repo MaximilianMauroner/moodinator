@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useMoodsStore } from "@/shared/state/moodsStore";
 import { moodService } from "./moodService";
 import { notificationService } from "./notificationService";
 
@@ -29,6 +30,7 @@ export async function resetDeveloperAppData(clearPin: () => Promise<void>): Prom
     // Both reminder features are now disabled, so the post-commit reconciliation
     // performed by clearAll cannot replace the requests we just canceled.
     await moodService.clearAll();
+    useMoodsStore.getState().invalidate();
     await AsyncStorage.clear();
   });
 }

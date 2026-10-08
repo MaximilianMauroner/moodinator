@@ -144,10 +144,9 @@ export const dataPortabilityService = {
 
   async importData(jsonData: string): Promise<DataImportResult> {
     const result = await importMoods(jsonData);
+    useMoodsStore.getState().invalidate();
     await reconcileRemindersAfterMoodChange();
     const syncResult = await presetSyncService.addMissingFromHistory("all");
-    useMoodsStore.getState().invalidate();
-    void useMoodsStore.getState().ensureFresh();
     return {
       ...result,
       addedEmotions: syncResult.addedEmotions,
@@ -166,8 +165,8 @@ export const dataPortabilityService = {
 
   async deleteLocalMoodData(): Promise<void> {
     await clearMoodData();
-    await reconcileRemindersAfterMoodChange();
     useMoodsStore.getState().invalidate();
+    await reconcileRemindersAfterMoodChange();
     await useMoodsStore.getState().ensureFresh();
   },
 
