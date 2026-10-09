@@ -16,8 +16,9 @@ import Animated, {
     useAnimatedStyle,
     withSpring,
 } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { Alert } from "@/components/ui/AppAlert";
+import { useModalAlert } from "@/components/ui/AppAlert";
 import { getMoodRatingDisplay } from "@/constants/moodScaleInterpretation";
 import { useThemeColors, colors } from "@/constants/colors";
 import { typography } from "@/constants/typography";
@@ -78,6 +79,7 @@ type BaseMoodEntryModalProps = {
     onClose: () => void;
     onSubmit: (values: MoodEntryFormValues) => Promise<void> | void;
     initialValues?: Partial<MoodEntryFormValues>;
+    currentEntryId?: number;
     showMoodSelector?: boolean;
     flow?: MoodEntryFlow;
     onCreateEmotion?: CreateEmotionOption;
@@ -137,6 +139,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     onClose,
     onSubmit,
     initialValues,
+    currentEntryId,
     showMoodSelector = true,
     flow = "detailed",
     onCreateEmotion,
@@ -147,6 +150,8 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     headerAction,
 }) => {
     const { isDark, get } = useThemeColors();
+    const insets = useSafeAreaInsets();
+    const { alert, alertView, hasAlert, onRequestClose: alertBack } = useModalAlert(visible);
     const { height: windowHeight } = useWindowDimensions();
     const pagerRef = useRef<PagerView>(null);
     const scrollViewRef = useRef<ScrollView>(null);
@@ -345,7 +350,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
             if (mountedRef.current) setIsSaving(false);
             console.error("Failed to save mood entry:", error);
             runPostCommitEffect("Save failure haptic", () => haptics.reject());
-            Alert.alert(
+            alert(
                 "Save failed",
                 "Unable to save your entry. Please try again."
             );
@@ -373,6 +378,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
             }, 250);
         }
     }, [
+        alert,
         basedOnEntryId,
         contextTags,
         emotions,
@@ -417,7 +423,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
             return;
         }
 
-        Alert.alert(
+        alert(
             "Discard changes?",
             "Your unsaved changes will be lost.",
             [
@@ -425,7 +431,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                 { text: "Discard", style: "destructive", onPress: onClose },
             ]
         );
-    }, [isDirty, onClose]);
+    }, [alert, isDirty, onClose]);
 
     const handleBack = useCallback(() => {
         if (isFirstStep) {
@@ -953,7 +959,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
             visible={visible}
             transparent
             animationType="slide"
-            onRequestClose={handleRequestClose}
+            onRequestClose={alertBack ?? handleRequestClose}
             accessibilityViewIsModal
             accessibilityLabel={`${title} form`}
         >
@@ -963,6 +969,8 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
             >
                 <View
                     className="rounded-t-3xl"
+                    accessibilityElementsHidden={hasAlert}
+                    importantForAccessibility={hasAlert ? "no-hide-descendants" : "auto"}
                     style={{
                         backgroundColor: get("background"),
                         height: sheetHeight,
@@ -1040,7 +1048,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                                 Kept. Add detail if you like.
                                             </Text>
                                         </View>
-                                        <SameAsYesterdayButton onCopy={handleCopyYesterday} />
+                                        <SameAsYesterdayButton onCopy={handleCopyYesterday} excludeEntryId={currentEntryId} />
                                     </View>
                                 ) : (
                                     <>
@@ -1054,7 +1062,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                             />
                                         </View>
                                         <View className="ml-2">
-                                            <SameAsYesterdayButton onCopy={handleCopyYesterday} />
+                                            <SameAsYesterdayButton onCopy={handleCopyYesterday} excludeEntryId={currentEntryId} />
                                         </View>
                                     </View>
 
@@ -1109,7 +1117,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                     : "rgba(250, 248, 244, 0.97)",
                                 paddingHorizontal: 20,
                                 paddingTop: 12,
-                                paddingBottom: 20,
+                                paddingBottom: 20 + (keyboardOffset > 0 ? 0 : insets.bottom),
                             }}
                         >
                             {/* ── Footer ─────────────────────────────────── */}
@@ -1274,6 +1282,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                         void submitCreatePresetModal();
                     }}
                 />
+                {alertView}
             </View>
         </Modal>
     );
@@ -1288,6 +1297,7 @@ type MoodEntryModalSharedProps = {
     onClose: () => void;
     onSubmit: (values: MoodEntryFormValues) => Promise<void> | void;
     initialValues?: Partial<MoodEntryFormValues>;
+    currentEntryId?: number;
     onCreateEmotion?: CreateEmotionOption;
     onCreateContextTag?: CreateContextOption;
 };

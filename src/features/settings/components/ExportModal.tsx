@@ -14,7 +14,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import * as Clipboard from "expo-clipboard";
 import { Ionicons } from "@expo/vector-icons";
-import { Alert } from "@/components/ui/AppAlert";
+import { useModalAlert } from "@/components/ui/AppAlert";
 import {
   dataPortabilityService,
   type ExportRange,
@@ -22,13 +22,15 @@ import {
 
 async function shareJsonData(
   jsonData: string,
-  fileName: string
+  fileName: string,
+  alert: ReturnType<typeof useModalAlert>["alert"],
+  onComplete: () => void
 ) {
   if (Platform.OS === "android") {
     const permissions =
       await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
     if (!permissions.granted) {
-      Alert.alert(
+      alert(
         "Permission Denied",
         "Please grant folder access to save the export."
       );
@@ -43,7 +45,7 @@ async function shareJsonData(
     await FileSystem.writeAsStringAsync(fileUri, jsonData, {
       encoding: FileSystem.EncodingType.UTF8,
     });
-    Alert.alert("Export Saved", "Your export was saved to the selected folder.");
+    alert("Export Saved", "Your export was saved to the selected folder.", [{ text: "OK", onPress: onComplete }]);
     return;
   }
 
@@ -57,8 +59,9 @@ async function shareJsonData(
       mimeType: "application/json",
       dialogTitle: "Moodinator Export",
     });
+    onComplete();
   } else {
-    Alert.alert(
+    alert(
       "Copy sensitive data?",
       "Sharing is unavailable. Copying puts the full JSON export on your clipboard, where other apps may be able to read it.",
       [
@@ -67,8 +70,8 @@ async function shareJsonData(
           text: "Copy JSON",
           onPress: () => {
             void Clipboard.setStringAsync(jsonData)
-              .then(() => Alert.alert("Copied", "The JSON export was copied to your clipboard."))
-              .catch(() => Alert.alert("Error", "The export could not be copied."));
+              .then(() => alert("Copied", "The JSON export was copied to your clipboard.", [{ text: "OK", onPress: onComplete }]))
+              .catch(() => alert("Error", "The export could not be copied."));
           },
         },
       ]
@@ -89,6 +92,7 @@ export function ExportModal({
   visible: boolean;
   onClose: () => void;
 }) {
+  const { alert, alertView, hasAlert, onRequestClose: alertBack } = useModalAlert(visible);
   const [loading, setLoading] = useState(false);
   const [exportRange, setExportRange] = useState<ExportRange>("week");
   const [customStartDate, setCustomStartDate] = useState(() => {
@@ -124,14 +128,13 @@ export function ExportModal({
       });
 
       if (!exportResult.ok) {
-        Alert.alert(exportResult.title, exportResult.message);
+        alert(exportResult.title, exportResult.message);
         return;
       }
 
-      await shareJsonData(exportResult.jsonData, exportResult.fileName);
-      onClose();
+      await shareJsonData(exportResult.jsonData, exportResult.fileName, alert, onClose);
     } catch (error) {
-      Alert.alert("Export Error", "Failed to export mood data");
+      alert("Export Error", "Failed to export mood data");
       console.error(error);
     } finally {
       setLoading(false);
@@ -144,7 +147,7 @@ export function ExportModal({
       exportRange === "month" ? "Last 30 days" :
       exportRange === "full" ? "All Moodinator data" :
       `${customStartDate.toLocaleDateString()} to ${customEndDate.toLocaleDateString()}`;
-    Alert.alert(
+    alert(
       "Review data export",
       `${rangeLabel}\n\nThis JSON may include sensitive mood entries, notes, presets, and settings. After saving or sharing it, Moodinator cannot control where it is stored or forwarded.`,
       [
@@ -159,10 +162,14 @@ export function ExportModal({
       visible={visible}
       transparent
       animationType="slide"
-      onRequestClose={onClose}
+      onRequestClose={alertBack ?? (loading ? () => {} : onClose)}
     >
       <View className="flex-1 justify-end bg-black/40">
-        <View className="rounded-t-3xl p-6 pb-10 bg-paper-100 dark:bg-paper-900 border-t border-sand-300 dark:border-paper-800">
+        <View
+          accessibilityElementsHidden={hasAlert}
+          importantForAccessibility={hasAlert ? "no-hide-descendants" : "auto"}
+          className="rounded-t-3xl p-6 pb-10 bg-paper-100 dark:bg-paper-900 border-t border-sand-300 dark:border-paper-800"
+        >
           <View className="items-center mb-6">
             <View className="w-12 h-1.5 rounded-full mb-4 bg-sand-300 dark:bg-sand-800" />
             <Text className="text-xl font-bold text-paper-800 dark:text-paper-200">
@@ -275,6 +282,8 @@ export function ExportModal({
           <View className="gap-3">
             <TouchableOpacity
               onPress={handleExportShare}
+              accessibilityRole="button"
+              accessibilityLabel="Share JSON"
               disabled={loading}
               className="p-4 rounded-xl flex-row justify-center items-center bg-sage-600 dark:bg-sage-600"
             >
@@ -297,6 +306,9 @@ export function ExportModal({
 
             <TouchableOpacity
               onPress={onClose}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel export"
+              disabled={loading}
               className="p-4 rounded-xl items-center bg-paper-200 dark:bg-paper-800"
             >
               <Text className="font-semibold text-paper-700 dark:text-sand-400">
@@ -305,6 +317,7 @@ export function ExportModal({
             </TouchableOpacity>
           </View>
         </View>
+        {alertView}
       </View>
     </Modal>
   );

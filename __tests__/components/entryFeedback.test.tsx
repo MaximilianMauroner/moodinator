@@ -58,7 +58,12 @@ vi.mock("react-native", () => ({
 vi.mock("react-native-pager-view", () => ({ default: "PagerView" }));
 vi.mock("@react-navigation/elements", () => ({ PlatformPressable: "Pressable" }));
 vi.mock("@/components/entry", () => ({ SameAsYesterdayButton: () => null }));
-vi.mock("@/components/ui/AppAlert", () => ({ Alert: { alert: entryFeedback.alert } }));
+vi.mock("@/components/ui/AppAlert", () => ({
+  useModalAlert: () => ({ alert: entryFeedback.alert, alertView: null, hasAlert: false }),
+}));
+vi.mock("react-native-safe-area-context", () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 24, left: 0, right: 0 }),
+}));
 vi.mock("@/lib/showCrisisSupportAlert", () => ({ showCrisisSupportAlert: entryFeedback.crisisSupport }));
 vi.mock("@/services/toastService", () => ({
   toastService: { success: entryFeedback.toastSuccess },
