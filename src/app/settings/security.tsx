@@ -12,6 +12,13 @@ import { ToggleRow } from "@/features/settings/components/ToggleRow";
 import { Alert } from "@/components/ui/AppAlert";
 import { getThemedColor } from "@/constants/colors";
 
+function getBiometricUnavailableMessage(hasHardware: boolean | null, hasEnrollment: boolean): string {
+  if (hasHardware === null) return "Moodinator couldn't check biometrics. Try again, or use your PIN.";
+  if (!hasHardware) return "Your device doesn't support biometric authentication.";
+  if (!hasEnrollment) return "No biometrics enrolled. Set up biometrics in your device settings to use biometric unlock.";
+  return "Your enrolled biometrics don't meet app unlock requirements. Check available methods in your device settings, or use your PIN.";
+}
+
 export default function SecuritySettingsScreen() {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === "dark";
@@ -30,10 +37,13 @@ export default function SecuritySettingsScreen() {
     isChecking: biometricsChecking,
     isAvailable: biometricsAvailable,
     isEnrolled: biometricsEnrolled,
+    hasHardware: biometricsHardware,
+    hasEnrollment: biometricsEnrollment,
     getBiometricLabel,
   } = useBiometrics();
 
   const canUseBiometrics = biometricsAvailable && biometricsEnrolled;
+  const biometricUnavailableMessage = getBiometricUnavailableMessage(biometricsHardware, biometricsEnrollment);
 
   useEffect(() => {
     if (!hydrated) {
@@ -200,9 +210,7 @@ export default function SecuritySettingsScreen() {
               </Text>
             </View>
             <Text className="text-xs text-paper-700 dark:text-sand-400">
-              {!biometricsAvailable
-                ? "Your device doesn't support biometric authentication."
-                : "No biometrics enrolled. Set up biometrics in your device settings to use biometric unlock."}
+              {biometricUnavailableMessage}
             </Text>
           </View>
         )}
