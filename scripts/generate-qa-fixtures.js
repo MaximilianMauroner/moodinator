@@ -145,7 +145,7 @@ function fixtureIdentity(entries, index, { editedNote = null } = {}) {
 
 function writeQaFixture(count, output, options) {
   if (![100, 1000, 10000].includes(count) || !output) {
-    throw new Error("Usage: bun run qa:fixtures -- <100|1000|10000> <output.json>");
+    throw new Error("Usage: pnpm run qa:fixtures -- <100|1000|10000> <output.json>");
   }
 
   const entries = createQaFixture(count, options);

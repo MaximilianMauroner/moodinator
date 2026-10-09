@@ -9,7 +9,7 @@ physical device or an existing simulator. No personal data or signing is needed.
 Use the exact reviewed PR #118 source SHA supplied with the handoff. A later
 source change needs its affected evidence refreshed before accepting that build.
 Prerequisites are existing Xcode with an installed iOS Simulator runtime,
-CocoaPods, Node 24 and Bun 1.3.14. If one is missing, return that error; the runner
+CocoaPods, Node 24 and pnpm 12.8.1. If one is missing, return that error; the runner
 does not install runtimes, change device settings or request credentials.
 
 ## Prepare and run
@@ -32,14 +32,14 @@ MOODINATOR_IOS_QA=$(node scripts/prepare-native-qa.js | sed -n 's/^QA workspace:
 test -n "$MOODINATOR_IOS_QA"
 cd "$MOODINATOR_IOS_QA"
 printf 'Disposable source: %s\nPrepared QA: %s\n' "$MOODINATOR_IOS_WORK" "$MOODINATOR_IOS_QA"
-bun install --frozen-lockfile
+pnpm install --frozen-lockfile
 export MOODINATOR_VARIANT=qa MOODINATOR_QA_ENCRYPTION_PROOF=1
 export EXPO_OS=ios EAS_BUILD_PLATFORM=ios MOODINATOR_METRO_MAX_WORKERS=1
 export NODE_OPTIONS=--max-old-space-size=768
 MOODINATOR_QA_PREPARE_NATIVE=1 node node_modules/expo/bin/cli prebuild --platform ios --clean --no-install
 (cd ios && pod install)
 node scripts/seal-native-qa.js --platform=ios
-bun scripts/run-native-encryption-ios.ts --out="$MOODINATOR_IOS_WORK/evidence" --keep-simulator
+pnpm exec tsx scripts/run-native-encryption-ios.ts --out="$MOODINATOR_IOS_WORK/evidence" --keep-simulator
 )
 ```
 

@@ -59,7 +59,7 @@ must use the isolated QA package `com.lab4code.moodinator.qa` for destructive
 fixtures, and the release package `com.lab4code.moodinator` only for a separate
 owner-approved release check. Confirm version name/code, target API 36, merged
 release manifest, generated permissions, and the absence of debug-only paths.
-Run `bun run verify:android-release-manifest` against the generated candidate,
+Run `pnpm run verify:android-release-manifest` against the generated candidate,
 retain the package checksum and screenshots beside the candidate evidence, and
 never call historical APKs or screenshots current. Use fabricated data only;
 do not install into a device containing personal Moodinator data.
@@ -77,16 +77,16 @@ Use the separate `com.lab4code.moodinator.qa` app on a disposable emulator. The
 smoke flow clears that app's data at launch. Do not point the flow at the normal
 Moodinator package or a device that holds personal mood data.
 
-1. Run `bun run qa:prepare` from the originating checkout. Use the isolated
+1. Run `pnpm run qa:prepare` from the originating checkout. Use the isolated
    workspace path and prepared source SHA printed by that command for the QA
    build; the workspace intentionally has no `.git` directory.
 2. Install dependencies, run a clean Android prebuild with
    `MOODINATOR_VARIANT=qa MOODINATOR_QA_PREPARE_NATIVE=1`, then run
-   `bun run qa:seal-native`. Unset `MOODINATOR_QA_PREPARE_NATIVE`; sealed builds reject
+   `pnpm run qa:seal-native`. Unset `MOODINATOR_QA_PREPARE_NATIVE`; sealed builds reject
    that prebuild-only flag. Build and install with `MOODINATOR_VARIANT=qa`. Confirm that
    the installed package is `com.lab4code.moodinator.qa` before continuing.
 3. Install Maestro and Android SDK platform tools. Start one disposable emulator.
-4. Run `bun run qa:smoke -- emulator-5554 --out /tmp/moodinator-native-smoke-current`
+4. Run `pnpm run qa:smoke -- emulator-5554 --out /tmp/moodinator-native-smoke-current`
    with the actual emulator serial. The runner first verifies its executing
    workspace against the sealed prepared manifest, then checks the emulator and QA package before invoking
    `.maestro/smoke.yaml`.
@@ -163,7 +163,7 @@ records; 60 records match the combined 90-day/mood/emotion/context/note filter
 before the boundary edit cycles. Edited notes retain their original fabricated
 text so exact-note indexed lookup remains active; 60 records still match until
 the dedicated refresh mutation removes one. The standalone generator remains
-available for manual setup: `bun run qa:fixtures -- 1000 /tmp/moodinator-fixtures-1000.json` and repeat with 10,000 entries. Use a fresh
+available for manual setup: `pnpm run qa:fixtures -- 1000 /tmp/moodinator-fixtures-1000.json` and repeat with 10,000 entries. Use a fresh
 QA dataset between sizes. Do not load fixtures into the normal app.
 
 The repeatable stress runner performs that import through Android's document
@@ -180,10 +180,10 @@ identity and decrement the count; a cached result fails the flow. The runner
 uses only fabricated data and writes evidence outside the repository:
 
 ```bash
-bun run qa:stress -- emulator-5554 --size 1000 --label baseline --runs 2 --out /tmp/moodinator-native-stress-baseline-1000
-bun run qa:stress -- emulator-5554 --size 1000 --label current --runs 2 --out /tmp/moodinator-native-stress-current-1000
-bun run qa:stress -- emulator-5554 --size 10000 --label baseline --runs 2 --out /tmp/moodinator-native-stress-baseline-10000
-bun run qa:stress -- emulator-5554 --size 10000 --label current --runs 2 --out /tmp/moodinator-native-stress-current-10000
+pnpm run qa:stress -- emulator-5554 --size 1000 --label baseline --runs 2 --out /tmp/moodinator-native-stress-baseline-1000
+pnpm run qa:stress -- emulator-5554 --size 1000 --label current --runs 2 --out /tmp/moodinator-native-stress-current-1000
+pnpm run qa:stress -- emulator-5554 --size 10000 --label baseline --runs 2 --out /tmp/moodinator-native-stress-baseline-10000
+pnpm run qa:stress -- emulator-5554 --size 10000 --label current --runs 2 --out /tmp/moodinator-native-stress-current-10000
 ```
 
 Use new empty output directories for each command. Each run records the source
@@ -263,7 +263,7 @@ generates and retains the complete fixture, imports it with Replace Data, and
 records its SHA-256 before any capture; it does not trust pre-existing app data:
 
 ```bash
-bun run qa:matrix -- emulator-5554 --fixture-count 1000 --out /tmp/moodinator-native-matrix-current
+pnpm run qa:matrix -- emulator-5554 --fixture-count 1000 --out /tmp/moodinator-native-matrix-current
 ```
 
 The matrix retains one screenshot per state. A successful command proves state
@@ -276,7 +276,7 @@ travels through UTC and Pacific/Auckland, and compares the row's accessibility
 date/time label:
 
 ```bash
-bun run qa:timezone -- emulator-5554 --out /tmp/moodinator-native-timezone-current
+pnpm run qa:timezone -- emulator-5554 --out /tmp/moodinator-native-timezone-current
 ```
 
 It reads the device timezone back after every request and records requested vs

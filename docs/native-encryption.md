@@ -49,7 +49,7 @@ remain bare-hex passphrases during conversion; this compatibility is needed
 while pre-V2 installs exist and must not be removed until those upgrades are no
 longer supported.
 
-The Bun patch in `patches/expo-secure-store@55.0.18.patch` makes Android reject a
+The pnpm patch in `patches/expo-secure-store@55.0.18.patch` makes Android reject a
 failed SharedPreferences commit. Readback alone can observe memory after a failed
 commit. Pending startup repeats persistence and readback before conversion.
 Remove this patch only when the installed Expo version propagates that failure.
@@ -66,13 +66,13 @@ native acceptance. Follow the `build` skill and its coding-vm resource helper.
 Build before emulator execution; do not overlap them or bypass busy admission.
 
 1. Run focused startup and bootstrap tests, then the required CI-equivalent
-   `bun run verify` and `bun run test:nightly` under guarded admission.
-2. From a clean committed checkout, run `bun run qa:prepare`. In its printed
+   `pnpm run verify` and `pnpm run test:nightly` under guarded admission.
+2. From a clean committed checkout, run `pnpm run qa:prepare`. In its printed
    temporary workspace install locked dependencies through the build helper.
 3. Set `MOODINATOR_VARIANT=qa` and `MOODINATOR_QA_ENCRYPTION_PROOF=1` for prebuild
    and build. Run the documented clean Android prebuild with
    `MOODINATOR_QA_PREPARE_NATIVE=1`, then unset that prebuild-only flag and run
-   `bun run qa:seal-native`. Do not change copied/generated source after sealing.
+   `pnpm run qa:seal-native`. Do not change copied/generated source after sealing.
    iOS uses its own native seal. Older version-3 Android seals without a platform
    field remain Android-only compatibility until old prepared workspaces retire.
 4. Build the non-debuggable local QA release without release credentials, with
@@ -85,7 +85,7 @@ Build before emulator execution; do not overlap them or bypass busy admission.
    Run the evidence runner through the build helper from the sealed workspace:
 
    ```sh
-   bun run scripts/run-native-encryption.ts \
+   pnpm exec tsx scripts/run-native-encryption.ts \
      --avd-root=/tmp/owned-native-proof/avd --avd=moodinator-issue45 \
      --port=5580 --apk=/tmp/owned-native-proof/app-release.apk \
      --out=/tmp/owned-native-proof/evidence
@@ -121,7 +121,7 @@ As an early diagnostic, the same production TypeScript state machine can run
 against real SQLCipher 4.2+ CLI processes:
 
 ```sh
-bun run scripts/verify-encryption-host.ts /absolute/path/to/sqlcipher
+pnpm exec tsx scripts/verify-encryption-host.ts /absolute/path/to/sqlcipher
 ```
 
 This uses fresh temporary databases and kills its own native sessions at every

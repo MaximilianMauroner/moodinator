@@ -56,7 +56,13 @@ async function buildFixture(mode, trigger, expected) {
     if (existsSync(pidFile)) {
       const [leader] = JSON.parse(readFileSync(pidFile, "utf8"));
       try { process.kill(-leader, "SIGKILL"); }
-      catch (error) { if (error.code !== "ESRCH") throw error; }
+      catch (error) {
+        if (error.code !== "ESRCH") {
+          // macOS can return EPERM for an already exited process group.
+          if (error.code !== "EPERM") throw error;
+          for (const pid of JSON.parse(readFileSync(pidFile, "utf8"))) assertExited(pid);
+        }
+      }
     }
     rmSync(directory, { recursive: true, force: true });
   }

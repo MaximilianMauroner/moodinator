@@ -1755,7 +1755,7 @@ test("README enters the prepared workspace before native QA installation", () =>
   const source = readFileSync(new URL("../README.md", import.meta.url), "utf8");
   assert.match(
     source,
-    /QA_WORKSPACE="\$\(bun run qa:prepare \| tee \/dev\/stderr \| sed -n '[^']+'\)"\ncd "\$QA_WORKSPACE"\nbun install --frozen-lockfile/,
+    /QA_WORKSPACE="\$\(pnpm run qa:prepare \| tee \/dev\/stderr \| sed -n '[^']+'\)"\ncd "\$QA_WORKSPACE"\npnpm install --frozen-lockfile/,
   );
 });
 

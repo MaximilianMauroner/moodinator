@@ -90,9 +90,9 @@ async function buildRelease() {
       worktreeAdded = true;
       stage = 'checks';
       checkReleaseResources(sourceRoot);
-      run('bun', ['install', '--frozen-lockfile'], sourceRoot);
-      run('bun', ['run', 'verify'], sourceRoot);
-      run('bun', ['run', 'test:nightly'], sourceRoot);
+      run('pnpm', ['install', '--frozen-lockfile'], sourceRoot);
+      run('pnpm', ['run', 'verify'], sourceRoot);
+      run('pnpm', ['run', 'test:nightly'], sourceRoot);
       // Dependencies and checks can reduce free disk space before reservation.
       checkReleaseResources(sourceRoot);
       reservation = ledger('reserve', [sha]);
