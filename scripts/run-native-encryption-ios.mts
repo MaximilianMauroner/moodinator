@@ -41,7 +41,7 @@ mkdirSync(output, { recursive: true });
 const evidence: {
   sourceSha: string; status: string; xcode: string; macOS: string;
   simulator?: { id: string; runtime: string; deviceType: string };
-  appExecutableSha256?: string; bundleSha256?: string;
+  appExecutableSha256?: string; bundleSha256?: string; simulatorSigning?: string;
   results: unknown[]; failure?: string; simulatorRetained?: boolean;
 } = {
   sourceSha, status: "running", results: [],
@@ -64,7 +64,7 @@ async function build(signal: AbortSignal) {
   try {
     await runOwnedBuild("/usr/bin/time", ["-l", "xcodebuild", "-workspace", workspace, "-scheme", scheme,
       "-configuration", "Release", "-sdk", "iphonesimulator", "-destination", "generic/platform=iOS Simulator",
-      "-derivedDataPath", path.join(output, "DerivedData"), "-jobs", "1", "CODE_SIGNING_ALLOWED=NO", "IPHONEOS_DEPLOYMENT_TARGET=15.1",
+      "-derivedDataPath", path.join(output, "DerivedData"), "-jobs", "1", "CODE_SIGNING_ALLOWED=YES", "CODE_SIGN_IDENTITY=-", "DEVELOPMENT_TEAM=", "IPHONEOS_DEPLOYMENT_TARGET=15.1",
       `ARCHS=${process.arch === "arm64" ? "arm64" : "x86_64"}`, "build"],
     { stdio: ["ignore", log, log], sample: resourceSample, signal });
   } finally {
@@ -77,6 +77,7 @@ async function build(signal: AbortSignal) {
   const app = path.join(products, apps[0]);
   assert.equal(plist(path.join(app, "Info.plist"), "CFBundleIdentifier"), QA_ID, "Refusing a non-QA app");
   assert.equal(plist(path.join(app, "Info.plist"), "DTPlatformName"), "iphonesimulator");
+  evidence.simulatorSigning = "Xcode ad hoc, no development team or credentials";
   const executable = plist(path.join(app, "Info.plist"), "CFBundleExecutable");
   assert.equal(path.basename(executable), executable);
   evidence.appExecutableSha256 = createHash("sha256").update(readFileSync(path.join(app, executable))).digest("hex");

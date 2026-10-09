@@ -48,9 +48,12 @@ pnpm exec tsx scripts/run-native-encryption-ios.mts --out="$MOODINATOR_IOS_WORK/
 ```
 
 Stop at the first failed command. Do not use `build`, release or EAS commands.
-The runner builds Release for `iphonesimulator` with signing disabled, one Xcode
+The runner builds Release for `iphonesimulator` with Xcode ad hoc signing, one Xcode
 job, this Mac’s simulator architecture, the app’s iOS 15.1 minimum applied to
-all pod targets, and a bundled app, so no Metro server is needed. It records Mac/Xcode,
+all pod targets, and a bundled app, so no Metro server is needed. Ad hoc signing uses no account,
+certificate or development team. Xcode embeds the simulated Keychain entitlements
+required by SecureStore; disabling signing leaves Keychain access unavailable.
+It records Mac/Xcode,
 source/app identity, resource samples and `/usr/bin/time` build memory in the
 evidence folder. Build and simulator execution do not overlap. Only its owned
 build process group receives cancellation signals. Cancellation, timeout or
