@@ -59,8 +59,17 @@ must use the isolated QA package `com.lab4code.moodinator.qa` for destructive
 fixtures, and the release package `com.lab4code.moodinator` only for a separate
 owner-approved release check. Confirm version name/code, target API 36, merged
 release manifest, generated permissions, and the absence of debug-only paths.
-Run `bun run verify:android-release-manifest` against the generated candidate,
-retain the package checksum and screenshots beside the candidate evidence, and
+For the isolated QA candidate, run
+`MOODINATOR_VARIANT=qa bun run verify:android-release-manifest` against its generated
+release manifests. The checker always validates the production source configuration;
+the selected variant sets only the expected generated package, scheme, app name and
+receiver permission. Production validation defaults to `production` and must reject
+QA-generated input. Both variants require the same approved permissions, API 36,
+disabled platform backup and a non-debuggable release. An explicit
+`--variant qa` argument selects the same QA checks. This does not replace sealing or
+the runners' installed-source identity checks.
+
+Retain the package checksum and screenshots beside the candidate evidence, and
 never call historical APKs or screenshots current. Use fabricated data only;
 do not install into a device containing personal Moodinator data.
 
@@ -136,6 +145,8 @@ failures. Use fabricated data only.
 | Context feedback | In Quick, Detailed, and Edit Entry with context enabled, select and deselect a context tag. Cancel a press by dragging off the chip. | One short event per accepted change. No event for a canceled press. |
 | Energy feedback | Select 0, select 10, tap the selected level, then set and clear energy. | Zero is retained as a value. Tapping the selected level and Clear both remove it. One short event per change. |
 | Preference | Turn haptics off in Settings. Repeat emotion, context, energy, save, and navigation actions. Restart and repeat. | Fields still work. App feedback remains silent after restart. |
+| Switch state | Read the native Haptic Feedback switch before a tap, after the tap and after a cold restart. | A native checkable switch exposes `checked=false` when off. `selected` does not report switch state. Missing checked state blocks this oracle; a screenshot is separate visual evidence. Physical feedback requires hardware. |
+| Saved presets | Create one unique custom emotion and context, then close/reopen the app, apply each in a new entry, save, cold-read the entry and delete the owned presets. | The Add dialog closes. The named preset appears as a list TextView with its list controls, then survives restart and applies to the saved entry. Text in an EditText or a still-open dialog is not a saved-preset pass. |
 | Android modal feedback | Record the device, API level, build revision, and app/system vibration settings. Compare selection feedback on Home and in each entry modal. Toggle the system touch-feedback setting and repeat. | Selection remains brief in modals. Record system-setting behavior: Expo selection uses the vibrator service, so it is not equivalent to Android view feedback. The in-app off setting must always silence it. |
 | Restrained feedback | Select the current emotion category again, then change it. Copy the previous entry once. | No event for an unchanged category. One result event after copying, without an initial buzz. |
 | Device feedback | Repeat on a real Android device and, when available, an iPhone. | Feedback is brief and consistent. Emulator silence is not evidence of physical feedback quality. |
@@ -154,10 +165,44 @@ failures. Use fabricated data only.
 If fault injection is unavailable, mark save and load errors as not tested.
 Do not substitute disabling networking: the app stores its data locally.
 
+## Native modal and statement diagnosis
+
+For the keyboard-dismissed touch/bounds investigation in issue #122, use the
+same fabricated preset/filter on a matching sealed QA build. First retain the
+active IME, screen size/density, navigation mode, keyboard visibility, screenshot,
+and full parent/child native bounds. Compare keyboard-visible and dismissed
+states after layout settles. Run once with the automation helper stopped and a
+normal visible keyboard, then use a manual touch and a fresh native locator in
+separate attempts. Keep all failed attempts. A moved footer or successful Back
+recovery does not identify a cause or establish reliable Cancel/Save interaction.
+If needed, use a separate provenance-labelled diagnostic build to record native
+touch coordinates and layout locations. Reproduce on a second profile or physical
+device before claiming broad Android acceptance. Sample app and emulator CPU
+separately; high emulator CPU is not an app CPU diagnosis.
+
+For the Expo NativeStatement investigation in issue #113, verify the compiled
+candidate's expo-sqlite and expo-modules-core graph, not only installed package
+metadata. Use one owned fabricated QA installation for 20 cold starts, History
+reads, delete/Undo and bounded Try Again recovery. Retain full logcat stacks,
+failure rate, operation order and data readback. The application publishes one
+initialized connection; source has no explicit close of that published connection.
+Expo creates a NativeStatement before passing it across the bridge, whose
+shared-object conversion precedes SQLite preparation. A conversion failure does
+not identify a bad SQL statement or prove damaged records. Change one diagnostic
+variable at a time if it reproduces. Node SQLite tests, migration passes and
+ordinary successful app reads do not close this intermittent native gate.
+
 ## Large history and performance
 
 The stress runner generates relative-time fabricated exports itself, pushes each
 one to the disposable emulator, and imports it through the normal Settings flow.
+Stress, matrix and timezone imports select Downloads through Show roots when
+available. Pickers that hide it use at most three native Back steps to a parent;
+recovery stops if the document picker closes. Disabled breadcrumbs are never
+forced. The import-success alert is dismissed, then Back to settings must reach
+Local privacy before any tab is selected. A missing fixture, failed unwind or
+wrong count still fails the run. Retain the failed prepared command separately
+from any later adapted/manual continuation.
 The pristine fixture has positive `QA match` records and negative `QA other`
 records; 60 records match the combined 90-day/mood/emotion/context/note filter
 before the boundary edit cycles. Edited notes retain their original fabricated
@@ -325,3 +370,12 @@ stable resource IDs (with the existing accessibility label as a fallback), and
 derives every tap point from current bounds. Disabled/invisible controls,
 hierarchy failure, or a late control fail the evidence; no production toast
 duration is changed.
+
+The Calendar legend is an accessible group with its complete label. QA-only
+exact-field markers have nonzero bounds, explicit labels and preserved native
+views; they do not change production accessibility or card layout. These source
+properties do not prove Android exposes them. Retain an actual native hierarchy
+showing every required offset/scale/energy/emotion/context marker before claiming
+exact-field Undo acceptance. Missing markers or a missing transient control must
+fail; neither visible-row equality nor a manual coordinate recovery substitutes
+for that prepared-runner pass.
