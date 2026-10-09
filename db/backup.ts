@@ -4,6 +4,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { exportMoods } from "./db";
 import {
   BACKUP_INTERVAL_MS,
+  WEEKS_TO_KEEP,
   getBackupFilename,
   parseBackupFilename,
   parseBackupUri,
@@ -13,7 +14,7 @@ import {
 } from "./backupPolicy";
 
 export type BackupResult<T> =
-  | { success: true; data: T }
+  | { success: true; data: T; warning?: string }
   | { success: false; error: string };
 
 const LAST_BACKUP_KEY = "lastBackupTimestamp";
@@ -83,19 +84,12 @@ async function migrateLegacyIosCacheBackupsIfNeeded(targetDir: string): Promise<
   }
 }
 
-/**
- * Gets the user-selected backup folder URI, or returns default
- */
-async function getBackupDirectory(): Promise<string> {
-  try {
-    const folderUri = await AsyncStorage.getItem(BACKUP_FOLDER_KEY);
-    if (folderUri) {
-      return folderUri.endsWith("/") ? folderUri : `${folderUri}/`;
-    }
-  } catch (error) {
-    console.error("Error getting backup folder:", error);
+/** Gets the selected destination, or the private default when none is selected. */
+function getBackupDirectory(folderUri: string | null): string {
+  if (!folderUri) {
+    return DEFAULT_BACKUP_DIR;
   }
-  return DEFAULT_BACKUP_DIR;
+  return folderUri.endsWith("/") ? folderUri : `${folderUri}/`;
 }
 
 /**
@@ -117,61 +111,21 @@ export async function setBackupFolder(folderUri: string): Promise<void> {
  * Gets the current backup folder URI
  */
 export async function getBackupFolder(): Promise<string | null> {
-  try {
-    return await AsyncStorage.getItem(BACKUP_FOLDER_KEY);
-  } catch (error) {
-    console.error("Error getting backup folder:", error);
-    return null;
-  }
+  return AsyncStorage.getItem(BACKUP_FOLDER_KEY);
 }
 
-/**
- * Ensures the backup directory exists
- */
-async function ensureBackupDirectory(): Promise<string> {
-  const backupDir = await getBackupDirectory();
-  try {
-    // Handle Android SAF URIs
-    if (backupDir.startsWith("content://")) {
-      // With SAF, we assume the user selected a valid directory
-      // We don't need to "create" it, but we can check read access by listing files
-      // This also verifies permissions are still granted
-      try {
-        await FileSystem.StorageAccessFramework.readDirectoryAsync(backupDir);
-        return backupDir;
-      } catch (e) {
-        console.warn(
-          "Selected SAF directory not accessible (permissions revoked?):",
-          e
-        );
-        throw e;
-      }
-    }
-
-    // Handle standard FileSystem paths
-    const dirInfo = await FileSystem.getInfoAsync(backupDir);
-    if (!dirInfo.exists) {
-      await FileSystem.makeDirectoryAsync(backupDir, { intermediates: true });
-    }
-
-    await migrateLegacyIosCacheBackupsIfNeeded(backupDir);
-  } catch (error) {
-    console.error("Error ensuring backup directory exists:", error);
-    // If user-selected folder fails, try default
-    if (backupDir !== DEFAULT_BACKUP_DIR) {
-      console.warn("User-selected folder inaccessible, using default");
-      const defaultDirInfo = await FileSystem.getInfoAsync(DEFAULT_BACKUP_DIR);
-      if (!defaultDirInfo.exists) {
-        await FileSystem.makeDirectoryAsync(DEFAULT_BACKUP_DIR, {
-          intermediates: true,
-        });
-      }
-      await migrateLegacyIosCacheBackupsIfNeeded(DEFAULT_BACKUP_DIR);
-      return DEFAULT_BACKUP_DIR;
-    }
-    throw error;
+/** Checks the requested destination without changing it on failure. */
+async function ensureBackupDirectory(backupDir: string): Promise<void> {
+  if (backupDir.startsWith("content://")) {
+    await FileSystem.StorageAccessFramework.readDirectoryAsync(backupDir);
+    return;
   }
-  return backupDir;
+
+  const dirInfo = await FileSystem.getInfoAsync(backupDir);
+  if (!dirInfo.exists) {
+    await FileSystem.makeDirectoryAsync(backupDir, { intermediates: true });
+  }
+  await migrateLegacyIosCacheBackupsIfNeeded(backupDir);
 }
 
 /**
@@ -204,93 +158,65 @@ async function setLastBackupTimestamp(timestamp: number): Promise<void> {
  */
 export async function createBackup(): Promise<BackupResult<string>> {
   try {
-    // On Android, enforce user-selected folder
-    if (Platform.OS === "android") {
-      const userFolder = await getBackupFolder();
-      if (!userFolder) {
-        return {
-          success: false,
-          error: "No backup folder selected. Please select a backup location in Settings.",
-        };
-      }
-    }
-
-    let backupDir: string;
-    try {
-      backupDir = await ensureBackupDirectory();
-    } catch (e) {
+    const folderUri = await getBackupFolder();
+    if (Platform.OS === "android" && !folderUri) {
       return {
         success: false,
-        error: "Could not access backup folder. Please check permissions or select a new location.",
+        error: "Select a backup folder in Settings > Data & Backups, then run the backup again.",
+      };
+    }
+
+    const backupDir = getBackupDirectory(folderUri);
+    try {
+      await ensureBackupDirectory(backupDir);
+    } catch (error) {
+      console.error("Error accessing backup directory:", error);
+      return {
+        success: false,
+        error: folderUri
+          ? "Moodinator cannot access the selected backup folder. Select the folder again in Settings > Data & Backups, then retry."
+          : "Moodinator cannot access backup storage. Check available device storage, restart the app, then retry.",
       };
     }
 
     const timestamp = Date.now();
     const filename = getBackupFilename(timestamp);
-
-    // Export all mood data
     const jsonData = await exportMoods();
-
-    let fileUri: string;
-
-    // Handle Android SAF URIs
-    if (backupDir.startsWith("content://")) {
-      try {
-        // Create file using SAF
-        fileUri = await FileSystem.StorageAccessFramework.createFileAsync(
+    const fileUri = backupDir.startsWith("content://")
+      ? await FileSystem.StorageAccessFramework.createFileAsync(
           backupDir,
           filename,
           "application/json"
-        );
+        )
+      : `${backupDir}${filename}`;
 
-        // Write content
-        await FileSystem.writeAsStringAsync(fileUri, jsonData, {
-          encoding: FileSystem.EncodingType.UTF8,
-        });
-      } catch (e) {
-        console.error("Error writing to SAF directory:", e);
-        // Fallback to default directory
-        try {
-          const defaultDirInfo = await FileSystem.getInfoAsync(DEFAULT_BACKUP_DIR);
-          if (!defaultDirInfo.exists) {
-            await FileSystem.makeDirectoryAsync(DEFAULT_BACKUP_DIR, { intermediates: true });
-          }
-          const defaultUri = `${DEFAULT_BACKUP_DIR}${filename}`;
-          await FileSystem.writeAsStringAsync(defaultUri, jsonData, {
-            encoding: FileSystem.EncodingType.UTF8,
-          });
-          fileUri = defaultUri;
-          console.warn("Fell back to default directory due to SAF error");
-        } catch (fallbackError) {
-          return {
-            success: false,
-            error: "Could not write backup file. Storage may be full or permissions denied.",
-          };
-        }
-      }
-    } else {
-      // Standard FileSystem path
-      fileUri = `${backupDir}${filename}`;
-      await FileSystem.writeAsStringAsync(fileUri, jsonData, {
-        encoding: FileSystem.EncodingType.UTF8,
-      });
-    }
-
-    // Update last backup timestamp
+    await FileSystem.writeAsStringAsync(fileUri, jsonData, {
+      encoding: FileSystem.EncodingType.UTF8,
+    });
     await setLastBackupTimestamp(timestamp);
-
     console.log(`Backup created: ${filename} at ${fileUri}`);
-    // Clean up old backups after creating a new one
-    const deletedCount = await cleanupOldBackups();
-    if (deletedCount > 0) {
-      console.log(`Cleaned up ${deletedCount} old backup(s)`);
+
+    try {
+      const deletedCount = await cleanupOldBackups(fileUri);
+      if (deletedCount > 0) {
+        console.log(`Cleaned up ${deletedCount} old backup(s)`);
+      }
+    } catch (error) {
+      console.error("Backup saved, but retention cleanup failed:", error);
+      return {
+        success: true,
+        data: fileUri,
+        warning: "Backup saved, but older backups could not be removed. Check folder access and available storage, then run the backup again.",
+      };
     }
     return { success: true, data: fileUri };
   } catch (error) {
     console.error("Error creating backup:", error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : "An unexpected error occurred while creating backup.",
+      error: Platform.OS === "android"
+        ? "Moodinator could not save the backup. Check available device storage and try again. Select the backup folder again in Settings > Data & Backups if access has changed."
+        : "Moodinator could not save the backup. Check available device storage, restart the app, then try again.",
     };
   }
 }
@@ -318,141 +244,63 @@ export async function isBackupNeeded(): Promise<boolean> {
   }
 }
 
-/**
- * Gets all backup files sorted by date (newest first)
- * Checks both user-selected folder and default folder
- */
-async function getBackupFiles(): Promise<BackupFileSummary[]> {
-  try {
-    const backupDir = await getBackupDirectory();
-    await migrateLegacyIosCacheBackupsIfNeeded(backupDir);
-    const backupFiles: BackupFileSummary[] = [];
-    const seenFilenames = new Set<string>();
+/** Lists supported physical backup files in one managed location. */
+async function readBackupDirectory(backupDir: string): Promise<BackupFileSummary[]> {
+  if (backupDir.startsWith("content://")) {
+    const uris = await FileSystem.StorageAccessFramework.readDirectoryAsync(backupDir);
+    return uris.flatMap((uri) => {
+      const file = parseBackupUri(uri);
+      return file ? [file] : [];
+    });
+  }
 
-    // Check user-selected folder
-    try {
-      if (backupDir.startsWith("content://")) {
-        // Handle Android SAF URIs
-        const files =
-          await FileSystem.StorageAccessFramework.readDirectoryAsync(backupDir);
-        for (const fileUri of files) {
-          // Decode URI to get filename (rough approximation, SAF URIs are complex)
-          // For SAF, we rely on reading the file content or metadata if needed,
-          // but for listing, we just check if it looks like a backup file
-          // SAF file URIs don't easily map to filenames, so we might need to just list them
-          // For now, we'll try to extract a name or read metadata
-
-          // Note: SAF readDirectoryAsync returns an array of URIs
-          // We can't easily filter by name without reading info for each file
-          // which is slow. So we'll just list all files and check if we can parse date
-
-          // Simplification: On Android SAF, we might not easily filter by filename pattern
-          // without checking each file. For performance, we might skip this or do it lazily.
-          // For this implementation, we'll skip SAF listing optimization and just try to read info
-
-          // Optimization: just return the URI, handle details later
-          // Or, we can try to parse the URI if it contains the name
-          const backupFile = parseBackupUri(fileUri);
-          if (backupFile && !seenFilenames.has(backupFile.filename)) {
-            backupFiles.push(backupFile);
-            seenFilenames.add(backupFile.filename);
-          }
-        }
-      } else {
-        // Standard FileSystem path
-        const dirInfo = await FileSystem.getInfoAsync(backupDir);
-        if (dirInfo.exists) {
-          const files = await FileSystem.readDirectoryAsync(backupDir);
-          for (const file of files) {
-            if (
-              file.startsWith("moodinator-backup-") &&
-              file.endsWith(".json") &&
-              !seenFilenames.has(file)
-            ) {
-              const backupFile = parseBackupFilename(file, `${backupDir}${file}`);
-              if (backupFile) {
-                backupFiles.push(backupFile);
-                seenFilenames.add(file);
-              }
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.warn("Error reading user-selected backup folder:", error);
-    }
-
-    // Also check default folder if different (and not SAF)
-    if (backupDir !== DEFAULT_BACKUP_DIR) {
-      try {
-        const defaultDirInfo = await FileSystem.getInfoAsync(
-          DEFAULT_BACKUP_DIR
-        );
-        if (defaultDirInfo.exists) {
-          const files = await FileSystem.readDirectoryAsync(DEFAULT_BACKUP_DIR);
-          for (const file of files) {
-            if (
-              file.startsWith("moodinator-backup-") &&
-              file.endsWith(".json") &&
-              !seenFilenames.has(file)
-            ) {
-              const backupFile = parseBackupFilename(file, `${DEFAULT_BACKUP_DIR}${file}`);
-              if (backupFile) {
-                backupFiles.push(backupFile);
-                seenFilenames.add(file);
-              }
-            }
-          }
-        }
-      } catch (error) {
-        console.warn("Error reading default backup folder:", error);
-      }
-    }
-
-    return sortBackupsNewestFirst(backupFiles);
-  } catch (error) {
-    console.error("Error getting backup files:", error);
+  const dirInfo = await FileSystem.getInfoAsync(backupDir);
+  if (!dirInfo.exists) {
     return [];
   }
+  const names = await FileSystem.readDirectoryAsync(backupDir);
+  return names.flatMap((name) => {
+    const file = parseBackupFilename(name, `${backupDir}${name}`);
+    return file ? [file] : [];
+  });
 }
 
-/**
- * Cleans up old backups
- * Keeps only the most recent WEEKS_TO_KEEP backups
- * Also deletes backups older than the cutoff date
- */
-export async function cleanupOldBackups(): Promise<number> {
-  try {
-    const backupFiles = await getBackupFiles();
+/** Counts each physical URI, including same-day copies and private legacy files. */
+async function getBackupFiles(): Promise<BackupFileSummary[]> {
+  const backupDir = getBackupDirectory(await getBackupFolder());
+  await migrateLegacyIosCacheBackupsIfNeeded(backupDir);
+  const directories = backupDir === DEFAULT_BACKUP_DIR
+    ? [backupDir]
+    : [backupDir, DEFAULT_BACKUP_DIR];
+  const backupFiles: BackupFileSummary[] = [];
+  const seenUris = new Set<string>();
 
-    const filesToDelete = selectBackupsForDeletion(backupFiles);
-
-    if (filesToDelete.length === 0) {
-      return 0;
-    }
-
-    let deletedCount = 0;
-
-    for (const file of filesToDelete) {
-      try {
-        // Handle SAF URIs
-        if (file.uri.startsWith("content://")) {
-          await FileSystem.StorageAccessFramework.deleteAsync(file.uri);
-        } else {
-          await FileSystem.deleteAsync(file.uri, { idempotent: true });
-        }
-        deletedCount++;
-        console.log(`Deleted old backup: ${file.filename}`);
-      } catch (error) {
-        console.error(`Error deleting backup ${file.filename}:`, error);
+  for (const directory of directories) {
+    const files = await readBackupDirectory(directory);
+    for (const file of files) {
+      if (!seenUris.has(file.uri)) {
+        backupFiles.push(file);
+        seenUris.add(file.uri);
       }
     }
-
-    return deletedCount;
-  } catch (error) {
-    console.error("Error cleaning up old backups:", error);
-    return 0;
   }
+  return sortBackupsNewestFirst(backupFiles);
+}
+
+/** Keeps the eight newest dated physical backups, including the file just saved. */
+export async function cleanupOldBackups(createdBackupUri?: string): Promise<number> {
+  const backupFiles = await getBackupFiles();
+  const filesToDelete = selectBackupsForDeletion(backupFiles, WEEKS_TO_KEEP, createdBackupUri);
+
+  for (const file of filesToDelete) {
+    if (file.uri.startsWith("content://")) {
+      await FileSystem.StorageAccessFramework.deleteAsync(file.uri);
+    } else {
+      await FileSystem.deleteAsync(file.uri, { idempotent: true });
+    }
+    console.log(`Deleted old backup: ${file.filename}`);
+  }
+  return filesToDelete.length;
 }
 
 /**
@@ -472,71 +320,28 @@ export async function getBackupInfo(): Promise<{
   files: Array<{ filename: string; timestamp: number; size: number }>;
   backupDirectory: string;
 }> {
-  try {
-    const backupFiles = await getBackupFiles();
-    const backupDir = await getBackupDirectory();
+  const backupFiles = await getBackupFiles();
+  const backupDir = getBackupDirectory(await getBackupFolder());
+  let totalSize = 0;
+  const files = [];
 
-    let totalSize = 0;
-    const files = [];
-
-    for (const file of backupFiles) {
-      try {
-        // Handle standard FileSystem paths
-        if (!file.uri.startsWith("content://")) {
-          const fileInfo = await FileSystem.getInfoAsync(file.uri);
-          const size =
-            fileInfo.exists && "size" in fileInfo ? fileInfo.size : 0;
-          totalSize += size;
-
-          files.push({
-            filename: file.filename,
-            timestamp: file.timestamp,
-            size,
-          });
-        } else {
-          // For SAF URIs, we might skip getting exact size if it's too slow
-          // or try to get it via FileSystem.getInfoAsync which *might* work on file URIs
-          // even if it doesn't work on tree URIs
-          try {
-            const fileInfo = await FileSystem.getInfoAsync(file.uri);
-            const size =
-              fileInfo.exists && "size" in fileInfo ? fileInfo.size : 0;
-            totalSize += size;
-
-            files.push({
-              filename: file.filename,
-              timestamp: file.timestamp,
-              size,
-            });
-          } catch (e) {
-            // If getting info fails, just add with 0 size
-            files.push({
-              filename: file.filename,
-              timestamp: file.timestamp,
-              size: 0,
-            });
-          }
-        }
-      } catch (e) {
-        // Ignore errors for individual files
-      }
+  for (const file of backupFiles) {
+    let size = 0;
+    try {
+      const fileInfo = await FileSystem.getInfoAsync(file.uri);
+      size = fileInfo.exists && "size" in fileInfo ? fileInfo.size : 0;
+    } catch {
+      // Some SAF providers can list files but cannot return their size.
     }
-
-    return {
-      count: backupFiles.length,
-      latestBackup: backupFiles.length > 0 ? backupFiles[0].timestamp : null,
-      totalSize,
-      files,
-      backupDirectory: backupDir,
-    };
-  } catch (error) {
-    console.error("Error getting backup info:", error);
-    return {
-      count: 0,
-      latestBackup: null,
-      totalSize: 0,
-      files: [],
-      backupDirectory: DEFAULT_BACKUP_DIR,
-    };
+    totalSize += size;
+    files.push({ filename: file.filename, timestamp: file.timestamp, size });
   }
+
+  return {
+    count: backupFiles.length,
+    latestBackup: backupFiles[0]?.timestamp ?? null,
+    totalSize,
+    files,
+    backupDirectory: backupDir,
+  };
 }

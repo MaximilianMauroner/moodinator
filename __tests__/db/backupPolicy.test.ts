@@ -47,4 +47,49 @@ describe("backupPolicy", () => {
       "moodinator-backup-2026-01-01.json",
     ]);
   });
+
+  it("preserves physical duplicate names in filesystem and encoded SAF paths", () => {
+    const filename = "moodinator-backup-2026-10-08 (2).json";
+    const uri = `content://provider/tree/primary%3ABackups/document/${encodeURIComponent(`primary:Backups/${filename}`)}`;
+
+    expect(parseBackupUri(uri)).toEqual({
+      uri,
+      filename,
+      timestamp: Date.UTC(2026, 9, 8),
+    });
+    expect(parseBackupFilename(filename, `file:///backups/${filename}`)?.filename).toBe(filename);
+  });
+
+  it.each([
+    "moodinator-export-full-2026-10-08.json",
+    "moodinator-backup-2026-10-08.txt",
+    "moodinator-backup-2026-10-08.json.bak",
+    "copy-moodinator-backup-2026-10-08.json",
+    "moodinator-backup-2026-02-30.json",
+    "moodinator-backup-2026-13-01.json",
+    "moodinator-backup-2026-10-08 (draft).json",
+  ])("does not classify unrelated or invalid names as managed backups: %s", (filename) => {
+    expect(parseBackupFilename(filename, `file:///backups/${filename}`)).toBeNull();
+    expect(parseBackupUri(`content://provider/document/${encodeURIComponent(filename)}`)).toBeNull();
+  });
+
+  it("ignores a malformed URI and a backup-named parent folder", () => {
+    expect(parseBackupUri("content://provider/document/invalid%uri")).toBeNull();
+    expect(parseBackupUri("content://provider/moodinator-backup-2026-10-08.json/export.json")).toBeNull();
+  });
+
+  it("counts same-day physical files and preserves the one just written", () => {
+    const files = Array.from({ length: 10 }, (_, index) => ({
+      filename: `moodinator-backup-2026-10-08 (${index + 1}).json`,
+      timestamp: Date.UTC(2026, 9, 8),
+      uri: `content://provider/document/${index}`,
+    }));
+    const createdUri = files[9].uri;
+    const deleted = selectBackupsForDeletion(files, 8, createdUri);
+
+    expect(deleted).toHaveLength(2);
+    expect(deleted.map((file) => file.uri)).not.toContain(createdUri);
+    // Existing enumeration order breaks date ties; suffixes are not creation times.
+    expect(deleted).toEqual(files.slice(7, 9));
+  });
 });

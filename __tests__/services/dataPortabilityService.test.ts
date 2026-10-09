@@ -209,6 +209,33 @@ describe("dataPortabilityService", () => {
     });
   });
 
+  it("includes retention recovery guidance after a successful backup write", async () => {
+    const warning = "Backup saved, but older backups could not be removed. Check folder access, then retry.";
+    mocks.createBackup.mockResolvedValueOnce({ success: true, data: "content://backup", warning });
+
+    await expect(dataPortabilityService.runBackupNow()).resolves.toEqual({
+      success: true,
+      title: "Backup Created",
+      message: warning,
+    });
+  });
+
+  it("keeps unexpected native backup exceptions in diagnostics", async () => {
+    const error = new Error("native API /data/user/0/private/path");
+    mocks.createBackup.mockRejectedValueOnce(error);
+    const diagnostic = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = await dataPortabilityService.runBackupNow();
+
+    expect(result).toEqual({
+      success: false,
+      title: "Backup Error",
+      message: "Could not create a backup. Check available storage and folder access, then try again.",
+    });
+    expect(diagnostic).toHaveBeenCalledWith("Error running manual backup:", error);
+    diagnostic.mockRestore();
+  });
+
   it("loads backup metadata and folder together", async () => {
     mocks.getBackupInfo.mockResolvedValue({ count: 2, latestBackup: 123 });
     mocks.getBackupFolder.mockResolvedValue("file:///backups");
