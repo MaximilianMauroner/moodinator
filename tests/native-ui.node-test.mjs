@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { Buffer } from "node:buffer";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { createRequire } from "node:module";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -55,10 +55,13 @@ const {
   findNodeByTestId,
   findNodeByTestIdPrefix,
   findNodeByText,
+  nodeMatches,
   nodeCenter,
   parseGfxInfo,
   parseMemInfo,
   parseUiHierarchy,
+  returnFromDataSettings,
+  selectDownloadFixture,
 } = require("../scripts/native-ui.js");
 const {
   assertInstalledQaBuild: stressInstalledBuildGuard,
@@ -203,6 +206,84 @@ test("derives the tap point from the inspected bounds", () => {
   assert.equal(nodeCenter({ bounds: "[0,0][0,10]" }), null);
 });
 
+test("native switch checks cannot infer checked state from selected", () => {
+  const node = { class: "android.widget.Switch", checkable: "true", checked: "true", selected: "false" };
+  assert.equal(nodeMatches(node, { className: "android.widget.Switch", checked: true }), true);
+  assert.equal(nodeMatches(node, { checked: false }), false);
+  assert.equal(nodeMatches({ ...node, checked: undefined }, { checked: false }), false);
+  assert.equal(nodeMatches({ ...node, checkable: "false" }, { checked: true }), false);
+});
+
+test("a typed preset name cannot satisfy the saved-list oracle", () => {
+  const matcher = { text: "QA Saved Context", className: "android.widget.TextView" };
+  assert.equal(nodeMatches({ text: "QA Saved Context", class: "android.widget.EditText" }, matcher), false);
+  assert.equal(nodeMatches({ text: "QA Saved Context", class: "android.widget.TextView" }, matcher), true);
+});
+
+test("successful import returns to Settings before a tab journey", async () => {
+  const calls = [];
+  await returnFromDataSettings("emulator-5554", {
+    tapImpl: async (_serial, matcher) => calls.push(["tap", matcher]),
+    waitImpl: async (_serial, matcher) => calls.push(["wait", matcher]),
+  });
+  assert.deepEqual(calls, [
+    ["tap", { contentDescription: "Back to settings" }],
+    ["wait", { text: "Local privacy" }],
+  ]);
+  for (const runner of ["stress", "matrix", "timezone"]) {
+    const source = readFileSync(new URL(`../scripts/run-native-${runner}.js`, import.meta.url), "utf8");
+    const importSuccess = source.indexOf('text: "Import Successful"');
+    const dismiss = source.indexOf('text: "OK"', importSuccess);
+    const unwind = source.indexOf("await returnFromDataSettings(serial)", dismiss);
+    assert.ok(importSuccess >= 0 && dismiss > importSuccess && unwind > dismiss);
+  }
+});
+
+test("remembered document-picker folders return through Show roots and exact Downloads", async () => {
+  const calls = [];
+  const roots = { package: "com.google.android.documentsui", "content-desc": "Show roots" };
+  await selectDownloadFixture("emulator-5554", "owned-fixture.json", {
+    waitImpl: async () => {},
+    readImpl: () => [roots],
+    tapImpl: (_serial, node) => calls.push(node["content-desc"]),
+    waitAndTapImpl: async (_serial, matcher) => calls.push(matcher),
+    runAdbImpl: () => { throw new Error("Unexpected Back"); },
+  });
+  assert.deepEqual(calls, [
+    "Show roots",
+    { anyOf: [{ text: "Downloads" }, { text: "Download" }] },
+    { text: "owned-fixture.json" },
+  ]);
+});
+
+test("a hidden picker root uses bounded Back without forcing its disabled breadcrumb", async () => {
+  const picker = { package: "com.android.documentsui" };
+  const disabled = { ...picker, text: "Download", enabled: "false" };
+  const parent = { ...picker, text: "Downloads", enabled: "true" };
+  const snapshots = [[disabled], [parent]];
+  const calls = [];
+  await selectDownloadFixture("emulator-5554", "owned-fixture.json", {
+    waitImpl: async () => {},
+    readImpl: () => snapshots.shift(),
+    tapImpl: (_serial, node) => calls.push(node.text),
+    waitAndTapImpl: async (_serial, matcher) => calls.push(matcher.text),
+    runAdbImpl: (_serial, args) => calls.push(args.at(-1)),
+  });
+  assert.deepEqual(calls, ["KEYCODE_BACK", "Downloads", "owned-fixture.json"]);
+});
+
+test("picker recovery stops if Back closes the picker", async () => {
+  let backs = 0;
+  const snapshots = [[{ package: "com.android.documentsui" }], [{ package: "com.lab4code.moodinator.qa" }]];
+  await assert.rejects(selectDownloadFixture("emulator-5554", "owned-fixture.json", {
+    waitImpl: async () => {},
+    readImpl: () => snapshots.shift(),
+    tapImpl: () => { throw new Error("Unexpected tap outside the picker"); },
+    runAdbImpl: () => { backs += 1; },
+  }), /document picker closed/);
+  assert.equal(backs, 1);
+});
+
 test("restoration rejects hidden duplicates and hidden-only stale rows", () => {
   const identity = {
     timestamp: 123,
@@ -274,6 +355,15 @@ test("exact identity inspects zero-footprint metadata in the full hierarchy", ()
     hierarchy: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
   });
   assert.equal(isExactlyOneRestoredEntry(nodes, identity), true);
+});
+
+test("exact identity fails when Android omits required QA metadata", () => {
+  const nodes = parseUiHierarchy(completeEntryHierarchy()).filter((node) =>
+    !node["resource-id"]?.startsWith("app:id/mood-entry-offset-"));
+  assert.throws(() => captureEntryIdentity("emulator-5554", {
+    note: "QA exact", mood: 6, captureUtcOffsetMinutes: true,
+    readHierarchyImpl: () => nodes,
+  }), /Expected exactly one recorded UTC offset/);
 });
 
 test("smoke identity captures the entry's recorded UTC offset", () => {
@@ -740,6 +830,25 @@ test("device profile captures the full remote display dump and normalizes it loc
   assert.ok(calls.every((args) => !args.includes("|") && !args.includes("grep")));
   assert.equal(profile.displayState, "mActiveModeId=1\nDisplayMode{id=1, fps=60.0}");
   assert.equal(normalizeDisplayState("noise\r\n refreshRate=120.0\r\n"), "refreshRate=120.0");
+});
+
+test("Android 16 AVD identity uses the boot property and retains the older property fallback", () => {
+  const values = new Map([
+    ["getprop ro.boot.qemu.avd_name", "Pixel_6_API_36\n"],
+    ["getprop ro.kernel.qemu.avd_name", "Pixel_8_API_35\n"],
+    ["getprop ro.build.fingerprint", "google/build/fingerprint\n"],
+    ["getprop ro.product.cpu.abilist", "arm64-v8a\n"],
+    ["nproc", "2\n"], ["cat /proc/meminfo", "MemTotal: 2048000 kB\n"],
+    ["wm size", "Physical size: 1080x2400\n"],
+    ["wm density", "Physical density: 420\n"],
+    ["dumpsys display", "mActiveModeId=1\nDisplayMode{id=1, fps=60.0}\n"],
+  ]);
+  const adb = (_serial, args) => values.get(args.slice(1).join(" ")) ?? "";
+  assert.equal(captureDeviceProfile("emulator-5554", adb).avdName, "Pixel_6_API_36");
+  values.delete("getprop ro.boot.qemu.avd_name");
+  assert.equal(captureDeviceProfile("emulator-5554", adb).avdName, "Pixel_8_API_35");
+  values.delete("getprop ro.kernel.qemu.avd_name");
+  assert.throws(() => captureDeviceProfile("emulator-5554", adb), /avdName/);
 });
 
 test("measured stress flows do not relaunch the app process", () => {
@@ -1529,6 +1638,81 @@ test("history metadata markers are mounted only in provenance-bound QA builds", 
   );
   assert.match(source, /const hasQaMetadata = \/\^\[0-9a-f\]\{40\}\$\/\.test\(/);
   assert.match(source, /\{hasQaMetadata \? \(\s*<>[^]*mood-entry-offset-/);
+  const marker = source.slice(source.indexOf("function QaMetadataMarker"), source.indexOf("function MoodTag"));
+  assert.match(marker, /accessible\s+accessibilityLabel=\{testID\}/);
+  assert.match(marker, /importantForAccessibility="yes"/);
+  assert.match(marker, /width: 1, height: 1/);
+  assert.match(marker, /pointerEvents="none"/);
+});
+
+test("generated QA manifest validation preserves production source and release safety gates", () => {
+  const directory = mkdtempSync(join(tmpdir(), "moodinator-manifest-test-"));
+  const manifestPath = join(directory, "android/app/build/intermediates/merged_manifests/release/AndroidManifest.xml");
+  const write = (relativePath, contents) => {
+    const parts = relativePath.split("/");
+    mkdirSync(join(directory, ...parts.slice(0, -1)), { recursive: true });
+    writeFileSync(join(directory, relativePath), contents);
+  };
+  for (const file of ["package.json", "app.json", "eas.json", "scripts/check-android-release-config.js", "src/app/settings/developer.tsx"]) {
+    write(file, readFileSync(new URL(`../${file}`, import.meta.url)));
+  }
+  const sourceApp = readFileSync(new URL("../app.json", import.meta.url), "utf8");
+  const productionPackage = "com.lab4code.moodinator";
+  const qaPackage = `${productionPackage}.qa`;
+  const permissions = [
+    "android.permission.INTERNET", "android.permission.USE_BIOMETRIC", "android.permission.USE_FINGERPRINT",
+    "android.permission.VIBRATE", "android.permission.ACCESS_NETWORK_STATE", "android.permission.RECEIVE_BOOT_COMPLETED",
+    "android.permission.POST_NOTIFICATIONS", "android.permission.WAKE_LOCK",
+  ];
+  const generated = ({ packageName = qaPackage, scheme = "moodinator-qa", receiverPackage = packageName, debuggable = false, extraPermission = "" } = {}) =>
+    `<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="${packageName}">
+      <uses-sdk android:targetSdkVersion="36" />
+      ${[...permissions, `${receiverPackage}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`, ...(extraPermission ? [extraPermission] : [])]
+        .map((permission) => `<uses-permission android:name="${permission}" />`).join("\n")}
+      <application android:allowBackup="false" android:debuggable="${debuggable}">
+        <activity><intent-filter><data android:scheme="${scheme}" /></intent-filter></activity>
+      </application>
+    </manifest>`;
+  const nativeInputs = (variant) => {
+    const qa = variant === "qa";
+    write("android/app/src/main/AndroidManifest.xml", `<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application android:allowBackup="false"><activity><intent-filter><data android:scheme="${qa ? "moodinator-qa" : "moodinator"}" /></intent-filter></activity></application></manifest>`);
+    write("android/app/src/main/res/values/strings.xml", `<resources><string name="app_name">${qa ? "Moodinator QA" : "Moodinator"}</string></resources>`);
+    write("android/app/build/intermediates/merged_manifests/release/AndroidManifest.xml", generated(qa ? {} : { packageName: productionPackage, scheme: "moodinator" }));
+  };
+  const run = (args = [], variant = "production") => spawnSync(process.execPath, [
+    "--max-old-space-size=64", join(directory, "scripts/check-android-release-config.js"), "--require-generated-manifest", ...args,
+  ], { encoding: "utf8", env: { ...process.env, MOODINATOR_VARIANT: variant }, timeout: 10000 });
+  try {
+    nativeInputs("production");
+    assert.equal(run().status, 0);
+    nativeInputs("qa");
+    assert.notEqual(run().status, 0, "production validation must reject QA-generated inputs");
+    assert.equal(run(["--variant", "qa"]).status, 0);
+    assert.equal(run([], "qa").status, 0);
+    assert.notEqual(run(["--variant", "unknown"]).status, 0);
+
+    writeFileSync(manifestPath, generated({ packageName: productionPackage }));
+    assert.match(run(["--variant", "qa"]).stderr, /must use package com\.lab4code\.moodinator\.qa/);
+    writeFileSync(manifestPath, generated({ scheme: "moodinator" }));
+    assert.match(run(["--variant", "qa"]).stderr, /must use the moodinator-qa deep-link scheme/);
+    writeFileSync(manifestPath, generated({ receiverPackage: productionPackage }));
+    assert.match(run(["--variant", "qa"]).stderr, /permission surface differs/);
+    writeFileSync(manifestPath, generated({ debuggable: true }));
+    assert.match(run(["--variant", "qa"]).stderr, /must not be debuggable/);
+    writeFileSync(manifestPath, generated({ extraPermission: "android.permission.CAMERA" }));
+    assert.match(run(["--variant", "qa"]).stderr, /permission surface differs/);
+
+    writeFileSync(manifestPath, generated());
+    const invalidSource = JSON.parse(sourceApp);
+    invalidSource.expo.android.package = qaPackage;
+    write("app.json", JSON.stringify(invalidSource));
+    assert.match(run(["--variant", "qa"]).stderr, /Android package must be com\.lab4code\.moodinator/);
+    write("app.json", sourceApp);
+    rmSync(manifestPath);
+    assert.match(run(["--variant", "qa"]).stderr, /No generated release manifest found/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("README enters the prepared workspace before native QA installation", () => {
