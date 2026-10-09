@@ -44,7 +44,7 @@ const derivedData = realpathSync(cacheDirectory);
 const evidence: {
   sourceSha: string; status: string; xcode: string; macOS: string;
   simulator?: { id: string; runtime: string; deviceType: string };
-  appExecutableSha256?: string; bundleSha256?: string; simulatorSigning?: string; derivedDataPath?: string;
+  appExecutableSha256?: string; bundleSha256?: string; simulatorSigning?: string; derivedDataPath?: string; simulatorInterface?: string;
   results: unknown[]; failure?: string; simulatorRetained?: boolean;
 } = {
   sourceSha, status: "running", results: [], derivedDataPath: derivedData,
@@ -211,7 +211,17 @@ await runIosProofLifecycle({
   evidence, save, run: runProof, keepSimulator: args.includes("--keep-simulator"),
   shutdown: (id: string) => rawXcrun(["simctl", "shutdown", id]),
   deleteSimulator: (id: string) => rawXcrun(["simctl", "delete", id]),
-  openSimulator: (id: string) => execFileSync("open", ["-a", "Simulator", "--args", "-CurrentDeviceUDID", id], { timeout: 15000 }),
+  openSimulator: (id: string) => {
+    const developerDirectory = execFileSync("xcode-select", ["-p"], { encoding: "utf8", timeout: 5000 }).trim();
+    const simulatorApp = path.join(developerDirectory, "Applications/Simulator.app");
+    if (existsSync(simulatorApp)) {
+      execFileSync("open", ["-a", simulatorApp, "--args", "-CurrentDeviceUDID", id], { timeout: 15000 });
+      evidence.simulatorInterface = "Xcode Simulator window";
+    } else {
+      evidence.simulatorInterface = "Device panel; Simulator.app is not installed";
+      console.log(`Normal QA app is running on owned simulator ${id}. Open it in the T3 Code Device panel for the visible journey.`);
+    }
+  },
 });
 if (evidence.simulatorRetained) {
   console.log(`Owned simulator: ${simulator}\nEvidence: ${output}/report.json\nComplete the fabricated-data UI journey, then shutdown/delete only this simulator.`);

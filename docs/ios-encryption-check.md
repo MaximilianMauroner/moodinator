@@ -80,7 +80,10 @@ the actual app database and exercises shared `getDb()` first-open startup twice.
 
 ## Check the visible app
 
-After a successful suite, the runner opens its own Simulator in the normal app.
+After a successful suite, the runner launches the normal app on its owned
+simulator. It opens the Simulator window from the selected Xcode installation
+when that app is installed. A tools-only Xcode installation can use the T3 Code
+Device panel instead; the report records which interface is available.
 Complete onboarding. In History, inspect the five fabricated original moods,
 including the best `0`, worst `10`, notes and linked emotions. Add a new mood with
 note `QA iOS retained after restart`, edit that note, and delete only that new
@@ -106,5 +109,6 @@ After retaining evidence, shutdown/delete only the printed owned simulator with
 `xcrun simctl shutdown <ID>` and `xcrun simctl delete <ID>`. Remove only the two
 printed disposable workspace paths when their evidence is saved. Failure runs
 attempt to dispose their owned simulator even if report writing fails. A cleanup
-failure reports its owned UUID for manual removal. Only a successful run and
-successful Simulator launch can retain the simulator for the visible app check.
+failure reports its owned UUID for manual removal. Only a successful proof run and app launch can retain the simulator for the
+visible app check. Failure to open an installed Simulator window still fails
+the run.
