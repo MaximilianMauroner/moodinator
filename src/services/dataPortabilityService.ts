@@ -207,7 +207,7 @@ export const dataPortabilityService = {
         return {
           success: true,
           title: "Backup Created",
-          message: "Backup created successfully.",
+          message: backupResult.warning ?? "Backup created successfully.",
         };
       }
 
@@ -216,11 +216,12 @@ export const dataPortabilityService = {
         title: "Backup Failed",
         message: backupResult.error,
       };
-    } catch {
+    } catch (error) {
+      console.error("Error running manual backup:", error);
       return {
         success: false,
         title: "Backup Error",
-        message: "Failed to create backup.",
+        message: "Could not create a backup. Check available storage and folder access, then try again.",
       };
     }
   },

@@ -1,6 +1,7 @@
 import type { MoodEntry } from "@db/types";
 import type { TherapyExportField } from "@/lib/entrySettings";
 import { getMoodRatingLabel } from "@/constants/moodScaleInterpretation";
+import { getEntryLocalDateParts } from "@/lib/entryTimezone";
 
 // Therapy exports are opened in a spreadsheet by someone other than the author,
 // so a cell that starts a formula would evaluate on their machine. Notes can
@@ -35,9 +36,18 @@ function csvEscape(value: string | number | null | undefined) {
   return body;
 }
 
-function formatTimestamp(value: number) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "" : date.toLocaleString();
+function formatTimestamp(entry: MoodEntry) {
+  const parts = getEntryLocalDateParts(entry);
+  if (!parts) {
+    const date = new Date(entry.timestamp);
+    return Number.isNaN(date.getTime()) ? "" : date.toLocaleString();
+  }
+  // Format canonical wall-clock parts in UTC so the device cannot shift them,
+  // including times that fall in a daylight-saving gap in its current zone.
+  const date = new Date(0);
+  date.setUTCFullYear(parts.year, parts.month, parts.day);
+  date.setUTCHours(parts.hour, parts.minute, parts.second, parts.millisecond);
+  return date.toLocaleString(undefined, { timeZone: "UTC" });
 }
 
 type CsvColumn = {
@@ -64,7 +74,7 @@ const FIELD_HEADERS: Record<TherapyExportField, string[]> = {
 function resolveFieldColumns(entry: MoodEntry, field: TherapyExportField): CsvColumn[] {
   switch (field) {
     case "timestamp":
-      return [{ header: "Timestamp", value: formatTimestamp(entry.timestamp) }];
+      return [{ header: "Timestamp", value: formatTimestamp(entry) }];
     case "mood":
       return [
         { header: "Mood Rating", value: entry.mood },
