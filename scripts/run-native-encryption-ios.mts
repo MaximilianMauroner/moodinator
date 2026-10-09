@@ -64,7 +64,7 @@ async function build(signal: AbortSignal) {
   try {
     await runOwnedBuild("/usr/bin/time", ["-l", "xcodebuild", "-workspace", workspace, "-scheme", scheme,
       "-configuration", "Release", "-sdk", "iphonesimulator", "-destination", "generic/platform=iOS Simulator",
-      "-derivedDataPath", path.join(output, "DerivedData"), "-jobs", "1", "CODE_SIGNING_ALLOWED=NO", "build"],
+      "-derivedDataPath", path.join(output, "DerivedData"), "-jobs", "1", "CODE_SIGNING_ALLOWED=NO", "IPHONEOS_DEPLOYMENT_TARGET=15.1", "build"],
     { stdio: ["ignore", log, log], sample: resourceSample, signal });
   } finally {
     closeSync(log);

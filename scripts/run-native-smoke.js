@@ -11,7 +11,7 @@ const root = path.resolve(__dirname, "..");
 function parseOptions(argv) {
   const serial = argv.shift();
   if (!serial || !/^emulator-\d+$/.test(serial)) {
-    throw new Error("Usage: pnpm run qa:smoke -- emulator-5554 [--out /tmp/evidence]");
+    throw new Error("Usage: pnpm run qa:smoke emulator-5554 [--out /tmp/evidence]");
   }
   let output = null;
   while (argv.length) {

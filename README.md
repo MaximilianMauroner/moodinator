@@ -110,7 +110,7 @@ pnpm install --frozen-lockfile
 MOODINATOR_VARIANT=qa MOODINATOR_QA_PREPARE_NATIVE=1 pnpm exec expo prebuild --platform android --clean
 pnpm run qa:seal-native
 MOODINATOR_VARIANT=qa pnpm exec expo run:android --variant release --device
-pnpm run qa:smoke -- emulator-5554 --out /tmp/moodinator-native-smoke-current
+pnpm run qa:smoke emulator-5554 --out /tmp/moodinator-native-smoke-current
 ```
 
 `qa:prepare` requires a clean checkout, then materializes committed `HEAD` files for the
