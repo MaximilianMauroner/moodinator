@@ -15,7 +15,11 @@ vi.mock("react-native", () => ({
 vi.mock("react-native-safe-area-context", () => ({ SafeAreaView: "SafeAreaView" }));
 vi.mock("nativewind", () => ({ useColorScheme: () => ({ colorScheme: "dark" }) }));
 vi.mock("expo-router", () => ({ useRouter: () => ({ push: vi.fn() }) }));
-vi.mock("expo-application", () => ({}));
+vi.mock("expo-application", () => ({
+  nativeApplicationVersion: null,
+  nativeBuildVersion: null,
+  applicationName: null,
+}));
 vi.mock("expo-constants", () => ({ default: { expoConfig: {} } }));
 vi.mock("@/components/ui/AppAlert", () => ({ Alert: { alert: native.alert } }));
 vi.mock("@/components/ui/IconBadge", () => ({ IconBadge: () => null }));
