@@ -85,7 +85,7 @@ Build before emulator execution; do not overlap them or bypass busy admission.
    Run the evidence runner through the build helper from the sealed workspace:
 
    ```sh
-   pnpm exec tsx scripts/run-native-encryption.ts \
+   pnpm exec tsx scripts/run-native-encryption.mts \
      --avd-root=/tmp/owned-native-proof/avd --avd=moodinator-issue45 \
      --port=5580 --apk=/tmp/owned-native-proof/app-release.apk \
      --out=/tmp/owned-native-proof/evidence
@@ -121,7 +121,7 @@ As an early diagnostic, the same production TypeScript state machine can run
 against real SQLCipher 4.2+ CLI processes:
 
 ```sh
-pnpm exec tsx scripts/verify-encryption-host.ts /absolute/path/to/sqlcipher
+pnpm exec tsx scripts/verify-encryption-host.mts /absolute/path/to/sqlcipher
 ```
 
 This uses fresh temporary databases and kills its own native sessions at every

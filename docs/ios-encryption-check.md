@@ -39,7 +39,7 @@ export NODE_OPTIONS=--max-old-space-size=768
 MOODINATOR_QA_PREPARE_NATIVE=1 node node_modules/expo/bin/cli prebuild --platform ios --clean --no-install
 (cd ios && pod install)
 node scripts/seal-native-qa.js --platform=ios
-pnpm exec tsx scripts/run-native-encryption-ios.ts --out="$MOODINATOR_IOS_WORK/evidence" --keep-simulator
+pnpm exec tsx scripts/run-native-encryption-ios.mts --out="$MOODINATOR_IOS_WORK/evidence" --keep-simulator
 )
 ```
 

@@ -24,15 +24,15 @@
     "qa:stress": "node scripts/run-native-stress.js",
     "qa:matrix": "node scripts/run-native-matrix.js",
     "qa:timezone": "node scripts/run-native-timezone.js",
-    "qa:encryption": "tsx scripts/run-native-encryption.ts",
-    "test:encryption-host": "tsx scripts/verify-encryption-host.ts",
+    "qa:encryption": "tsx scripts/run-native-encryption.mts",
+    "test:encryption-host": "tsx scripts/verify-encryption-host.mts",
     "qa:fixtures": "node scripts/generate-qa-fixtures.js",
     "test:qa": "node --test tests/native-ui.node-test.mjs",
     "release:internal": "node scripts/nightly-release.mjs run",
     "release:status": "node scripts/nightly-release.mjs status",
     "test:nightly": "node --test tests/release-environment.test.mjs tests/*.node-test.mjs && python3 tests/nightly-ledger.test.py",
     "verify:color-tokens": "node scripts/check-color-tokens.mjs",
-    "qa:encryption:ios": "tsx scripts/run-native-encryption-ios.ts"
+    "qa:encryption:ios": "tsx scripts/run-native-encryption-ios.mts"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
