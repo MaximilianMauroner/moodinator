@@ -8,8 +8,12 @@ physical device or an existing simulator. No personal data or signing is needed.
 
 Use the exact reviewed PR #118 source SHA supplied with the handoff. A later
 source change needs its affected evidence refreshed before accepting that build.
+The pinned Expo Router patch guards its iOS 16-only action subtitle so the app
+can still build for its declared iOS 15.1 minimum. Remove that patch when the
+pinned upstream version includes the same availability guard.
+
 Prerequisites are existing Xcode with an installed iOS Simulator runtime,
-CocoaPods, Node 24 and pnpm 12.8.1. If one is missing, return that error; the runner
+CocoaPods, Node 24 and pnpm 10.34.6. If one is missing, return that error; the runner
 does not install runtimes, change device settings or request credentials.
 
 ## Prepare and run
@@ -45,7 +49,8 @@ pnpm exec tsx scripts/run-native-encryption-ios.mts --out="$MOODINATOR_IOS_WORK/
 
 Stop at the first failed command. Do not use `build`, release or EAS commands.
 The runner builds Release for `iphonesimulator` with signing disabled, one Xcode
-job, the app’s iOS 15.1 minimum applied to all pod targets, and a bundled app, so no Metro server is needed. It records Mac/Xcode,
+job, this Mac’s simulator architecture, the app’s iOS 15.1 minimum applied to
+all pod targets, and a bundled app, so no Metro server is needed. It records Mac/Xcode,
 source/app identity, resource samples and `/usr/bin/time` build memory in the
 evidence folder. Build and simulator execution do not overlap. Only its owned
 build process group receives cancellation signals. Cancellation, timeout or

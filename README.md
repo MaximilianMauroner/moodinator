@@ -45,7 +45,7 @@ A privacy-focused mood tracking app built with React Native. Record how you feel
 ### Prerequisites
 
 - Node.js 24 LTS, version 24.13.1 or newer within major 24 (`.node-version`)
-- pnpm 12.8.1 (`packageManager` in `package.json`)
+- pnpm 10.34.6 (`packageManager` in `package.json`)
 - Android Studio and an emulator, or Xcode on macOS for iOS
 
 The test suite uses Node's built-in SQLite. Expo Go cannot verify custom native

@@ -37,7 +37,7 @@ number, or erase attempted SHAs. Configure both secrets before activation.
 Merging installs the schedule; runs fail before reservation until setup is ready.
 The parent owns secret verification and the first live dispatch.
 
-The workflow pins action commit SHAs, Node 24.13.1, pnpm 12.8.1, Java 17,
+The workflow pins action commit SHAs, Node 24.13.1, pnpm 10.34.6, Java 17,
 EAS 20.5.1, Android build-tools 36, and bundletool 1.18.2 with a SHA-256 check.
 It checks actual disk/RAM and removes only unused tool bundles on the disposable
 runner if disk is low. Preflight still requires 15 GiB free disk and 8 GiB RAM.
