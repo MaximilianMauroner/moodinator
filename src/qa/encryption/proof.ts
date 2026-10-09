@@ -240,6 +240,101 @@ export async function resumeEncryptionProof(caseName: string) {
   return { status: "passed", caseName, evidence: "cold reopen, exact data, recovery and subsequent open" };
 }
 
+// Limit only the attached target in a disposable QA namespace. SQLCipher itself
+// must reject the actual export with SQLITE_FULL; no JS error substitutes for a
+// native write failure and no host/simulator volume is filled.
+export async function prepareNativeWriteFailure(progress: Progress) {
+  const f = fixture("native-write-failure");
+  await seed(f);
+  const original = await f.storage.open(DATABASE_FILES.original);
+  let expected: DatabaseSnapshot;
+  try {
+    await original.execAsync("CREATE TABLE qa_write_payload (value TEXT NOT NULL);");
+    await original.runAsync("INSERT INTO qa_write_payload VALUES (?);", "Fabricated write-failure payload ".repeat(2048));
+    expected = await captureSnapshot(original);
+    f.file("expected.json").write(JSON.stringify(expected));
+  } finally { await original.closeAsync(); }
+  const originalBytes = await f.file(DATABASE_FILES.original).bytes();
+  const nativeOpen = f.storage.open;
+  let injections = 0;
+  let pageLimit = 0;
+  f.storage.open = async (name) => {
+    const db = await nativeOpen(name);
+    if (name !== DATABASE_FILES.copy) return db;
+    const nativeExec = db.execAsync.bind(db);
+    db.execAsync = async (sql) => {
+      if (sql.includes("SELECT sqlcipher_export('encrypted')")) {
+        const limit = await db.getFirstAsync<{ max_page_count: number }>("PRAGMA encrypted.max_page_count = 1;");
+        pageLimit = limit?.max_page_count ?? 0;
+        check(pageLimit > 0 && pageLimit <= 2, "Native attached-target page limit was not applied");
+        injections++;
+        progress("running:native-write-failure:sqlcipher-export");
+      }
+      return nativeExec(sql);
+    };
+    return db;
+  };
+  let nativeError = "";
+  try {
+    const unexpected = await openEncryptedDatabase(f.storage);
+    await unexpected.closeAsync();
+  } catch (error) {
+    if (!(error instanceof Error) || !/database or disk is full|SQLITE_FULL/i.test(error.message)) throw error;
+    nativeError = error.message;
+  } finally { f.storage.open = nativeOpen; }
+  check(injections === 1 && nativeError !== "", "Actual SQLCipher export did not reject the native page-limit write");
+  check(equalBytes(await f.file(DATABASE_FILES.original).bytes(), originalBytes), "Native write failure changed the original database bytes");
+  const retained = await f.storage.open(DATABASE_FILES.original);
+  try { requireMatchingSnapshot(await captureSnapshot(retained), expected); }
+  finally { await retained.closeAsync(); }
+  const coordinator = await f.storage.open(DATABASE_FILES.coordinator);
+  try {
+    check((await coordinator.getFirstAsync<{ status: string }>("SELECT status FROM encryption_state WHERE id = 1;"))?.status === "pending", "Native failed export was marked completed");
+  } finally { await coordinator.closeAsync(); }
+  f.file("native-write-failure.json").write(JSON.stringify({ nativeError, pageLimit, originalRetained: true, status: "pending" }));
+  return { status: "passed", caseName: "native-write-failure", nativeError, pageLimit,
+    evidence: "actual SQLCipher SQLITE_FULL during export, byte-identical original and exact snapshot retained, pending coordinator; cold retry required" };
+}
+
+export async function verifyNativeWriteFailureRecovery() {
+  const f = fixture("native-write-failure");
+  check(f.file("native-write-failure.json").exists, "Native write-failure evidence is required before recovery");
+  check(await f.storage.exists(DATABASE_FILES.original), "Cold retry requires the retained failed-export source");
+  const expected: DatabaseSnapshot = JSON.parse(await f.file("expected.json").text());
+  const original = await f.storage.open(DATABASE_FILES.original);
+  try { requireMatchingSnapshot(await captureSnapshot(original), expected); }
+  finally { await original.closeAsync(); }
+  return resumeEncryptionProof("native-write-failure");
+}
+
+export async function prepareNativeExportInterruption(progress: Progress) {
+  const caseName = "native-export-interruption";
+  const f = fixture(caseName);
+  await seed(f);
+  const original = await f.storage.open(DATABASE_FILES.original);
+  try {
+    // 256 separate 64 KiB fabricated blobs give a bounded 16 MiB native export
+    // and a roughly 32 MiB exact hex snapshot, without a giant JS seed string.
+    await original.execAsync(`CREATE TABLE qa_export_payload (id INTEGER PRIMARY KEY, value BLOB NOT NULL);
+      BEGIN;
+      WITH RECURSIVE rows(id) AS (VALUES(1) UNION ALL SELECT id + 1 FROM rows WHERE id < 256)
+      INSERT INTO qa_export_payload SELECT id, zeroblob(65536) FROM rows;
+      COMMIT;`);
+    check((await original.getFirstAsync<{ bytes: number }>("SELECT sum(length(value)) AS bytes FROM qa_export_payload;"))?.bytes === 16 * 1024 * 1024, "Native export payload size is incorrect");
+    f.file("expected.json").write(JSON.stringify(await captureSnapshot(original)));
+  } finally { await original.closeAsync(); }
+  f.file("export-interruption.json").write(JSON.stringify({ caseName, payloadBytes: 16 * 1024 * 1024,
+    target: DATABASE_FILES.active, evidence: "inside-export interruption requires externally observed partial target growth and actual process kill" }));
+  const unexpectedlyCompleted = await openEncryptedDatabase(f.storage, async (phase) => {
+    if (phase === "export-started" || phase === "export-closed") {
+      progress(`running:${caseName}:${phase}`);
+    }
+    // Return immediately. Pausing here would only prove a phase boundary.
+  });
+  await unexpectedlyCompleted.closeAsync();
+  throw new Error("Native export completed before the external interruption; inside-export proof was not obtained");
+}
+
 export async function prepareAppUpgrade() {
   requireQaPackage();
   const storage = createNativeEncryptionStorage(initializeDatabase);

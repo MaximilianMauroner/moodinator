@@ -78,6 +78,17 @@ by two exact reopen checks. The driver resolves the QA process inside its own
 simulator and verifies its executable path before signalling it. It also seeds
 the actual app database and exercises shared `getDb()` first-open startup twice.
 
+The runner also caps the attached destination's page count and requires a real
+SQLCipher `SQLITE_FULL` during export. It checks byte-identical original retention,
+exact data and pending state, then retries in two cold processes. This tests native
+destination write capacity; it does not fill the host volume.
+
+For inside-export interruption, an isolated source includes 16 MiB of fabricated
+blobs. The runner requires an encrypted target larger than 256 KiB and smaller
+than 8 MiB, plus the current export-started action identity immediately before
+SIGKILL. If export finishes too early, the run fails rather than claiming an
+interruption. Two cold exact-data recovery actions follow.
+
 ## Check the visible app
 
 After a successful suite, the runner launches the normal app on its owned
@@ -102,8 +113,8 @@ these visible interactions. The initial launch capture needs visual review.
 Return `evidence/report.json`, the source SHA/Xcode/iOS version and a short
 add/edit/delete/restart pass or failure result. On setup/build failure, return
 the failed command and its first error instead. Do not return databases or keys.
-Interruption inside native export and native disk/write failure are still
-separate unexecuted gates; phase-boundary results do not waive them.
+Native partial-export and destination-write-failure results are recorded separately
+from phase-boundary results. Host-volume exhaustion is not covered.
 
 After retaining evidence, shutdown/delete only the printed owned simulator with
 `xcrun simctl shutdown <ID>` and `xcrun simctl delete <ID>`. Remove only the two

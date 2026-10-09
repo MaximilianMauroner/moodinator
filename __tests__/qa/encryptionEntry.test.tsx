@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   launchURL: vi.fn(), initialURL: vi.fn(), parse: vi.fn(), suite: vi.fn(), write: vi.fn(),
+  writeFailure: vi.fn(), verifyWriteFailure: vi.fn(),
+  exportInterruption: vi.fn(),
 }));
 vi.mock("react-native", () => ({ View: "View", Text: "Text" }));
 vi.mock("expo-constants", () => ({ default: { expoConfig: { extra: { qaSourceSha: "qa-source" } } } }));
@@ -14,6 +16,8 @@ vi.mock("@/qa/encryption/proof", () => ({
   crashEncryptionProof: vi.fn(), loseProofKey: vi.fn(), prepareAppUpgrade: vi.fn(),
   prepareWalCrash: vi.fn(), resumeEncryptionProof: vi.fn(), verifyAppUpgrade: vi.fn(),
   verifyLostProofKey: vi.fn(),
+  prepareNativeWriteFailure: mocks.writeFailure, verifyNativeWriteFailureRecovery: mocks.verifyWriteFailure,
+  prepareNativeExportInterruption: mocks.exportInterruption,
 }));
 
 let Entry: typeof import("@/qa/encryption/Entry").default;
@@ -41,6 +45,52 @@ beforeEach(async () => {
 afterEach(async () => { await act(async () => renderers.forEach((renderer) => renderer.unmount())); });
 
 describe("native encryption proof initial execution", () => {
+  it("publishes an in-flight export action without claiming completion", async () => {
+    mocks.parse.mockReturnValue({ queryParams: { proof: "export-interruption", runId: "export" } });
+    mocks.exportInterruption.mockImplementation(async (publish) => {
+      publish("running:native-export-interruption:export-started");
+      await new Promise<void>(() => {});
+    });
+    const renderer = await mount();
+    await mount();
+    expect(mocks.exportInterruption).toHaveBeenCalledOnce();
+    expect(progress(renderer)).toBe("running:native-export-interruption:export-started");
+    expect(published()).toEqual(["launch", "running:native-export-interruption:export-started"]);
+  });
+
+  it("reports a completed uninterrupted export as failed proof", async () => {
+    mocks.parse.mockReturnValue({ queryParams: { proof: "export-interruption" } });
+    mocks.exportInterruption.mockRejectedValue(new Error("Native export completed before the external interruption"));
+    const renderer = await mount();
+    expect(progress(renderer)).toBe("failed");
+    expect(report(renderer)).toContain("completed before the external interruption");
+    expect(published()).toEqual(["launch", "failed"]);
+  });
+
+  it("runs the native write-failure preparation once and preserves its native error evidence", async () => {
+    mocks.parse.mockReturnValue({ queryParams: { proof: "write-failure", runId: "write" } });
+    mocks.writeFailure.mockImplementation(async (publish) => {
+      publish("running:native-write-failure:sqlcipher-export");
+      return { status: "passed", nativeError: "database or disk is full", evidence: "cold retry required" };
+    });
+    const first = await mount();
+    await mount();
+    expect(mocks.writeFailure).toHaveBeenCalledOnce();
+    expect(report(first)).toContain("database or disk is full");
+    expect(published()).toEqual(["launch", "running:native-write-failure:sqlcipher-export", "complete"]);
+    expect(mocks.verifyWriteFailure).not.toHaveBeenCalled();
+  });
+
+  it("keeps cold write-failure recovery as a separate launch action", async () => {
+    mocks.parse.mockReturnValue({ queryParams: { proof: "verify-write-failure", runId: "retry" } });
+    mocks.verifyWriteFailure.mockResolvedValue({ status: "passed", caseName: "native-write-failure" });
+    const renderer = await mount();
+    expect(progress(renderer)).toBe("complete");
+    expect(mocks.verifyWriteFailure).toHaveBeenCalledOnce();
+    expect(mocks.writeFailure).not.toHaveBeenCalled();
+    expect(mocks.write.mock.calls[1][0].runId).toBe("retry");
+  });
+
   it("uses the staged simulator action without opening a system-confirmed URL", async () => {
     mocks.launchURL.mockReturnValue("moodinator-qa:///?proof=suite&runId=one");
     mocks.suite.mockResolvedValue({ status: "passed" });

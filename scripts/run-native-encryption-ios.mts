@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { freemem, loadavg, totalmem } from "node:os";
 import path from "node:path";
@@ -140,7 +140,7 @@ async function result(parameters: Record<string, string>) {
   console.log(`Passed iOS ${parameters.proof}${parameters.case ? `:${parameters.case}` : ""}`);
 }
 
-async function abruptStop() {
+async function abruptStop(beforeKill?: () => void) {
   // Resolve only this QA app inside this freshly created simulator, then check
   // its full installed executable path before sending an actual SIGKILL.
   const jobs = simctl(["spawn", "launchctl", "list"]).split(/\r?\n/);
@@ -150,6 +150,7 @@ async function abruptStop() {
   assert.ok(Number.isSafeInteger(pid) && pid > 1);
   const command = execFileSync("ps", ["-ww", "-p", String(pid), "-o", "command="], { encoding: "utf8", timeout: 5000 }).trim();
   assert.ok(command === installedExecutable || command.startsWith(`${installedExecutable} `), "QA process ownership does not match; no signal sent");
+  beforeKill?.();
   process.kill(pid, "SIGKILL");
   const alive = () => {
     try { process.kill(pid, 0); return true; }
@@ -198,13 +199,58 @@ async function runProof(signal: AbortSignal) {
     await result({ proof: "resume", case: caseName });
     await result({ proof: "resume", case: caseName });
   }
+  await result({ proof: "write-failure" });
+  await result({ proof: "verify-write-failure" });
+  await result({ proof: "resume", case: "native-write-failure" });
+  const exportRun = await launch({ proof: "export-interruption" });
+  const exportTarget = path.join(container, "Documents/encryption-proof/native-export-interruption/moodinator.encrypted-v2.db");
+  const exportStatusFile = path.join(container, "Documents/encryption-proof-status.json");
+  const partialExport = () => {
+    const status: ProofStatus = JSON.parse(readFileSync(exportStatusFile, "utf8"));
+    assert.equal(status.sourceSha, sourceSha);
+    assert.equal(status.runId, exportRun);
+    assert.equal(status.progress, "running:native-export-interruption:export-started");
+    const bytes = statSync(exportTarget).size;
+    assert.ok(bytes > 256 * 1024 && bytes < 8 * 1024 * 1024, `Export is not demonstrably partial: ${bytes} bytes`);
+    return { bytes, observedAt: new Date().toISOString(), progress: status.progress };
+  };
+  const exportDeadline = Date.now() + 180000;
+  let observedPartial = false;
+  while (Date.now() < exportDeadline) {
+    signal.throwIfAborted();
+    if (existsSync(exportStatusFile) && existsSync(exportTarget)) {
+      let status: ProofStatus | undefined;
+      try { status = JSON.parse(readFileSync(exportStatusFile, "utf8")); } catch { /* Native status write in progress. */ }
+      if (status?.runId === exportRun) {
+        assert.equal(status.sourceSha, sourceSha);
+        assert.notEqual(status.progress, "failed", JSON.stringify(status));
+        assert.notEqual(status.progress, "running:native-export-interruption:export-closed", "Export completed before SIGKILL");
+        if (status.progress === "running:native-export-interruption:export-started" && statSync(exportTarget).size > 256 * 1024) {
+          const first = partialExport();
+          let atKill: ReturnType<typeof partialExport> | undefined;
+          await abruptStop(() => { atKill = partialExport(); });
+          assert.ok(atKill);
+          assert.ok(existsSync(path.join(path.dirname(exportTarget), "moodinator.db")), "Interrupted source must remain");
+          evidence.results.push({ action: { proof: "export-interruption" }, runId: exportRun,
+            report: { status: "passed", first, atKill, signal: "SIGKILL", evidence: "partial native target below half payload size immediately before actual owned-process kill; cold recovery required" } });
+          save();
+          observedPartial = true;
+          break;
+        }
+      }
+    }
+    await delay(10);
+  }
+  assert.ok(observedPartial, "No partial native export was observed before interruption timeout");
+  await result({ proof: "resume", case: "native-export-interruption" });
+  await result({ proof: "resume", case: "native-export-interruption" });
   await result({ proof: "prepare-app" });
   await result({ proof: "verify-app" });
   await result({ proof: "verify-app" });
   const journeyRun = await launch({ proof: "journey" });
   await wait(journeyRun, (value) => value.progress === "launch");
   simctl(["io", "screenshot", path.join(output, "initial-launch.png")]);
-  console.log("iOS Expo lifecycle cases passed. Manual app journey, inside-export interruption and disk/write-failure proof remain separate.");
+  console.log("iOS Expo lifecycle cases passed. Native partial-export interruption and destination SQLITE_FULL recovery passed. Manual app journey and host-volume disk exhaustion remain separate.");
 }
 
 await runIosProofLifecycle({
