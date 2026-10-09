@@ -53,7 +53,10 @@ job, this Mac’s simulator architecture, the app’s iOS 15.1 minimum applied t
 all pod targets, and a bundled app, so no Metro server is needed. Ad hoc signing uses no account,
 certificate or development team. Xcode embeds the simulated Keychain entitlements
 required by SecureStore; disabling signing leaves Keychain access unavailable.
-It records Mac/Xcode,
+First launches have a 60-second command limit. Xcode caches native build products
+under `.expo/ios-encryption-derived-data` in the disposable QA workspace; each run
+still requires a fresh evidence directory and validates the prepared source before
+and after the build. It records Mac/Xcode,
 source/app identity, resource samples and `/usr/bin/time` build memory in the
 evidence folder. Build and simulator execution do not overlap. Only its owned
 build process group receives cancellation signals. Cancellation, timeout or

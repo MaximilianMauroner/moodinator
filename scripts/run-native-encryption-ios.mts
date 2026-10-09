@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { freemem, loadavg, totalmem } from "node:os";
 import path from "node:path";
@@ -38,13 +38,16 @@ assert.equal(workspaceNames.length, 1, "Expected one CocoaPods-generated iOS wor
 const workspace = path.resolve("ios", workspaceNames[0]);
 const scheme = path.basename(workspace, ".xcworkspace");
 mkdirSync(output, { recursive: true });
+const cacheDirectory = path.resolve(".expo", "ios-encryption-derived-data");
+mkdirSync(cacheDirectory, { recursive: true });
+const derivedData = realpathSync(cacheDirectory);
 const evidence: {
   sourceSha: string; status: string; xcode: string; macOS: string;
   simulator?: { id: string; runtime: string; deviceType: string };
-  appExecutableSha256?: string; bundleSha256?: string; simulatorSigning?: string;
+  appExecutableSha256?: string; bundleSha256?: string; simulatorSigning?: string; derivedDataPath?: string;
   results: unknown[]; failure?: string; simulatorRetained?: boolean;
 } = {
-  sourceSha, status: "running", results: [],
+  sourceSha, status: "running", results: [], derivedDataPath: derivedData,
   xcode: execFileSync("xcodebuild", ["-version"], { encoding: "utf8", timeout: 15000 }).trim(),
   macOS: execFileSync("sw_vers", [], { encoding: "utf8", timeout: 5000 }).trim(),
 };
@@ -64,14 +67,14 @@ async function build(signal: AbortSignal) {
   try {
     await runOwnedBuild("/usr/bin/time", ["-l", "xcodebuild", "-workspace", workspace, "-scheme", scheme,
       "-configuration", "Release", "-sdk", "iphonesimulator", "-destination", "generic/platform=iOS Simulator",
-      "-derivedDataPath", path.join(output, "DerivedData"), "-jobs", "1", "CODE_SIGNING_ALLOWED=YES", "CODE_SIGN_IDENTITY=-", "DEVELOPMENT_TEAM=", "IPHONEOS_DEPLOYMENT_TARGET=15.1",
+      "-derivedDataPath", derivedData, "-jobs", "1", "CODE_SIGNING_ALLOWED=YES", "CODE_SIGN_IDENTITY=-", "DEVELOPMENT_TEAM=", "IPHONEOS_DEPLOYMENT_TARGET=15.1",
       `ARCHS=${process.arch === "arm64" ? "arm64" : "x86_64"}`, "build"],
     { stdio: ["ignore", log, log], sample: resourceSample, signal });
   } finally {
     closeSync(log);
   }
   readPreparedSourceSha(process.cwd(), process.env, "ios");
-  const products = path.join(output, "DerivedData/Build/Products/Release-iphonesimulator");
+  const products = path.join(derivedData, "Build/Products/Release-iphonesimulator");
   const apps = readdirSync(products).filter((name) => name.endsWith(".app"));
   assert.equal(apps.length, 1, "Expected one owned simulator Release app");
   const app = path.join(products, apps[0]);
@@ -102,7 +105,7 @@ async function launch(parameters: Record<string, string>) {
   // one-use request in this owned QA container before each real cold launch.
   writeFileSync(path.join(container, "Documents/encryption-proof-launch.txt"),
     `moodinator-qa:///?${new URLSearchParams({ ...parameters, runId })}`);
-  simctl(["launch", QA_ID]);
+  simctl(["launch", QA_ID], 60000);
   launched = true;
   return runId;
 }
