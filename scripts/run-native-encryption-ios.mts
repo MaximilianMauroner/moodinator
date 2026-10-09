@@ -140,7 +140,7 @@ async function result(parameters: Record<string, string>) {
   console.log(`Passed iOS ${parameters.proof}${parameters.case ? `:${parameters.case}` : ""}`);
 }
 
-async function abruptStop(beforeKill?: () => void) {
+function ownedProcess() {
   // Resolve only this QA app inside this freshly created simulator, then check
   // its full installed executable path before sending an actual SIGKILL.
   const jobs = simctl(["spawn", "launchctl", "list"]).split(/\r?\n/);
@@ -148,8 +148,17 @@ async function abruptStop(beforeKill?: () => void) {
   assert.ok(job, "Could not identify the owned QA process for abrupt interruption");
   const pid = Number(job.trim().split(/\s+/)[0]);
   assert.ok(Number.isSafeInteger(pid) && pid > 1);
+  requireOwnedProcess(pid);
+  return pid;
+}
+
+function requireOwnedProcess(pid: number) {
   const command = execFileSync("ps", ["-ww", "-p", String(pid), "-o", "command="], { encoding: "utf8", timeout: 5000 }).trim();
   assert.ok(command === installedExecutable || command.startsWith(`${installedExecutable} `), "QA process ownership does not match; no signal sent");
+}
+
+async function abruptStop(beforeKill?: () => void, pid = ownedProcess()) {
+  requireOwnedProcess(pid);
   beforeKill?.();
   process.kill(pid, "SIGKILL");
   const alive = () => {
@@ -203,6 +212,7 @@ async function runProof(signal: AbortSignal) {
   await result({ proof: "verify-write-failure" });
   await result({ proof: "resume", case: "native-write-failure" });
   const exportRun = await launch({ proof: "export-interruption" });
+  const exportPid = ownedProcess();
   const exportTarget = path.join(container, "Documents/encryption-proof/native-export-interruption/moodinator.encrypted-v2.db");
   const exportStatusFile = path.join(container, "Documents/encryption-proof-status.json");
   const partialExport = () => {
@@ -211,7 +221,7 @@ async function runProof(signal: AbortSignal) {
     assert.equal(status.runId, exportRun);
     assert.equal(status.progress, "running:native-export-interruption:export-started");
     const bytes = statSync(exportTarget).size;
-    assert.ok(bytes > 256 * 1024 && bytes < 8 * 1024 * 1024, `Export is not demonstrably partial: ${bytes} bytes`);
+    assert.ok(bytes > 256 * 1024 && bytes < 32 * 1024 * 1024, `Export is not demonstrably partial: ${bytes} bytes`);
     return { bytes, observedAt: new Date().toISOString(), progress: status.progress };
   };
   const exportDeadline = Date.now() + 180000;
@@ -228,7 +238,7 @@ async function runProof(signal: AbortSignal) {
         if (status.progress === "running:native-export-interruption:export-started" && statSync(exportTarget).size > 256 * 1024) {
           const first = partialExport();
           let atKill: ReturnType<typeof partialExport> | undefined;
-          await abruptStop(() => { atKill = partialExport(); });
+          await abruptStop(() => { atKill = partialExport(); }, exportPid);
           assert.ok(atKill);
           assert.ok(existsSync(path.join(path.dirname(exportTarget), "moodinator.db")), "Interrupted source must remain");
           evidence.results.push({ action: { proof: "export-interruption" }, runId: exportRun,

@@ -313,17 +313,17 @@ export async function prepareNativeExportInterruption(progress: Progress) {
   await seed(f);
   const original = await f.storage.open(DATABASE_FILES.original);
   try {
-    // 256 separate 64 KiB fabricated blobs give a bounded 16 MiB native export
-    // and a roughly 32 MiB exact hex snapshot, without a giant JS seed string.
+    // 1024 separate 64 KiB fabricated blobs give a bounded 64 MiB native export
+    // and a roughly 128 MiB exact hex snapshot, without a giant JS seed string.
     await original.execAsync(`CREATE TABLE qa_export_payload (id INTEGER PRIMARY KEY, value BLOB NOT NULL);
       BEGIN;
-      WITH RECURSIVE rows(id) AS (VALUES(1) UNION ALL SELECT id + 1 FROM rows WHERE id < 256)
+      WITH RECURSIVE rows(id) AS (VALUES(1) UNION ALL SELECT id + 1 FROM rows WHERE id < 1024)
       INSERT INTO qa_export_payload SELECT id, zeroblob(65536) FROM rows;
       COMMIT;`);
-    check((await original.getFirstAsync<{ bytes: number }>("SELECT sum(length(value)) AS bytes FROM qa_export_payload;"))?.bytes === 16 * 1024 * 1024, "Native export payload size is incorrect");
+    check((await original.getFirstAsync<{ bytes: number }>("SELECT sum(length(value)) AS bytes FROM qa_export_payload;"))?.bytes === 64 * 1024 * 1024, "Native export payload size is incorrect");
     f.file("expected.json").write(JSON.stringify(await captureSnapshot(original)));
   } finally { await original.closeAsync(); }
-  f.file("export-interruption.json").write(JSON.stringify({ caseName, payloadBytes: 16 * 1024 * 1024,
+  f.file("export-interruption.json").write(JSON.stringify({ caseName, payloadBytes: 64 * 1024 * 1024,
     target: DATABASE_FILES.active, evidence: "inside-export interruption requires externally observed partial target growth and actual process kill" }));
   const unexpectedlyCompleted = await openEncryptedDatabase(f.storage, async (phase) => {
     if (phase === "export-started" || phase === "export-closed") {

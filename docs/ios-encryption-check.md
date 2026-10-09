@@ -83,10 +83,10 @@ SQLCipher `SQLITE_FULL` during export. It checks byte-identical original retenti
 exact data and pending state, then retries in two cold processes. This tests native
 destination write capacity; it does not fill the host volume.
 
-For inside-export interruption, an isolated source includes 16 MiB of fabricated
+For inside-export interruption, an isolated source includes 64 MiB of fabricated
 blobs. The runner requires an encrypted target larger than 256 KiB and smaller
-than 8 MiB, plus the current export-started action identity immediately before
-SIGKILL. If export finishes too early, the run fails rather than claiming an
+than 32 MiB, plus the current export-started action identity immediately before
+SIGKILL. Process ownership is resolved before polling target growth. If export finishes too early, the run fails rather than claiming an
 interruption. Two cold exact-data recovery actions follow.
 
 ## Check the visible app
