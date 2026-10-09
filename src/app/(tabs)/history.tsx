@@ -231,6 +231,7 @@ function HistoryScreenContent() {
         contextOptions={entrySettings.contextOptions}
         fieldConfig={entrySettings.detailedFieldConfig}
         initialValues={modals.editingInitialValues}
+        currentEntryId={modals.editingEntry?.id}
         onClose={modals.closeEditEntry}
         onSubmit={handleEditEntrySave}
         onCreateEmotion={entrySettings.createEmotionOption}

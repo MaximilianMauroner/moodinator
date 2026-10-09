@@ -88,47 +88,77 @@ function buttonColor(button: AlertButton, isDark: boolean) {
   return isDark ? colors.primaryMuted.dark : colors.positive.text.light;
 }
 
-export function AppAlertProvider() {
-  const { isDark, get } = useThemeColors();
-  const { width, fontScale } = useWindowDimensions();
-  const reducedMotion = useReducedMotion();
-  const titleRef = useRef<Text>(null);
-  const scrollRef = useRef<ScrollView>(null);
-  const modalShown = useRef(false);
+function useAlertQueue() {
   const [requests, setRequests] = useState<AlertRequest[]>([]);
   const request = requests[0] ?? null;
   const handledRequest = useRef<AlertRequest | null>(null);
-
   const show = useCallback((next: AlertRequest) => {
     setRequests((current) => [...current, next]);
   }, []);
-
-  useEffect(() => {
-    alertController = show;
-    if (pendingRequests.length) {
-      const requests = pendingRequests.splice(0, pendingRequests.length);
-      requests.forEach(show);
-    }
-    return () => {
-      if (alertController === show) {
-        alertController = null;
-      }
-    };
-  }, [show]);
-
+  const clear = useCallback(() => setRequests([]), []);
   const dismiss = useCallback(() => {
     if (!request || handledRequest.current === request) return;
     handledRequest.current = request;
     setRequests((current) => current.slice(1));
     request.options?.onDismiss?.();
   }, [request]);
-
   const pressButton = useCallback((button: AlertButton) => {
     if (!request || handledRequest.current === request) return;
     handledRequest.current = request;
     setRequests((current) => current.slice(1));
     button.onPress?.();
   }, [request]);
+  return { request, show, clear, dismiss, pressButton };
+}
+
+export function AppAlertProvider() {
+  const { request, show, dismiss, pressButton } = useAlertQueue();
+  useEffect(() => {
+    alertController = show;
+    pendingRequests.splice(0).forEach(show);
+    return () => {
+      if (alertController === show) alertController = null;
+    };
+  }, [show]);
+  return <AppAlertDialog request={request} dismiss={dismiss} pressButton={pressButton} />;
+}
+
+/** Render alerts inside an existing native Modal, without presenting another one. */
+export function useModalAlert(visible: boolean) {
+  const { request, show, clear, dismiss, pressButton } = useAlertQueue();
+  const visibleRef = useRef(visible);
+  visibleRef.current = visible;
+  useEffect(() => {
+    if (!visible) clear();
+  }, [visible, clear]);
+  const alert = useCallback<AlertStatic["alert"]>((title, message, buttons, options) => {
+    if (!visibleRef.current) return;
+    show({ title, message, buttons: buttons?.length ? buttons : [{ text: "OK" }], options });
+  }, [show]);
+  return {
+    alert,
+    hasAlert: visible && request !== null,
+    onRequestClose: request ? () => {
+      if (request.options?.cancelable === true) dismiss();
+    } : undefined,
+    alertView: visible ? (
+      <AppAlertDialog request={request} dismiss={dismiss} pressButton={pressButton} inline />
+    ) : null,
+  };
+}
+
+function AppAlertDialog({ request, dismiss, pressButton, inline = false }: {
+  request: AlertRequest | null;
+  dismiss: () => void;
+  pressButton: (button: AlertButton) => void;
+  inline?: boolean;
+}) {
+  const { isDark, get } = useThemeColors();
+  const { width, fontScale } = useWindowDimensions();
+  const reducedMotion = useReducedMotion();
+  const titleRef = useRef<Text>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  const modalShown = useRef(false);
 
   const focusTitle = useCallback(() => {
     const titleTag = findNodeHandle(titleRef.current);
@@ -142,11 +172,11 @@ export function AppAlertProvider() {
     }
     scrollRef.current?.scrollTo({ y: 0, animated: false });
     // Queued alerts reuse the native Modal, so onShow does not run again.
-    if (modalShown.current) {
+    if (inline || modalShown.current) {
       const frame = requestAnimationFrame(focusTitle);
       return () => cancelAnimationFrame(frame);
     }
-  }, [request, focusTitle]);
+  }, [request, focusTitle, inline]);
 
   if (!request) return null;
 
@@ -161,22 +191,8 @@ export function AppAlertProvider() {
     && width >= 360 && fontScale <= 1.2
     && request.buttons.every((button) => (button.text ?? "OK").length <= 14);
 
-  return (
-    <Modal
-      visible
-      transparent
-      animationType={reducedMotion ? "none" : "fade"}
-      statusBarTranslucent
-      navigationBarTranslucent
-      onShow={() => {
-        modalShown.current = true;
-        focusTitle();
-      }}
-      onRequestClose={() => {
-        if (cancelable) dismiss();
-      }}
-    >
-      <View style={styles.overlay}>
+  const content = (
+      <View style={[styles.overlay, inline && styles.inlineOverlay]}>
         {cancelable ? (
           <Pressable
             accessibilityRole="button"
@@ -284,11 +300,34 @@ export function AppAlertProvider() {
           </View>
         </SafeAreaView>
       </View>
+  );
+  if (inline) return content;
+  return (
+    <Modal
+      visible
+      transparent
+      animationType={reducedMotion ? "none" : "fade"}
+      statusBarTranslucent
+      navigationBarTranslucent
+      onShow={() => {
+        modalShown.current = true;
+        focusTitle();
+      }}
+      onRequestClose={() => {
+        if (cancelable) dismiss();
+      }}
+    >
+      {content}
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  inlineOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 10,
+    elevation: 10,
+  },
   overlay: {
     flex: 1,
     backgroundColor: colors.overlay,

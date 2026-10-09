@@ -24,6 +24,7 @@ import type { MoodEntry, MoodScaleSnapshot } from "@db/types";
 
 interface SameAsYesterdayButtonProps {
   onCopy: (entry: MoodEntry) => void;
+  excludeEntryId?: number;
 }
 
 // Get readable time ago string
@@ -48,6 +49,7 @@ const getTimeAgo = (timestamp: number | null): string => {
 
 export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
   onCopy,
+  excludeEntryId,
 }) => {
   const { isDark, get } = useThemeColors();
   const { width: windowWidth } = useWindowDimensions();
@@ -81,7 +83,7 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
     [windowWidth]
   );
 
-  const fetchLastEntry = async (): Promise<MoodEntry | null> => moodService.getLastEntry();
+  const fetchLastEntry = async (): Promise<MoodEntry | null> => moodService.getLastEntry(excludeEntryId);
 
   const showNoPreviousEntry = () => {
     setNoEntry(true);
