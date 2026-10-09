@@ -64,9 +64,10 @@ retain the package checksum and screenshots beside the candidate evidence, and
 never call historical APKs or screenshots current. Use fabricated data only;
 do not install into a device containing personal Moodinator data.
 
-The Android database remains unencrypted by Moodinator and JSON/CSV
-exports/backups remain plaintext. This slice does not redesign encryption,
-backup, or deletion semantics. Play-facing copy must continue to describe
+This candidate automatically migrates native working databases to SQLCipher
+storage on first open. Verify its native encryption evidence using
+[native-encryption.md](./native-encryption.md). JSON/CSV exports and backups remain
+plaintext. This QA procedure does not change backup or deletion semantics. Play-facing copy must continue to describe
 personal wellness journaling and descriptive self-reflection only: no
 diagnosis, treatment, medical-device, causal-insight, monitoring, guaranteed
 backup, or emergency-response claims.

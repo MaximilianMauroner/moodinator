@@ -65,6 +65,11 @@ emulator. A browser, Expo Go, Node adapter or host CLI cannot establish Expo
 native acceptance. Follow the `build` skill and its coding-vm resource helper.
 Build before emulator execution; do not overlap them or bypass busy admission.
 
+The Android runner below supports Linux/x86_64 with KVM only. Its APK library
+checks and emulator command do not support Android on a macOS ARM64 host.
+Mac users must use [the iOS simulator procedure](./ios-encryption-check.md) for
+iOS/Keychain evidence. Android ARM64 host support is a separate tooling change.
+
 1. Run focused startup and bootstrap tests, then the required CI-equivalent
    `pnpm run verify` and `pnpm run test:nightly` under guarded admission.
 2. From a clean committed checkout, run `pnpm run qa:prepare`. In its printed
