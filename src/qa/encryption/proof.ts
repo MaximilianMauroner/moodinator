@@ -19,6 +19,17 @@ function requireQaPackage() {
   if (Platform.OS !== "android" && Platform.OS !== "ios") throw new Error("Encryption proof requires a native QA build.");
 }
 
+// Consume only the disposable simulator driver's next cold-launch action.
+export function readEncryptionProofLaunchUrl() {
+  requireQaPackage();
+  const request = new File(Paths.document, "encryption-proof-launch.txt");
+  if (!request.exists) return null;
+  const url = request.textSync();
+  check(url.startsWith("moodinator-qa:///?"), "Invalid native proof launch request");
+  request.delete();
+  return url;
+}
+
 // The simulator driver reads only this QA status file, never databases or keys.
 export function writeEncryptionProofStatus(status: { sourceSha: unknown; runId: string | null; progress: string; result?: unknown }) {
   requireQaPackage();

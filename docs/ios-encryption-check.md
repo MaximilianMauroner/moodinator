@@ -58,6 +58,10 @@ failed resource monitoring fails the run even if the build exits successfully.
 The runner uses only an installed runtime and a compatible iPhone profile; it
 fails if compatibility cannot be established and does not install a runtime.
 
+The iOS driver writes each one-use action URL into its owned QA container before
+cold-launching the app. This avoids iOS 26 custom-scheme confirmation prompts.
+The app consumes that request once; Android keeps its initial-link launch path.
+
 The suite creates five fabricated original moods, exact int64/NUL/BLOB values,
 legacy columns, links, sequences and schema objects. It verifies plaintext and
 V1 passphrase conversion, exact retention/roundtrip, keyed fresh initialization,
@@ -78,7 +82,7 @@ mood. Cold-open between the add/edit/delete steps using the printed simulator ID
 
 ```sh
 xcrun simctl terminate <printed-simulator-ID> com.lab4code.moodinator.qa
-xcrun simctl openurl <printed-simulator-ID> 'moodinator-qa:///?proof=journey'
+xcrun simctl launch <printed-simulator-ID> com.lab4code.moodinator.qa
 ```
 
 Each committed change must survive restart, and the five originals must remain.

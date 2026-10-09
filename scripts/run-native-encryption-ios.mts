@@ -97,7 +97,11 @@ const terminate = () => { if (launched) { simctl(["terminate", QA_ID]); launched
 async function launch(parameters: Record<string, string>) {
   terminate();
   const runId = randomUUID();
-  simctl(["openurl", `moodinator-qa:///?${new URLSearchParams({ ...parameters, runId })}`]);
+  // iOS 26 confirms custom-scheme links even when opened by simctl. Stage a
+  // one-use request in this owned QA container before each real cold launch.
+  writeFileSync(path.join(container, "Documents/encryption-proof-launch.txt"),
+    `moodinator-qa:///?${new URLSearchParams({ ...parameters, runId })}`);
+  simctl(["launch", QA_ID]);
   launched = true;
   return runId;
 }

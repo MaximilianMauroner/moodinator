@@ -4,7 +4,7 @@ import Constants from "expo-constants";
 import * as Linking from "expo-linking";
 import { App as RouterApp } from "expo-router/build/qualified-entry";
 import { STARTUP_PHASES } from "@db/encryption/startup";
-import { crashEncryptionProof, loseProofKey, prepareAppUpgrade, prepareWalCrash, resumeEncryptionProof, runEncryptionProof, verifyAppUpgrade, verifyLostProofKey, writeEncryptionProofStatus } from "./proof";
+import { crashEncryptionProof, loseProofKey, prepareAppUpgrade, prepareWalCrash, resumeEncryptionProof, runEncryptionProof, verifyAppUpgrade, verifyLostProofKey, writeEncryptionProofStatus, readEncryptionProofLaunchUrl } from "./proof";
 
 type ProofView = { progress: string; report: string; showApp: boolean };
 // Driver actions cold-start the app. Keep the initial URL's execution and its
@@ -22,7 +22,7 @@ async function executeInitialProof() {
   const sourceSha = Constants.expoConfig?.extra?.qaSourceSha;
   let runId: string | null = null;
   try {
-    const url = await Linking.getInitialURL();
+    const url = readEncryptionProofLaunchUrl() ?? await Linking.getInitialURL();
     const params = url ? Linking.parse(url).queryParams : null;
     const action = params?.proof ?? "journey";
     const caseName = params?.case;

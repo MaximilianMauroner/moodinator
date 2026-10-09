@@ -3,14 +3,14 @@ import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  initialURL: vi.fn(), parse: vi.fn(), suite: vi.fn(), write: vi.fn(),
+  launchURL: vi.fn(), initialURL: vi.fn(), parse: vi.fn(), suite: vi.fn(), write: vi.fn(),
 }));
 vi.mock("react-native", () => ({ View: "View", Text: "Text" }));
 vi.mock("expo-constants", () => ({ default: { expoConfig: { extra: { qaSourceSha: "qa-source" } } } }));
 vi.mock("expo-linking", () => ({ getInitialURL: mocks.initialURL, parse: mocks.parse }));
 vi.mock("expo-router/build/qualified-entry", () => ({ App: "RouterApp" }));
 vi.mock("@/qa/encryption/proof", () => ({
-  runEncryptionProof: mocks.suite, writeEncryptionProofStatus: mocks.write,
+  readEncryptionProofLaunchUrl: mocks.launchURL, runEncryptionProof: mocks.suite, writeEncryptionProofStatus: mocks.write,
   crashEncryptionProof: vi.fn(), loseProofKey: vi.fn(), prepareAppUpgrade: vi.fn(),
   prepareWalCrash: vi.fn(), resumeEncryptionProof: vi.fn(), verifyAppUpgrade: vi.fn(),
   verifyLostProofKey: vi.fn(),
@@ -33,6 +33,7 @@ beforeEach(async () => {
   vi.resetModules();
   vi.resetAllMocks();
   renderers = [];
+  mocks.launchURL.mockReturnValue(null);
   mocks.initialURL.mockResolvedValue("moodinator://qa?proof=suite&runId=one");
   mocks.parse.mockReturnValue({ queryParams: { proof: "suite", runId: "one" } });
   Entry = (await import("@/qa/encryption/Entry")).default;
@@ -40,6 +41,18 @@ beforeEach(async () => {
 afterEach(async () => { await act(async () => renderers.forEach((renderer) => renderer.unmount())); });
 
 describe("native encryption proof initial execution", () => {
+  it("uses the staged simulator action without opening a system-confirmed URL", async () => {
+    mocks.launchURL.mockReturnValue("moodinator-qa:///?proof=suite&runId=one");
+    mocks.suite.mockResolvedValue({ status: "passed" });
+    const first = await mount();
+    await mount();
+    expect(progress(first)).toBe("complete");
+    expect(mocks.launchURL).toHaveBeenCalledOnce();
+    expect(mocks.initialURL).not.toHaveBeenCalled();
+    expect(mocks.suite).toHaveBeenCalledOnce();
+    expect(published()).toEqual(["launch", "complete"]);
+  });
+
   it("shares fixture work and progress between duplicate mounted roots, then replays success after remount", async () => {
     let finish!: (result: unknown) => void;
     let publish!: (message: string) => void;
