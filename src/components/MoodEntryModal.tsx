@@ -939,9 +939,13 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
         : get("onPrimary");
     // Keyboard-aware sheet sizing. Transparent modals do not reliably receive
     // Android's usual adjustResize behavior, so lift and shrink the sheet
-    // ourselves on both platforms when the keyboard is visible.
+    // ourselves on both platforms when the keyboard is visible. Android reports
+    // the keyboard height above the navigation bar, but this edge-to-edge
+    // modal extends below it, so the sheet must also clear the bottom inset.
     const keyboardOffset = Math.min(
-        keyboardHeight,
+        keyboardHeight > 0 && Platform.OS === "android"
+            ? keyboardHeight + insets.bottom
+            : keyboardHeight,
         Math.max(windowHeight - 1, 0)
     );
     const availableHeight = Math.max(0, windowHeight - keyboardOffset);
@@ -1105,7 +1109,6 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                     </PagerView>
                     )}
 
-                    {!isNotesKeyboardActive && (
                         <View
                             style={{
                                 borderTopWidth: 1,
@@ -1121,6 +1124,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                             }}
                         >
                             {/* ── Footer ─────────────────────────────────── */}
+                            {/* It stays while Notes has the keyboard, so Save remains reachable. */}
                         {/* Primary row */}
                         <View className="flex-row gap-3">
                             {/* Back / Cancel */}
@@ -1246,7 +1250,6 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                         </View>
 
                         </View>
-                    )}
                 </View>
                 <CreatePresetModal
                     kind={createPresetModal}
