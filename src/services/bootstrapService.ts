@@ -165,8 +165,15 @@ async function runLegacyEmotionCategoryMigration(
 
 export async function runAppBootstrap(): Promise<AppBootstrapResult> {
   // A completed legacy migration must not skip the database safety gate.
+  // Only this open may reject; the layout then blocks the app.
   await getDb();
-  const state = await loadState();
-  const warned = await runLegacyEmotionCategoryMigration(state);
-  return { status: warned ? "ready-with-warning" : "ready" };
+  try {
+    const state = await loadState();
+    const warned = await runLegacyEmotionCategoryMigration(state);
+    return { status: warned ? "ready-with-warning" : "ready" };
+  } catch (error) {
+    // The database is open, so a failed bookkeeping write must not block it.
+    console.error("[bootstrap] Failed to record migration state:", error);
+    return { status: "ready-with-warning" };
+  }
 }

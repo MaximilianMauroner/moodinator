@@ -93,6 +93,14 @@ describe("runAppBootstrap", () => {
     expect(mocks.invalidate).not.toHaveBeenCalled();
   });
 
+  it("opens the database with a warning when migration state cannot be saved", async () => {
+    await AsyncStorage.setItem("emotionCategoryMigrationCompleted", "true");
+    vi.mocked(AsyncStorage.setItem).mockRejectedValueOnce(new Error("Storage full"));
+
+    await expect(runAppBootstrap()).resolves.toEqual({ status: "ready-with-warning" });
+    expect(mocks.migrateEmotionsToCategories).not.toHaveBeenCalled();
+  });
+
   it("runs the legacy emotion-category migration on first run", async () => {
     mocks.migrateEmotionsToCategories.mockResolvedValue({
       migrated: 2,
