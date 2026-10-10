@@ -28,16 +28,19 @@ export default function DataSettingsScreen() {
   const [backupFolderUri, setBackupFolderUri] = useState<string | null>(null);
   const [backupError, setBackupError] = useState(false);
 
+  /** Returns false when the backup status could not be read. */
   const loadBackupInfo = useCallback(async () => {
     try {
       const status = await dataPortabilityService.getBackupStatus();
       setBackupInfo(status.info);
       setBackupFolderUri(status.folderUri);
       setBackupError(false);
+      return true;
     } catch (error) {
       console.error("Error loading backup status:", error);
       setBackupInfo(null);
       setBackupError(true);
+      return false;
     }
   }, []);
 
@@ -67,8 +70,15 @@ export default function DataSettingsScreen() {
         if (permissions.granted) {
           const folderUri = permissions.directoryUri;
           await dataPortabilityService.setBackupFolder(folderUri);
-          await loadBackupInfo();
-          Alert.alert("Backup Folder Selected", "Backups will now be saved to the selected folder.");
+          setBackupFolderUri(folderUri);
+          if (await loadBackupInfo()) {
+            Alert.alert("Backup Folder Selected", "Backups will now be saved to the selected folder.");
+          } else {
+            Alert.alert(
+              "Could Not Read Backups",
+              "Moodinator saved this folder but could not read the backup status, so backups can fail. Check folder access and device storage, then try again."
+            );
+          }
         } else {
           Alert.alert("Permission Denied", "Please grant folder access to enable backup functionality.");
         }

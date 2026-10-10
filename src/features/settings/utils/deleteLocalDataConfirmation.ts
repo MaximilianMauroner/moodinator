@@ -13,7 +13,7 @@ export type DeleteLocalDataConfirmationOptions = {
     buttons?: DeleteLocalDataAlertButton[]
   ) => void;
   deleteLocalMoodData: () => Promise<void>;
-  loadBackupInfo: () => Promise<void>;
+  loadBackupInfo: () => Promise<unknown>;
   setLoading: (loading: DeleteLocalDataLoadingState) => void;
   onError?: (error: unknown) => void;
 };
