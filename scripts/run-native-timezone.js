@@ -9,6 +9,7 @@ const {
   evidenceAcceptance,
   evidenceStatus,
   isToolUnavailable,
+  launchQaApp,
   requirePreparedSourceSha,
 } = require("./native-qa-common");
 const { runMaestro: runMaestroWithDiagnostics } = require("./native-qa-runner");
@@ -250,7 +251,7 @@ function runMaestro(serial) {
 
 function restartApp(serial) {
   runAdb(serial, ["shell", "am", "force-stop", appId]);
-  runAdb(serial, ["shell", "monkey", "-p", appId, "1"]);
+  launchQaApp(serial, { appId });
 }
 
 async function importFixture(serial, fixtureName) {

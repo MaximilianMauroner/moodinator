@@ -34,6 +34,7 @@ const {
   combineOperationalErrors,
   evidenceStatus,
   isToolUnavailable,
+  launchQaApp,
   packageIsDebuggable,
   requirePreparedSourceSha,
 } = require("../scripts/native-qa-common.js");
@@ -1241,6 +1242,14 @@ test("ADB command and app assertion failures remain failed evidence", () => {
   }
 });
 
+const QA_LAUNCHER = "com.lab4code.moodinator.qa/com.lab4code.moodinator.MainActivity";
+
+function fakeLaunchAdb(args, { resolved = `priority=0 preferredOrder=0 match=0x108000\n${QA_LAUNCHER}\n`, started = "Status: ok\nLaunchState: COLD\nComplete\n" } = {}) {
+  if (args.includes("resolve-activity")) return resolved;
+  if (args.includes("start")) return started;
+  return "";
+}
+
 test("installed QA build must expose the requested source SHA", async () => {
   assert.equal(stressInstalledBuildGuard, assertInstalledQaBuild);
   const sourceSha = "b".repeat(40);
@@ -1248,15 +1257,29 @@ test("installed QA build must expose the requested source SHA", async () => {
   const result = await assertInstalledQaBuild("emulator-5554", sourceSha, {
     execFile: (_command, args) => {
       calls.push(args);
-      return args.includes("path") ? "package:/data/app/base.apk\n" : "";
+      return args.includes("path") ? "package:/data/app/base.apk\n" : fakeLaunchAdb(args);
     },
     waitForNodeImpl: async (_serial, matcher) => {
       assert.deepEqual(matcher, { testId: `qa-source-sha-${sourceSha}` });
     },
   });
   assert.deepEqual(result, { appId: "com.lab4code.moodinator.qa", sourceSha });
-  assert.equal(calls.length, 4);
   assert.deepEqual(calls[1], ["-s", "emulator-5554", "shell", "dumpsys", "package", "com.lab4code.moodinator.qa"]);
+  assert.deepEqual(calls.at(-1), ["-s", "emulator-5554", "shell", "am", "start", "-W", "-n", QA_LAUNCHER]);
+  assert.equal(calls.some((args) => args.includes("monkey")), false);
+});
+
+test("QA launch fails clearly when Android cannot resolve or start the launcher", () => {
+  const launch = (responses) => launchQaApp("emulator-5554", {
+    execFile: (_command, args) => fakeLaunchAdb(args, responses),
+  });
+  assert.equal(launch({}), QA_LAUNCHER);
+  assert.throws(() => launch({ resolved: "No activity found\n" }), /Could not resolve the launcher activity.*No activity found/);
+  assert.throws(
+    () => launch({ started: "Starting: Intent { cmp=x }\nError: Activity class does not exist.\n" }),
+    /Could not launch [\s\S]*Activity class does not exist/,
+  );
+  assert.throws(() => launch({ started: "Status: timeout\n" }), /Could not launch .*Status: timeout/);
 });
 
 test("installed QA build rejects debuggable packages before collecting evidence", async () => {
