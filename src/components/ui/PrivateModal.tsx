@@ -12,7 +12,14 @@ export const NavigatorHiddenProvider = NavigatorHiddenContext.Provider;
  * navigator is hidden and opens it again afterwards. The owner stays mounted,
  * so drafts kept in the owner survive; the modal's own content remounts.
  */
-export function PrivateModal({ visible = true, ...props }: ModalProps) {
+export function PrivateModal({ visible = true, animationType, ...props }: ModalProps) {
   const navigatorHidden = useContext(NavigatorHiddenContext);
-  return <Modal {...props} visible={visible && !navigatorHidden} />;
+  return (
+    <Modal
+      {...props}
+      // iOS animates the dismissal with this setting; close at once instead of sliding out above the lock.
+      animationType={navigatorHidden ? "none" : animationType}
+      visible={visible && !navigatorHidden}
+    />
+  );
 }

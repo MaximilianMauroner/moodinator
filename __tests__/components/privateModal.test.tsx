@@ -9,7 +9,7 @@ vi.mock("react-native", () => ({ Modal: "Modal", TextInput: "TextInput" }));
 function DraftSheet({ visible }: { visible: boolean }) {
   const [draft, setDraft] = useState("");
   return (
-    <PrivateModal visible={visible} transparent>
+    <PrivateModal visible={visible} transparent animationType="slide">
       <TextInput value={draft} onChangeText={setDraft} />
     </PrivateModal>
   );
@@ -23,7 +23,7 @@ function App({ hidden, sheetVisible = true }: { hidden: boolean; sheetVisible?: 
   );
 }
 
-it("closes an open sheet's native window while the navigator is hidden and keeps its draft", async () => {
+it("closes an open sheet's native window at once while the navigator is hidden and keeps its draft", async () => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   let renderer!: ReactTestRenderer;
   await act(async () => { renderer = create(<App hidden={false} />); });
@@ -35,10 +35,12 @@ it("closes an open sheet's native window while the navigator is hidden and keeps
 
   await act(async () => renderer.update(<App hidden />));
   expect(modal().props.visible).toBe(false);
+  expect(modal().props.animationType).toBe("none");
   expect(modal().props.transparent).toBe(true);
 
   await act(async () => renderer.update(<App hidden={false} />));
   expect(modal().props.visible).toBe(true);
+  expect(modal().props.animationType).toBe("slide");
   expect(input().props.value).toBe("fabricated private note");
 
   await act(async () => renderer.update(<App hidden={false} sheetVisible={false} />));
