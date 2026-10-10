@@ -19,7 +19,7 @@ export default function PrivacyPolicyScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Text className="text-xs text-paper-700 dark:text-sand-400 mb-4">
-          Last Updated: September 15, 2026
+          Last Updated: October 8, 2026
         </Text>
 
         <Section title="Introduction">
@@ -48,7 +48,7 @@ export default function PrivacyPolicyScreen() {
 
         <Section title="Storage and Security">
           <Paragraph>
-            Mood data is stored in a local SQLite database inside the operating system app sandbox. On Android, Moodinator does not apply database-level encryption to that database. App lock is not database encryption.
+            Moodinator encrypts its working mood database with SQLCipher on Android and iOS, using a random key kept in operating-system secure storage. The updated app automatically migrates an existing database on its first open. During an incomplete migration, the original and a temporary copy can remain in the private app sandbox; they are removed only after the encrypted database and recovery state are verified. If safe opening fails, mood screens remain closed and saved files are retained. App lock is a separate screen-access control. Settings outside the mood database and exported files are not covered by database encryption. Losing the stored encryption key can make the database unreadable; there is no developer-side recovery key.
           </Paragraph>
           <Paragraph>
             If you set an app-lock PIN, Moodinator stores a salted hash—not the plaintext PIN—in the operating system secure storage. Biometric enrollment and matching stay with the operating system; Moodinator does not receive or store your biometric template.
@@ -127,7 +127,7 @@ export default function PrivacyPolicyScreen() {
           <BulletList
             items={[
               "No developer-operated account, data server, analytics, or ads",
-              "Android mood database is sandboxed but not encrypted by Moodinator",
+              "Working mood database is encrypted with SQLCipher",
               "JSON and CSV exports and JSON backups are readable plaintext",
               "Delete Mood Data has a limited, documented scope",
             ]}

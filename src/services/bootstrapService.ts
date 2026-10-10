@@ -1,3 +1,4 @@
+import { getDb } from "@db/client";
 import { migrateEmotionsToCategories } from "@db/moods/migrations";
 
 import { getJson, getString, setJson } from "@/shared/storage/asyncStorage";
@@ -9,10 +10,10 @@ import {
 import { useMoodsStore } from "@/shared/state/moodsStore";
 import { toastService } from "@/services/toastService";
 
-export type AppBootstrapStatus = "running" | "ready" | "ready-with-warning";
+export type AppBootstrapStatus = "running" | "blocked" | "ready" | "ready-with-warning";
 
 export type AppBootstrapResult = {
-  status: Exclude<AppBootstrapStatus, "running">;
+  status: Exclude<AppBootstrapStatus, "running" | "blocked">;
 };
 
 /**
@@ -163,6 +164,8 @@ async function runLegacyEmotionCategoryMigration(
 }
 
 export async function runAppBootstrap(): Promise<AppBootstrapResult> {
+  // A completed legacy migration must not skip the database safety gate.
+  await getDb();
   const state = await loadState();
   const warned = await runLegacyEmotionCategoryMigration(state);
   return { status: warned ? "ready-with-warning" : "ready" };

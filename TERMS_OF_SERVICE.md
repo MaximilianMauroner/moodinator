@@ -1,6 +1,6 @@
 # Terms of Service
 
-**Last Updated: September 15, 2026**
+**Last Updated: October 8, 2026**
 
 ## Agreement to Terms
 
@@ -15,6 +15,8 @@ You may use the app for lawful personal purposes. Do not use it to violate appli
 ## Your Data and Local Storage
 
 You retain your rights in the mood entries, notes, tags, settings, exports, and backups you create. Moodinator has no developer-operated account or server copy. Its working data is stored locally, and you are responsible for device security and for protecting plaintext JSON mood exports/backups and plaintext CSV therapy exports.
+
+The working mood database is encrypted with SQLCipher, with its key held in operating-system secure storage. The updated app migrates existing databases automatically on first open. A failed or interrupted attempt keeps saved files and blocks mood screens until safe opening succeeds. Losing the encryption key can make data unreadable; there is no developer-side recovery key. Settings outside the mood database and plaintext exports/backups are not protected by database encryption.
 
 The **Delete Mood Data** control deletes mood history, including mood rows, mood–emotion link records, and database emotion records used by that history. It retains the user-visible Emotion List presets, context-tag presets, other settings, reminders, and app-lock configuration. It does not delete exports, backups, clipboard contents, or other copies outside the app.
 

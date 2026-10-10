@@ -480,7 +480,7 @@ function baseMetadata(options, sourceSha, entries, fixturePath, outputDirectory,
     workloadHash: normalizedWorkloadHash(entries, referenceNow, editIndexes),
     measurementProtocol,
     measurementProtocolHash: measurementProtocolHash(),
-    command: `bun run qa:stress -- ${options.serial} --size ${options.size} --label ${options.label} --runs ${options.runs} --out ${outputDirectory}`,
+    command: `pnpm run qa:stress ${options.serial} --size ${options.size} --label ${options.label} --runs ${options.runs} --out ${outputDirectory}`,
     fabricatedFixture: fixturePath,
     fabricatedDataOnly: true,
     fabricatedDataProof: {

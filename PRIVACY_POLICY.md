@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last Updated: September 15, 2026**
+**Last Updated: October 8, 2026**
 
 ## Introduction
 
@@ -22,7 +22,7 @@ New entries retain the UTC offset at their recorded time so calendar days remain
 
 ## Storage and Security
 
-Mood data is stored in the app's local SQLite database inside the operating system's app sandbox. On Android, Moodinator does **not** apply database-level encryption to that SQLite database. The app sandbox, device encryption, screen lock, and other platform protections may reduce access, but app lock is not database encryption.
+Mood data is stored in the app's local SQLite database inside the operating system's app sandbox. Moodinator encrypts its working mood database with SQLCipher on Android and iOS, using a random key kept in operating-system secure storage. The updated app automatically migrates an existing database on its first open. During an incomplete migration, the original and a temporary copy can remain in the private app sandbox; the app removes them only after it verifies the encrypted database and recovery state. If safe opening fails, mood screens remain closed and saved files are retained. App lock is a separate screen-access control, not database encryption. Settings outside the mood database and exported files are not covered by database encryption. Losing the stored encryption key can make the database unreadable; Moodinator has no developer-side recovery key.
 
 If you set an app-lock PIN, Moodinator stores a salted hash, not the plaintext PIN, in the operating system's secure storage. Biometric enrollment and biometric matching are handled by the operating system; Moodinator does not receive or store your fingerprint, face, iris, or biometric template.
 

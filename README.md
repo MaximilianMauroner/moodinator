@@ -45,7 +45,7 @@ A privacy-focused mood tracking app built with React Native. Record how you feel
 ### Prerequisites
 
 - Node.js 24 LTS, version 24.13.1 or newer within major 24 (`.node-version`)
-- Bun 1.3.14 (`packageManager` in `package.json`)
+- pnpm 10.34.6 (`packageManager` in `package.json`)
 - Android Studio and an emulator, or Xcode on macOS for iOS
 
 The test suite uses Node's built-in SQLite. Expo Go cannot verify custom native
@@ -56,15 +56,15 @@ configuration such as SQLCipher; use a native build for that coverage.
 ```bash
 git clone https://github.com/MaximilianMauroner/moodinator.git
 cd moodinator
-bun install --frozen-lockfile
-bun start
+pnpm install --frozen-lockfile
+pnpm start
 ```
 
 ### Running the app
 
 ```bash
-bun run android
-bun run ios
+pnpm run android
+pnpm run ios
 ```
 
 These commands build the normal app identifier. For disposable test data and
@@ -88,9 +88,9 @@ Do not open a browser for normal app verification.
 ## Development
 
 ```bash
-bun run verify   # Lint, typecheck, tests, Expo Doctor, Android release config
-bun run test     # Watch tests while editing
-bun run test:run # Run tests once
+pnpm run verify   # Lint, typecheck, tests, Expo Doctor, Android release config
+pnpm run test     # Watch tests while editing
+pnpm run test:run # Run tests once
 ```
 
 The suite includes real in-memory SQLite queries, migrations and rollback,
@@ -104,13 +104,13 @@ locally so the command does not download a different checker on each run.
 ### Isolated native verification
 
 ```bash
-QA_WORKSPACE="$(bun run qa:prepare | tee /dev/stderr | sed -n 's/^QA workspace: //p')"
+QA_WORKSPACE="$(pnpm run qa:prepare | tee /dev/stderr | sed -n 's/^QA workspace: //p')"
 cd "$QA_WORKSPACE"
-bun install --frozen-lockfile
-MOODINATOR_VARIANT=qa MOODINATOR_QA_PREPARE_NATIVE=1 bunx expo prebuild --platform android --clean
-bun run qa:seal-native
-MOODINATOR_VARIANT=qa bunx expo run:android --variant release --device
-bun run qa:smoke -- emulator-5554 --out /tmp/moodinator-native-smoke-current
+pnpm install --frozen-lockfile
+MOODINATOR_VARIANT=qa MOODINATOR_QA_PREPARE_NATIVE=1 pnpm exec expo prebuild --platform android --clean
+pnpm run qa:seal-native
+MOODINATOR_VARIANT=qa pnpm exec expo run:android --variant release --device
+pnpm run qa:smoke emulator-5554 --out /tmp/moodinator-native-smoke-current
 ```
 
 `qa:prepare` requires a clean checkout, then materializes committed `HEAD` files for the
@@ -139,9 +139,9 @@ version and version code into an isolated build workspace. Use its shared
 release ledger and Play Internal record for the current candidate; the
 checked-in values do not identify the latest uploaded build.
 
-Normal Internal releases use `bun run release:internal`; the shared ledger
+Normal Internal releases use `pnpm run release:internal`; the shared ledger
 reserves the next version and Android code. There is no standalone
-`version:bump` command. Native generation uses `bunx expo prebuild` in an
+`version:bump` command. Native generation uses `pnpm exec expo prebuild` in an
 isolated workspace.
 
 ## Known Issues
@@ -178,7 +178,7 @@ For support or feedback: support.moodinator@lab4code.com
 
 ## Internal testing releases
 
-Use `npm run release:internal` (Zen Mode) or `bun run release:internal`
+Use `npm run release:internal` (Zen Mode) or `pnpm run release:internal`
 (Moodinator) for a changed, committed `origin/main`. The shared release ledger
 reserves the next patch version and Android version code, builds locally,
 and submits to Google Play Internal testing. Run `release:status` to see

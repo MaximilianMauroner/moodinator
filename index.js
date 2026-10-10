@@ -17,4 +17,9 @@ console.warn = (...args) => {
 
 LogBox.ignoreLogs(ignoredWarnings);
 
-require("expo-router/entry");
+if (require("expo-constants").default.expoConfig?.extra?.qaEncryptionProof === true) {
+  const { registerRootComponent } = require("expo");
+  registerRootComponent(require("./src/qa/encryption/Entry").default);
+} else {
+  require("expo-router/entry");
+}

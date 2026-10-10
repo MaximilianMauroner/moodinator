@@ -1,0 +1,9 @@
+nodeLinker: hoisted
+overrides:
+  expo-image-loader: "55.0.1"
+patchedDependencies:
+  expo-router@55.0.18: patches/expo-router@55.0.18.patch
+  expo-secure-store@55.0.18: patches/expo-secure-store@55.0.18.patch
+allowBuilds:
+  unrs-resolver: false
+  esbuild: true

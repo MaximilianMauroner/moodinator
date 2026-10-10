@@ -37,7 +37,7 @@ number, or erase attempted SHAs. Configure both secrets before activation.
 Merging installs the schedule; runs fail before reservation until setup is ready.
 The parent owns secret verification and the first live dispatch.
 
-The workflow pins action commit SHAs, Node 24.13.1, Bun 1.3.14, Java 17,
+The workflow pins action commit SHAs, Node 24.13.1, pnpm 10.34.6, Java 17,
 EAS 20.5.1, Android build-tools 36, and bundletool 1.18.2 with a SHA-256 check.
 It checks actual disk/RAM and removes only unused tool bundles on the disposable
 runner if disk is low. Preflight still requires 15 GiB free disk and 8 GiB RAM.
@@ -47,15 +47,15 @@ runner if disk is low. Preflight still requires 15 GiB free disk and 8 GiB RAM.
 Every normal build command uses `scripts/nightly-release.mjs`:
 
 ```sh
-bun run release:internal
-bun run release:status
+pnpm run release:internal
+pnpm run release:status
 node scripts/nightly-release.mjs status
 ```
 
 The runner fetches `origin/main`, checks the chosen EAS stable version against
 that SHA's `eas.json`, then prepares an isolated worktree of the same SHA.
-Hosted checks run locked dependency installation, full `bun run verify`, and
-`bun run test:nightly` on a separate credential-free runner. The build job checks
+Hosted checks run locked dependency installation, full `pnpm run verify`, and
+`pnpm run test:nightly` on a separate credential-free runner. The build job checks
 out that exact SHA and installs dependencies with `--ignore-scripts` before
 credential-bearing steps. Reservation fetches main again and requires checked
 SHA, checkout HEAD and current main to agree; a moved main fails before reserve.
@@ -138,8 +138,8 @@ remains for supported local manual builds and is not persistent ledger state.
 ## Verification
 
 ```sh
-bun run verify
-bun run test:nightly
+pnpm run verify
+pnpm run test:nightly
 ```
 
 Tests use fixtures and mocked storage, never live ledgers or uploads. They cover
