@@ -8,10 +8,10 @@ import {
   TextInput,
   View,
 } from "react-native";
-import DateTimePicker from "@react-native-community/datetimepicker";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { PrivateModal } from "@/components/ui/PrivateModal";
+import { PrivateDateTimePicker } from "@/components/ui/PrivateDateTimePicker";
 import { typography } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { useEntrySettings } from "@/hooks/useEntrySettings";
@@ -443,7 +443,7 @@ export function HistoryFilterSheet() {
                     />
                   </View>
                 ) : null}
-                <DateTimePicker
+                <PrivateDateTimePicker
                   value={picking === "start" ? customStart : customEnd}
                   mode="date"
                   display={Platform.OS === "ios" ? "spinner" : "default"}

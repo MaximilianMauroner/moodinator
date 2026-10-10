@@ -1,12 +1,11 @@
 import React, { useState, useMemo, useRef } from "react";
 import { View, Text, Pressable, Platform, ScrollView } from "react-native";
-import DateTimePicker, {
-  type DateTimePickerEvent,
-} from "@react-native-community/datetimepicker";
+import type { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
 import { MoodEntry } from "@db/types";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { PrivateModal } from "@/components/ui/PrivateModal";
+import { PrivateDateTimePicker } from "@/components/ui/PrivateDateTimePicker";
 import { getMoodRatingDisplay } from "@/constants/moodScaleInterpretation";
 import { useThemeColors, colors } from "@/constants/colors";
 import { haptics } from "@/lib/haptics";
@@ -643,7 +642,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
 
             {/* Date picker */}
             {showDatePicker && (
-              <DateTimePicker
+              <PrivateDateTimePicker
                 disabled={saving}
                 value={selectedDate ?? new Date()}
                 timeZoneName={recordedOffset ? "UTC" : undefined}
@@ -655,7 +654,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
 
             {/* Time picker */}
             {showTimePicker && (
-              <DateTimePicker
+              <PrivateDateTimePicker
                 disabled={saving}
                 value={selectedDate ?? new Date()}
                 timeZoneName={recordedOffset ? "UTC" : undefined}

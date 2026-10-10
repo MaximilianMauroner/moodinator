@@ -15,7 +15,7 @@ import { useRouter } from "expo-router";
 import { Alert } from "@/components/ui/AppAlert";
 import { Ionicons } from "@expo/vector-icons";
 import { useColorScheme } from "nativewind";
-import DateTimePicker from "@react-native-community/datetimepicker";
+import { PrivateDateTimePicker } from "@/components/ui/PrivateDateTimePicker";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import * as Clipboard from "expo-clipboard";
@@ -427,7 +427,7 @@ export default function TherapyExportScreen() {
                   </Text>
                   {Platform.OS === "ios" ? (
                     <View className="rounded-2xl border border-paper-200 dark:border-paper-800 bg-paper-100 dark:bg-paper-900 p-2 overflow-hidden">
-                      <DateTimePicker
+                      <PrivateDateTimePicker
                         value={customStartDate}
                         mode="date"
                         display="spinner"
@@ -457,7 +457,7 @@ export default function TherapyExportScreen() {
                         <Ionicons name="chevron-down" size={20} color={isDark ? "#8AAE98" : "#9D8660"} />
                       </Pressable>
                       {showStartPicker && (
-                        <DateTimePicker
+                        <PrivateDateTimePicker
                           value={customStartDate}
                           mode="date"
                           display="default"
@@ -482,7 +482,7 @@ export default function TherapyExportScreen() {
                   </Text>
                   {Platform.OS === "ios" ? (
                     <View className="rounded-2xl border border-paper-200 dark:border-paper-800 bg-paper-100 dark:bg-paper-900 p-2 overflow-hidden">
-                      <DateTimePicker
+                      <PrivateDateTimePicker
                         value={customEndDate}
                         mode="date"
                         display="spinner"
@@ -513,7 +513,7 @@ export default function TherapyExportScreen() {
                         <Ionicons name="chevron-down" size={20} color={isDark ? "#8AAE98" : "#9D8660"} />
                       </Pressable>
                       {showEndPicker && (
-                        <DateTimePicker
+                        <PrivateDateTimePicker
                           value={customEndDate}
                           mode="date"
                           display="default"

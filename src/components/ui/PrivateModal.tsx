@@ -6,6 +6,10 @@ const NavigatorHiddenContext = createContext(false);
 /** The root layout sets this while it hides the navigator, e.g. behind App Lock. */
 export const NavigatorHiddenProvider = NavigatorHiddenContext.Provider;
 
+export function useNavigatorHidden() {
+  return useContext(NavigatorHiddenContext);
+}
+
 /**
  * A React Native Modal opens its own native window above the root layout, so
  * the App Lock screen cannot cover it. This Modal closes that window while the
@@ -13,7 +17,7 @@ export const NavigatorHiddenProvider = NavigatorHiddenContext.Provider;
  * so drafts kept in the owner survive; the modal's own content remounts.
  */
 export function PrivateModal({ visible = true, animationType, ...props }: ModalProps) {
-  const navigatorHidden = useContext(NavigatorHiddenContext);
+  const navigatorHidden = useNavigatorHidden();
   return (
     <Modal
       {...props}
