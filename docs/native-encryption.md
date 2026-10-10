@@ -54,6 +54,15 @@ failed SharedPreferences commit. Readback alone can observe memory after a faile
 commit. Pending startup repeats persistence and readback before conversion.
 Remove this patch only when the installed Expo version propagates that failure.
 
+Verification keeps a complete encoded copy of every table in memory. Text and
+BLOB values cross the native bridge as hex, so peak memory grows with database
+size. On Android a fabricated 64 MiB database ran out of memory under the
+default 192 MiB app heap growth limit, and passed with a temporary 512 MiB growth
+limit and 768 MiB heap. Mood entries hold short text and small JSON fields, so
+ordinary databases are far smaller. If supported databases can approach that
+size, replace the whole-table snapshots with a streaming comparison and repeat
+the native proofs.
+
 Database encryption does not encrypt settings outside SQLite or plaintext
 JSON/CSV exports and backups. Password-based export encryption is a separate
 feature requiring a reviewed KDF and authenticated versioned envelope.
@@ -111,6 +120,12 @@ iOS/Keychain evidence. Android ARM64 host support is a separate tooling change.
    The ten callbacks test phase boundaries. Do not report an interruption inside
    native export or native disk-full handling as proved by that boundary matrix;
    each needs a focused actual native failure case and retained/reopened data.
+   This runner does not run those focused cases. The 64 MiB export-interruption
+   fixture needs a temporary 512 MiB app heap growth limit and 768 MiB heap on
+   the disposable emulator (see the memory limit above). Record the override with
+   the evidence and restore the defaults afterwards. An out-of-memory result at
+   the default heap is that documented limit; keep it, and do not report it as an
+   interruption result.
 6. Inspect the native app screenshot. Complete onboarding, inspect fabricated
    history and details, add/edit/delete a new fabricated mood, and cold-open again
    to confirm retained changes. Run the existing native smoke/sync journeys to
