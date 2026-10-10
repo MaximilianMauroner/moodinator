@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import {
-    Modal,
     View,
     Text,
     Pressable,
@@ -17,6 +16,7 @@ import Animated, {
     withSpring,
 } from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
+import { PrivateModal } from "@/components/ui/PrivateModal";
 import { Alert } from "@/components/ui/AppAlert";
 import { getMoodRatingDisplay } from "@/constants/moodScaleInterpretation";
 import { useThemeColors, colors } from "@/constants/colors";
@@ -949,7 +949,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     );
 
     return (
-        <Modal
+        <PrivateModal
             visible={visible}
             transparent
             animationType="slide"
@@ -1088,7 +1088,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                     <PagerView
                         ref={pagerRef}
                         style={{ flex: 1 }}
-                        initialPage={0}
+                        initialPage={currentStep}
                         scrollEnabled={!isSaving && !isNotesKeyboardActive}
                         onPageSelected={handlePageSelected}
                         offscreenPageLimit={1}
@@ -1275,7 +1275,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                     }}
                 />
             </View>
-        </Modal>
+        </PrivateModal>
     );
 };
 

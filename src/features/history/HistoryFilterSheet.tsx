@@ -1,7 +1,6 @@
 import React, { useCallback, useMemo, useState } from "react";
 import {
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -12,6 +11,7 @@ import {
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { PrivateModal } from "@/components/ui/PrivateModal";
 import { typography } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { useEntrySettings } from "@/hooks/useEntrySettings";
@@ -194,7 +194,7 @@ export function HistoryFilterSheet() {
         ) : null}
       </Pressable>
 
-      <Modal
+      <PrivateModal
         visible={visible}
         animationType="slide"
         presentationStyle="pageSheet"
@@ -460,7 +460,7 @@ export function HistoryFilterSheet() {
             ) : null}
           </SafeAreaView>
         </KeyboardAvoidingView>
-      </Modal>
+      </PrivateModal>
     </>
   );
 }

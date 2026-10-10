@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
-  Modal,
   Pressable,
   Platform,
   TouchableOpacity,
@@ -14,6 +13,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import * as Clipboard from "expo-clipboard";
 import { Ionicons } from "@expo/vector-icons";
+import { PrivateModal } from "@/components/ui/PrivateModal";
 import { Alert } from "@/components/ui/AppAlert";
 import {
   dataPortabilityService,
@@ -155,7 +155,7 @@ export function ExportModal({
   };
 
   return (
-    <Modal
+    <PrivateModal
       visible={visible}
       transparent
       animationType="slide"
@@ -306,7 +306,7 @@ export function ExportModal({
           </View>
         </View>
       </View>
-    </Modal>
+    </PrivateModal>
   );
 }
 

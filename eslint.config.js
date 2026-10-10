@@ -13,4 +13,17 @@ module.exports = defineConfig([
       "coverage/**",
     ],
   },
+  {
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: ["src/components/ui/PrivateModal.tsx"],
+    rules: {
+      "no-restricted-imports": ["error", {
+        paths: [{
+          name: "react-native",
+          importNames: ["Modal"],
+          message: "Use PrivateModal. A React Native Modal stays above the App Lock screen.",
+        }],
+      }],
+    },
+  },
 ]);
