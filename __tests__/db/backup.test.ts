@@ -177,6 +177,21 @@ describe("physical backup discovery and retention", () => {
     expect(mocks.settings.has("lastBackupTimestamp")).toBe(true);
     expect(console.error).toHaveBeenCalledWith("Backup saved, but retention cleanup failed:", nativeFailure);
   });
+
+  it("keeps deleting older backups after the provider refuses one", async () => {
+    const stale = [safUri("moodinator-backup-2026-09-01.json"), safUri("moodinator-backup-2026-09-02.json")];
+    for (let day = 1; day <= 9; day++) {
+      mocks.files.set(safUri(`moodinator-backup-2026-09-${String(day).padStart(2, "0")}.json`), JSON_DATA);
+    }
+    mocks.deleteSafFile.mockRejectedValueOnce(nativeFailure);
+
+    const result = await createBackup();
+
+    expect(result).toMatchObject({ success: true, warning: expect.stringContaining("older backups could not be removed") });
+    expect(mocks.deleteSafFile).toHaveBeenCalledTimes(2);
+    expect(stale.filter((uri) => mocks.files.has(uri))).toHaveLength(1);
+    expect(await getBackupInfo()).toMatchObject({ count: 9 });
+  });
 });
 
 describe("backup destination and failure recovery", () => {

@@ -287,18 +287,31 @@ async function getBackupFiles(): Promise<BackupFileSummary[]> {
   return sortBackupsNewestFirst(backupFiles);
 }
 
-/** Keeps the eight newest dated physical backups, including the file just saved. */
+/**
+ * Keeps the eight newest dated physical backups, including the file just saved.
+ * Tries every stale file, then rethrows the first deletion failure.
+ */
 export async function cleanupOldBackups(createdBackupUri?: string): Promise<number> {
   const backupFiles = await getBackupFiles();
   const filesToDelete = selectBackupsForDeletion(backupFiles, WEEKS_TO_KEEP, createdBackupUri);
+  const failures: unknown[] = [];
 
   for (const file of filesToDelete) {
-    if (file.uri.startsWith("content://")) {
-      await FileSystem.StorageAccessFramework.deleteAsync(file.uri);
-    } else {
-      await FileSystem.deleteAsync(file.uri, { idempotent: true });
+    try {
+      if (file.uri.startsWith("content://")) {
+        await FileSystem.StorageAccessFramework.deleteAsync(file.uri);
+      } else {
+        await FileSystem.deleteAsync(file.uri, { idempotent: true });
+      }
+      console.log(`Deleted old backup: ${file.filename}`);
+    } catch (error) {
+      // A provider can refuse one document and still allow the others.
+      console.error(`Could not delete old backup ${file.filename}:`, error);
+      failures.push(error);
     }
-    console.log(`Deleted old backup: ${file.filename}`);
+  }
+  if (failures.length > 0) {
+    throw failures[0];
   }
   return filesToDelete.length;
 }
