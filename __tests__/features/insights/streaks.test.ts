@@ -21,4 +21,36 @@ describe("streak baseline", () => {
     ).toEqual({ current: 0, longest: 2 });
     expect(calculateStreak([])).toEqual({ current: 0, longest: 0 });
   });
+  it("calculates streaks from the full Mood history", () => {
+    expect(
+      calculateStreak(
+        [at("2024-03-13"), at("2024-03-12"), at("2024-03-10")],
+        new Date("2024-03-13T12:00:00"),
+      ),
+    ).toEqual({ current: 2, longest: 2 });
+  });
+});
+
+describe("streak calendar days across DST", () => {
+  it.each([
+    ["2026-03-09T00:30:00", "2026-03-08T12:00:00"],
+    ["2026-11-01T23:30:00", "2026-10-31T12:00:00"],
+  ])("counts the previous local day at %s", (today, yesterday) => {
+    const previousTZ = process.env.TZ;
+    process.env.TZ = "America/New_York";
+    try {
+      const entry = createMockMoodEntry({
+        id: 1,
+        mood: 4,
+        timestamp: new Date(yesterday).getTime(),
+      });
+      expect(calculateStreak([entry], new Date(today))).toEqual({
+        current: 1,
+        longest: 1,
+      });
+    } finally {
+      if (previousTZ === undefined) delete process.env.TZ;
+      else process.env.TZ = previousTZ;
+    }
+  });
 });
