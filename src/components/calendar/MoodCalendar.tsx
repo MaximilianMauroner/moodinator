@@ -321,6 +321,7 @@ export function MoodCalendar({
       {monthData && !loading ? (
         <View
           className="mt-3 flex-row items-center justify-center"
+          accessible
           accessibilityRole="text"
           accessibilityLabel="Calendar legend: a dot marks a day with multiple entries."
         >

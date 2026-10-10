@@ -31,6 +31,8 @@ const {
   parseGfxInfo,
   parseMemInfo,
   runAdb,
+  returnFromDataSettings,
+  selectDownloadFixture,
   waitForNode,
   waitForNodeAndTap,
   waitForNodeHierarchyGone,
@@ -228,18 +230,14 @@ function importCompletionTimeoutMs(size) {
 async function importFixture(serial, fixtureName, size) {
   await runMaestro(serial, importFlow, { cwd: root });
 
-  try {
-    await waitForNodeAndTap(serial, { text: fixtureName }, { timeoutMs: 3500 });
-  } catch (error) {
-    await waitForNodeAndTap(serial, { text: "Downloads", contains: true }, { timeoutMs: 2500 });
-    await waitForNodeAndTap(serial, { text: fixtureName }, { timeoutMs: 5000 });
-  }
+  await selectDownloadFixture(serial, fixtureName);
 
   await waitForNodeAndTap(serial, { text: "Replace Data" }, { timeoutMs: 5000 });
   await waitForNode(serial, { text: "Import Successful", contains: true }, {
     timeoutMs: importCompletionTimeoutMs(size),
   });
   await waitForNodeAndTap(serial, { text: "OK" }, { timeoutMs: 5000 });
+  await returnFromDataSettings(serial);
 }
 
 async function settleImportedHistory(serial, expectedCount) {
@@ -532,7 +530,7 @@ function captureDeviceProfile(serial, runAdbImpl = runAdb) {
   const shell = (...args) => runAdbImpl(serial, ["shell", ...args]).trim();
   const displayDump = shell("dumpsys", "display");
   return parseDeviceProfile({
-    avdName: shell("getprop", "ro.kernel.qemu.avd_name"),
+    avdName: shell("getprop", "ro.boot.qemu.avd_name") || shell("getprop", "ro.kernel.qemu.avd_name"),
     systemFingerprint: shell("getprop", "ro.build.fingerprint"),
     cpuAbiList: shell("getprop", "ro.product.cpu.abilist"),
     cpuCount: shell("nproc"),

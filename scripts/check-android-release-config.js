@@ -2,6 +2,16 @@ const fs = require("fs");
 const path = require("path");
 
 const root = path.resolve(__dirname, "..");
+const variantArgument = process.argv.indexOf("--variant");
+const nativeVariant = variantArgument >= 0
+  ? process.argv[variantArgument + 1]
+  : process.env.MOODINATOR_VARIANT ?? "production";
+if (nativeVariant !== "production" && nativeVariant !== "qa") {
+  throw new Error("Android manifest variant must be production or qa.");
+}
+const nativeIdentity = nativeVariant === "qa"
+  ? { package: "com.lab4code.moodinator.qa", scheme: "moodinator-qa", name: "Moodinator QA" }
+  : { package: "com.lab4code.moodinator", scheme: "moodinator", name: "Moodinator" };
 const systemAlertWindowPermission = "android.permission.SYSTEM_ALERT_WINDOW";
 const advertisingIdPermission = "com.google.android.gms.permission.AD_ID";
 const requiredBlockedPermissions = new Set([
@@ -38,7 +48,7 @@ const approvedReleasePermissions = new Set([
   "android.permission.RECEIVE_BOOT_COMPLETED",
   "android.permission.POST_NOTIFICATIONS",
   "android.permission.WAKE_LOCK",
-  "com.lab4code.moodinator.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
+  `${nativeIdentity.package}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`,
 ]);
 const generatedManifestDirectoryNames = [
   "merged_manifest",
@@ -121,6 +131,11 @@ function findTag(manifest, tagName) {
 
 function readAndroidAttribute(tag, attribute) {
   return tag.match(new RegExp(`\\bandroid:${attribute}\\s*=\\s*(["'])(.*?)\\1`, "i"))?.[2];
+}
+
+function hasScheme(manifest, scheme) {
+  const dataTags = manifest.match(/<data\b[^>]*>/gi) ?? [];
+  return dataTags.some((tag) => readAndroidAttribute(tag, "scheme") === scheme);
 }
 
 function removesPermissionDuringMerge(permissionDeclaration) {
@@ -255,8 +270,8 @@ if (mainManifest) {
     "Main Android manifest may only declare AD_ID with tools:node=\"remove\""
   );
   assert(
-    /<data\b[^>]*\bandroid:scheme\s*=\s*(["'])moodinator\1/i.test(mainManifest),
-    "Main Android manifest must use the moodinator deep-link scheme"
+    hasScheme(mainManifest, nativeIdentity.scheme),
+    `Main Android manifest must use the ${nativeIdentity.scheme} deep-link scheme`
   );
 }
 
@@ -280,8 +295,8 @@ for (const manifestPath of generatedReleaseManifests) {
   );
 
   assert(
-    /\bpackage\s*=\s*(["'])com\.lab4code\.moodinator\1/i.test(manifestTag),
-    `${relativeManifestPath} must use package com.lab4code.moodinator`
+    manifestTag.match(/\bpackage\s*=\s*(["'])(.*?)\1/i)?.[2] === nativeIdentity.package,
+    `${relativeManifestPath} must use package ${nativeIdentity.package}`
   );
   assert(
     readAndroidAttribute(usesSdkTag, "targetSdkVersion") === "36",
@@ -292,8 +307,12 @@ for (const manifestPath of generatedReleaseManifests) {
     `${relativeManifestPath} must set android:allowBackup=\"false\"`
   );
   assert(
-    /<data\b[^>]*\bandroid:scheme\s*=\s*(["'])moodinator\1/i.test(manifest),
-    `${relativeManifestPath} must use the moodinator deep-link scheme`
+    hasScheme(manifest, nativeIdentity.scheme),
+    `${relativeManifestPath} must use the ${nativeIdentity.scheme} deep-link scheme`
+  );
+  assert(
+    readAndroidAttribute(applicationTag, "debuggable") !== "true",
+    `${relativeManifestPath} must not be debuggable`
   );
 
   assert(
@@ -314,9 +333,9 @@ for (const manifestPath of generatedReleaseManifests) {
 
 if (strings) {
   assert(
-    strings.includes('<string name="app_name">Moodinator</string>'),
-    "Android app_name must be Moodinator"
+    strings.includes(`<string name="app_name">${nativeIdentity.name}</string>`),
+    `Android app_name must be ${nativeIdentity.name}`
   );
 }
 
-console.log("Android release config checks passed.");
+console.log(`Android release config checks passed (production source, ${nativeVariant} native identity).`);

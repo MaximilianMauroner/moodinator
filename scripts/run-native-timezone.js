@@ -9,10 +9,11 @@ const {
   evidenceAcceptance,
   evidenceStatus,
   isToolUnavailable,
+  launchQaApp,
   requirePreparedSourceSha,
 } = require("./native-qa-common");
 const { runMaestro: runMaestroWithDiagnostics } = require("./native-qa-runner");
-const { runAdb, waitForNode, waitForNodeAndTap } = require("./native-ui");
+const { runAdb, returnFromDataSettings, selectDownloadFixture, waitForNode, waitForNodeAndTap } = require("./native-ui");
 
 const appId = "com.lab4code.moodinator.qa";
 const root = path.resolve(__dirname, "..");
@@ -250,20 +251,16 @@ function runMaestro(serial) {
 
 function restartApp(serial) {
   runAdb(serial, ["shell", "am", "force-stop", appId]);
-  runAdb(serial, ["shell", "monkey", "-p", appId, "1"]);
+  launchQaApp(serial, { appId });
 }
 
 async function importFixture(serial, fixtureName) {
   await runMaestro(serial);
-  try {
-    await waitForNodeAndTap(serial, { text: fixtureName }, { timeoutMs: 3500 });
-  } catch (error) {
-    await waitForNodeAndTap(serial, { text: "Downloads", contains: true }, { timeoutMs: 2500 });
-    await waitForNodeAndTap(serial, { text: fixtureName }, { timeoutMs: 5000 });
-  }
+  await selectDownloadFixture(serial, fixtureName);
   await waitForNodeAndTap(serial, { text: "Replace Data" }, { timeoutMs: 5000 });
   await waitForNode(serial, { text: "Import Successful", contains: true }, { timeoutMs: 15000 });
   await waitForNodeAndTap(serial, { text: "OK" }, { timeoutMs: 5000 });
+  await returnFromDataSettings(serial);
 }
 
 function writeEvidence(outputDirectory, evidence) {
