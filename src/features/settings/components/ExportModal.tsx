@@ -2,18 +2,18 @@ import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
-  Modal,
   Pressable,
   Platform,
   TouchableOpacity,
   ActivityIndicator,
   StyleSheet,
 } from "react-native";
-import DateTimePicker from "@react-native-community/datetimepicker";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import * as Clipboard from "expo-clipboard";
 import { Ionicons } from "@expo/vector-icons";
+import { PrivateModal } from "@/components/ui/PrivateModal";
+import { PrivateDateTimePicker } from "@/components/ui/PrivateDateTimePicker";
 import { useModalAlert } from "@/components/ui/AppAlert";
 import {
   dataPortabilityService,
@@ -158,7 +158,7 @@ export function ExportModal({
   };
 
   return (
-    <Modal
+    <PrivateModal
       visible={visible}
       transparent
       animationType="slide"
@@ -246,7 +246,7 @@ export function ExportModal({
           )}
 
           {showStartDatePicker && (
-            <DateTimePicker
+            <PrivateDateTimePicker
               value={customStartDate}
               mode="date"
               display={Platform.OS === "ios" ? "spinner" : "default"}
@@ -262,7 +262,7 @@ export function ExportModal({
             />
           )}
           {showEndDatePicker && (
-            <DateTimePicker
+            <PrivateDateTimePicker
               value={customEndDate}
               mode="date"
               display={Platform.OS === "ios" ? "spinner" : "default"}
@@ -319,7 +319,7 @@ export function ExportModal({
         </View>
         {alertView}
       </View>
-    </Modal>
+    </PrivateModal>
   );
 }
 

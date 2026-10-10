@@ -3,6 +3,7 @@ import { Modal, Pressable } from "react-native";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Alert, AppAlertProvider, showSupportSheet, useModalAlert } from "@/components/ui/AppAlert";
+import { NavigatorHiddenProvider } from "@/components/ui/PrivateModal";
 import { colors } from "@/constants/colors";
 
 const exportsMock = vi.hoisted(() => ({
@@ -253,6 +254,21 @@ describe("export modal decisions", () => {
     expect(titles()).toContain("Review data export");
     await press("Back and edit");
     expect(renderer.root.findAllByProps({ accessibilityRole: "radio" })[2].props.accessibilityState.selected).toBe(true);
+    expect(exportsMock.createExport).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("closes the export window and its consent while the app is locked", async () => {
+    const onClose = await mountExport();
+    const app = (locked: boolean) => (
+      <NavigatorHiddenProvider value={locked}><ExportModal visible onClose={onClose} /></NavigatorHiddenProvider>
+    );
+    await act(async () => renderer.update(app(false)));
+    await press("Share JSON");
+    await act(async () => renderer.update(app(true)));
+    expect(renderer.root.findByType("Modal").props.visible).toBe(false);
+    await act(async () => renderer.update(app(false)));
+    expect(titles()).toContain("Review data export");
     expect(exportsMock.createExport).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
   });
