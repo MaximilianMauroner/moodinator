@@ -31,9 +31,10 @@ export default function DataSettingsScreen() {
   /** Returns false when the backup status could not be read. */
   const loadBackupInfo = useCallback(async () => {
     try {
-      const status = await dataPortabilityService.getBackupStatus();
-      setBackupInfo(status.info);
-      setBackupFolderUri(status.folderUri);
+      const folderUri = await dataPortabilityService.getBackupFolder();
+      setBackupFolderUri(folderUri);
+      const info = await dataPortabilityService.getBackupInfo();
+      setBackupInfo(info);
       setBackupError(false);
       return true;
     } catch (error) {

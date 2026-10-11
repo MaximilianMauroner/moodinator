@@ -4,7 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   alert: vi.fn(),
-  getBackupStatus: vi.fn(),
+  getBackupInfo: vi.fn(),
+  getBackupFolder: vi.fn(),
   setBackupFolder: vi.fn(),
   requestDirectoryPermissionsAsync: vi.fn(),
 }));
@@ -32,7 +33,8 @@ vi.mock("@/constants/colors", () => ({ getThemedColor: () => "#000" }));
 vi.mock("@/components/ui/AppAlert", () => ({ Alert: { alert: mocks.alert } }));
 vi.mock("@/services/dataPortabilityService", () => ({
   dataPortabilityService: {
-    getBackupStatus: mocks.getBackupStatus,
+    getBackupInfo: mocks.getBackupInfo,
+    getBackupFolder: mocks.getBackupFolder,
     setBackupFolder: mocks.setBackupFolder,
   },
 }));
@@ -55,12 +57,11 @@ async function selectNewFolder() {
 
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  Object.values(mocks).forEach((mock) => mock.mockReset());
   vi.spyOn(console, "error").mockImplementation(() => {});
   mocks.setBackupFolder.mockResolvedValue(undefined);
-  mocks.getBackupStatus.mockResolvedValueOnce({
-    info: { count: 2, latestBackup: null },
-    folderUri: "content://provider/tree/OldFolder",
-  });
+  mocks.getBackupInfo.mockResolvedValueOnce({ count: 2, latestBackup: null });
+  mocks.getBackupFolder.mockResolvedValueOnce("content://provider/tree/OldFolder");
 });
 
 afterEach(async () => {
@@ -69,11 +70,28 @@ afterEach(async () => {
 });
 
 describe("backup folder selection", () => {
-  it("reports success after the new folder is read", async () => {
-    mocks.getBackupStatus.mockResolvedValueOnce({
-      info: { count: 0, latestBackup: null },
-      folderUri: "content://provider/tree/NewFolder",
+  it("keeps the saved folder on cold mount when backups cannot be read", async () => {
+    mocks.getBackupInfo.mockReset();
+    mocks.getBackupInfo.mockRejectedValueOnce(new Error("Provider I/O error"));
+
+    await act(async () => {
+      renderer = create(<DataSettingsScreen />);
     });
+
+    expect(backupFolderRow().props.subLabel).toBe("Location: OldFolder");
+    expect(
+      renderer.root.findAllByType("Text").some((node) => node.props.children === "Could not read backups")
+    ).toBe(true);
+    expect(renderer.root.findByProps({ label: "Backup Status" }).props.subLabel)
+      .toBe("Check folder access, then retry");
+    expect(mocks.setBackupFolder).not.toHaveBeenCalled();
+    expect(mocks.requestDirectoryPermissionsAsync).not.toHaveBeenCalled();
+    expect(mocks.alert).not.toHaveBeenCalled();
+  });
+
+  it("reports success after the new folder is read", async () => {
+    mocks.getBackupInfo.mockResolvedValueOnce({ count: 0, latestBackup: null });
+    mocks.getBackupFolder.mockResolvedValueOnce("content://provider/tree/NewFolder");
 
     await selectNewFolder();
 
@@ -81,7 +99,8 @@ describe("backup folder selection", () => {
   });
 
   it("shows the new folder without a success message when the folder cannot be read", async () => {
-    mocks.getBackupStatus.mockRejectedValueOnce(new Error("Provider I/O error"));
+    mocks.getBackupInfo.mockRejectedValueOnce(new Error("Provider I/O error"));
+    mocks.getBackupFolder.mockResolvedValueOnce("content://provider/tree/NewFolder");
 
     await selectNewFolder();
 

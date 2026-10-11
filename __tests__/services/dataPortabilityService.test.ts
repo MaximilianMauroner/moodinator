@@ -235,14 +235,4 @@ describe("dataPortabilityService", () => {
     expect(diagnostic).toHaveBeenCalledWith("Error running manual backup:", error);
     diagnostic.mockRestore();
   });
-
-  it("loads backup metadata and folder together", async () => {
-    mocks.getBackupInfo.mockResolvedValue({ count: 2, latestBackup: 123 });
-    mocks.getBackupFolder.mockResolvedValue("file:///backups");
-
-    await expect(dataPortabilityService.getBackupStatus()).resolves.toEqual({
-      info: { count: 2, latestBackup: 123 },
-      folderUri: "file:///backups",
-    });
-  });
 });

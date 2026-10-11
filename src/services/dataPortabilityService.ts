@@ -30,11 +30,6 @@ export type BackupInfoSummary = {
   latestBackup: number | null;
 };
 
-export type BackupStatusSummary = {
-  info: BackupInfoSummary;
-  folderUri: string | null;
-};
-
 export type ManualBackupOutcome =
   | { success: true; title: "Backup Created"; message: string }
   | { success: false; title: "Backup Failed" | "Backup Error"; message: string };
@@ -236,15 +231,6 @@ export const dataPortabilityService = {
 
   async getBackupFolder(): Promise<string | null> {
     return getBackupFolder();
-  },
-
-  async getBackupStatus(): Promise<BackupStatusSummary> {
-    const [info, folderUri] = await Promise.all([
-      this.getBackupInfo(),
-      this.getBackupFolder(),
-    ]);
-
-    return { info, folderUri };
   },
 
   async setBackupFolder(uri: string): Promise<void> {
