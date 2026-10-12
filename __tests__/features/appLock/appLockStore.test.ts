@@ -2,6 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const secure = vi.hoisted(() => ({ values: new Map<string, string>() }));
+const capture = vi.hoisted(() => ({ apply: vi.fn<(enabled: boolean) => Promise<void>>(() => Promise.resolve()) }));
+
+vi.mock("@/features/appLock/services/captureProtection", () => ({
+  applyAppLockCaptureProtection: capture.apply,
+}));
 
 vi.mock("expo-secure-store", () => ({
   WHEN_UNLOCKED_THIS_DEVICE_ONLY: "device-only",
@@ -33,6 +38,8 @@ describe("appLockStore", () => {
     useAppLockStore.setState({
       hydrated: false,
       hydrationError: null,
+      captureReady: false,
+      captureError: null,
       isEnabled: false,
       biometricsEnabled: false,
       pinLength: 4,
@@ -41,6 +48,8 @@ describe("appLockStore", () => {
       lockoutUntil: null,
       hasPinSet: false,
     });
+    capture.apply.mockReset();
+    capture.apply.mockResolvedValue(undefined);
   });
 
   it("fails closed and remains retryable when app-lock storage cannot be read", async () => {
@@ -153,5 +162,88 @@ describe("appLockStore", () => {
       "appLockAttemptState",
       JSON.stringify({ failedAttempts: 1, lockoutUntil: null })
     );
+  });
+
+  it("keeps hydration gated until the persisted enabled policy reaches native capture", async () => {
+    secure.values.set("appLockPinHash", "v3$4$salt$digest:v3:4:salt:1234");
+    await AsyncStorage.setItem("appLockEnabled", "true");
+    let finishCapture!: () => void;
+    capture.apply.mockImplementationOnce(() => new Promise<void>((resolve) => { finishCapture = resolve; }));
+
+    const hydration = useAppLockStore.getState().hydrate();
+    await vi.waitFor(() => expect(capture.apply).toHaveBeenCalledWith(true));
+    expect(useAppLockStore.getState()).toMatchObject({ hydrated: false, captureReady: false });
+    finishCapture();
+    await hydration;
+    useAppLockStore.getState().unlock();
+
+    expect(useAppLockStore.getState()).toMatchObject({ captureReady: true, isEnabled: true, isLocked: false });
+    expect(capture.apply).toHaveBeenCalledTimes(1);
+  });
+
+  it("releases startup protection when the persisted setting is off", async () => {
+    await useAppLockStore.getState().hydrate();
+    expect(capture.apply).toHaveBeenCalledWith(false);
+    expect(useAppLockStore.getState()).toMatchObject({ captureReady: true, isEnabled: false });
+  });
+
+  it("protects capture before persisting App Lock on", async () => {
+    useAppLockStore.setState({ hasPinSet: true, hydrated: true, captureReady: true });
+    let finishCapture!: () => void;
+    capture.apply.mockImplementationOnce(() => new Promise<void>((resolve) => { finishCapture = resolve; }));
+
+    const enabling = useAppLockStore.getState().setEnabled(true);
+    await vi.waitFor(() => expect(capture.apply).toHaveBeenCalledWith(true));
+    expect(await AsyncStorage.getItem("appLockEnabled")).toBeNull();
+    expect(useAppLockStore.getState().captureReady).toBe(false);
+    finishCapture();
+    await enabling;
+
+    expect(await AsyncStorage.getItem("appLockEnabled")).toBe("true");
+    expect(useAppLockStore.getState()).toMatchObject({ isEnabled: true, captureReady: true });
+  });
+
+  it("does not claim protection when capture activation fails and can retry hydration", async () => {
+    secure.values.set("appLockPinHash", "v3$4$salt$digest:v3:4:salt:1234");
+    await AsyncStorage.setItem("appLockEnabled", "true");
+    capture.apply.mockRejectedValueOnce(new Error("native unavailable"));
+
+    await useAppLockStore.getState().hydrate();
+    expect(useAppLockStore.getState()).toMatchObject({
+      captureReady: false, captureError: "Capture protection could not be applied.",
+      hydrationError: "native unavailable",
+    });
+    await useAppLockStore.getState().hydrate();
+    expect(useAppLockStore.getState()).toMatchObject({ captureReady: true, captureError: null });
+    expect(capture.apply).toHaveBeenCalledTimes(2);
+  });
+
+  it("serializes overlapping enabled-setting changes", async () => {
+    useAppLockStore.setState({ hasPinSet: true, hydrated: true, captureReady: true });
+    let finishCapture!: () => void;
+    capture.apply.mockImplementationOnce(() => new Promise<void>((resolve) => { finishCapture = resolve; }));
+
+    const enabling = useAppLockStore.getState().setEnabled(true);
+    const disabling = useAppLockStore.getState().setEnabled(false);
+    await vi.waitFor(() => expect(capture.apply).toHaveBeenCalledTimes(1));
+    finishCapture();
+    await Promise.all([enabling, disabling]);
+
+    expect(capture.apply.mock.calls).toEqual([[true], [false]]);
+    expect(await AsyncStorage.getItem("appLockEnabled")).toBe("false");
+    expect(useAppLockStore.getState()).toMatchObject({ isEnabled: false, captureReady: true });
+  });
+
+  it("keeps PIN recovery gated when capture release fails during PIN removal", async () => {
+    const pinHash = "v3$4$salt$digest:v3:4:salt:1234";
+    secure.values.set("appLockPinHash", pinHash);
+    await AsyncStorage.setItem("appLockEnabled", "true");
+    useAppLockStore.setState({ hasPinSet: true, isEnabled: true, hydrated: true, captureReady: true });
+    capture.apply.mockRejectedValueOnce(new Error("native unavailable"));
+
+    await expect(useAppLockStore.getState().clearPin()).rejects.toThrow("native unavailable");
+    expect(secure.values.get("appLockPinHash")).toBe(pinHash);
+    expect(await AsyncStorage.getItem("appLockEnabled")).toBe("true");
+    expect(useAppLockStore.getState()).toMatchObject({ isEnabled: true, captureReady: false });
   });
 });

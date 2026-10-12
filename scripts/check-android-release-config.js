@@ -13,13 +13,14 @@ const nativeIdentity = nativeVariant === "qa"
   ? { package: "com.lab4code.moodinator.qa", scheme: "moodinator-qa", name: "Moodinator QA" }
   : { package: "com.lab4code.moodinator", scheme: "moodinator", name: "Moodinator" };
 const systemAlertWindowPermission = "android.permission.SYSTEM_ALERT_WINDOW";
-const recentsScreenshotPlugin = "./plugins/withRecentsScreenshotDisabled";
+const captureProtectionPlugin = "./plugins/withAndroidCaptureProtection";
 const advertisingIdPermission = "com.google.android.gms.permission.AD_ID";
 const requiredBlockedPermissions = new Set([
   systemAlertWindowPermission,
   advertisingIdPermission,
   "android.permission.FOREGROUND_SERVICE",
   "android.permission.READ_EXTERNAL_STORAGE",
+  "android.permission.READ_MEDIA_IMAGES",
   "android.permission.WRITE_EXTERNAL_STORAGE",
   "com.google.android.c2dm.permission.RECEIVE",
   "com.google.android.finsky.permission.BIND_GET_INSTALL_REFERRER_SERVICE",
@@ -204,8 +205,8 @@ assert(
   "app.json Android permissions must not request SYSTEM_ALERT_WINDOW"
 );
 assert(
-  app.expo.plugins?.includes(recentsScreenshotPlugin),
-  `app.json plugins must include ${recentsScreenshotPlugin}, which keeps entries out of the Recents thumbnail`
+  app.expo.plugins?.includes(captureProtectionPlugin),
+  `app.json plugins must include ${captureProtectionPlugin}, which protects capture until App Lock hydration`
 );
 assert(
   androidBlockedPermissions.includes(systemAlertWindowPermission),
@@ -285,8 +286,14 @@ if (mainManifest) {
 
 if (mainActivity) {
   assert(
-    mainActivity.includes("setRecentsScreenshotEnabled(false)"),
-    "MainActivity must disable the Recents screenshot; regenerate stale native files"
+    mainActivity.includes("window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)") &&
+      mainActivity.indexOf("window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)") <
+        mainActivity.indexOf("super.onCreate(null)"),
+    "MainActivity must start secure before onCreate; regenerate stale native files"
+  );
+  assert(
+    !mainActivity.includes("setRecentsScreenshotEnabled(false)"),
+    "MainActivity must not disable Recents unconditionally; run a clean Android prebuild"
   );
 }
 

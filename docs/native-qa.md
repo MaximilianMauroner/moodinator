@@ -36,7 +36,35 @@ native control remained reachable.
 | Read/edit/delete | History actions edit, change date/time, delete, and undo through the mood service/store. | Edit persists after restart; date/time changes are intentional; delete removes one row and Undo restores the same data. |
 | Insights | Insights shows descriptive charts and the climate card; Calendar remains in History’s Month view. Zero, one, and multiple records have honest no-data/insufficient-sample states, descriptive comparisons, mood statistics, and streaks. | Check Insights charts, History Month, all ranges, refresh, and populated fixtures on a clean QA install. Verify that no confidence dots or pattern-confidence sentences remain. |
 | Settings and portability | Local privacy status and all Settings destinations remain available; presets affect the next entry; JSON import replacement is confirmed; export, backup, deletion, and external-copy limits are disclosed. | Verify privacy status, every Settings destination, therapy export, preset application, malformed import recovery, selected Android backup folder, manual backup, deletion scope, restart, and offline use. |
-| Protection and reminders | Optional app lock, biometrics, and local reminders are separate existing functionality. On Android 13 and later the Recents thumbnail is always blank; screenshots stay allowed. | Verify PIN/biometric recovery and reminder delivery after restart on the exact candidate; physical-device notification behavior remains separate. On Android 13 or later, open Recents with an entry on screen: the thumbnail is blank, and `adb exec-out screencap -p` still shows the app. |
+| Protection and reminders | Optional app lock, biometrics, and local reminders are separate existing functionality. On Android, the persisted App Lock setting also controls capture: off permits screenshots and normal Recents; on hides app content from screenshots and Recents, including after PIN unlock. Recording follows Android secure-window behavior. | Verify both persisted states, enable/disable and PIN removal, cold start, HOME/resume, open sheets/alerts, and picker/share return on the exact emulator candidate. Capture protection must finish before private content appears; API failure keeps content hidden with retry guidance. Treat recording and external activities separately. Physical-device notification behavior remains separate. |
+
+### Android App Lock capture acceptance
+
+The native window starts with `FLAG_SECURE` while the stored preference is
+unknown. Hydration applies that preference before any private screen appears.
+With App Lock off, the flag is cleared and ordinary screenshots and Recents
+return. With App Lock enabled, it stays set during an unlocked session. Changing
+the setting closes private native windows while the capture policy changes,
+then restores them through the existing modal gate. A failed capture API call
+does not establish protection: private content stays hidden and recovery offers
+another settings read. No new setting, QA exception or iOS capture feature exists.
+
+Use a source-matched QA build on a verified disposable emulator with fabricated
+records, an owned app PIN, and an explicit adb serial. Test App Lock off/on,
+including cold launches and an unlocked session, enabling/disabling and PIN
+removal, background/resume, open app sheets/alerts, and return from system
+pickers/share activities. Inspect live screenshots and Recents independently;
+screen recording needs its own observation. External activities have their own
+windows, so MainActivity protection does not prove their capture policy.
+
+The screen-capture package's photo-read permissions are blocked. This app does
+not request screenshot-listener permissions or consume screenshot events. Its
+Android 14+ native package declares the normal screenshot-detection permission.
+Check the merged manifest during native verification.
+
+Phase-one source checks are not native evidence. Frozen dependency installation,
+full checks, clean prebuild, native compilation and emulator acceptance run only
+when the coordinator assigns the later verification phase.
 
 ## Evidence boundary and remaining runtime inventory
 
