@@ -152,9 +152,10 @@ In older Expo builds, toggling NativeWind `shadow-*` utilities during state upda
 
 ## Roadmap
 
-Use the task tracker for planned features, implementation slices, dependencies, and task
-status. See [AGENTS.md](./AGENTS.md) for the parent-task, vertical-slice,
-review, and merge workflow.
+Use [GitHub Issues](https://github.com/MaximilianMauroner/moodinator/issues)
+for planned features, implementation slices, dependencies, and issue status.
+See [AGENTS.md](./AGENTS.md) for the parent-issue, vertical-slice, review, and
+merge workflow.
 
 ## Privacy & Legal
 
@@ -165,8 +166,9 @@ review, and merge workflow.
 
 ## Contributing
 
-Contributions are welcome. Use the task tracker for planned work and implementation
-handoff; pull requests should reference the relevant task when one exists.
+Contributions are welcome. Use [GitHub Issues](https://github.com/MaximilianMauroner/moodinator/issues)
+for planned work and implementation handoff; pull requests should reference the
+relevant issue when one exists.
 
 ## Contact
 
