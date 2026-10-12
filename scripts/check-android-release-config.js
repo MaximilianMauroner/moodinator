@@ -13,6 +13,7 @@ const nativeIdentity = nativeVariant === "qa"
   ? { package: "com.lab4code.moodinator.qa", scheme: "moodinator-qa", name: "Moodinator QA" }
   : { package: "com.lab4code.moodinator", scheme: "moodinator", name: "Moodinator" };
 const systemAlertWindowPermission = "android.permission.SYSTEM_ALERT_WINDOW";
+const recentsScreenshotPlugin = "./plugins/withRecentsScreenshotDisabled";
 const advertisingIdPermission = "com.google.android.gms.permission.AD_ID";
 const requiredBlockedPermissions = new Set([
   systemAlertWindowPermission,
@@ -167,6 +168,9 @@ const app = readJson("app.json");
 const eas = readJson("eas.json");
 const gradle = readOptionalText("android/app/build.gradle");
 const mainManifest = readOptionalText("android/app/src/main/AndroidManifest.xml");
+const mainActivity = readOptionalText(
+  `android/app/src/main/java/${nativeIdentity.package.replaceAll(".", "/")}/MainActivity.kt`
+);
 const strings = readOptionalText("android/app/src/main/res/values/strings.xml");
 const developerRoute = readText("src/app/settings/developer.tsx");
 const generatedReleaseManifests = findGeneratedReleaseManifests();
@@ -198,6 +202,10 @@ assert(
 assert(
   !androidPermissions.includes(systemAlertWindowPermission),
   "app.json Android permissions must not request SYSTEM_ALERT_WINDOW"
+);
+assert(
+  app.expo.plugins?.includes(recentsScreenshotPlugin),
+  `app.json plugins must include ${recentsScreenshotPlugin}, which keeps entries out of the Recents thumbnail`
 );
 assert(
   androidBlockedPermissions.includes(systemAlertWindowPermission),
@@ -272,6 +280,13 @@ if (mainManifest) {
   assert(
     hasScheme(mainManifest, nativeIdentity.scheme),
     `Main Android manifest must use the ${nativeIdentity.scheme} deep-link scheme`
+  );
+}
+
+if (mainActivity) {
+  assert(
+    mainActivity.includes("setRecentsScreenshotEnabled(false)"),
+    "MainActivity must disable the Recents screenshot; regenerate stale native files"
   );
 }
 
