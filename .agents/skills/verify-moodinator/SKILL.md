@@ -7,7 +7,7 @@ description: Verify Moodinator native recording, insights and recovery. Use when
 
 Draft until an owned matching QA build and device/profile are ready.
 Read AGENTS.md, README.md, [Native QA](../../../docs/native-qa.md) and
-[features.md](features.md). The existing native QA document and runners own
+[the feature index](features/README.md). The existing native QA document and runners own
 setup, selectors, fixture identity and cleanup. Do not open a browser.
 Check active work, host resources, clean source SHA and device ownership first.
 Select journeys affected by work in the requested audit window.
