@@ -1,7 +1,8 @@
 import React from "react";
-import { View, Text, Modal, Pressable, ScrollView } from "react-native";
+import { View, Text, Pressable, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { format } from "date-fns";
+import { PrivateModal } from "@/components/ui/PrivateModal";
 import { useThemeColors, colors, getThemedColor } from "@/constants/colors";
 import { getMoodRatingDisplay } from "@/constants/moodScaleInterpretation";
 import { haptics } from "@/lib/haptics";
@@ -60,7 +61,7 @@ export function DayDetailModal({
       : `${entryCount} · ${lightest.label} ${lightest.value} to ${heaviest.label} ${heaviest.value}`;
 
   return (
-    <Modal
+    <PrivateModal
       visible={visible}
       transparent
       animationType="slide"
@@ -255,6 +256,6 @@ export function DayDetailModal({
           </ScrollView>
         </View>
       </View>
-    </Modal>
+    </PrivateModal>
   );
 }

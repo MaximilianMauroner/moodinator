@@ -19,7 +19,7 @@ export default function PrivacyPolicyScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Text className="text-xs text-paper-700 dark:text-sand-400 mb-4">
-          Last Updated: September 15, 2026
+          Last Updated: October 9, 2026
         </Text>
 
         <Section title="Introduction">
@@ -69,7 +69,7 @@ export default function PrivacyPolicyScreen() {
             Moodinator attempts to delete temporary exports after the flow, but an interrupted or failed share can leave a file until the operating system clears the cache. Selected destinations can include cloud-backed providers. Anyone with access to a file or clipboard copy may be able to read it.
           </Paragraph>
           <Paragraph>
-            Periodic backups are scheduled by the operating system, which decides whether and when they run. After backup storage is available, the background task may run automatically and limits its successful backups to at most once per week; manual backups are not subject to that cadence. Android requires a selected folder first. Moodinator keeps the eight newest app-managed backup files it can identify and removes older identified managed backups. It cannot delete arbitrary exports, renamed copies, clipboard content, or copies held by another app or provider.
+            Periodic backups are scheduled by the operating system, which decides whether and when they run. After backup storage is available, the background task may run automatically and limits its successful backups to at most once per week; manual backups are not subject to that cadence. Android requires a selected folder first. If a selected folder is inaccessible, the backup fails and asks you to select the folder again; Moodinator does not switch to another destination. Moodinator keeps the eight newest app-managed backup files it can identify and removes older identified managed backups. Each same-day copy counts toward this eight-file limit. It cannot delete arbitrary exports, renamed copies, clipboard content, or copies held by another app or provider.
           </Paragraph>
         </Section>
 
