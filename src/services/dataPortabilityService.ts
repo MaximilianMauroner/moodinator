@@ -30,11 +30,6 @@ export type BackupInfoSummary = {
   latestBackup: number | null;
 };
 
-export type BackupStatusSummary = {
-  info: BackupInfoSummary;
-  folderUri: string | null;
-};
-
 export type ManualBackupOutcome =
   | { success: true; title: "Backup Created"; message: string }
   | { success: false; title: "Backup Failed" | "Backup Error"; message: string };
@@ -207,7 +202,7 @@ export const dataPortabilityService = {
         return {
           success: true,
           title: "Backup Created",
-          message: "Backup created successfully.",
+          message: backupResult.warning ?? "Backup created successfully.",
         };
       }
 
@@ -216,11 +211,12 @@ export const dataPortabilityService = {
         title: "Backup Failed",
         message: backupResult.error,
       };
-    } catch {
+    } catch (error) {
+      console.error("Error running manual backup:", error);
       return {
         success: false,
         title: "Backup Error",
-        message: "Failed to create backup.",
+        message: "Could not create a backup. Check available storage and folder access, then try again.",
       };
     }
   },
@@ -235,15 +231,6 @@ export const dataPortabilityService = {
 
   async getBackupFolder(): Promise<string | null> {
     return getBackupFolder();
-  },
-
-  async getBackupStatus(): Promise<BackupStatusSummary> {
-    const [info, folderUri] = await Promise.all([
-      this.getBackupInfo(),
-      this.getBackupFolder(),
-    ]);
-
-    return { info, folderUri };
   },
 
   async setBackupFolder(uri: string): Promise<void> {

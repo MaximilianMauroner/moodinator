@@ -1,9 +1,88 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { buildTherapyExportCsv } from "../../src/services/therapyExportService";
 import { createMockMoodEntry } from "../db/mockClient";
 
 describe("therapyExportService", () => {
+  describe("recorded timestamps", () => {
+    const originalTimezone = process.env.TZ;
+
+    afterEach(() => {
+      if (originalTimezone === undefined) {
+        delete process.env.TZ;
+      } else {
+        process.env.TZ = originalTimezone;
+      }
+    });
+
+    it.each([
+      [0, "2026-10-08T23:48:29Z"],
+      [-120, "2026-10-09T01:48:29Z"],
+      [420, "2026-10-08T16:48:29Z"],
+      [-330, "2026-10-09T05:18:29Z"],
+      [210, "2026-10-08T20:18:29Z"],
+    ])("keeps captured offset %i stable after timezone travel", (utcOffsetMinutes, wallClock) => {
+      const entry = createMockMoodEntry({
+        timestamp: Date.parse("2026-10-08T23:48:29Z"),
+        utcOffsetMinutes,
+      });
+      const expected = new Date(wallClock).toLocaleString(undefined, { timeZone: "UTC" });
+      const exports = ["Europe/Vienna", "America/Los_Angeles", "Asia/Kolkata"].map((timezone) => {
+        process.env.TZ = timezone;
+        return buildTherapyExportCsv([entry], ["timestamp"]);
+      });
+
+      expect(new Set(exports).size).toBe(1);
+      expect(exports[0]).toContain(expected);
+      expect(entry.timestamp).toBe(Date.parse("2026-10-08T23:48:29Z"));
+      expect(entry.utcOffsetMinutes).toBe(utcOffsetMinutes);
+    });
+
+    it("preserves a recorded clock time inside the device's daylight-saving gap", () => {
+      process.env.TZ = "America/New_York";
+      const entry = createMockMoodEntry({
+        timestamp: Date.parse("2026-03-08T02:30:00Z"),
+        utcOffsetMinutes: 0,
+      });
+      const expected = new Date("2026-03-08T02:30:00Z").toLocaleString(undefined, { timeZone: "UTC" });
+
+      expect(buildTherapyExportCsv([entry], ["timestamp"])).toContain(expected);
+    });
+
+    it("preserves the previous calendar day at a western half-hour offset", () => {
+      process.env.TZ = "Asia/Tokyo";
+      const entry = createMockMoodEntry({
+        timestamp: Date.parse("2026-10-09T00:15:00Z"),
+        utcOffsetMinutes: 210,
+      });
+      const expected = new Date("2026-10-08T20:45:00Z").toLocaleString(undefined, { timeZone: "UTC" });
+
+      expect(buildTherapyExportCsv([entry], ["timestamp"])).toContain(expected);
+    });
+
+    it("keeps the current-device timezone fallback for legacy entries", () => {
+      const entry = createMockMoodEntry({ timestamp: Date.parse("2026-10-08T23:48:29Z"), utcOffsetMinutes: null });
+      const exports = ["Europe/Vienna", "America/Los_Angeles"].map((timezone) => {
+        process.env.TZ = timezone;
+        const csv = buildTherapyExportCsv([entry], ["timestamp", "notes", "energy"]);
+        expect(csv.split("\n")[0]).toBe("Timestamp,Notes,Energy Level");
+        expect(csv).toContain(new Date(entry.timestamp).toLocaleString());
+        return csv;
+      });
+
+      expect(exports[0]).not.toBe(exports[1]);
+    });
+
+    it("retains existing CSV output for unreadable and invalid timestamps", () => {
+      process.env.TZ = "Europe/Vienna";
+      const unreadable = createMockMoodEntry({ timestamp: 0, utcOffsetMinutes: null });
+      const invalid = createMockMoodEntry({ timestamp: Number.NaN, utcOffsetMinutes: null });
+
+      expect(buildTherapyExportCsv([unreadable], ["timestamp"])).toContain(new Date(0).toLocaleString());
+      expect(buildTherapyExportCsv([invalid], ["timestamp"])).toBe("Timestamp\n");
+    });
+  });
+
   it("includes Mood Scale context whenever Mood Rating is exported", () => {
     const csv = buildTherapyExportCsv(
       [

@@ -298,6 +298,26 @@ describe("export modal decisions", () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
+  it("ignores clipboard completion from a closed export after reopening", async () => {
+    const onClose = await mountExport();
+    exportsMock.available.mockResolvedValue(false);
+    let completeCopy!: () => void;
+    exportsMock.copy.mockImplementationOnce(() => new Promise<void>((resolve) => {
+      completeCopy = resolve;
+    }));
+    await press("Share JSON");
+    await press("Create export");
+    await press("Copy JSON");
+    await act(async () => renderer.update(<ExportModal visible={false} onClose={onClose} />));
+    await act(async () => renderer.update(<ExportModal visible onClose={onClose} />));
+    await act(async () => completeCopy());
+
+    expect(titles()).toEqual([]);
+    expect(onClose).not.toHaveBeenCalled();
+    await press("Share JSON");
+    expect(titles()).toEqual(["Review data export"]);
+  });
+
   it("keeps the export open for correction when creation fails", async () => {
     const onClose = await mountExport();
     exportsMock.createExport.mockResolvedValue({ ok: false, title: "No data", message: "Choose another range" });

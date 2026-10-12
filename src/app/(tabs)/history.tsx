@@ -114,8 +114,9 @@ function HistoryScreenContent() {
 
   const header = (
     <View style={{ gap: 14, paddingBottom: 12 }}>
-      <View className="flex-row items-center justify-between pt-4">
-        <View>
+      <View className="flex-row items-center justify-between gap-2.5 pt-4">
+        {/* Let large text wrap here so the settings gear stays on screen. */}
+        <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={[typography.titleMd, { color: get("text"), fontSize: 24, lineHeight: 28 }]}>History</Text>
           <Text style={[typography.bodySm, { color: get("textSubtle"), marginTop: 2 }]}>
             {view === "days" ? "Lightest to heaviest, each day" : "Each day shows its average weather"}

@@ -128,13 +128,19 @@ export function useModalAlert(visible: boolean) {
   const { request, show, clear, dismiss, pressButton } = useAlertQueue();
   const visibleRef = useRef(visible);
   visibleRef.current = visible;
+  const sessionRef = useRef(0);
+  const session = sessionRef.current;
   useEffect(() => {
-    if (!visible) clear();
+    if (!visible) {
+      // A late result from this opening must not show in the next opening.
+      sessionRef.current += 1;
+      clear();
+    }
   }, [visible, clear]);
   const alert = useCallback<AlertStatic["alert"]>((title, message, buttons, options) => {
-    if (!visibleRef.current) return;
+    if (!visibleRef.current || sessionRef.current !== session) return;
     show({ title, message, buttons: buttons?.length ? buttons : [{ text: "OK" }], options });
-  }, [show]);
+  }, [session, show]);
   return {
     alert,
     hasAlert: visible && request !== null,

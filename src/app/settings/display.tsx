@@ -70,8 +70,8 @@ function CardStyleOption({
           className="rounded-2xl p-3"
           style={{ borderWidth: 1, borderColor: get("borderSubtle") }}
         >
-          <View className="mb-2 flex-row items-baseline justify-between">
-            <View className="flex-row items-baseline gap-2">
+          <View className="mb-2 flex-row flex-wrap items-baseline justify-between gap-2">
+            <View className="flex-row flex-wrap items-baseline gap-2">
               <Text className="text-2xl font-black" style={{ color: "#D4A574" }}>
                 6
               </Text>
@@ -129,9 +129,9 @@ function CardStyleOption({
           className="rounded-2xl p-3"
           style={{ backgroundColor: get("surfaceAlt"), borderWidth: 1, borderColor: get("borderSubtle") }}
         >
-          <View className="flex-row items-center gap-3">
+          <View className="flex-row flex-wrap items-center gap-3">
             <View
-              className="h-8 w-8 items-center justify-center rounded-full"
+              className="min-h-8 min-w-8 px-2 py-1 items-center justify-center rounded-full"
               style={{ backgroundColor: "#7A6545" }}
             >
               <Text className="text-sm font-bold text-white">6</Text>

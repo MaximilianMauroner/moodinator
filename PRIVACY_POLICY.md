@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last Updated: September 15, 2026**
+**Last Updated: October 9, 2026**
 
 ## Introduction
 
@@ -38,7 +38,7 @@ Mood-history exports and backups are plaintext JSON files. Therapy exports are p
 
 Moodinator attempts to delete its temporary cache export after the export flow, but an interrupted or failed share can leave a temporary file until the operating system clears the app cache. You may choose another app or destination through the operating system, including a cloud-backed storage provider. After data is copied, shared, or saved outside Moodinator's private storage, the destination provider's and operating system's practices apply.
 
-Moodinator registers a periodic backup task with the operating system. The operating system decides whether and when it runs; execution is not guaranteed. After backup storage is available, the task may create a backup automatically and throttles successful backups to at most once per week. On Android, no backup can be created until you select a folder. On iOS, the app's Documents area is the default. Moodinator's retention cleanup keeps the eight newest app-managed `moodinator-backup-*.json` files it can identify in its managed backup locations and deletes older identified backups. This cleanup does not delete arbitrary exports, renamed copies, clipboard contents, or copies held by another app or provider.
+Moodinator registers a periodic backup task with the operating system. The operating system decides whether and when it runs; execution is not guaranteed. After backup storage is available, the task may create a backup automatically and throttles successful backups to at most once per week. On Android, no backup can be created until you select a folder. On iOS, the app's Documents area is the default. If a selected backup folder is inaccessible, the backup fails and asks you to select the folder again; Moodinator does not switch to another destination. Moodinator's retention cleanup keeps the eight newest app-managed `moodinator-backup-*.json` files it can identify in its managed backup locations and deletes older identified backups. Each same-day copy counts toward this eight-file limit. This cleanup does not delete arbitrary exports, renamed copies, clipboard contents, or copies held by another app or provider.
 
 ## External Support Actions
 
