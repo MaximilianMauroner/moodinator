@@ -10,6 +10,7 @@ import { LockScreen, useAppLockStore } from "@/features/appLock";
 import { OnboardingScreen, useOnboardingStore } from "@/features/onboarding";
 import { AppToaster } from "@/components/ui/AppToaster";
 import { AppAlertProvider } from "@/components/ui/AppAlert";
+import { NavigatorHiddenProvider } from "@/components/ui/PrivateModal";
 import { useSettingsStore } from "@/shared/state/settingsStore";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { runAppBootstrap, type AppBootstrapStatus } from "@/services/bootstrapService";
@@ -203,14 +204,17 @@ export default function Layout() {
           importantForAccessibility={blocksNavigator ? "no-hide-descendants" : "auto"}
         >
           {shouldMountNavigator && (
-            <Stack
-              screenOptions={{
-                headerShown: false,
-                contentStyle: {
-                  backgroundColor: "transparent",
-                },
-              }}
-            />
+            // Sheets open native windows that display: none cannot hide.
+            <NavigatorHiddenProvider value={blocksNavigator}>
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  contentStyle: {
+                    backgroundColor: "transparent",
+                  },
+                }}
+              />
+            </NavigatorHiddenProvider>
           )}
         </View>
 
@@ -245,7 +249,10 @@ export default function Layout() {
         )}
 
         {!blocksNavigator && <AppToaster />}
-        {!blocksNavigator && <AppAlertProvider />}
+        {/* Stays mounted, so an open alert closes at once behind the lock and returns after unlock. */}
+        <NavigatorHiddenProvider value={blocksNavigator}>
+          <AppAlertProvider />
+        </NavigatorHiddenProvider>
       </View>
     </GestureHandlerRootView>
   );

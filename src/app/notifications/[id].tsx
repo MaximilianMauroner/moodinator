@@ -14,7 +14,7 @@ import {
 import type { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import DateTimePicker from "@react-native-community/datetimepicker";
+import { PrivateDateTimePicker } from "@/components/ui/PrivateDateTimePicker";
 import {
   getAllNotifications,
   addNotification,
@@ -410,7 +410,7 @@ export default function NotificationDetailScreen() {
                     borderColor: get("border"),
                   }}
                 >
-                  <DateTimePicker
+                  <PrivateDateTimePicker
                     value={new Date(new Date().setHours(hour, minute))}
                     mode="time"
                     display={Platform.OS === "ios" ? "spinner" : "default"}
