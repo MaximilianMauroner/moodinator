@@ -220,7 +220,10 @@ export default function Layout() {
         )}
 
         {!blocksNavigator && <AppToaster />}
-        {!blocksNavigator && <AppAlertProvider />}
+        {/* Stays mounted, so an open alert closes at once behind the lock and returns after unlock. */}
+        <NavigatorHiddenProvider value={blocksNavigator}>
+          <AppAlertProvider />
+        </NavigatorHiddenProvider>
       </View>
     </GestureHandlerRootView>
   );
