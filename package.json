@@ -107,6 +107,9 @@
   "overrides": {
     "expo-image-loader": "55.0.1"
   },
+  "patchedDependencies": {
+    "@react-native-community/datetimepicker@8.6.0": "patches/datetimepicker@8.6.0.patch"
+  },
   "packageManager": "bun@1.3.14",
   "engines": {
     "node": ">=24.13.1 <25",

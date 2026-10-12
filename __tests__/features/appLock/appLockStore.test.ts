@@ -246,4 +246,20 @@ describe("appLockStore", () => {
     expect(await AsyncStorage.getItem("appLockEnabled")).toBe("true");
     expect(useAppLockStore.getState()).toMatchObject({ isEnabled: true, captureReady: false });
   });
+
+  it.each([false, true])("preserves background locking during capture activation (previous enabled: %s)", async (wasEnabled) => {
+    useAppLockStore.setState({
+      hasPinSet: true, hydrated: true, captureReady: true, isEnabled: wasEnabled, isLocked: false,
+    });
+    let finishCapture!: () => void;
+    capture.apply.mockImplementationOnce(() => new Promise<void>((resolve) => { finishCapture = resolve; }));
+
+    const enabling = useAppLockStore.getState().setEnabled(true);
+    await vi.waitFor(() => expect(capture.apply).toHaveBeenCalledWith(true));
+    useAppLockStore.getState().lock();
+    finishCapture();
+    await enabling;
+
+    expect(useAppLockStore.getState()).toMatchObject({ isEnabled: true, isLocked: true, captureReady: true });
+  });
 });

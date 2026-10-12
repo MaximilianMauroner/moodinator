@@ -42,6 +42,7 @@ const requiredBlockedPermissions = new Set([
   "me.everything.badger.permission.BADGE_COUNT_WRITE",
 ]);
 const approvedReleasePermissions = new Set([
+  "android.permission.DETECT_SCREEN_CAPTURE",
   "android.permission.INTERNET",
   "android.permission.USE_BIOMETRIC",
   "android.permission.USE_FINGERPRINT",

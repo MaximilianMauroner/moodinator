@@ -1,0 +1,30 @@
+diff --git a/android/src/main/java/com/reactcommunity/rndatetimepicker/RNDatePickerDialogFragment.java b/android/src/main/java/com/reactcommunity/rndatetimepicker/RNDatePickerDialogFragment.java
+--- a/android/src/main/java/com/reactcommunity/rndatetimepicker/RNDatePickerDialogFragment.java
++++ b/android/src/main/java/com/reactcommunity/rndatetimepicker/RNDatePickerDialogFragment.java
+@@ -49,6 +49,11 @@
+   public Dialog onCreateDialog(Bundle savedInstanceState) {
+     Bundle args = getArguments();
+     instance = createDialog(args);
++    // Independent dialogs do not inherit the Activity capture policy.
++    final int secureFlag = android.view.WindowManager.LayoutParams.FLAG_SECURE;
++    if ((requireActivity().getWindow().getAttributes().flags & secureFlag) != 0) {
++      instance.getWindow().addFlags(secureFlag);
++    }
+     return instance;
+   }
+ 
+diff --git a/android/src/main/java/com/reactcommunity/rndatetimepicker/RNTimePickerDialogFragment.java b/android/src/main/java/com/reactcommunity/rndatetimepicker/RNTimePickerDialogFragment.java
+--- a/android/src/main/java/com/reactcommunity/rndatetimepicker/RNTimePickerDialogFragment.java
++++ b/android/src/main/java/com/reactcommunity/rndatetimepicker/RNTimePickerDialogFragment.java
+@@ -42,6 +42,11 @@
+   public Dialog onCreateDialog(Bundle savedInstanceState) {
+     final Bundle args = getArguments();
+     instance = createDialog(args);
++    // Independent dialogs do not inherit the Activity capture policy.
++    final int secureFlag = android.view.WindowManager.LayoutParams.FLAG_SECURE;
++    if ((requireActivity().getWindow().getAttributes().flags & secureFlag) != 0) {
++      instance.getWindow().addFlags(secureFlag);
++    }
+     return instance;
+   }
+ 

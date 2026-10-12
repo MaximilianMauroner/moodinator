@@ -62,6 +62,11 @@ not request screenshot-listener permissions or consume screenshot events. Its
 Android 14+ native package declares the normal screenshot-detection permission.
 Check the merged manifest during native verification.
 
+The pinned date/time picker patch copies the Activity secure flag to each
+app-owned picker dialog before it appears. Android does not inherit this flag
+for independent dialogs. Keep the patch until the upstream picker provides
+equivalent protection; check both date and time windows on the native candidate.
+
 Phase-one source checks are not native evidence. Frozen dependency installation,
 full checks, clean prebuild, native compilation and emulator acceptance run only
 when the coordinator assigns the later verification phase.

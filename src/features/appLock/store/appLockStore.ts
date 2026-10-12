@@ -204,6 +204,7 @@ async function restorePinHash(storedHash: string | null): Promise<void> {
 }
 
 let pinAttemptInFlight = false;
+let lockEpoch = 0;
 let captureUpdate: Promise<void> = Promise.resolve();
 
 // Keep native capture and the persisted preference in order during overlapping
@@ -340,6 +341,7 @@ export const useAppLockStore = create<AppLockStore>((set, get) => ({
 
   setEnabled: (enabled) => serializeCaptureUpdate(async () => {
     const previous = get();
+    const epochBeforeChange = lockEpoch;
     if (enabled && !previous.hasPinSet) {
       throw new Error("Set a PIN before enabling app lock.");
     }
@@ -364,7 +366,7 @@ export const useAppLockStore = create<AppLockStore>((set, get) => ({
     }
     set({
       isEnabled: enabled,
-      isLocked: enabled ? previous.isLocked : false,
+      isLocked: enabled ? get().isLocked || lockEpoch !== epochBeforeChange : false,
       failedAttempts: enabled ? previous.failedAttempts : 0,
       lockoutUntil: enabled ? previous.lockoutUntil : null,
       captureReady: true,
@@ -500,6 +502,9 @@ export const useAppLockStore = create<AppLockStore>((set, get) => ({
   }),
 
   lock: () => {
+    // A background event during enablement must survive its awaited writes,
+    // even before the enabled preference has been published.
+    lockEpoch += 1;
     const { isEnabled, hasPinSet } = get();
     if (isEnabled && hasPinSet) set({ isLocked: true });
   },

@@ -74,6 +74,9 @@
   "overrides": {
     "expo-image-loader": "55.0.1",
   },
+  "patchedDependencies": {
+    "@react-native-community/datetimepicker@8.6.0": "patches/datetimepicker@8.6.0.patch",
+  },
   "packages": {
     "@alloc/quick-lru": ["@alloc/quick-lru@5.2.0", "", {}, "sha512-UrcABB+4bUrFABwbluTIBErXwvbsU/V7TZWfmbgJfbkwiBuziS9gxdODUyuiecfdGQ85jglMW6juS3+z5TsKLw=="],
 
