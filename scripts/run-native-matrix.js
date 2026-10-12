@@ -14,7 +14,7 @@ const {
   requirePreparedSourceSha,
 } = require("./native-qa-common");
 const { runMaestro: runMaestroWithDiagnostics } = require("./native-qa-runner");
-const { runAdb, waitForNode, waitForNodeAndTap } = require("./native-ui");
+const { runAdb, returnFromDataSettings, selectDownloadFixture, waitForNode, waitForNodeAndTap } = require("./native-ui");
 
 const appId = "com.lab4code.moodinator.qa";
 const root = path.resolve(__dirname, "..");
@@ -185,17 +185,13 @@ async function importFabricatedFixture(serial, fixtureName, fixtureCount) {
     timeoutMs: MAESTRO_TIMEOUT_MS,
   });
 
-  try {
-    await waitForNodeAndTap(serial, { text: fixtureName }, { timeoutMs: 3500 });
-  } catch (error) {
-    await waitForNodeAndTap(serial, { text: "Downloads", contains: true }, { timeoutMs: 2500 });
-    await waitForNodeAndTap(serial, { text: fixtureName }, { timeoutMs: 5000 });
-  }
+  await selectDownloadFixture(serial, fixtureName);
 
   await waitForNodeAndTap(serial, { text: "Replace Data" }, { timeoutMs: 5000 });
   const timeoutMs = fixtureCount === 10000 ? 600000 : fixtureCount === 1000 ? 120000 : 30000;
   await waitForNode(serial, { text: "Import Successful", contains: true }, { timeoutMs });
   await waitForNodeAndTap(serial, { text: "OK" }, { timeoutMs: 5000 });
+  await returnFromDataSettings(serial);
 }
 
 function screenshot(serial, filePath) {

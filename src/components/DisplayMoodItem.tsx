@@ -43,6 +43,22 @@ const hasQaMetadata = /^[0-9a-f]{40}$/.test(
   String(Constants.expoConfig?.extra?.qaSourceSha ?? ""),
 );
 
+function QaMetadataMarker({ testID }: { testID: string }) {
+  // Android may omit zero-size views even when collapsable is false. These QA
+  // labels have bounds but do not affect card layout or intercept touches.
+  return (
+    <View
+      testID={testID}
+      accessible
+      accessibilityLabel={testID}
+      importantForAccessibility="yes"
+      collapsable={false}
+      pointerEvents="none"
+      style={{ position: "absolute", top: 0, left: 0, width: 1, height: 1 }}
+    />
+  );
+}
+
 function MoodTag({
   label,
   backgroundColor,
@@ -317,31 +333,27 @@ function MoodEntryCard(
       >
         {hasQaMetadata ? (
           <>
-            <View
+            <QaMetadataMarker
               testID={`mood-entry-offset-${mood.timestamp}-${mood.utcOffsetMinutes ?? "null"}`}
-              collapsable={false}
             />
-            <View
+            <QaMetadataMarker
               testID={`mood-entry-scale-${mood.timestamp}-${mood.moodScale.version}-${mood.moodScale.min}-${mood.moodScale.max}-${mood.moodScale.lowerIsBetter}`}
-              collapsable={false}
             />
-            <View testID={`mood-entry-emotion-count-${mood.timestamp}-${mood.emotions.length}`} collapsable={false} />
-            <View testID={`mood-entry-context-count-${mood.timestamp}-${mood.contextTags.length}`} collapsable={false} />
+            <QaMetadataMarker testID={`mood-entry-emotion-count-${mood.timestamp}-${mood.emotions.length}`} />
+            <QaMetadataMarker testID={`mood-entry-context-count-${mood.timestamp}-${mood.contextTags.length}`} />
             {typeof mood.energy === "number" ? (
-              <View testID={`mood-entry-energy-${mood.timestamp}-${mood.energy}`} collapsable={false} />
+              <QaMetadataMarker testID={`mood-entry-energy-${mood.timestamp}-${mood.energy}`} />
             ) : null}
             {mood.emotions.map((emotion) => (
-              <View
+              <QaMetadataMarker
                 key={`qa-emotion-${emotion.name}`}
                 testID={`mood-entry-emotion-${mood.timestamp}-${emotion.name}-${emotion.category}-${emotion.energy ?? "null"}`}
-                collapsable={false}
               />
             ))}
             {mood.contextTags.map((context) => (
-              <View
+              <QaMetadataMarker
                 key={`qa-context-${context}`}
                 testID={`mood-entry-context-${mood.timestamp}-${context}`}
-                collapsable={false}
               />
             ))}
           </>

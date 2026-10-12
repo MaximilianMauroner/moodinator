@@ -46,6 +46,28 @@ function packageIsDebuggable(packageDump) {
   return /(?:^|\n)\s*(?:pkgFlags|flags)=\[[^\]\n]*\bDEBUGGABLE\b[^\]\n]*\]/m.test(packageDump);
 }
 
+// `monkey -p` aborts on API 36 emulators without physical keys ("SYS_KEYS has
+// no physical keys") and may inject a random UI event. Start the resolved
+// launcher activity instead and wait until Android reports the launch.
+function launchQaApp(serial, { appId = QA_APP_ID, execFile = execFileSync } = {}) {
+  const resolved = String(execFile("adb", [
+    "-s", serial, "shell", "cmd", "package", "resolve-activity", "--brief",
+    "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER", appId,
+  ], { encoding: "utf8", timeout: 15000 })).trim();
+  const component = resolved.split(/\r?\n/).at(-1)?.trim() ?? "";
+  if (!component.startsWith(`${appId}/`)) {
+    throw new Error(`Could not resolve the launcher activity of ${appId}: ${resolved || "no output"}`);
+  }
+  const started = String(execFile("adb", ["-s", serial, "shell", "am", "start", "-W", "-n", component], {
+    encoding: "utf8",
+    timeout: 30000,
+  })).trim();
+  if (!/^Status: ok$/m.test(started) || /^Error/m.test(started)) {
+    throw new Error(`Could not launch ${component}: ${started || "no output"}`);
+  }
+  return component;
+}
+
 async function assertInstalledQaBuild(serial, sourceSha, {
   appId = QA_APP_ID,
   execFile = execFileSync,
@@ -66,10 +88,7 @@ async function assertInstalledQaBuild(serial, sourceSha, {
     throw new Error(`The installed QA package ${appId} is debuggable; native acceptance requires a non-debuggable release build.`);
   }
   execFile("adb", ["-s", serial, "shell", "am", "force-stop", appId], { timeout: 15000 });
-  execFile("adb", ["-s", serial, "shell", "monkey", "-p", appId, "1"], {
-    stdio: "ignore",
-    timeout: 15000,
-  });
+  launchQaApp(serial, { appId, execFile });
   const waitForSource = waitForNodeImpl ?? require("./native-ui").waitForNode;
   await waitForSource(serial, { testId: `qa-source-sha-${sourceSha}` }, { timeoutMs: 10000 });
   return { appId, sourceSha };
@@ -85,6 +104,7 @@ module.exports = {
   evidenceAcceptance,
   evidenceStatus,
   isToolUnavailable,
+  launchQaApp,
   packageIsDebuggable,
   requirePreparedSourceSha,
 };

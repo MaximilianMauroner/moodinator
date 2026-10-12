@@ -91,11 +91,15 @@ function nodeMatches(node, matcher, { visibleOnly = true } = {}) {
   const text = node.text ?? "";
   const contentDescription = node["content-desc"] ?? "";
   const hasSelector = Boolean(
-    matcher.testId || matcher.testIdPrefix || matcher.text !== undefined || matcher.contentDescription !== undefined,
+    matcher.testId || matcher.testIdPrefix || matcher.text !== undefined ||
+    matcher.contentDescription !== undefined || matcher.className !== undefined || matcher.checked !== undefined,
   );
 
   if (matcher.testId && testId !== matcher.testId) return false;
   if (matcher.testIdPrefix && !testId.startsWith(matcher.testIdPrefix)) return false;
+  if (matcher.className !== undefined && node.class !== matcher.className) return false;
+  if (matcher.checked !== undefined &&
+      (node.checkable !== "true" || node.checked !== String(matcher.checked))) return false;
   if (matcher.text !== undefined) {
     if (matcher.contains ? !text.includes(matcher.text) : text !== matcher.text) return false;
   }
@@ -303,6 +307,57 @@ async function waitForNodeAndTap(serial, matcher, options = {}) {
   }
 }
 
+async function returnFromDataSettings(serial, {
+  tapImpl = waitForNodeAndTap,
+  waitImpl = waitForNode,
+} = {}) {
+  await tapImpl(serial, { contentDescription: "Back to settings" }, { timeoutMs: 5000 });
+  await waitImpl(serial, { text: "Local privacy" }, { timeoutMs: 5000 });
+}
+
+function isDocumentPickerNode(node) {
+  return /^(?:com\.android|com\.google\.android)\.documentsui$/.test(node.package ?? "") ||
+    /^(?:com\.android|com\.google\.android)\.documentsui:/.test(node["resource-id"] ?? "");
+}
+
+async function selectDownloadFixture(serial, fixtureName, {
+  readImpl = (device) => parseUiHierarchy(dumpUiHierarchy(device, { timeoutMs: 5000 })),
+  tapImpl = tapNode,
+  waitImpl = waitForNode,
+  waitAndTapImpl = waitForNodeAndTap,
+  runAdbImpl = runAdb,
+} = {}) {
+  const fixtureMatcher = { text: fixtureName };
+  const rootsMatcher = { contentDescription: "Show roots" };
+  const downloadsMatcher = { anyOf: [{ text: "Downloads" }, { text: "Download" }] };
+  await waitImpl(serial, isDocumentPickerNode, { timeoutMs: 5000, dumpTimeoutMs: 5000 });
+
+  // Some picker versions hide Show roots in a remembered subfolder. Native Back
+  // can reach its parent, but must never continue after the picker has closed.
+  for (let parents = 0; parents <= 3; parents += 1) {
+    const nodes = readImpl(serial);
+    if (!nodes.some(isDocumentPickerNode)) {
+      throw new Error("Android document picker closed before the owned fixture was selected.");
+    }
+    const roots = findNodes(nodes, rootsMatcher);
+    if (roots.length === 1) {
+      tapImpl(serial, roots[0]);
+      await waitAndTapImpl(serial, downloadsMatcher, { timeoutMs: 5000, dumpTimeoutMs: 5000 });
+      return waitAndTapImpl(serial, fixtureMatcher, { timeoutMs: 5000, dumpTimeoutMs: 5000 });
+    }
+    const fixtures = findNodes(nodes, fixtureMatcher);
+    if (fixtures.length > 1) throw new Error("Document picker exposed more than one owned fixture filename.");
+    if (fixtures.length === 1) return tapImpl(serial, fixtures[0]);
+    const downloads = findNodes(nodes, downloadsMatcher);
+    if (downloads.length === 1) {
+      tapImpl(serial, downloads[0]);
+      return waitAndTapImpl(serial, fixtureMatcher, { timeoutMs: 5000, dumpTimeoutMs: 5000 });
+    }
+    if (parents < 3) runAdbImpl(serial, ["shell", "input", "keyevent", "KEYCODE_BACK"]);
+  }
+  throw new Error("Could not reach Downloads and the owned fixture within three document-picker parent steps.");
+}
+
 function parseGfxInfo(output) {
   const numberAfter = (pattern) => {
     const value = output.match(pattern)?.[1];
@@ -354,6 +409,8 @@ module.exports = {
   parseMemInfo,
   parseUiHierarchy,
   runAdb,
+  returnFromDataSettings,
+  selectDownloadFixture,
   tapNode,
   waitForNode,
   waitForNodeAbsent,
