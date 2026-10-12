@@ -8,7 +8,7 @@ export interface EncryptionDatabase {
 }
 
 type SchemaRow = { type: string; name: string; tbl_name: string; sql: string | null };
-type ColumnRow = { name: string; pk: number };
+type ColumnRow = { name: string; pk: number; hidden: number };
 type ForeignKeyViolation = { table: string; parent: string; fkid: number };
 type ForeignKeyDefinition = {
   id: number; seq: number; table: string; from: string; to: string;
@@ -146,6 +146,10 @@ export async function requireMatchingDatabases(actual: EncryptionDatabase, expec
     const order = await rowOrder(actual, expected, name, columns);
     const actualRowid = rowidColumn(table, columns);
     const expectedRowid = rowidColumn(table, columns);
+    // The pinned SQLite blob API rejects every generated-column table and
+    // virtual table. Keep row locators, but use SQL bytes for these layouts.
+    const incremental = actualRowid !== undefined && !columns.some(({ hidden }) => hidden === 2 || hidden === 3)
+      && !/\bVIRTUAL(?:\s|\/\*[\s\S]*?\*\/|--[^\n]*(?:\n|$))+TABLE\b/i.test(table.sql ?? "");
     const positions = (rowid: string | undefined) =>
       `SELECT ${rowid ? `CAST(${rowid} AS TEXT)` : "NULL"} AS position FROM ${name} ORDER BY ${order};`;
     const right = expected.getEachAsync<RowPosition>(positions(expectedRowid));
@@ -161,7 +165,7 @@ export async function requireMatchingDatabases(actual: EncryptionDatabase, expec
         const expectedPosition = expectedRowid ? next.value.position : offset;
         if (actualPosition === null || expectedPosition === null) throw mismatch();
         for (const column of columns) {
-          await compareCell(actual, expected, table.name, column.name, actualRowid !== undefined, row(actualRowid), row(expectedRowid),
+          await compareCell(actual, expected, table.name, column.name, incremental, row(actualRowid), row(expectedRowid),
             [actualPosition], [expectedPosition]);
         }
         offset++;

@@ -82,7 +82,7 @@ No production data format stores calls to the private primitive.
 The prior whole-table implementation exhausted a normal 192 MiB Android heap on
 a fabricated 64 MiB database. The retained larger-heap proof applies only to that
 older source. The chunked replacement has source/host evidence only until a new
-sealed native candidate passes under normal heap limits. SQLite still owns sorting and page caches. WITHOUT ROWID tables and tables
+sealed native candidate passes under normal heap limits. SQLite still owns sorting and page caches. WITHOUT ROWID, generated-column and virtual tables, plus tables
 that shadow every hidden rowid alias use an exact SQL chunk fallback; SQLite
 may materialize individual values on that path. Include those layouts in later
 resource proof when present. Neither source probes nor the fallback claim that

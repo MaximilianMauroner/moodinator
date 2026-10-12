@@ -22,12 +22,20 @@ class StateDatabase implements EncryptionDatabase {
     this.db.function("moodinator_blob_read", { varargs: true, useBigIntArguments: true }, (table, column, rowid, offset, length) => {
       if (typeof table !== "string" || typeof column !== "string" || typeof rowid !== "bigint") throw new Error("Invalid fixture reader arguments");
       const identifier = (name: string) => `"${name.replaceAll('"', '""')}"`;
-      const from = `FROM ${identifier(table)} WHERE rowid = ?`;
+      const columns = this.db.prepare(`PRAGMA table_xinfo(${identifier(table)})`).all();
+      if (columns.some(({ hidden }) => hidden === 2 || hidden === 3)) throw new Error("cannot open table with generated columns");
+      const alias = ["rowid", "_rowid_", "oid"].find((name) => !columns.some((column) => String(column.name).toLowerCase() === name));
+      if (!alias) throw new Error("Fixture has no hidden rowid alias");
+      const from = `FROM ${identifier(table)} WHERE ${alias} = ?`;
       if (offset === undefined) {
-        return this.db.prepare(`SELECT length(CAST(${identifier(column)} AS BLOB)) AS bytes ${from}`).get(rowid)!.bytes;
+        const row = this.db.prepare(`SELECT length(CAST(${identifier(column)} AS BLOB)) AS bytes ${from}`).get(rowid);
+        if (!row || typeof row.bytes !== "number") throw new Error("Fixture value length is unavailable");
+        return row.bytes;
       }
-      return this.db.prepare(`SELECT substr(CAST(${identifier(column)} AS BLOB), ?, ?) AS chunk ${from}`)
-        .get(Number(offset) + 1, Number(length), rowid)!.chunk;
+      const row = this.db.prepare(`SELECT substr(CAST(${identifier(column)} AS BLOB), ?, ?) AS chunk ${from}`)
+        .get(Number(offset) + 1, Number(length), rowid);
+      if (!row || !(row.chunk instanceof Uint8Array)) throw new Error("Fixture value bytes are unavailable");
+      return row.chunk;
     });
   }
   async execAsync(sql: string) { this.db.exec(sql); }
@@ -196,6 +204,7 @@ it("compares individual multi-chunk text/BLOB values with bounded bridge results
 
 it.each([
   { name: "duplicate rows", schema: "CREATE TABLE content (value TEXT COLLATE NOCASE, number_value);", values: "('a', 1), ('A', 1.0), ('a', 1), (NULL, NULL)", move: "UPDATE content SET rowid = -rowid;" },
+  { name: "partial rowid shadow", schema: "CREATE TABLE content (rowid TEXT, value TEXT);", values: "('not-an-id', 'payload'), ('another-user-id', 'value')", move: "" },
   { name: "shadowed rowids", schema: "CREATE TABLE content (rowid TEXT, _rowid_ TEXT, oid TEXT);", values: "('a', 'b', 'c'), ('a', 'b', 'c'), (NULL, NULL, NULL)", move: "" },
   { name: "WITHOUT ROWID", schema: "CREATE TABLE content (a TEXT, b INTEGER, value BLOB, PRIMARY KEY(a, b)) WITHOUT /* retained comment */ ROWID;", values: "('a', 1, x'00ff'), ('A', 2, x'0080')", move: "" },
 ])("retains exact $name and ignores hidden row identity", async ({ schema, values, move }) => {
@@ -210,6 +219,23 @@ it.each([
     if (move) await actual.execAsync(move);
     await requireMatchingDatabases(actual, expected);
     await actual.execAsync("DELETE FROM content WHERE 1 = 1;");
+    await expect(requireMatchingDatabases(actual, expected)).rejects.toThrow("preserve all stored data");
+  } finally { await actual.closeAsync(); await expected.closeAsync(); }
+});
+
+it.each(["VIRTUAL", "STORED"])("compares %s generated-column tables without unsupported native blob reads", async (mode) => {
+  const f = fixture();
+  const seeded = new DatabaseSync(f.file("actual.db"));
+  seeded.exec(`CREATE TABLE generated (id INTEGER PRIMARY KEY, value TEXT,
+    derived TEXT GENERATED ALWAYS AS (value || '-suffix') ${mode});
+    INSERT INTO generated(id, value) VALUES (1, 'before' || char(0) || 'after');`);
+  seeded.close();
+  copyFileSync(f.file("actual.db"), f.file("expected.db"));
+  const actual = await f.storage.open("actual.db");
+  const expected = await f.storage.open("expected.db");
+  try {
+    await requireMatchingDatabases(actual, expected);
+    await actual.execAsync("UPDATE generated SET value = 'before' || char(0) || 'changed';");
     await expect(requireMatchingDatabases(actual, expected)).rejects.toThrow("preserve all stored data");
   } finally { await actual.closeAsync(); await expected.closeAsync(); }
 });

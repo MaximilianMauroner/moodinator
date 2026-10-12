@@ -91,7 +91,10 @@ class CipherDatabase implements EncryptionDatabase {
       const [table, column, rowid, offset, length] = params;
       assert.equal(typeof table, "string"); assert.equal(typeof column, "string");
       if (sql.startsWith("SELECT hex(")) {
-        sql = `SELECT hex(substr(CAST(${identifier(String(column))} AS BLOB), ?, ?)) AS chunk FROM ${identifier(String(table))} WHERE rowid = CAST(? AS INTEGER);`;
+        const columns = await this.getAllAsync<{ name: string }>(`PRAGMA table_xinfo(${identifier(String(table))});`);
+        const alias = ["rowid", "_rowid_", "oid"].find((name) => !columns.some((column) => column.name.toLowerCase() === name));
+        assert.ok(alias, "The diagnostic incremental reader requires a hidden rowid alias");
+        sql = `SELECT hex(substr(CAST(${identifier(String(column))} AS BLOB), ?, ?)) AS chunk FROM ${identifier(String(table))} WHERE ${alias} = CAST(? AS INTEGER);`;
         params = [Number(offset) + 1, Number(length), rowid];
       } else {
         sql = sql.replace("moodinator_blob_read(?, ?, CAST(? AS INTEGER))", `length(CAST(${identifier(String(column))} AS BLOB))`);
