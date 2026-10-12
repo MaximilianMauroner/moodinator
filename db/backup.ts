@@ -182,7 +182,8 @@ export async function createBackup(): Promise<BackupResult<string>> {
     const timestamp = Date.now();
     const filename = getBackupFilename(timestamp);
     const jsonData = await exportMoods();
-    const fileUri = backupDir.startsWith("content://")
+    const isSafDestination = backupDir.startsWith("content://");
+    const fileUri = isSafDestination
       ? await FileSystem.StorageAccessFramework.createFileAsync(
           backupDir,
           filename,
@@ -190,9 +191,21 @@ export async function createBackup(): Promise<BackupResult<string>> {
         )
       : `${backupDir}${filename}`;
 
-    await FileSystem.writeAsStringAsync(fileUri, jsonData, {
-      encoding: FileSystem.EncodingType.UTF8,
-    });
+    try {
+      await FileSystem.writeAsStringAsync(fileUri, jsonData, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+    } catch (error) {
+      // A failed write leaves the new SAF document empty or partial. Left behind, it
+      // counts toward retention and could replace a valid backup. Private writes are
+      // atomic and can target an earlier backup from the same day, so they are not deleted.
+      if (isSafDestination) {
+        await FileSystem.StorageAccessFramework.deleteAsync(fileUri).catch((deleteError: unknown) => {
+          console.error("Could not remove the incomplete backup file:", deleteError);
+        });
+      }
+      throw error;
+    }
     await setLastBackupTimestamp(timestamp);
     console.log(`Backup created: ${filename} at ${fileUri}`);
 

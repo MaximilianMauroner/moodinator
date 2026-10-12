@@ -231,6 +231,32 @@ describe("backup destination and failure recovery", () => {
     expect([...mocks.files.keys()].some((uri) => uri.startsWith(PRIVATE_FOLDER))).toBe(false);
     expect(mocks.settings.has("lastBackupTimestamp")).toBe(false);
     expect(console.error).toHaveBeenCalledWith("Error creating backup:", nativeFailure);
+    expect(mocks.files.size).toBe(0);
+  });
+
+  it("removes the empty SAF document after a failed write, so a retry keeps every valid backup", async () => {
+    const dates = ["2026-08-13", "2026-08-20", "2026-08-27", "2026-09-03", "2026-09-10", "2026-09-17", "2026-09-24", "2026-10-01"];
+    for (const date of dates) {
+      mocks.files.set(safUri(`moodinator-backup-${date}.json`), JSON_DATA);
+    }
+    mocks.writeFile.mockRejectedValueOnce(nativeFailure);
+
+    expect(await createBackup()).toMatchObject({ success: false });
+    expect(await createBackup()).toEqual({ success: true, data: safUri("moodinator-backup-2026-10-08.json") });
+
+    expect([...mocks.files.values()].every((data) => data === JSON_DATA)).toBe(true);
+    expect(mocks.files.has(safUri("moodinator-backup-2026-08-13.json"))).toBe(false);
+    expect(dates.slice(1).every((date) => mocks.files.has(safUri(`moodinator-backup-${date}.json`)))).toBe(true);
+  });
+
+  it("reports the write failure when the incomplete SAF document cannot be removed", async () => {
+    const deleteFailure = new Error("provider refused delete");
+    mocks.writeFile.mockRejectedValueOnce(nativeFailure);
+    mocks.deleteSafFile.mockRejectedValueOnce(deleteFailure);
+
+    expect(await createBackup()).toMatchObject({ success: false, error: expect.stringContaining("Check available device storage") });
+    expect(console.error).toHaveBeenCalledWith("Could not remove the incomplete backup file:", deleteFailure);
+    expect(console.error).toHaveBeenCalledWith("Error creating backup:", nativeFailure);
   });
 
   it("does not treat unreadable destination settings as no selection", async () => {
@@ -250,6 +276,19 @@ describe("backup destination and failure recovery", () => {
     expect(await createBackup()).toMatchObject({ success: false, error: expect.stringContaining("selected backup folder") });
     expect(mocks.makeDirectory).not.toHaveBeenCalled();
     expect(mocks.writeFile).not.toHaveBeenCalled();
+  });
+
+  it("keeps the earlier same-day private backup when its overwrite fails", async () => {
+    const uri = `${PRIVATE_FOLDER}moodinator-backup-2026-10-08.json`;
+    mocks.platform.OS = "ios";
+    mocks.settings.delete("backupFolderUri");
+    mocks.directories.add(PRIVATE_FOLDER);
+    mocks.files.set(uri, JSON_DATA);
+    mocks.exportMoods.mockResolvedValue("[]");
+    mocks.writeFile.mockRejectedValueOnce(nativeFailure);
+
+    expect(await createBackup()).toMatchObject({ success: false });
+    expect(mocks.files.get(uri)).toBe(JSON_DATA);
   });
 
   it("uses private default storage on iOS when no external folder was selected", async () => {
