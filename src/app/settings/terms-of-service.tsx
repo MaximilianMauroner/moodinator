@@ -19,7 +19,7 @@ export default function TermsOfServiceScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Text className="text-xs text-paper-700 dark:text-sand-400 mb-4">
-          Last Updated: September 15, 2026
+          Last Updated: October 9, 2026
         </Text>
 
         <Section title="Agreement to Terms">
@@ -54,7 +54,7 @@ export default function TermsOfServiceScreen() {
             Delete Mood Data removes mood history, including mood rows, mood–emotion link records, and database emotion records used by that history. It retains the user-visible Emotion List presets, context-tag presets, other settings, reminders, app-lock data, and external files.
           </Paragraph>
           <Paragraph>
-            Export flows may use a temporary app-cache file and share sheet, or offer a clipboard copy. Failed sharing can leave a temporary file until the operating system clears it. Periodic OS-scheduled backups are not guaranteed to run; after storage is available, the background task may run automatically and limits its successful backups to at most once per week, while manual backups are not subject to that cadence. Android requires a selected folder. Moodinator keeps the eight newest app-managed backups it can identify and removes older identified managed backups, but cannot delete arbitrary exports, renamed copies, clipboard contents, or provider copies. Uninstall and platform backup or transfer behavior can vary. We cannot recover lost data or delete external copies.
+            Export flows may use a temporary app-cache file and share sheet, or offer a clipboard copy. Failed sharing can leave a temporary file until the operating system clears it. Periodic OS-scheduled backups are not guaranteed to run; after storage is available, the background task may run automatically and limits its successful backups to at most once per week, while manual backups are not subject to that cadence. Android requires a selected folder. If the selected folder is inaccessible, backups fail until you select an accessible folder; Moodinator does not switch to another destination. Moodinator keeps the eight newest app-managed backups it can identify and removes older identified managed backups; each same-day copy counts toward this eight-file limit. Moodinator cannot delete arbitrary exports, renamed copies, clipboard contents, or provider copies. Uninstall and platform backup or transfer behavior can vary. We cannot recover lost data or delete external copies.
           </Paragraph>
           <Paragraph>
             Send Feedback opens a prefilled GitHub issue form. Submitted feedback is public in the Moodinator repository and is handled under GitHub terms and privacy policy. Do not include private mood entries or other sensitive information.

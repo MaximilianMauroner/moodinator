@@ -1,9 +1,10 @@
 import React, { useRef, useState } from "react";
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeIn, FadeInUp, FadeOut, SlideOutDown } from "react-native-reanimated";
 import type { Emotion } from "@db/types";
+import { PrivateModal } from "@/components/ui/PrivateModal";
 import { haptics } from "@/lib/haptics";
 import {
   EMOTION_ENERGY_BAND_LABELS,
@@ -128,7 +129,7 @@ function EmotionModal({
   const inputBg = isDark ? "rgba(0,0,0,0.25)" : "#F5F1E8";
 
   return (
-    <Modal
+    <PrivateModal
       visible={visible}
       transparent
       animationType="none"
@@ -423,7 +424,7 @@ function EmotionModal({
           </ScrollView>
         </Animated.View>
       </KeyboardAvoidingView>
-    </Modal>
+    </PrivateModal>
   );
 }
 
@@ -437,7 +438,7 @@ function RemoveEmotionDialog({
   if (!emotionName) return null;
 
   return (
-    <Modal
+    <PrivateModal
       visible={visible}
       transparent
       animationType="none"
@@ -551,7 +552,7 @@ function RemoveEmotionDialog({
           </View>
         </Animated.View>
       </View>
-    </Modal>
+    </PrivateModal>
   );
 }
 
@@ -566,7 +567,7 @@ function MoveEmotionDialog({
   if (!emotionName || !currentCategory) return null;
 
   return (
-    <Modal
+    <PrivateModal
       visible={visible}
       transparent
       animationType="none"
@@ -725,7 +726,7 @@ function MoveEmotionDialog({
           </Pressable>
         </Animated.View>
       </View>
-    </Modal>
+    </PrivateModal>
   );
 }
 

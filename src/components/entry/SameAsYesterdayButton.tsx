@@ -4,7 +4,6 @@ import {
   Text,
   ActivityIndicator,
   View,
-  Modal,
   ScrollView,
   useWindowDimensions,
 } from "react-native";
@@ -16,6 +15,7 @@ import Animated, {
   Easing,
 } from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
+import { PrivateModal } from "@/components/ui/PrivateModal";
 import { useThemeColors, colors } from "@/constants/colors";
 import { haptics } from "@/lib/haptics";
 import { moodService } from "@/services/moodService";
@@ -285,7 +285,7 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
       </Pressable>
 
       {/* Preview Modal */}
-      <Modal
+      <PrivateModal
         visible={showPreview}
         transparent
         animationType="none"
@@ -548,7 +548,7 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
           </Animated.View>
           </Pressable>
         </Animated.View>
-      </Modal>
+      </PrivateModal>
     </>
   );
 };

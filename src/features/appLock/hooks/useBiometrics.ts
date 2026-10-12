@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import * as LocalAuthentication from "expo-local-authentication";
 import { AppState, Platform } from "react-native";
 
-export type BiometricType = "fingerprint" | "facial" | "iris" | "none";
+export type BiometricType = "fingerprint" | "facial" | "iris" | "generic" | "none";
 
 export function isStrongBiometricLevel(
   platform: typeof Platform.OS,
@@ -17,20 +17,25 @@ export function useBiometrics() {
   const [isAvailable, setIsAvailable] = useState(false);
   const [biometricType, setBiometricType] = useState<BiometricType>("none");
   const [isEnrolled, setIsEnrolled] = useState(false);
+  const [hasHardware, setHasHardware] = useState<boolean | null>(null);
+  const [hasEnrollment, setHasEnrollment] = useState(false);
 
   const checkBiometrics = useCallback(async () => {
     setIsChecking(true);
     try {
       const compatible = await LocalAuthentication.hasHardwareAsync();
+      setHasHardware(compatible);
 
       if (!compatible) {
         setIsAvailable(false);
         setIsEnrolled(false);
+        setHasEnrollment(false);
         setBiometricType("none");
         return;
       }
 
       const enrolled = await LocalAuthentication.isEnrolledAsync();
+      setHasEnrollment(enrolled);
       const securityLevel = enrolled
         ? await LocalAuthentication.getEnrolledLevelAsync()
         : LocalAuthentication.SecurityLevel.NONE;
@@ -44,7 +49,10 @@ export function useBiometrics() {
       }
 
       const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
-      if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
+      // Android reports supported hardware, not which methods are enrolled.
+      if (Platform.OS === "android" && types.length > 1) {
+        setBiometricType("generic");
+      } else if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
         setBiometricType("facial");
       } else if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
         setBiometricType("fingerprint");
@@ -57,6 +65,8 @@ export function useBiometrics() {
       console.error("Error checking biometrics:", error);
       setIsAvailable(false);
       setIsEnrolled(false);
+      setHasHardware(null);
+      setHasEnrollment(false);
       setBiometricType("none");
     } finally {
       setIsChecking(false);
@@ -108,6 +118,7 @@ export function useBiometrics() {
   };
 
   const getBiometricIcon = (): string => {
+    if (biometricType === "generic") return "scan";
     if (biometricType === "facial") {
       return Platform.OS === "ios" ? "scan" : "happy-outline";
     }
@@ -118,6 +129,8 @@ export function useBiometrics() {
     isChecking,
     isAvailable,
     isEnrolled,
+    hasHardware,
+    hasEnrollment,
     biometricType,
     authenticate,
     checkBiometrics,
