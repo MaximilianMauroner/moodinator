@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, ScrollView, Linking, StyleSheet } from "react-native";
+import { View, Text, ScrollView, Linking, StyleSheet, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useColorScheme } from "nativewind";
 import { useRouter } from "expo-router";
@@ -55,6 +55,10 @@ export default function AboutSettingsScreen() {
   };
 
   const handleRateApp = async () => {
+    if (Platform.OS !== "android") {
+      Alert.alert("Rate Moodinator", "App Store ratings are not available yet.");
+      return;
+    }
     const storeUrl = `market://details?id=${ANDROID_PACKAGE}`;
     const webUrl = `https://play.google.com/store/apps/details?id=${ANDROID_PACKAGE}`;
     try {
