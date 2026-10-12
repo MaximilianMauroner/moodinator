@@ -17,16 +17,17 @@ export function parseBackupFilename(
   filename: string,
   uri: string
 ): BackupFileSummary | null {
-  if (!filename.startsWith("moodinator-backup-") || !filename.endsWith(".json")) {
+  const match = filename.match(
+    /^moodinator-backup-(\d{4}-\d{2}-\d{2})(?: \([1-9]\d*\))?\.json$/
+  );
+  if (!match) {
     return null;
   }
 
-  const dateStr = filename
-    .replace("moodinator-backup-", "")
-    .replace(".json", "");
-  const timestamp = new Date(dateStr).getTime();
+  const dateStr = match[1];
+  const timestamp = Date.parse(`${dateStr}T00:00:00.000Z`);
 
-  if (Number.isNaN(timestamp)) {
+  if (!Number.isFinite(timestamp) || new Date(timestamp).toISOString().slice(0, 10) !== dateStr) {
     return null;
   }
 
@@ -34,13 +35,18 @@ export function parseBackupFilename(
 }
 
 export function parseBackupUri(uri: string): BackupFileSummary | null {
-  const uriDecoded = decodeURIComponent(uri);
-  const match = uriDecoded.match(/moodinator-backup-(\d{4}-\d{2}-\d{2})/);
-  if (!match) {
+  let decodedUri: string;
+  try {
+    decodedUri = decodeURIComponent(uri);
+  } catch {
     return null;
   }
 
-  const filename = `moodinator-backup-${match[1]}.json`;
+  // SAF document IDs include a volume prefix and can contain an encoded path.
+  const filename = decodedUri.split("/").pop()?.split(":").pop();
+  if (!filename) {
+    return null;
+  }
   return parseBackupFilename(filename, uri);
 }
 
@@ -50,7 +56,11 @@ export function sortBackupsNewestFirst<T extends BackupFileSummary>(files: T[]):
 
 export function selectBackupsForDeletion<T extends BackupFileSummary>(
   files: T[],
-  keepCount = WEEKS_TO_KEEP
+  keepCount = WEEKS_TO_KEEP,
+  createdBackupUri?: string
 ): T[] {
-  return sortBackupsNewestFirst(files).slice(keepCount);
+  // A just-written file must survive its own cleanup, even when dated files tie.
+  const createdBackup = files.find((file) => file.uri === createdBackupUri);
+  const candidates = files.filter((file) => file.uri !== createdBackupUri);
+  return sortBackupsNewestFirst(candidates).slice(keepCount - (createdBackup ? 1 : 0));
 }

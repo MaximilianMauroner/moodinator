@@ -26,11 +26,23 @@ export default function DataSettingsScreen() {
     latestBackup: number | null;
   } | null>(null);
   const [backupFolderUri, setBackupFolderUri] = useState<string | null>(null);
+  const [backupError, setBackupError] = useState(false);
 
+  /** Returns false when the backup status could not be read. */
   const loadBackupInfo = useCallback(async () => {
-    const status = await dataPortabilityService.getBackupStatus();
-    setBackupInfo(status.info);
-    setBackupFolderUri(status.folderUri);
+    try {
+      const folderUri = await dataPortabilityService.getBackupFolder();
+      setBackupFolderUri(folderUri);
+      const info = await dataPortabilityService.getBackupInfo();
+      setBackupInfo(info);
+      setBackupError(false);
+      return true;
+    } catch (error) {
+      console.error("Error loading backup status:", error);
+      setBackupInfo(null);
+      setBackupError(true);
+      return false;
+    }
   }, []);
 
   useEffect(() => {
@@ -41,12 +53,10 @@ export default function DataSettingsScreen() {
     try {
       setLoading("backup");
       const backupResult = await dataPortabilityService.runBackupNow();
-      if (backupResult.success) {
-        await loadBackupInfo();
-      }
+      await loadBackupInfo();
       Alert.alert(backupResult.title, backupResult.message);
     } catch (error) {
-      Alert.alert("Backup Error", "Failed to create backup.");
+      Alert.alert("Backup Error", "Could not create a backup. Check available storage and folder access, then try again.");
       console.error(error);
     } finally {
       setLoading(null);
@@ -61,8 +71,15 @@ export default function DataSettingsScreen() {
         if (permissions.granted) {
           const folderUri = permissions.directoryUri;
           await dataPortabilityService.setBackupFolder(folderUri);
-          await loadBackupInfo();
-          Alert.alert("Backup Folder Selected", "Backups will now be saved to the selected folder.");
+          setBackupFolderUri(folderUri);
+          if (await loadBackupInfo()) {
+            Alert.alert("Backup Folder Selected", "Backups will now be saved to the selected folder.");
+          } else {
+            Alert.alert(
+              "Could Not Read Backups",
+              "Moodinator saved this folder but could not read the backup status, so backups can fail. Check folder access and device storage, then try again."
+            );
+          }
         } else {
           Alert.alert("Permission Denied", "Please grant folder access to enable backup functionality.");
         }
@@ -169,13 +186,20 @@ export default function DataSettingsScreen() {
               style={{ marginRight: 8 }}
             />
             <Text className="text-base font-bold text-sage-600 dark:text-sage-300">
-              {backupInfo
+              {backupError ? "Could not read backups" : backupInfo
                 ? backupInfo.count > 0
                   ? `${backupInfo.count} backup${backupInfo.count === 1 ? "" : "s"} saved`
                   : "No backups yet"
                 : "Checking..."}
             </Text>
           </View>
+          {backupError && (
+            <Text className="text-xs text-paper-700 dark:text-sand-400">
+              {Platform.OS === "android"
+                ? "Select the backup folder again below, then retry."
+                : "Check available device storage and try again."}
+            </Text>
+          )}
           {backupInfo?.latestBackup && (
             <Text className="text-xs text-paper-700 dark:text-sand-400">
               Last backup: {formatBackupDate(backupInfo.latestBackup)}
@@ -246,7 +270,7 @@ export default function DataSettingsScreen() {
           <SettingRow
             label="Backup Status"
             subLabel={
-              backupInfo
+              backupError ? "Check folder access, then retry" : backupInfo
                 ? `${backupInfo.count} backup(s), last: ${formatBackupDate(backupInfo.latestBackup)}`
                 : "Checking backup status..."
             }
