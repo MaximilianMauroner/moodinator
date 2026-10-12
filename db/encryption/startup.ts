@@ -1,12 +1,12 @@
 import { legacyKeyPragma, rawKeyPragma, requireCipherVersion, validateRawKey } from "./keys";
-import { captureSnapshot, requireMatchingSnapshot, type DatabaseSnapshot,
-  type EncryptionDatabase } from "./snapshot";
+import { inspectDatabase, requireMatchingDatabases, type EncryptionDatabase } from "./verification";
 
 export const DATABASE_FILES = {
   original: "moodinator.db",
   active: "moodinator.encrypted-v2.db",
   copy: "moodinator.migration-copy.db",
   coordinator: "moodinator.startup-v2.db",
+  verification: "moodinator.verification-v2.db",
 } as const;
 
 export const STARTUP_PHASES = [
@@ -96,7 +96,8 @@ async function configureCoordinator(db: EncryptionDatabase) {
 
 async function determineSource<Db extends EncryptionDatabase>(context: Context<Db>): Promise<Source> {
   const { storage } = context;
-  if (await hasArtifacts(storage, DATABASE_FILES.active) || await hasArtifacts(storage, DATABASE_FILES.copy)) {
+  if (await hasArtifacts(storage, DATABASE_FILES.active) || await hasArtifacts(storage, DATABASE_FILES.copy)
+    || await hasArtifacts(storage, DATABASE_FILES.verification)) {
     throw new Error("Database recovery artifacts have no committed intent. Existing files were retained.");
   }
   if (!await storage.exists(DATABASE_FILES.original)) {
@@ -109,14 +110,14 @@ async function determineSource<Db extends EncryptionDatabase>(context: Context<D
   const legacy = header.length !== 0 && !isPlaintextHeader(header);
   const key = legacy ? validateRawKey(await storage.loadLegacyKey()) : undefined;
   const original = await context.open(DATABASE_FILES.original, key, legacy);
-  try { await captureSnapshot(original); } finally { await context.close(original); }
+  try { await inspectDatabase(original); } finally { await context.close(original); }
   return legacy ? "legacy-passphrase" : "plaintext";
 }
 
 async function persistKey<Db extends EncryptionDatabase>(context: Context<Db>) {
   const { storage } = context;
   const existing = await storage.loadKey();
-  if (!existing && await hasArtifacts(storage, DATABASE_FILES.active)) {
+  if (!existing && (await hasArtifacts(storage, DATABASE_FILES.active) || await hasArtifacts(storage, DATABASE_FILES.verification))) {
     throw new Error("The encrypted database key is missing. Existing files were retained.");
   }
   const key = validateRawKey(existing ?? storage.createKey());
@@ -148,9 +149,9 @@ async function openOriginal<Db extends EncryptionDatabase>(context: Context<Db>,
 async function exportOriginal<Db extends EncryptionDatabase>(context: Context<Db>, source: Source, key: string) {
   const { storage } = context;
   const original = await openOriginal(context, source);
-  let expected: DatabaseSnapshot;
+  let expected: Awaited<ReturnType<typeof inspectDatabase>>;
   try {
-    expected = await captureSnapshot(original);
+    expected = await inspectDatabase(original);
     const checkpoint = await original.getFirstAsync<{ busy: number }>("PRAGMA wal_checkpoint(TRUNCATE);");
     if (!checkpoint || checkpoint.busy !== 0) throw new Error("The original database could not be checkpointed safely.");
   } finally { await context.close(original); }
@@ -158,12 +159,14 @@ async function exportOriginal<Db extends EncryptionDatabase>(context: Context<Db
   // has been opened and verified. No user handle can have used this target.
   await removeDatabaseFiles(storage, DATABASE_FILES.active);
   await removeDatabaseFiles(storage, DATABASE_FILES.copy);
+  await removeDatabaseFiles(storage, DATABASE_FILES.verification);
   await storage.copy(DATABASE_FILES.original, DATABASE_FILES.copy);
   const legacy = source === "legacy-passphrase";
   const legacyKey = legacy ? validateRawKey(await storage.loadLegacyKey()) : undefined;
   const verifiedCopy = await context.open(DATABASE_FILES.copy, legacyKey, legacy);
-  try { requireMatchingSnapshot(await captureSnapshot(verifiedCopy), expected); }
-  finally { await context.close(verifiedCopy); }
+  const retainedOriginal = await openOriginal(context, source);
+  try { await requireMatchingDatabases(verifiedCopy, retainedOriginal); }
+  finally { await context.close(retainedOriginal); await context.close(verifiedCopy); }
   await context.phase("copy-closed");
   const copy = await context.open(DATABASE_FILES.copy, legacyKey, legacy);
   try {
@@ -171,13 +174,13 @@ async function exportOriginal<Db extends EncryptionDatabase>(context: Context<Db
     await copy.runAsync("ATTACH DATABASE ? AS encrypted KEY ?;", storage.path(DATABASE_FILES.active), `x'${key}'`);
     await context.phase("export-started");
     await copy.execAsync(`PRAGMA encrypted.synchronous = EXTRA;
+      PRAGMA encrypted.encoding = '${expected.encoding}';
       SELECT sqlcipher_export('encrypted');
       PRAGMA encrypted.user_version = ${expected.userVersion};
       PRAGMA encrypted.application_id = ${expected.applicationId};
       DETACH DATABASE encrypted;`);
   } finally { await context.close(copy); }
   await context.phase("export-closed");
-  return expected;
 }
 
 async function requireUnreadable<Db extends EncryptionDatabase>(context: Context<Db>, key?: string) {
@@ -193,19 +196,19 @@ async function requireUnreadable<Db extends EncryptionDatabase>(context: Context
   } finally { await context.close(candidate); }
 }
 
-async function verifyEncrypted<Db extends EncryptionDatabase>(context: Context<Db>, db: Db, key: string, expected?: DatabaseSnapshot) {
-  const snapshot = await captureSnapshot(db);
-  if (expected) requireMatchingSnapshot(snapshot, expected);
-  if ((await db.getAllAsync("PRAGMA cipher_integrity_check;")).length !== 0) {
-    throw new Error("Encrypted database integrity verification failed.");
-  }
+async function verifyEncrypted<Db extends EncryptionDatabase>(context: Context<Db>, db: Db, key: string, expected?: Db) {
+  if (expected) await requireMatchingDatabases(db, expected);
+  else await inspectDatabase(db);
+  const integrity = db.getEachAsync("PRAGMA cipher_integrity_check;");
+  try {
+    if (!(await integrity.next()).done) throw new Error("Encrypted database integrity verification failed.");
+  } finally { await integrity.return?.(); }
   if (isPlaintextHeader(await context.storage.readHeader(DATABASE_FILES.active))) {
     throw new Error("The converted database still has a plaintext header.");
   }
   await requireUnreadable(context);
   const wrongKey = (key.startsWith("00") ? "01" : "00") + key.slice(2);
   await requireUnreadable(context, wrongKey);
-  return snapshot;
 }
 
 async function enableForeignKeys(db: EncryptionDatabase) {
@@ -219,32 +222,42 @@ async function enableForeignKeys(db: EncryptionDatabase) {
 async function initializeTarget<Db extends EncryptionDatabase>(context: Context<Db>, state: State) {
   const { storage } = context;
   const key = await persistKey(context);
-  let expected: DatabaseSnapshot | undefined;
   if (state.source === "fresh") {
     if (await hasArtifacts(storage, DATABASE_FILES.original) || await hasArtifacts(storage, DATABASE_FILES.copy)) {
       throw new Error("Unexpected source files appeared during fresh database initialization.");
     }
     await removeDatabaseFiles(storage, DATABASE_FILES.active);
+    await removeDatabaseFiles(storage, DATABASE_FILES.verification);
   } else {
-    expected = await exportOriginal(context, state.source, key);
+    await exportOriginal(context, state.source, key);
   }
   const target = await context.open(DATABASE_FILES.active, key);
   // Export connections stay FK-off so existing legacy orphan rows are copied.
   // Only keyed app handles enforce future writes and cascading deletions.
   await enableForeignKeys(target);
   await target.execAsync("PRAGMA synchronous = EXTRA;");
-  if (expected) {
-    await verifyEncrypted(context, target, key, expected);
+  if (state.source !== "fresh") {
+    const original = await openOriginal(context, state.source);
+    try { await verifyEncrypted(context, target, key, original); }
+    finally { await context.close(original); }
     await context.phase("target-verified");
   }
   await storage.initialize(target);
   await context.phase("initialized");
-  const initialized = await verifyEncrypted(context, target, key);
-  if (!expected) await context.phase("target-verified");
+  await verifyEncrypted(context, target, key);
+  if (state.source === "fresh") await context.phase("target-verified");
+  const checkpoint = await target.getFirstAsync<{ busy: number }>("PRAGMA wal_checkpoint(TRUNCATE);");
+  if (!checkpoint || checkpoint.busy !== 0) throw new Error("The initialized database could not be checkpointed safely.");
+  // Preserve the initialized state across a true close/reopen without holding
+  // encoded user data in JavaScript. This copy remains encrypted with the same
+  // key and is disposable only under positive pending/completed ownership.
+  await storage.copy(DATABASE_FILES.active, DATABASE_FILES.verification);
   await context.close(target);
   const active = await context.open(DATABASE_FILES.active, key);
   await enableForeignKeys(active);
-  await verifyEncrypted(context, active, key, initialized);
+  const initialized = await context.open(DATABASE_FILES.verification, key);
+  try { await verifyEncrypted(context, active, key, initialized); }
+  finally { await context.close(initialized); }
   await context.phase("active-reopened");
   await context.coordinator.runAsync("UPDATE encryption_state SET status = 'completed' WHERE id = 1;");
   return active;
@@ -273,6 +286,7 @@ async function finishCleanup<Db extends EncryptionDatabase>(context: Context<Db>
     }
     await removeDatabaseFiles(context.storage, DATABASE_FILES.original);
     await removeDatabaseFiles(context.storage, DATABASE_FILES.copy);
+    await removeDatabaseFiles(context.storage, DATABASE_FILES.verification);
   });
   await context.phase("cleanup-complete");
 }
@@ -284,7 +298,8 @@ export async function openEncryptedDatabase<Db extends EncryptionDatabase>(
   // Opening through Expo creates missing files. Inspect staging paths before
   // creating a coordinator, then inspect them again under the native lock.
   if (!await storage.exists(DATABASE_FILES.coordinator)
-    && (await hasArtifacts(storage, DATABASE_FILES.active) || await hasArtifacts(storage, DATABASE_FILES.copy))) {
+    && (await hasArtifacts(storage, DATABASE_FILES.active) || await hasArtifacts(storage, DATABASE_FILES.copy)
+    || await hasArtifacts(storage, DATABASE_FILES.verification))) {
     throw new Error("Database encryption state is missing. Existing files were retained.");
   }
   const handles = new Set<Db>();

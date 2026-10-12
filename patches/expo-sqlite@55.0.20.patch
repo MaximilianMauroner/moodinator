@@ -1,0 +1,172 @@
+diff --git a/vendor/sqlite3/sqlite3.c b/vendor/sqlite3/sqlite3.c
+--- a/vendor/sqlite3/sqlite3.c
++++ b/vendor/sqlite3/sqlite3.c
+@@ -130698,2 +130698,77 @@
+ */
++/* Private Moodinator verification primitive. Read-only, direct SQL only.
++** Incremental BLOB reads avoid materializing a complete TEXT/BLOB value.
++** Three arguments return byte length; five return at most 16 KiB of bytes.
++*/
++static void moodinatorBlobReadFunc(
++  exsqlite3_context *context,
++  int argc,
++  exsqlite3_value **argv
++){
++  sqlite3 *db = exsqlite3_context_db_handle(context);
++  exsqlite3_blob *blob = 0;
++  void *buffer = 0;
++  sqlite3_int64 offset = 0;
++  sqlite3_int64 length = 0;
++  int bytes = 0;
++  int rc = SQLITE_OK;
++  const char *table;
++  const char *column;
++  if( exsqlite3_value_type(argv[0])!=SQLITE_TEXT
++   || exsqlite3_value_type(argv[1])!=SQLITE_TEXT
++   || exsqlite3_value_type(argv[2])!=SQLITE_INTEGER
++  ){
++    exsqlite3_result_error(context, "Invalid incremental verification arguments", -1);
++    return;
++  }
++  table = (const char*)exsqlite3_value_text(argv[0]);
++  column = (const char*)exsqlite3_value_text(argv[1]);
++  if( !table || !column ){
++    exsqlite3_result_error_nomem(context);
++    return;
++  }
++  if( argc==5 ){
++    offset = exsqlite3_value_int64(argv[3]);
++    length = exsqlite3_value_int64(argv[4]);
++    if( exsqlite3_value_type(argv[3])!=SQLITE_INTEGER
++     || exsqlite3_value_type(argv[4])!=SQLITE_INTEGER
++     || offset<0 || length<0 || length>16384
++    ){
++      exsqlite3_result_error(context, "Invalid incremental verification range", -1);
++      return;
++    }
++  }
++  rc = exsqlite3_blob_open(db, "main", table, column,
++                         exsqlite3_value_int64(argv[2]), 0, &blob);
++  if( rc==SQLITE_OK ){
++    bytes = exsqlite3_blob_bytes(blob);
++    if( argc==5 ){
++      if( offset>bytes ){
++        rc = SQLITE_RANGE;
++      }else{
++        if( length>bytes-offset ) length = bytes-offset;
++        if( length>0 ){
++          buffer = exsqlite3_malloc64((sqlite3_uint64)length);
++          if( !buffer ) rc = SQLITE_NOMEM;
++          else rc = exsqlite3_blob_read(blob, buffer, (int)length, (int)offset);
++        }
++      }
++    }
++  }
++  if( blob ){
++    int closeRc = exsqlite3_blob_close(blob);
++    if( rc==SQLITE_OK ) rc = closeRc;
++  }
++  if( rc!=SQLITE_OK ){
++    exsqlite3_free(buffer);
++    exsqlite3_result_error_code(context, rc);
++  }else if( argc==3 ){
++    exsqlite3_result_int(context, bytes);
++  }else if( length==0 ){
++    exsqlite3_result_blob(context, "", 0, SQLITE_STATIC);
++  }else{
++    exsqlite3_result_blob(context, buffer, (int)length, exsqlite3_free);
++  }
++}
++
+ static void substrFunc(
+@@ -133201,2 +133276,4 @@
+     FUNCTION(zeroblob,           1, 0, 0, zeroblobFunc     ),
++    SFUNCTION(moodinator_blob_read, 3, 0, 0, moodinatorBlobReadFunc),
++    SFUNCTION(moodinator_blob_read, 5, 0, 0, moodinatorBlobReadFunc),
+     FUNCTION(substr,             2, 0, 0, substrFunc       ),
+diff --git a/vendor/sqlcipher/sqlite3.c b/vendor/sqlcipher/sqlite3.c
+--- a/vendor/sqlcipher/sqlite3.c
++++ b/vendor/sqlcipher/sqlite3.c
+@@ -135501,2 +135501,77 @@
+ */
++/* Private Moodinator verification primitive. Read-only, direct SQL only.
++** Incremental BLOB reads avoid materializing a complete TEXT/BLOB value.
++** Three arguments return byte length; five return at most 16 KiB of bytes.
++*/
++static void moodinatorBlobReadFunc(
++  exsqlite3_context *context,
++  int argc,
++  exsqlite3_value **argv
++){
++  sqlite3 *db = exsqlite3_context_db_handle(context);
++  exsqlite3_blob *blob = 0;
++  void *buffer = 0;
++  sqlite3_int64 offset = 0;
++  sqlite3_int64 length = 0;
++  int bytes = 0;
++  int rc = SQLITE_OK;
++  const char *table;
++  const char *column;
++  if( exsqlite3_value_type(argv[0])!=SQLITE_TEXT
++   || exsqlite3_value_type(argv[1])!=SQLITE_TEXT
++   || exsqlite3_value_type(argv[2])!=SQLITE_INTEGER
++  ){
++    exsqlite3_result_error(context, "Invalid incremental verification arguments", -1);
++    return;
++  }
++  table = (const char*)exsqlite3_value_text(argv[0]);
++  column = (const char*)exsqlite3_value_text(argv[1]);
++  if( !table || !column ){
++    exsqlite3_result_error_nomem(context);
++    return;
++  }
++  if( argc==5 ){
++    offset = exsqlite3_value_int64(argv[3]);
++    length = exsqlite3_value_int64(argv[4]);
++    if( exsqlite3_value_type(argv[3])!=SQLITE_INTEGER
++     || exsqlite3_value_type(argv[4])!=SQLITE_INTEGER
++     || offset<0 || length<0 || length>16384
++    ){
++      exsqlite3_result_error(context, "Invalid incremental verification range", -1);
++      return;
++    }
++  }
++  rc = exsqlite3_blob_open(db, "main", table, column,
++                         exsqlite3_value_int64(argv[2]), 0, &blob);
++  if( rc==SQLITE_OK ){
++    bytes = exsqlite3_blob_bytes(blob);
++    if( argc==5 ){
++      if( offset>bytes ){
++        rc = SQLITE_RANGE;
++      }else{
++        if( length>bytes-offset ) length = bytes-offset;
++        if( length>0 ){
++          buffer = exsqlite3_malloc64((sqlite3_uint64)length);
++          if( !buffer ) rc = SQLITE_NOMEM;
++          else rc = exsqlite3_blob_read(blob, buffer, (int)length, (int)offset);
++        }
++      }
++    }
++  }
++  if( blob ){
++    int closeRc = exsqlite3_blob_close(blob);
++    if( rc==SQLITE_OK ) rc = closeRc;
++  }
++  if( rc!=SQLITE_OK ){
++    exsqlite3_free(buffer);
++    exsqlite3_result_error_code(context, rc);
++  }else if( argc==3 ){
++    exsqlite3_result_int(context, bytes);
++  }else if( length==0 ){
++    exsqlite3_result_blob(context, "", 0, SQLITE_STATIC);
++  }else{
++    exsqlite3_result_blob(context, buffer, (int)length, exsqlite3_free);
++  }
++}
++
+ static void substrFunc(
+@@ -137900,2 +137975,4 @@
+     FUNCTION(zeroblob,           1, 0, 0, zeroblobFunc     ),
++    SFUNCTION(moodinator_blob_read, 3, 0, 0, moodinatorBlobReadFunc),
++    SFUNCTION(moodinator_blob_read, 5, 0, 0, moodinatorBlobReadFunc),
+     FUNCTION(substr,             2, 0, 0, substrFunc       ),

@@ -6,7 +6,7 @@ import { Platform } from "react-native";
 import { getDb, initializeDatabase } from "@db/client";
 import { legacyKeyPragma, rawKeyPragma, validateRawKey } from "@db/encryption/keys";
 import { createNativeEncryptionStorage, LEGACY_KEY_STORAGE_NAME, RAW_KEY_STORAGE_NAME } from "@db/encryption/native";
-import { captureSnapshot, requireMatchingSnapshot, type DatabaseSnapshot } from "@db/encryption/snapshot";
+import { inspectDatabase, requireMatchingDatabases } from "@db/encryption/verification";
 import { DATABASE_FILES, openEncryptedDatabase, type StartupPhase } from "@db/encryption/startup";
 import { ENCRYPTION_PROOF_FIXTURE } from "./fixture";
 
@@ -54,6 +54,36 @@ function fixture(caseName: string, initialize = async (_db: SQLite.SQLiteDatabas
   return { directory, namespace, storage, file };
 }
 
+// An exact native reference replaces the old full-table JSON payload. Only
+// fabricated QA data is exported here; production verification copies stay keyed.
+async function saveExpected(f: ReturnType<typeof fixture>, db: SQLite.SQLiteDatabase) {
+  const metadata = await inspectDatabase(db);
+  for (const suffix of ["", "-wal", "-shm", "-journal"]) {
+    const name = "expected.db" + suffix;
+    if (await f.storage.exists(name)) await f.storage.remove(name);
+  }
+  const foreignKeys = await db.getFirstAsync<{ foreign_keys: number }>("PRAGMA foreign_keys;");
+  await db.execAsync("PRAGMA foreign_keys = OFF;");
+  try {
+    await db.runAsync("ATTACH DATABASE ? AS proof_expected KEY '';", f.storage.path("expected.db"));
+    try {
+      await db.execAsync(`PRAGMA proof_expected.encoding = '${metadata.encoding}';
+        SELECT sqlcipher_export('proof_expected');
+        PRAGMA proof_expected.user_version = ${metadata.userVersion};
+        PRAGMA proof_expected.application_id = ${metadata.applicationId};`);
+    } finally { await db.execAsync("DETACH DATABASE proof_expected;"); }
+  } finally {
+    if (foreignKeys?.foreign_keys === 1) await db.execAsync("PRAGMA foreign_keys = ON;");
+  }
+}
+
+async function requireExpected(f: ReturnType<typeof fixture>, db: SQLite.SQLiteDatabase) {
+  check(await f.storage.exists("expected.db"), "Exact native proof reference is missing; prepare a new source-matched case");
+  const expected = await f.storage.open("expected.db");
+  try { await requireMatchingDatabases(db, expected); }
+  finally { await expected.closeAsync(); }
+}
+
 async function seed(f: ReturnType<typeof fixture>, legacy = false, orphans = false) {
   for (const name of Object.values(DATABASE_FILES)) {
     check(!await f.storage.exists(name), "Proof case already contains a database. Use a fresh owned QA install.");
@@ -69,14 +99,12 @@ async function seed(f: ReturnType<typeof fixture>, legacy = false, orphans = fal
       DELETE FROM mood_emotions WHERE mood_id = 1;
       INSERT INTO mood_emotions VALUES (777, 1);
       DELETE FROM emotions WHERE id = 3;`);
-    const snapshot = await captureSnapshot(db);
-    f.file("expected.json").write(JSON.stringify(snapshot));
-    return snapshot;
+    await saveExpected(f, db);
   } finally { await db.closeAsync(); }
 }
 
 async function roundtrip(f: ReturnType<typeof fixture>, db: SQLite.SQLiteDatabase) {
-  const expected = await captureSnapshot(db);
+  const expected = await inspectDatabase(db);
   const exporter = await f.storage.open(DATABASE_FILES.active);
   try {
     await exporter.execAsync(rawKeyPragma(validateRawKey(await f.storage.loadKey())));
@@ -88,7 +116,7 @@ async function roundtrip(f: ReturnType<typeof fixture>, db: SQLite.SQLiteDatabas
       DETACH DATABASE roundtrip;`);
   } finally { await exporter.closeAsync(); }
   const plain = await f.storage.open("roundtrip.db");
-  try { requireMatchingSnapshot(await captureSnapshot(plain), expected); }
+  try { await requireMatchingDatabases(plain, db); }
   finally { await plain.closeAsync(); }
   await f.storage.remove("roundtrip.db");
 }
@@ -114,10 +142,10 @@ export async function runEncryptionProof(progress: Progress) {
   for (const source of ["plaintext", "legacy-passphrase", "legacy-orphans"]) {
     progress(`running:${source}`);
     const f = fixture(source);
-    const expected = await seed(f, source === "legacy-passphrase", source === "legacy-orphans");
+    await seed(f, source === "legacy-passphrase", source === "legacy-orphans");
     const db = await openEncryptedDatabase(f.storage);
     try {
-      requireMatchingSnapshot(await captureSnapshot(db), expected);
+      await requireExpected(f, db);
       check((await db.getFirstAsync<{ foreign_keys: number }>("PRAGMA foreign_keys;"))?.foreign_keys === 1, "Published native handle has foreign keys disabled");
       if (source === "legacy-orphans") {
         check((await db.getAllAsync("PRAGMA foreign_key_check;")).length === 2, "Legacy orphan link rows were changed");
@@ -141,7 +169,7 @@ export async function runEncryptionProof(progress: Progress) {
     });
     try {
       check((await reopened.getFirstAsync<{ count: number }>("SELECT count(*) AS count FROM moods;"))?.count === 6, "Later writes were lost");
-      f.file("expected.json").write(JSON.stringify(await captureSnapshot(reopened)));
+      await saveExpected(f, reopened);
     }
     finally { await reopened.closeAsync(); }
     check(!await f.storage.exists(DATABASE_FILES.original) && !await f.storage.exists(DATABASE_FILES.copy), "Plaintext migration files remain after successful publication");
@@ -153,7 +181,7 @@ export async function runEncryptionProof(progress: Progress) {
   const initialized = await openEncryptedDatabase(fresh.storage);
   try {
     check((await initialized.getFirstAsync<{ count: number }>("SELECT count(*) AS count FROM moods;"))?.count === 0, "Fresh app schema was not initialized correctly");
-    fresh.file("expected.json").write(JSON.stringify(await captureSnapshot(initialized)));
+    await saveExpected(fresh, initialized);
   }
   finally { await initialized.closeAsync(); }
   passed.push("fresh:actual-app-initialization");
@@ -229,12 +257,11 @@ export async function crashEncryptionProof(caseName: string, phase: StartupPhase
 
 export async function resumeEncryptionProof(caseName: string) {
   const f = fixture(caseName);
-  const expected: DatabaseSnapshot = JSON.parse(await f.file("expected.json").text());
   const db = await openEncryptedDatabase(f.storage);
-  try { requireMatchingSnapshot(await captureSnapshot(db), expected); }
+  try { await requireExpected(f, db); }
   finally { await db.closeAsync(); }
   const reopened = await openEncryptedDatabase(f.storage);
-  try { requireMatchingSnapshot(await captureSnapshot(reopened), expected); }
+  try { await requireExpected(f, reopened); }
   finally { await reopened.closeAsync(); }
   check(!await f.storage.exists(DATABASE_FILES.original) && !await f.storage.exists(DATABASE_FILES.copy), "Recovered source cleanup is incomplete");
   return { status: "passed", caseName, evidence: "cold reopen, exact data, recovery and subsequent open" };
@@ -247,12 +274,10 @@ export async function prepareNativeWriteFailure(progress: Progress) {
   const f = fixture("native-write-failure");
   await seed(f);
   const original = await f.storage.open(DATABASE_FILES.original);
-  let expected: DatabaseSnapshot;
   try {
     await original.execAsync("CREATE TABLE qa_write_payload (value TEXT NOT NULL);");
     await original.runAsync("INSERT INTO qa_write_payload VALUES (?);", "Fabricated write-failure payload ".repeat(2048));
-    expected = await captureSnapshot(original);
-    f.file("expected.json").write(JSON.stringify(expected));
+    await saveExpected(f, original);
   } finally { await original.closeAsync(); }
   const originalBytes = await f.file(DATABASE_FILES.original).bytes();
   const nativeOpen = f.storage.open;
@@ -285,7 +310,7 @@ export async function prepareNativeWriteFailure(progress: Progress) {
   check(injections === 1 && nativeError !== "", "Actual SQLCipher export did not reject the native page-limit write");
   check(equalBytes(await f.file(DATABASE_FILES.original).bytes(), originalBytes), "Native write failure changed the original database bytes");
   const retained = await f.storage.open(DATABASE_FILES.original);
-  try { requireMatchingSnapshot(await captureSnapshot(retained), expected); }
+  try { await requireExpected(f, retained); }
   finally { await retained.closeAsync(); }
   const coordinator = await f.storage.open(DATABASE_FILES.coordinator);
   try {
@@ -300,9 +325,8 @@ export async function verifyNativeWriteFailureRecovery() {
   const f = fixture("native-write-failure");
   check(f.file("native-write-failure.json").exists, "Native write-failure evidence is required before recovery");
   check(await f.storage.exists(DATABASE_FILES.original), "Cold retry requires the retained failed-export source");
-  const expected: DatabaseSnapshot = JSON.parse(await f.file("expected.json").text());
   const original = await f.storage.open(DATABASE_FILES.original);
-  try { requireMatchingSnapshot(await captureSnapshot(original), expected); }
+  try { await requireExpected(f, original); }
   finally { await original.closeAsync(); }
   return resumeEncryptionProof("native-write-failure");
 }
@@ -313,15 +337,15 @@ export async function prepareNativeExportInterruption(progress: Progress) {
   await seed(f);
   const original = await f.storage.open(DATABASE_FILES.original);
   try {
-    // 1024 separate 64 KiB fabricated blobs give a bounded 64 MiB native export
-    // and a roughly 128 MiB exact hex snapshot, without a giant JS seed string.
+    // 1024 native 64 KiB values exercise a 64 MiB export without a giant JS
+    // seed or expected payload. A separate single-64-MiB-cell run is required.
     await original.execAsync(`CREATE TABLE qa_export_payload (id INTEGER PRIMARY KEY, value BLOB NOT NULL);
       BEGIN;
       WITH RECURSIVE rows(id) AS (VALUES(1) UNION ALL SELECT id + 1 FROM rows WHERE id < 1024)
       INSERT INTO qa_export_payload SELECT id, zeroblob(65536) FROM rows;
       COMMIT;`);
     check((await original.getFirstAsync<{ bytes: number }>("SELECT sum(length(value)) AS bytes FROM qa_export_payload;"))?.bytes === 64 * 1024 * 1024, "Native export payload size is incorrect");
-    f.file("expected.json").write(JSON.stringify(await captureSnapshot(original)));
+    await saveExpected(f, original);
   } finally { await original.closeAsync(); }
   f.file("export-interruption.json").write(JSON.stringify({ caseName, payloadBytes: 64 * 1024 * 1024,
     target: DATABASE_FILES.active, evidence: "inside-export interruption requires externally observed partial target growth and actual process kill" }));
@@ -357,7 +381,7 @@ export async function verifyAppUpgrade() {
   check(!await storage.exists(DATABASE_FILES.original) && !await storage.exists(DATABASE_FILES.copy), "App admitted data before plaintext cleanup");
   const key = validateRawKey(await storage.loadKey());
   const reopened = await storage.open(DATABASE_FILES.active);
-  try { await reopened.execAsync(rawKeyPragma(key)); await captureSnapshot(reopened); }
+  try { await reopened.execAsync(rawKeyPragma(key)); await inspectDatabase(reopened); }
   finally { await reopened.closeAsync(); }
   return { status: "passed", evidence: "actual getDb, shared handle, initialization, data retention and keyed independent reopen" };
 }
@@ -377,7 +401,7 @@ export async function prepareWalCrash(progress: Progress) {
   const mode = await original.getFirstAsync<{ journal_mode: string }>("PRAGMA journal_mode = WAL;");
   check(mode?.journal_mode === "wal", "Native source did not enter WAL mode");
   await original.execAsync(ENCRYPTION_PROOF_FIXTURE);
-  f.file("expected.json").write(JSON.stringify(await captureSnapshot(original)));
+  await saveExpected(f, original);
   check(await f.storage.exists(`${DATABASE_FILES.original}-wal`), "Committed native WAL is missing before interruption");
   check((await f.file(`${DATABASE_FILES.original}-wal`).bytes()).length > 32, "Native WAL has no committed frames");
   progress("paused:wal-source:committed-wal");

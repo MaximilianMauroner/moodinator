@@ -4,7 +4,7 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { legacyKeyPragma, rawKeyPragma, requireCipherVersion, validateRawKey } from "../../db/encryption/keys";
-import { captureSnapshot, requireMatchingSnapshot, type EncryptionDatabase } from "../../db/encryption/snapshot";
+import { inspectDatabase, requireMatchingDatabases, type EncryptionDatabase } from "../../db/encryption/verification";
 import { DATABASE_FILES, openEncryptedDatabase, type EncryptionStorage } from "../../db/encryption/startup";
 
 const KEY = "ab".repeat(32); // Fabricated test material only.
@@ -16,7 +16,20 @@ afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: 
 // supplied; no encryption implementation or successful native startup is mocked.
 class StateDatabase implements EncryptionDatabase {
   constructor(private readonly db: DatabaseSync, private readonly version: string | null,
-    private readonly closed: () => void) {}
+    private readonly closed: () => void) {
+    // The Node adapter emulates the private native reader on small fixtures.
+    // This tests comparison semantics, not the C patch or native heap behavior.
+    this.db.function("moodinator_blob_read", { varargs: true, useBigIntArguments: true }, (table, column, rowid, offset, length) => {
+      if (typeof table !== "string" || typeof column !== "string" || typeof rowid !== "bigint") throw new Error("Invalid fixture reader arguments");
+      const identifier = (name: string) => `"${name.replaceAll('"', '""')}"`;
+      const from = `FROM ${identifier(table)} WHERE rowid = ?`;
+      if (offset === undefined) {
+        return this.db.prepare(`SELECT length(CAST(${identifier(column)} AS BLOB)) AS bytes ${from}`).get(rowid)!.bytes;
+      }
+      return this.db.prepare(`SELECT substr(CAST(${identifier(column)} AS BLOB), ?, ?) AS chunk ${from}`)
+        .get(Number(offset) + 1, Number(length), rowid)!.chunk;
+    });
+  }
   async execAsync(sql: string) { this.db.exec(sql); }
   async runAsync(sql: string, ...params: (string | number | null)[]) {
     return { changes: Number(this.db.prepare(sql).run(...params).changes) };
@@ -29,6 +42,9 @@ class StateDatabase implements EncryptionDatabase {
   }
   async getFirstAsync<Row>(sql: string, ...params: (string | number | null)[]) {
     return (await this.getAllAsync<Row>(sql, ...params))[0] ?? null;
+  }
+  async *getEachAsync<Row>(sql: string, ...params: (string | number | null)[]): AsyncIterableIterator<Row> {
+    for (const row of this.db.prepare(sql).iterate(...params)) yield { ...row } as Row;
   }
   async closeAsync() { this.db.close(); this.closed(); }
 }
@@ -114,17 +130,88 @@ it("snapshot comparison retains int64, NUL text, BLOBs, close real values and se
   seeded.close();
   const db = await storage.open("snapshot.db");
   try {
-    const original = await captureSnapshot(db);
-    expect(original.content.values_to_retain[0]).toContain("integer:9007199254740993");
-    expect(original.content.values_to_retain[0]).toContain("text:6265666F7265006166746572");
-    expect(original.content.values_to_retain[0]).toContain("blob:00FF80");
-    expect(original.content.sqlite_sequence[0]).toContain("integer:99");
-    await db.execAsync("UPDATE values_to_retain SET real_value = 0.12500000000000003;");
-    expect(() => requireMatchingSnapshot(original, original)).not.toThrow();
-    const changed = await captureSnapshot(db);
-    expect(() => requireMatchingSnapshot(changed, original)).toThrow("preserve all stored data");
+    copyFileSync(file("snapshot.db"), file("expected.db"));
+    const expected = await storage.open("expected.db");
+    try {
+      await requireMatchingDatabases(db, expected);
+      await db.execAsync("UPDATE values_to_retain SET real_value = 0.12500000000000003;");
+      await expect(requireMatchingDatabases(db, expected)).rejects.toThrow("preserve all stored data");
+    } finally { await expected.closeAsync(); }
   } finally { await db.closeAsync(); }
   expect(handles.size).toBe(0);
+});
+
+it.each([
+  { name: "int64", sql: "UPDATE exact_values SET integer_value = 9007199254740992;" },
+  { name: "NUL suffix", sql: "UPDATE exact_values SET text_value = 'before' || char(0) || 'changed';" },
+  { name: "BLOB byte", sql: "UPDATE exact_values SET blob_value = x'00ff81';" },
+  { name: "storage class", sql: "UPDATE exact_values SET untyped_value = 1.0;" },
+  { name: "sequence", sql: "UPDATE sqlite_sequence SET seq = 98;" },
+  { name: "schema", sql: "DROP INDEX retained_index;" },
+])("rejects exact $name loss without JavaScript numeric or text coercion", async ({ sql }) => {
+  const f = fixture();
+  const seeded = new DatabaseSync(f.file("actual.db"));
+  seeded.exec(`CREATE TABLE exact_values (id INTEGER PRIMARY KEY AUTOINCREMENT, integer_value INTEGER,
+    text_value TEXT, blob_value BLOB, untyped_value);
+    CREATE INDEX retained_index ON exact_values(integer_value);
+    INSERT INTO exact_values VALUES (9007199254740993, 9007199254740993, 'before' || char(0) || 'after', x'00ff80', 1);
+    UPDATE sqlite_sequence SET seq = 99;`);
+  seeded.close();
+  copyFileSync(f.file("actual.db"), f.file("expected.db"));
+  const actual = await f.storage.open("actual.db");
+  const expected = await f.storage.open("expected.db");
+  try {
+    await requireMatchingDatabases(actual, expected);
+    await actual.execAsync(sql);
+    await expect(requireMatchingDatabases(actual, expected)).rejects.toThrow("preserve all stored data");
+  } finally { await actual.closeAsync(); await expected.closeAsync(); }
+});
+
+it("compares individual multi-chunk text/BLOB values with bounded bridge results and detects their tail", async () => {
+  const f = fixture();
+  const seeded = new DatabaseSync(f.file("actual.db"));
+  seeded.exec(`CREATE TABLE payload (id INTEGER PRIMARY KEY, text_value TEXT, blob_value BLOB);
+    INSERT INTO payload VALUES (1, 'before' || char(0) || printf('%.*c', 49153, 'z'), zeroblob(49153));`);
+  seeded.close();
+  copyFileSync(f.file("actual.db"), f.file("expected.db"));
+  const actual = await f.storage.open("actual.db");
+  const expected = await f.storage.open("expected.db");
+  const nativeRead = actual.getFirstAsync.bind(actual);
+  let chunks = 0;
+  actual.getFirstAsync = async <Row,>(sql: string, ...params: (string | number | null)[]) => {
+    const result = await nativeRead<Row>(sql, ...params);
+    if (sql.startsWith("SELECT hex(")) {
+      chunks++;
+      expect(JSON.stringify(result).length).toBeLessThan(33000);
+    }
+    return result;
+  };
+  try {
+    await requireMatchingDatabases(actual, expected);
+    expect(chunks).toBeGreaterThan(6);
+    await actual.execAsync("UPDATE payload SET blob_value = CAST(substr(blob_value, 1, 49152) || x'01' AS BLOB);");
+    await expect(requireMatchingDatabases(actual, expected)).rejects.toThrow("preserve all stored data");
+  } finally { await actual.closeAsync(); await expected.closeAsync(); }
+});
+
+it.each([
+  { name: "duplicate rows", schema: "CREATE TABLE content (value TEXT COLLATE NOCASE, number_value);", values: "('a', 1), ('A', 1.0), ('a', 1), (NULL, NULL)", move: "UPDATE content SET rowid = -rowid;" },
+  { name: "shadowed rowids", schema: "CREATE TABLE content (rowid TEXT, _rowid_ TEXT, oid TEXT);", values: "('a', 'b', 'c'), ('a', 'b', 'c'), (NULL, NULL, NULL)", move: "" },
+  { name: "WITHOUT ROWID", schema: "CREATE TABLE content (a TEXT, b INTEGER, value BLOB, PRIMARY KEY(a, b)) WITHOUT /* retained comment */ ROWID;", values: "('a', 1, x'00ff'), ('A', 2, x'0080')", move: "" },
+])("retains exact $name and ignores hidden row identity", async ({ schema, values, move }) => {
+  const f = fixture();
+  const seeded = new DatabaseSync(f.file("actual.db"));
+  seeded.exec(`${schema} INSERT INTO content VALUES ${values};`);
+  seeded.close();
+  copyFileSync(f.file("actual.db"), f.file("expected.db"));
+  const actual = await f.storage.open("actual.db");
+  const expected = await f.storage.open("expected.db");
+  try {
+    if (move) await actual.execAsync(move);
+    await requireMatchingDatabases(actual, expected);
+    await actual.execAsync("DELETE FROM content WHERE 1 = 1;");
+    await expect(requireMatchingDatabases(actual, expected)).rejects.toThrow("preserve all stored data");
+  } finally { await actual.closeAsync(); await expected.closeAsync(); }
 });
 
 describe("legacy relationship preservation", () => {
@@ -133,14 +220,14 @@ describe("legacy relationship preservation", () => {
     f.seedLegacyLinks("relations.db");
     const db = await f.storage.open("relations.db");
     try {
-      const snapshot = await captureSnapshot(db);
+      const snapshot = await inspectDatabase(db);
       expect(snapshot.legacyForeignKeyViolations.map(({ parent, count }) => ({ parent, count }))).toEqual([
         { parent: "emotions", count: 1 }, { parent: "moods", count: 1 },
       ]);
       expect(await db.getAllAsync("SELECT mood_id, emotion_id FROM mood_emotions ORDER BY mood_id;")).toEqual([
         { mood_id: 1, emotion_id: 1 }, { mood_id: 2, emotion_id: 3 }, { mood_id: 3, emotion_id: 2 },
       ]);
-      expect(snapshot.content.mood_emotions).toHaveLength(3);
+      expect((await db.getFirstAsync<{ count: number }>("SELECT count(*) AS count FROM mood_emotions;"))?.count).toBe(3);
     } finally { await db.closeAsync(); }
   });
 
@@ -149,12 +236,14 @@ describe("legacy relationship preservation", () => {
     f.seedLegacyLinks("relations.db");
     const db = await f.storage.open("relations.db");
     try {
-      const original = await captureSnapshot(db);
-      const before = await db.getAllAsync("PRAGMA foreign_key_check;");
-      await db.execAsync("UPDATE mood_emotions SET rowid = rowid + 100;");
-      expect(await db.getAllAsync("PRAGMA foreign_key_check;")).not.toEqual(before);
-      const compacted = await captureSnapshot(db);
-      expect(() => requireMatchingSnapshot(compacted, original)).not.toThrow();
+      copyFileSync(f.file("relations.db"), f.file("expected.db"));
+      const expected = await f.storage.open("expected.db");
+      try {
+        const before = await db.getAllAsync("PRAGMA foreign_key_check;");
+        await db.execAsync("UPDATE mood_emotions SET rowid = rowid + 100;");
+        expect(await db.getAllAsync("PRAGMA foreign_key_check;")).not.toEqual(before);
+        await requireMatchingDatabases(db, expected);
+      } finally { await expected.closeAsync(); }
     } finally { await db.closeAsync(); }
   });
 
@@ -166,11 +255,15 @@ describe("legacy relationship preservation", () => {
     f.seedLegacyLinks("relations.db");
     const db = await f.storage.open("relations.db");
     try {
-      const original = await captureSnapshot(db);
-      await db.execAsync(`PRAGMA foreign_keys = OFF; ${sql}`);
-      const damaged = await captureSnapshot(db);
-      if (loss === "changed") expect(damaged.legacyForeignKeyViolations).toEqual(original.legacyForeignKeyViolations);
-      expect(() => requireMatchingSnapshot(damaged, original)).toThrow("preserve all stored data");
+      copyFileSync(f.file("relations.db"), f.file("expected.db"));
+      const expected = await f.storage.open("expected.db");
+      try {
+        const original = await inspectDatabase(expected);
+        await db.execAsync(`PRAGMA foreign_keys = OFF; ${sql}`);
+        const damaged = await inspectDatabase(db);
+        if (loss === "changed") expect(damaged.legacyForeignKeyViolations).toEqual(original.legacyForeignKeyViolations);
+        await expect(requireMatchingDatabases(db, expected)).rejects.toThrow("preserve all stored data");
+      } finally { await expected.closeAsync(); }
     } finally { await db.closeAsync(); }
   });
 
@@ -182,7 +275,7 @@ describe("legacy relationship preservation", () => {
       await db.execAsync(`PRAGMA foreign_keys = OFF;
         CREATE TABLE unknown_relationship (parent_id INTEGER REFERENCES moods(id) ON DELETE CASCADE);
         INSERT INTO unknown_relationship VALUES (9999);`);
-      await expect(captureSnapshot(db)).rejects.toThrow("relationship verification failed");
+      await expect(inspectDatabase(db)).rejects.toThrow("relationship verification failed");
     } finally { await db.closeAsync(); }
   });
 
@@ -195,7 +288,7 @@ describe("legacy relationship preservation", () => {
       "FOREIGN KEY (mood_id) REFERENCES moods(id) ON DELETE CASCADE", replacement
     ));
     const db = await f.storage.open("relations.db");
-    try { await expect(captureSnapshot(db)).rejects.toThrow("relationship verification failed"); }
+    try { await expect(inspectDatabase(db)).rejects.toThrow("relationship verification failed"); }
     finally { await db.closeAsync(); }
   });
 });
@@ -217,6 +310,38 @@ describe("fail-closed startup state", () => {
     await expect(openEncryptedDatabase(f.storage)).rejects.toThrow("foreign-key enforcement is unavailable");
     expect(f.storage.initialize).not.toHaveBeenCalled();
     expect(f.recordedState().status).toBe("pending");
+    expect(f.handles.size).toBe(0);
+  });
+
+  it.each(["plaintext", "fresh"])("retains verification files when %s source ownership cannot be verified", async (source) => {
+    const f = fixture({ key: KEY });
+    f.state("pending", source);
+    if (source === "fresh") f.seed(DATABASE_FILES.original);
+    writeFileSync(f.file(DATABASE_FILES.verification), "Fabricated encrypted verification copy");
+    await expect(openEncryptedDatabase(f.storage)).rejects.toThrow(source === "fresh" ? "Unexpected source files" : "original database is missing");
+    expect(f.storage.remove).not.toHaveBeenCalled();
+    expect(existsSync(f.file(DATABASE_FILES.verification))).toBe(true);
+    expect(f.handles.size).toBe(0);
+  });
+
+  it("refuses an orphan encrypted verification copy before creating state or keys", async () => {
+    const f = fixture();
+    writeFileSync(f.file(DATABASE_FILES.verification), "Fabricated encrypted verification copy");
+    const before = readFileSync(f.file(DATABASE_FILES.verification));
+    await expect(openEncryptedDatabase(f.storage)).rejects.toThrow("state is missing");
+    expect(f.opened).toEqual([]);
+    expect(f.storage.createKey).not.toHaveBeenCalled();
+    expect(readFileSync(f.file(DATABASE_FILES.verification))).toEqual(before);
+  });
+
+  it("does not replace a lost key when only a pending encrypted verification copy remains", async () => {
+    const f = fixture();
+    f.state("pending");
+    f.seed(DATABASE_FILES.original);
+    writeFileSync(f.file(DATABASE_FILES.verification), "Fabricated encrypted verification copy");
+    await expect(openEncryptedDatabase(f.storage)).rejects.toThrow("encrypted database key is missing");
+    expect(f.storage.createKey).not.toHaveBeenCalled();
+    expect(f.storage.remove).not.toHaveBeenCalled();
     expect(f.handles.size).toBe(0);
   });
 

@@ -54,14 +54,42 @@ failed SharedPreferences commit. Readback alone can observe memory after a faile
 commit. Pending startup repeats persistence and readback before conversion.
 Remove this patch only when the installed Expo version propagates that failure.
 
-Verification keeps a complete encoded copy of every table in memory. Text and
-BLOB values cross the native bridge as hex, so peak memory grows with database
-size. On Android a fabricated 64 MiB database ran out of memory under the
-default 192 MiB app heap growth limit, and passed with a temporary 512 MiB growth
-limit and 768 MiB heap. Mood entries hold short text and small JSON fields, so
-ordinary databases are far smaller. If supported databases can approach that
-size, replace the whole-table snapshots with a streaming comparison and repeat
-the native proofs.
+Verification compares exact typed values through 16 KiB byte chunks. Int64 and
+precise real encoding stays in SQLite; text and BLOB chunks preserve NUL bytes
+and database encoding. JavaScript retains neither whole user rows nor tables.
+The pinned expo-sqlite patch adds the private, read-only `moodinator_blob_read`
+SQL primitive in both vendored engines. It uses SQLite's incremental BLOB API
+for TEXT/BLOB values in rowid tables, caps each buffer at 16 KiB, closes every
+handle and is blocked in stored triggers/views. This also bounds a single large
+cell without repeatedly materializing it through SQL substr. Remove the patch
+when the installed Expo API exposes equivalent bounded reads and callers adopt it.
+Frozen install, native compilation and actual primitive execution remain required.
+
+Non-null primary keys order ordinary app tables without sorting their payloads;
+tables without such keys use exact typed row ordering, preserving duplicates
+and ignoring hidden rowids. Schema, metadata, sqlite_sequence and known orphan
+constraints remain part of verification.
+
+A temporary encrypted `moodinator.verification-v2.db` preserves initialized data
+across true close/keyed reopen. It uses the existing V2 key, is created only under
+positive pending ownership after a successful checkpoint, and is removed only
+under verified pending retry or completed cleanup. Missing state or keys and an
+unverifiable source retain it. The immutable copy adds disk space to the startup
+requirements; copy/checkpoint failures block publication and retain recovery data.
+Existing plaintext and V1/V2 databases keep their stored formats and key semantics.
+No production data format stores calls to the private primitive.
+
+The prior whole-table implementation exhausted a normal 192 MiB Android heap on
+a fabricated 64 MiB database. The retained larger-heap proof applies only to that
+older source. The chunked replacement has source/host evidence only until a new
+sealed native candidate passes under normal heap limits. SQLite still owns sorting and page caches. WITHOUT ROWID tables and tables
+that shadow every hidden rowid alias use an exact SQL chunk fallback; SQLite
+may materialize individual values on that path. Include those layouts in later
+resource proof when present. Neither source probes nor the fallback claim that
+all native memory is constant. Verify both many-row 64 MiB and single-64-MiB-cell
+fixtures, low-memory/disk failures, interruptions and exact cold recovery. No
+arbitrary product size cap applies; support is constrained by SQLite and actual
+platform/storage resources.
 
 Database encryption does not encrypt settings outside SQLite or plaintext
 JSON/CSV exports and backups. Password-based export encryption is a separate
@@ -121,11 +149,11 @@ iOS/Keychain evidence. Android ARM64 host support is a separate tooling change.
    native export or native disk-full handling as proved by that boundary matrix;
    each needs a focused actual native failure case and retained/reopened data.
    This runner does not run those focused cases. The 64 MiB export-interruption
-   fixture needs a temporary 512 MiB app heap growth limit and 768 MiB heap on
-   the disposable emulator (see the memory limit above). Record the override with
-   the evidence and restore the defaults afterwards. An out-of-memory result at
-   the default heap is that documented limit; keep it, and do not report it as an
-   interruption result.
+   fixture previously needed a 512 MiB growth limit / 768 MiB heap on the older
+   whole-table source. That retained result does not verify the replacement.
+   Run both many-row and single-cell 64 MiB shapes under normal heap limits and
+   record their exact source/configuration. An OOM is a resource failure, not an
+   interruption result. Do not raise the heap to claim support.
 6. Inspect the native app screenshot. Complete onboarding, inspect fabricated
    history and details, add/edit/delete a new fabricated mood, and cold-open again
    to confirm retained changes. Run the existing native smoke/sync journeys to
@@ -158,3 +186,8 @@ journeys remain pending shared resource admission. Full feature acceptance and
 activation are not established by these results. Record current-head CI,
 independent source reviews, required approvals and platform acceptance separately
 in issue #117 and the implementation PR.
+
+The stock host SQLCipher diagnostic adapter emulates the private reader with
+SQL length/substr to check exact comparison and state transitions. Its results
+cannot prove the native C patch, large-cell allocation bounds or Expo behavior.
+Keep those limits separate from patched-engine native acceptance.

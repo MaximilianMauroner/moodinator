@@ -6,9 +6,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import keys from "../db/encryption/keys";
 const { legacyKeyPragma, rawKeyPragma, validateRawKey } = keys;
-import snapshot from "../db/encryption/snapshot";
-import type { EncryptionDatabase } from "../db/encryption/snapshot";
-const { captureSnapshot, requireMatchingSnapshot } = snapshot;
+import verification from "../db/encryption/verification";
+import type { EncryptionDatabase } from "../db/encryption/verification";
+const { inspectDatabase, requireMatchingDatabases } = verification;
 import startup from "../db/encryption/startup";
 import type { EncryptionStorage } from "../db/encryption/startup";
 const { DATABASE_FILES, STARTUP_PHASES, openEncryptedDatabase } = startup;
@@ -82,8 +82,38 @@ class CipherDatabase implements EncryptionDatabase {
     const result = await this.request(sql, params);
     return result ? JSON.parse(result) : [];
   }
-  async getFirstAsync<Row>(sql: string, ...params: (string | number | null)[]) {
+  async getFirstAsync<Row>(sql: string, ...params: (string | number | null)[]): Promise<Row | null> {
+    // An external stock CLI emulates the private reader with SQL substr. This
+    // preserves exact diagnostic results but cannot prove incremental native
+    // allocation behavior. Expo must execute the patched primitive separately.
+    const identifier = (name: string) => `"${name.replaceAll('"', '""')}"`;
+    if (sql.includes("moodinator_blob_read")) {
+      const [table, column, rowid, offset, length] = params;
+      assert.equal(typeof table, "string"); assert.equal(typeof column, "string");
+      if (sql.startsWith("SELECT hex(")) {
+        sql = `SELECT hex(substr(CAST(${identifier(String(column))} AS BLOB), ?, ?)) AS chunk FROM ${identifier(String(table))} WHERE rowid = CAST(? AS INTEGER);`;
+        params = [Number(offset) + 1, Number(length), rowid];
+      } else {
+        sql = sql.replace("moodinator_blob_read(?, ?, CAST(? AS INTEGER))", `length(CAST(${identifier(String(column))} AS BLOB))`);
+        params = params.slice(3);
+      }
+    }
     return (await this.getAllAsync<Row>(sql, ...params))[0] ?? null;
+  }
+  async *getEachAsync<Row>(sql: string, ...params: (string | number | null)[]): AsyncIterableIterator<Row> {
+    // The CLI has no cursor API. Bound ordinary rows with offset reads; only
+    // cipher diagnostic rows use its batch API, never stored table contents.
+    if (sql === "PRAGMA cipher_integrity_check;") {
+      for (const row of await this.getAllAsync<Row>(sql, ...params)) yield row;
+      return;
+    }
+    const pragma = sql.match(/^PRAGMA (integrity_check|foreign_key_check);$/);
+    const query = pragma ? `SELECT * FROM pragma_${pragma[1]}` : sql.replace(/;\s*$/, "");
+    for (let offset = 0; ; offset++) {
+      const row = await this.getFirstAsync<Row>(`${query} LIMIT 1 OFFSET ?;`, ...params, offset);
+      if (!row) return;
+      yield row;
+    }
   }
   async runAsync(sql: string, ...params: (string | number | null)[]) {
     await this.request(sql, params);
@@ -122,12 +152,12 @@ async function seed(storage: EncryptionStorage<CipherDatabase>, legacy = false, 
       DELETE FROM mood_emotions WHERE mood_id = 1;
       INSERT INTO mood_emotions VALUES (777, 1);
       DELETE FROM emotions WHERE id = 3;`);
-    return await captureSnapshot(db);
+    await inspectDatabase(db);
   } finally { await db.closeAsync(); }
 }
 
 async function verifyRoundtrip(storage: EncryptionStorage<CipherDatabase>, db: CipherDatabase) {
-  const expected = await captureSnapshot(db);
+  const expected = await inspectDatabase(db);
   const exporter = await storage.open(DATABASE_FILES.active);
   try {
     await exporter.execAsync(rawKeyPragma(validateRawKey(await storage.loadKey())));
@@ -139,7 +169,7 @@ async function verifyRoundtrip(storage: EncryptionStorage<CipherDatabase>, db: C
       DETACH DATABASE roundtrip;`);
   } finally { await exporter.closeAsync(); }
   const plain = await storage.open("roundtrip.db");
-  try { requireMatchingSnapshot(await captureSnapshot(plain), expected); }
+  try { await requireMatchingDatabases(plain, db); }
   finally { await plain.closeAsync(); }
 }
 
@@ -192,15 +222,15 @@ try {
     const original = await storage.open(DATABASE_FILES.original);
     await original.execAsync("PRAGMA journal_mode = WAL;");
     await original.execAsync(fixtureSql);
-    const expected = await captureSnapshot(original);
+    const expected = await storage.open("expected.db");
+    await expected.execAsync(fixtureSql);
+    await storage.initialize(expected);
     original.crash();
     await original.closeAsync();
     assert.ok(await storage.exists(DATABASE_FILES.original + "-wal"), "A committed WAL must remain after the abrupt native stop");
     const recovered = await openEncryptedDatabase(storage);
-    const actual = await captureSnapshot(recovered);
-    delete actual.content.fresh_install;
-    actual.schema = actual.schema.filter((row) => row.name !== "fresh_install");
-    requireMatchingSnapshot(actual, expected);
+    await requireMatchingDatabases(recovered, expected);
+    await expected.closeAsync();
     await recovered.closeAsync();
     passed.push("crashed-plaintext-wal:committed-data-retained");
   }
