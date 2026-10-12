@@ -1,10 +1,11 @@
 import React, { useCallback, useRef, useState } from "react";
 import { ActivityIndicator, AppState, Linking, Platform, Pressable, Switch, Text, View } from "react-native";
-import DateTimePicker, { type DateTimePickerEvent } from "@react-native-community/datetimepicker";
+import type { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { useFocusEffect } from "expo-router";
 import { useCalendars, useLocales } from "expo-localization";
 import { useThemeColors } from "@/constants/colors";
 import { Alert } from "@/components/ui/AppAlert";
+import { PrivateDateTimePicker } from "@/components/ui/PrivateDateTimePicker";
 import { formatReminderTime } from "@/lib/reminderTimePresentation";
 import { getNoEntryReminderSettings, saveNoEntryReminderSettings, reconcileNoEntryReminder } from "@/services/notificationService";
 import type { NoEntryReminderSettings as Settings } from "@/services/noEntryReminderScheduler";
@@ -73,7 +74,7 @@ export function NoEntryReminderSettings() {
         <Text style={{ color: get("text") }}>{time} · Local time</Text>
       </Pressable>
       {pickerOpen && <>
-        <DateTimePicker mode="time" display={Platform.OS === "ios" ? "spinner" : "default"}
+        <PrivateDateTimePicker mode="time" display={Platform.OS === "ios" ? "spinner" : "default"}
           value={new Date(new Date().setHours(hour, minute, 0, 0))} onChange={changeTime} is24Hour={uses24hourClock ?? undefined} />
         {Platform.OS === "ios" && <Pressable accessibilityRole="button" accessibilityLabel="Done choosing no-entry reminder time" onPress={() => setPickerOpen(false)} className="p-3">
           <Text style={{ color: get("text") }}>Done</Text>

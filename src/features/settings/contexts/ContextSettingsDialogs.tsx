@@ -1,8 +1,9 @@
 import React, { useRef, useState } from "react";
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeIn, FadeInUp, FadeOut, SlideOutDown } from "react-native-reanimated";
+import { PrivateModal } from "@/components/ui/PrivateModal";
 import { CONTEXT_THEME } from "./contextSettingsConfig";
 import { styles } from "./contextSettingsStyles";
 import { colors, getThemedColor } from "@/constants/colors";
@@ -55,7 +56,7 @@ function AddContextModal({
   };
 
   return (
-    <Modal
+    <PrivateModal
       visible={visible}
       transparent
       animationType="none"
@@ -233,7 +234,7 @@ function AddContextModal({
           </ScrollView>
         </Animated.View>
       </KeyboardAvoidingView>
-    </Modal>
+    </PrivateModal>
   );
 }
 
@@ -253,7 +254,7 @@ function RemoveContextDialog({
   if (!contextName) return null;
 
   return (
-    <Modal
+    <PrivateModal
       visible={visible}
       transparent
       animationType="none"
@@ -365,7 +366,7 @@ function RemoveContextDialog({
           </View>
         </Animated.View>
       </View>
-    </Modal>
+    </PrivateModal>
   );
 }
 

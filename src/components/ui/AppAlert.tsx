@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   AccessibilityInfo,
   findNodeHandle,
-  Modal,
   ScrollView,
   useWindowDimensions,
   Pressable,
@@ -15,6 +14,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
+import { PrivateModal } from "./PrivateModal";
 import { colors, effectColors, useThemeColors } from "@/constants/colors";
 import { fontFamilies, typography } from "@/constants/typography";
 
@@ -162,7 +162,7 @@ export function AppAlertProvider() {
     && request.buttons.every((button) => (button.text ?? "OK").length <= 14);
 
   return (
-    <Modal
+    <PrivateModal
       visible
       transparent
       animationType={reducedMotion ? "none" : "fade"}
@@ -284,7 +284,7 @@ export function AppAlertProvider() {
           </View>
         </SafeAreaView>
       </View>
-    </Modal>
+    </PrivateModal>
   );
 }
 
