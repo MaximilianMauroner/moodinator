@@ -167,6 +167,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     const [energy, setEnergy] = useState<number | null>(null);
     const [note, setNote] = useState("");
     const [basedOnEntryId, setBasedOnEntryId] = useState<number | null>(null);
+    const [hasCopiedEntry, setHasCopiedEntry] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [keyboardHeight, setKeyboardHeight] = useState(0);
     const [isNotesFocused, setIsNotesFocused] = useState(false);
@@ -301,6 +302,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
             setEnergy(draft.energy);
             setNote(draft.note);
             setBasedOnEntryId(draft.basedOnEntryId);
+            setHasCopiedEntry(false);
             saveInFlightRef.current = false;
             setIsSaving(false);
             setCurrentStep(0);
@@ -336,11 +338,9 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
         setIsSaving(true);
 
         try {
+            const draft = { mood, emotions, contextTags, energy, note, basedOnEntryId };
             await onSubmit(
-                buildMoodEntrySubmitValues(
-                    { mood, emotions, contextTags, energy, note, basedOnEntryId },
-                    fieldConfig
-                )
+                hasCopiedEntry ? draft : buildMoodEntrySubmitValues(draft, fieldConfig)
             );
         } catch (error) {
             saveInFlightRef.current = false;
@@ -380,6 +380,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
         emotions,
         energy,
         fieldConfig,
+        hasCopiedEntry,
         mood,
         note,
         onClose,
@@ -457,6 +458,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
         setEnergy(entry.energy);
         setNote(entry.note ?? "");
         setBasedOnEntryId(entry.id);
+        setHasCopiedEntry(true);
     };
 
     const handleNoteChange = useCallback(

@@ -572,17 +572,18 @@ describe("entry save acknowledgement", () => {
 
 
 describe("last-entry prefill", () => {
+  const copied: MoodEntry = {
+    id: 41, mood: 0, timestamp: 300, utcOffsetMinutes: 0,
+    note: "  prior note \u0000 and café  ",
+    emotions: [{ name: "Custom calm", category: "positive", icon: null }],
+    contextTags: ["Custom place"], energy: 0,
+    moodScale: { version: 1, min: 0, max: 10, lowerIsBetter: true },
+    basedOnEntryId: null,
+  };
+
   it.each([
     ["kept", true], ["edit", true], ["kept", false], ["edit", false],
   ] as const)("copies exact values in the %s form with all fields visible=%s", async (variant, allFields) => {
-    const copied: MoodEntry = {
-      id: 41, mood: 0, timestamp: 300, utcOffsetMinutes: 0,
-      note: "  prior note \u0000 and café  ",
-      emotions: [{ name: "Custom calm", category: "positive", icon: null }],
-      contextTags: ["Custom place"], energy: 0,
-      moodScale: { version: 1, min: 0, max: 10, lowerIsBetter: true },
-      basedOnEntryId: null,
-    };
     const onSubmit = vi.fn(async () => {});
     const props = {
       visible: true, initialMood: 5, currentEntryId: 77,
@@ -604,5 +605,86 @@ describe("last-entry prefill", () => {
       mood: 0, emotions: copied.emotions, contextTags: copied.contextTags,
       energy: 0, note: copied.note, basedOnEntryId: 41,
     });
+  });
+
+  it("saves the copied note even when notes are hidden", async () => {
+    const onSubmit = vi.fn(async () => {});
+    await render(
+      <KeptEntryDetailModal
+        visible initialMood={5} currentEntryId={77}
+        emotionOptions={options} contextOptions={["Work"]}
+        fieldConfig={{ emotions: false, context: false, energy: false, notes: false }}
+        onClose={vi.fn()} onSubmit={onSubmit} onUndo={vi.fn()}
+      />,
+    );
+
+    await act(async () => renderer.root.find((node) => node.type === "CopyLastEntry").props.onCopy(copied));
+    expect(renderer.root.findAllByProps({ testID: "entry-notes" })).toHaveLength(0);
+    await pressLabel("Done");
+
+    expect(onSubmit).toHaveBeenCalledExactlyOnceWith({
+      mood: 0, emotions: copied.emotions, contextTags: copied.contextTags,
+      energy: 0, note: copied.note, basedOnEntryId: 41,
+    });
+  });
+
+  it.each([null, 41])("restores normal submission after reopen with stored source ID %s", async (basedOnEntryId) => {
+    const onSubmit = vi.fn(async () => {});
+    const props = {
+      initialMood: 5, currentEntryId: 77,
+      initialValues: basedOnEntryId === null ? undefined : { basedOnEntryId },
+      emotionOptions: options, contextOptions: ["Work"], fieldConfig: NOTES_ONLY,
+      onClose: vi.fn(), onSubmit, onUndo: vi.fn(),
+    };
+    await render(<KeptEntryDetailModal {...props} visible />);
+    await act(async () => renderer.root.find((node) => node.type === "CopyLastEntry").props.onCopy(copied));
+    expect(button("entry-notes").props.value).toBe(copied.note);
+
+    await act(async () => renderer.update(<KeptEntryDetailModal {...props} visible={false} />));
+    await act(async () => renderer.update(<KeptEntryDetailModal {...props} visible />));
+    expect(button("entry-notes").props.value).toBe("");
+    await act(async () => button("entry-notes").props.onChangeText("  fresh note  "));
+    await pressLabel("Done");
+
+    expect(onSubmit).toHaveBeenCalledExactlyOnceWith({
+      mood: 5, emotions: [], contextTags: [], energy: null,
+      note: "fresh note", basedOnEntryId,
+    });
+  });
+
+  it("keeps copied fields and subsequent edits through a failed save and retry", async () => {
+    const onSubmit = vi.fn(async () => {}).mockRejectedValueOnce(new Error("storage rejected"));
+    const onClose = vi.fn();
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await render(
+        <KeptEntryDetailModal
+          visible initialMood={5} currentEntryId={77}
+          emotionOptions={options} contextOptions={["Work"]} fieldConfig={NOTES_ONLY}
+          onClose={onClose} onSubmit={onSubmit} onUndo={vi.fn()}
+        />,
+      );
+      await act(async () => renderer.root.find((node) => node.type === "CopyLastEntry").props.onCopy(copied));
+      await act(async () => button("entry-notes").props.onChangeText("  first edit  "));
+      await pressLabel("Done");
+
+      expect(onClose).not.toHaveBeenCalled();
+      expect(button("entry-notes").props.value).toBe("  first edit  ");
+      await act(async () => button("entry-notes").props.onChangeText("  retry edit  "));
+      await pressLabel("Done");
+
+      expect(onSubmit).toHaveBeenCalledTimes(2);
+      expect(onSubmit).toHaveBeenNthCalledWith(1, {
+        mood: 0, emotions: copied.emotions, contextTags: copied.contextTags,
+        energy: 0, note: "  first edit  ", basedOnEntryId: 41,
+      });
+      expect(onSubmit).toHaveBeenNthCalledWith(2, {
+        mood: 0, emotions: copied.emotions, contextTags: copied.contextTags,
+        energy: 0, note: "  retry edit  ", basedOnEntryId: 41,
+      });
+      expect(onClose).toHaveBeenCalledTimes(1);
+    } finally {
+      consoleSpy.mockRestore();
+    }
   });
 });
