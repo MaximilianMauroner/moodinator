@@ -78,6 +78,7 @@ type BaseMoodEntryModalProps = {
     onClose: () => void;
     onSubmit: (values: MoodEntryFormValues) => Promise<void> | void;
     initialValues?: Partial<MoodEntryFormValues>;
+    currentEntryId?: number;
     showMoodSelector?: boolean;
     flow?: MoodEntryFlow;
     onCreateEmotion?: CreateEmotionOption;
@@ -137,6 +138,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     onClose,
     onSubmit,
     initialValues,
+    currentEntryId,
     showMoodSelector = true,
     flow = "detailed",
     onCreateEmotion,
@@ -1040,7 +1042,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                                 Kept. Add detail if you like.
                                             </Text>
                                         </View>
-                                        <SameAsYesterdayButton onCopy={handleCopyYesterday} />
+                                        <SameAsYesterdayButton onCopy={handleCopyYesterday} excludeEntryId={currentEntryId} />
                                     </View>
                                 ) : (
                                     <>
@@ -1054,7 +1056,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                             />
                                         </View>
                                         <View className="ml-2">
-                                            <SameAsYesterdayButton onCopy={handleCopyYesterday} />
+                                            <SameAsYesterdayButton onCopy={handleCopyYesterday} excludeEntryId={currentEntryId} />
                                         </View>
                                     </View>
 
@@ -1288,6 +1290,7 @@ type MoodEntryModalSharedProps = {
     onClose: () => void;
     onSubmit: (values: MoodEntryFormValues) => Promise<void> | void;
     initialValues?: Partial<MoodEntryFormValues>;
+    currentEntryId?: number;
     onCreateEmotion?: CreateEmotionOption;
     onCreateContextTag?: CreateContextOption;
 };

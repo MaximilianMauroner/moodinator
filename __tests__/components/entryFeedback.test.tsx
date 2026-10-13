@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Emotion } from "@db/types";
+import type { Emotion, MoodEntry } from "@db/types";
 import { EmotionPicker } from "@/components/entry/EmotionPicker";
 import { EnergySlider } from "@/components/entry/EnergySlider";
 import {
@@ -57,7 +57,7 @@ vi.mock("react-native", () => ({
 }));
 vi.mock("react-native-pager-view", () => ({ default: "PagerView" }));
 vi.mock("@react-navigation/elements", () => ({ PlatformPressable: "Pressable" }));
-vi.mock("@/components/entry", () => ({ SameAsYesterdayButton: () => null }));
+vi.mock("@/components/entry", () => ({ SameAsYesterdayButton: "CopyLastEntry" }));
 vi.mock("@/components/ui/AppAlert", () => ({ Alert: { alert: entryFeedback.alert } }));
 vi.mock("@/lib/showCrisisSupportAlert", () => ({ showCrisisSupportAlert: entryFeedback.crisisSupport }));
 vi.mock("@/services/toastService", () => ({
@@ -73,6 +73,7 @@ vi.mock("react-native-reanimated", async () => {
     useAnimatedStyle: (style: () => unknown) => style(),
     withSpring: (value: number) => value,
     withTiming: (value: number) => value,
+    withSequence: (...values: number[]) => values.at(-1),
     FadeIn: transition,
     FadeOut: transition,
   };
@@ -566,5 +567,42 @@ describe("entry save acknowledgement", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+
+describe("last-entry prefill", () => {
+  it.each([
+    ["kept", true], ["edit", true], ["kept", false], ["edit", false],
+  ] as const)("copies exact values in the %s form with all fields visible=%s", async (variant, allFields) => {
+    const copied: MoodEntry = {
+      id: 41, mood: 0, timestamp: 300, utcOffsetMinutes: 0,
+      note: "  prior note \u0000 and café  ",
+      emotions: [{ name: "Custom calm", category: "positive", icon: null }],
+      contextTags: ["Custom place"], energy: 0,
+      moodScale: { version: 1, min: 0, max: 10, lowerIsBetter: true },
+      basedOnEntryId: null,
+    };
+    const onSubmit = vi.fn(async () => {});
+    const props = {
+      visible: true, initialMood: 5, currentEntryId: 77,
+      emotionOptions: options, contextOptions: ["Work"],
+      fieldConfig: { emotions: allFields, context: allFields, energy: allFields, notes: true },
+      onClose: vi.fn(), onSubmit,
+    };
+    await render(variant === "kept"
+      ? <KeptEntryDetailModal {...props} onUndo={vi.fn()} />
+      : <EditMoodEntryModal {...props} />);
+    const copy = renderer.root.find((node) => node.type === "CopyLastEntry");
+    expect(copy.props.excludeEntryId).toBe(77);
+    await act(async () => copy.props.onCopy(copied));
+    while (renderer.root.findAllByProps({ accessibilityLabel: "Next step" }).length > 0) {
+      await pressLabel("Next step");
+    }
+    await pressLabel(variant === "kept" ? "Done" : "Save entry");
+    expect(onSubmit).toHaveBeenCalledExactlyOnceWith({
+      mood: 0, emotions: copied.emotions, contextTags: copied.contextTags,
+      energy: 0, note: copied.note, basedOnEntryId: 41,
+    });
   });
 });
