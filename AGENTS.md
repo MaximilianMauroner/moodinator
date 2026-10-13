@@ -247,6 +247,6 @@ review pass before merge.
 
 * No secrets.
 * No destructive git commands.
-* No CI/deployment/auth/billing/data-loss-sensitive changes without explicit
+* No deployment/auth/billing/data-loss-sensitive changes without explicit
   direction.
 * Final handoff: changed, verification, known limits, GitHub issue status/next step.
