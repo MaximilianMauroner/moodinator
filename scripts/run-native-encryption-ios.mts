@@ -211,49 +211,54 @@ async function runProof(signal: AbortSignal) {
   await result({ proof: "write-failure" });
   await result({ proof: "verify-write-failure" });
   await result({ proof: "resume", case: "native-write-failure" });
-  const exportRun = await launch({ proof: "export-interruption" });
-  const exportPid = ownedProcess();
-  const exportTarget = path.join(container, "Documents/encryption-proof/native-export-interruption/moodinator.encrypted-v2.db");
-  const exportStatusFile = path.join(container, "Documents/encryption-proof-status.json");
-  const partialExport = () => {
-    const status: ProofStatus = JSON.parse(readFileSync(exportStatusFile, "utf8"));
-    assert.equal(status.sourceSha, sourceSha);
-    assert.equal(status.runId, exportRun);
-    assert.equal(status.progress, "running:native-export-interruption:export-started");
-    const bytes = statSync(exportTarget).size;
-    assert.ok(bytes > 256 * 1024 && bytes < 32 * 1024 * 1024, `Export is not demonstrably partial: ${bytes} bytes`);
-    return { bytes, observedAt: new Date().toISOString(), progress: status.progress };
-  };
-  const exportDeadline = Date.now() + 180000;
-  let observedPartial = false;
-  while (Date.now() < exportDeadline) {
-    signal.throwIfAborted();
-    if (existsSync(exportStatusFile) && existsSync(exportTarget)) {
-      let status: ProofStatus | undefined;
-      try { status = JSON.parse(readFileSync(exportStatusFile, "utf8")); } catch { /* Native status write in progress. */ }
-      if (status?.runId === exportRun) {
-        assert.equal(status.sourceSha, sourceSha);
-        assert.notEqual(status.progress, "failed", JSON.stringify(status));
-        assert.notEqual(status.progress, "running:native-export-interruption:export-closed", "Export completed before SIGKILL");
-        if (status.progress === "running:native-export-interruption:export-started" && statSync(exportTarget).size > 256 * 1024) {
-          const first = partialExport();
-          let atKill: ReturnType<typeof partialExport> | undefined;
-          await abruptStop(() => { atKill = partialExport(); }, exportPid);
-          assert.ok(atKill);
-          assert.ok(existsSync(path.join(path.dirname(exportTarget), "moodinator.db")), "Interrupted source must remain");
-          evidence.results.push({ action: { proof: "export-interruption" }, runId: exportRun,
-            report: { status: "passed", first, atKill, signal: "SIGKILL", evidence: "partial native target below half payload size immediately before actual owned-process kill; cold recovery required" } });
-          save();
-          observedPartial = true;
-          break;
+  const interruptNativeExport = async (shape: "many-rows" | "single-cell") => {
+    const caseName = `native-export-interruption-${shape}`;
+    const exportRun = await launch({ proof: "export-interruption", shape });
+    const exportPid = ownedProcess();
+    const exportTarget = path.join(container, `Documents/encryption-proof/${caseName}/moodinator.encrypted-v2.db`);
+    const exportStatusFile = path.join(container, "Documents/encryption-proof-status.json");
+    const partialExport = () => {
+      const status: ProofStatus = JSON.parse(readFileSync(exportStatusFile, "utf8"));
+      assert.equal(status.sourceSha, sourceSha);
+      assert.equal(status.runId, exportRun);
+      assert.equal(status.progress, `running:${caseName}:export-started`);
+      const bytes = statSync(exportTarget).size;
+      assert.ok(bytes > 256 * 1024 && bytes < 32 * 1024 * 1024, `Export is not demonstrably partial: ${bytes} bytes`);
+      return { bytes, observedAt: new Date().toISOString(), progress: status.progress };
+    };
+    const exportDeadline = Date.now() + 180000;
+    let observedPartial = false;
+    while (Date.now() < exportDeadline) {
+      signal.throwIfAborted();
+      if (existsSync(exportStatusFile) && existsSync(exportTarget)) {
+        let status: ProofStatus | undefined;
+        try { status = JSON.parse(readFileSync(exportStatusFile, "utf8")); } catch { /* Native status write in progress. */ }
+        if (status?.runId === exportRun) {
+          assert.equal(status.sourceSha, sourceSha);
+          assert.notEqual(status.progress, "failed", JSON.stringify(status));
+          assert.notEqual(status.progress, `running:${caseName}:export-closed`, "Export completed before SIGKILL");
+          if (status.progress === `running:${caseName}:export-started` && statSync(exportTarget).size > 256 * 1024) {
+            const first = partialExport();
+            let atKill: ReturnType<typeof partialExport> | undefined;
+            await abruptStop(() => { atKill = partialExport(); }, exportPid);
+            assert.ok(atKill);
+            assert.ok(existsSync(path.join(path.dirname(exportTarget), "moodinator.db")), "Interrupted source must remain");
+            evidence.results.push({ action: { proof: "export-interruption", shape }, runId: exportRun,
+              report: { status: "passed", first, atKill, signal: "SIGKILL", evidence: "partial native target below half payload size immediately before actual owned-process kill; cold recovery required" } });
+            save();
+            observedPartial = true;
+            break;
+          }
         }
       }
+      await delay(10);
     }
-    await delay(10);
-  }
-  assert.ok(observedPartial, "No partial native export was observed before interruption timeout");
-  await result({ proof: "resume", case: "native-export-interruption" });
-  await result({ proof: "resume", case: "native-export-interruption" });
+    assert.ok(observedPartial, `No partial ${shape} native export was observed before interruption timeout`);
+    await result({ proof: "resume", case: caseName });
+    await result({ proof: "resume", case: caseName });
+  };
+  await interruptNativeExport("many-rows");
+  await interruptNativeExport("single-cell");
   await result({ proof: "prepare-app" });
   await result({ proof: "verify-app" });
   await result({ proof: "verify-app" });

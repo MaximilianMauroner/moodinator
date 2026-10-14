@@ -34,4 +34,29 @@ describe("setDurableItemAsync", () => {
 
     await expect(setDurableItemAsync("key", "value")).rejects.toThrow("commit failed");
   });
+
+  it("serializes concurrent writes through their checked commits", async () => {
+    let releaseFirstCommit: (() => void) | undefined;
+    vi.mocked(SecureStore.deleteItemAsync).mockImplementationOnce(
+      () => new Promise<void>((resolve) => { releaseFirstCommit = resolve; })
+    );
+
+    const first = setDurableItemAsync("key", "first");
+    await vi.waitFor(() => expect(releaseFirstCommit).toBeTypeOf("function"));
+    const second = setDurableItemAsync("key", "second");
+
+    expect(vi.mocked(SecureStore.setItemAsync).mock.calls).toEqual([
+      ["key.moodinatorDurabilityCheck", "pending", undefined],
+      ["key", "first", undefined],
+    ]);
+
+    releaseFirstCommit?.();
+    await Promise.all([first, second]);
+    expect(vi.mocked(SecureStore.setItemAsync).mock.calls).toEqual([
+      ["key.moodinatorDurabilityCheck", "pending", undefined],
+      ["key", "first", undefined],
+      ["key.moodinatorDurabilityCheck", "pending", undefined],
+      ["key", "second", undefined],
+    ]);
+  });
 });

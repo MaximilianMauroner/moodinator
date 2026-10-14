@@ -35,6 +35,7 @@ const port = Number(options.port);
 assert.ok(Number.isInteger(port) && port >= 5554 && port <= 5682 && port % 2 === 0, "Use an explicit valid emulator port");
 const serial = `emulator-${port}`;
 const runAdb = (args: string[], timeout = 15000) => execFileSync(adb, ["-s", serial, ...args], { encoding: "utf8", timeout });
+const shellQuote = (value: string) => `'${value.replaceAll("'", `'\\''`)}'`;
 assert.ok(!execFileSync(adb, ["devices"], { encoding: "utf8", timeout: 15000 }).split(/\r?\n/).some((line) => line.startsWith(`${serial}\t`)), "Refusing to use an already running emulator");
 const output = path.resolve(options.out);
 mkdirSync(output, { recursive: true });
@@ -65,7 +66,7 @@ async function launch(params: Record<string, string>) {
   runAdb(["shell", "am", "force-stop", QA_ID]);
   const runId = randomUUID();
   const url = `moodinator-qa:///?${new URLSearchParams({ ...params, runId })}`;
-  runAdb(["shell", "am", "start", "-W", "-a", "android.intent.action.VIEW", "-d", url, QA_ID]);
+  runAdb(["shell", "am", "start", "-W", "-a", "android.intent.action.VIEW", "-d", shellQuote(url), QA_ID]);
   await waitForNode(serial, { testId: `qa-source-sha-${sourceSha}` }, { adbPath: adb, timeoutMs: 45000, dumpTimeoutMs: 5000, pollIntervalMs: 500 });
   return runId;
 }
@@ -112,34 +113,22 @@ function appPidValue() {
   }
 }
 
-function ownedAppPid() {
-  const value = appPidValue();
-  assert.match(value, /^\d+$/, "Could not identify one owned QA process");
-  const pid = Number(value);
-  const command = runAdb(["exec-out", "cat", `/proc/${pid}/cmdline`], 3000).replace(/\0/g, "");
-  assert.equal(command, QA_ID, "QA process ownership does not match; no signal sent");
-  assert.equal(runAdb(["shell", "stat", "-c", "%u", `/proc/${pid}`], 3000).trim(), appUid, "QA process UID does not match installed package");
-  return pid;
-}
-
-async function abruptlyStopOwnedApp(pid: number, beforeKill: () => unknown) {
-  assert.equal(ownedAppPid(), pid, "Owned QA process changed before interruption");
-  const observation = beforeKill();
-  runAdb(["shell", "kill", "-9", String(pid)], 3000);
+async function abruptlyStopOwnedApp(beforeStop: () => unknown) {
+  assert.match(appPidValue(), /^\d+$/, "Could not identify one owned QA process");
+  const before = beforeStop();
+  runAdb(["shell", "am", "force-stop", QA_ID], 3000);
   const deadline = Date.now() + 10000;
   while (Date.now() < deadline) {
     const current = appPidValue();
-    if (!current) return observation;
-    assert.equal(current, String(pid), "A different QA process started during interruption");
+    if (!current) return { before, after: beforeStop() };
     await delay(100);
   }
-  throw new Error("Owned QA process did not exit after SIGKILL");
+  throw new Error("Owned QA process did not exit after package-scoped force-stop");
 }
 
 async function interruptNativeExport(shape: "many-rows" | "single-cell") {
   const caseName = `native-export-interruption-${shape}`;
   const runId = await launch({ proof: "export-interruption", shape });
-  const pid = ownedAppPid();
   const caseDirectory = path.posix.join(appDataDirectory, "files/encryption-proof", caseName);
   const target = path.posix.join(caseDirectory, "moodinator.encrypted-v2.db");
   const source = path.posix.join(caseDirectory, "moodinator.db");
@@ -151,20 +140,23 @@ async function interruptNativeExport(shape: "many-rows" | "single-cell") {
     return { bytes, observedAt: new Date().toISOString(), progress: status.progress };
   };
   const deadline = Date.now() + 180000;
-  let proof: { first: ReturnType<typeof partialExport>; atKill: ReturnType<typeof partialExport> } | null = null;
+  let proof: { first: ReturnType<typeof partialExport>; beforeStop: ReturnType<typeof partialExport>; afterStop: ReturnType<typeof partialExport> } | null = null;
   while (Date.now() < deadline) {
     const status = readProofStatus(runId);
     if (status) {
-      assert.notEqual(status.progress, `running:${caseName}:export-closed`, "Export completed before SIGKILL");
+      assert.notEqual(status.progress, `running:${caseName}:export-closed`, "Export completed before package-scoped termination");
       if (status.progress === `running:${caseName}:export-started`) {
+        let first: ReturnType<typeof partialExport>;
         try {
-          const first = partialExport();
-          const atKill = await abruptlyStopOwnedApp(pid, partialExport) as ReturnType<typeof partialExport>;
-          proof = { first, atKill };
-          break;
+          first = partialExport();
         } catch (error) {
-          if (!(error instanceof Error) || !/No such file|not demonstrably partial/.test(error.message)) throw error;
+          if (!/No such file|not demonstrably partial/.test(commandErrorText(error))) throw error;
+          await delay(20);
+          continue;
         }
+        const stopped = await abruptlyStopOwnedApp(partialExport) as { before: ReturnType<typeof partialExport>; after: ReturnType<typeof partialExport> };
+        proof = { first, beforeStop: stopped.before, afterStop: stopped.after };
+        break;
       }
     }
     await delay(20);
@@ -174,8 +166,8 @@ async function interruptNativeExport(shape: "many-rows" | "single-cell") {
   evidence.results.push({
     action: { proof: "export-interruption", shape },
     runId,
-    report: { status: "passed", ...proof, signal: "SIGKILL", sourceRetained: true,
-      evidence: "partial native target growth immediately before actual owned-process kill; cold recovery required" },
+    report: { status: "passed", ...proof, termination: "package-scoped force-stop", sourceRetained: true,
+      evidence: "partial native target remained incomplete after actual owned-package termination; cold recovery required" },
   });
   writeFileSync(path.join(output, "report.json"), `${JSON.stringify(evidence, null, 2)}\n`);
   await result({ proof: "resume", case: caseName });
@@ -260,10 +252,13 @@ try {
   try { writeFileSync(path.join(output, "logcat.txt"), runAdb(["logcat", "-d", "-t", "1200"])); } catch { /* Keep the original diagnostic. */ }
   throw error;
 } finally {
-  writeFileSync(path.join(output, "report.json"), `${JSON.stringify(evidence, null, 2)}\n`);
-  try { if (!emulatorExited) runAdb(["emu", "kill"]); } catch { /* Terminate only this runner's child below. */ }
-  const deadline = Date.now() + 15000;
-  while (!emulatorExited && Date.now() < deadline) await delay(200);
-  if (!emulatorExited) { owned.kill("SIGTERM"); await delay(1000); }
-  if (!emulatorExited) owned.kill("SIGKILL");
+  try {
+    try { if (!emulatorExited) runAdb(["emu", "kill"]); } catch { /* Terminate only this runner's child below. */ }
+    const deadline = Date.now() + 15000;
+    while (!emulatorExited && Date.now() < deadline) await delay(200);
+    if (!emulatorExited) { owned.kill("SIGTERM"); await delay(1000); }
+    if (!emulatorExited) owned.kill("SIGKILL");
+  } finally {
+    writeFileSync(path.join(output, "report.json"), `${JSON.stringify(evidence, null, 2)}\n`);
+  }
 }
