@@ -51,7 +51,7 @@ export interface MoodServiceInterface {
   getInRange: (range?: MoodDateRange) => Promise<MoodEntry[]>;
   getByMonth: (year: number, month: number) => Promise<Map<number, MoodEntry[]>>;
   getYesterday: () => Promise<MoodEntry | null>;
-  getLastEntry: () => Promise<MoodEntry | null>;
+  getLastEntry: (excludeEntryId?: number) => Promise<MoodEntry | null>;
   getCount: () => Promise<number>;
   hasLoggedToday: () => Promise<boolean>;
   clearAll: () => Promise<void>;
@@ -141,8 +141,8 @@ export const moodService: MoodServiceInterface = {
     return moods.length > 0 ? moods[0] : null;
   },
 
-  async getLastEntry(): Promise<MoodEntry | null> {
-    return getLatestMood();
+  async getLastEntry(excludeEntryId?: number): Promise<MoodEntry | null> {
+    return getLatestMood(excludeEntryId);
   },
 
   async getCount(): Promise<number> {

@@ -76,9 +76,9 @@ afterEach(() => {
   if (renderer) renderer.unmount();
 });
 
-async function render(onCopy = vi.fn()) {
+async function render(onCopy = vi.fn(), excludeEntryId?: number) {
   await act(async () => {
-    renderer = create(<SameAsYesterdayButton onCopy={onCopy} />);
+    renderer = create(<SameAsYesterdayButton onCopy={onCopy} excludeEntryId={excludeEntryId} />);
   });
   return onCopy;
 }
@@ -96,7 +96,7 @@ function visibleText() {
 
 describe("SameAsYesterdayButton", () => {
   it("copies into the draft on tap and describes the real effect", async () => {
-    const onCopy = await render();
+    const onCopy = await render(vi.fn(), 77);
 
     expect(visibleText()).toContain("Copy last entry");
     expect(visibleText()).not.toContain("LAST ENTRY");
@@ -104,14 +104,16 @@ describe("SameAsYesterdayButton", () => {
     expect(copyButton().props.accessibilityHint).toContain("copy");
     await act(async () => copyButton().props.onPress());
 
+    expect(mocks.getLastEntry).toHaveBeenCalledWith(77);
     expect(onCopy).toHaveBeenCalledWith(entry);
     expect(mocks.commit).toHaveBeenCalledTimes(1);
   });
 
   it("does not run the tap action after a long press and exposes preview actions", async () => {
-    const onCopy = await render();
+    const onCopy = await render(vi.fn(), 77);
 
     await act(async () => copyButton().props.onLongPress());
+    expect(mocks.getLastEntry).toHaveBeenCalledWith(77);
     expect(onCopy).not.toHaveBeenCalled();
     expect(renderer.root.findByProps({ accessibilityLabel: "Cancel preview" })).toBeTruthy();
     expect(renderer.root.findByProps({ accessibilityLabel: "Close preview" })).toBeTruthy();

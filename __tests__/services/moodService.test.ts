@@ -22,4 +22,22 @@ describe("moodService.getLastEntry", () => {
     expect(first).toHaveBeenCalledTimes(1);
     expect(first).toHaveBeenCalledWith(expect.stringContaining("LIMIT 1"));
   });
+  it("excludes the saved quick entry and preserves deterministic timestamp ties", async () => {
+    const prior = db.__addMood({ timestamp: 300, note: "prior" });
+    const current = db.__addMood({ timestamp: 300, note: "just saved" });
+    expect(await moodService.getLastEntry()).toMatchObject({ id: current.id });
+    expect(await moodService.getLastEntry(current.id)).toMatchObject({ id: prior.id, note: "prior" });
+  });
+
+  it("does not copy an entry into itself when it is the only saved entry", async () => {
+    const current = db.__addMood({ timestamp: 300 });
+    expect(await moodService.getLastEntry(current.id)).toBeNull();
+  });
+
+  it("can copy the latest other entry while editing an older one", async () => {
+    const editing = db.__addMood({ timestamp: 100 });
+    const latest = db.__addMood({ timestamp: 400, note: "latest other entry" });
+    expect(await moodService.getLastEntry(editing.id)).toMatchObject({ id: latest.id });
+  });
+
 });

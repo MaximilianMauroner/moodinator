@@ -20,6 +20,8 @@ const nativeFeedback = vi.hoisted(() => ({
   performAndroidHapticsAsync: vi.fn(async () => {}),
   impactAsync: vi.fn(async () => {}),
 }));
+type KeyboardListener = (event: { endCoordinates: { height: number } }) => void;
+const keyboardListeners = vi.hoisted(() => new Map<string, KeyboardListener>());
 const entryFeedback = vi.hoisted(() => ({
   alert: vi.fn(),
   crisisSupport: vi.fn(),
@@ -42,7 +44,13 @@ vi.mock("react-native", () => ({
   Modal: "Modal",
   KeyboardAvoidingView: "KeyboardAvoidingView",
   TextInput: "TextInput",
-  Keyboard: { addListener: () => ({ remove: () => {} }), dismiss: vi.fn() },
+  Keyboard: {
+    addListener: (event: string, listener: KeyboardListener) => {
+      keyboardListeners.set(event, listener);
+      return { remove: () => keyboardListeners.delete(event) };
+    },
+    dismiss: vi.fn(),
+  },
   useWindowDimensions: () => ({ width: 390, height: 844 }),
   View: "View",
   Text: "Text",
@@ -58,7 +66,12 @@ vi.mock("react-native", () => ({
 vi.mock("react-native-pager-view", () => ({ default: "PagerView" }));
 vi.mock("@react-navigation/elements", () => ({ PlatformPressable: "Pressable" }));
 vi.mock("@/components/entry", () => ({ SameAsYesterdayButton: () => null }));
-vi.mock("@/components/ui/AppAlert", () => ({ Alert: { alert: entryFeedback.alert } }));
+vi.mock("@/components/ui/AppAlert", () => ({
+  useModalAlert: () => ({ alert: entryFeedback.alert, alertView: null, hasAlert: false }),
+}));
+vi.mock("react-native-safe-area-context", () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 24, left: 0, right: 0 }),
+}));
 vi.mock("@/lib/showCrisisSupportAlert", () => ({ showCrisisSupportAlert: entryFeedback.crisisSupport }));
 vi.mock("@/services/toastService", () => ({
   toastService: { success: entryFeedback.toastSuccess },
@@ -566,5 +579,41 @@ describe("entry save acknowledgement", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe.each(["android", "ios"])("entry notes keyboard on %s", (platform) => {
+  beforeEach(() => {
+    nativePlatform.OS = platform;
+    nativePlatform.Version = platform === "android" ? 35 : 18;
+  });
+
+  it("keeps Save reachable above the keyboard while Notes has focus", async () => {
+    const onSubmit = vi.fn(async () => {});
+    await render(
+      <SaveEntryModal variant="detailed" fieldConfig={NOTES_ONLY} onClose={vi.fn()} onSubmit={onSubmit} />,
+    );
+
+    await act(async () => button("entry-notes").props.onFocus());
+    await act(async () => {
+      keyboardListeners.get(platform === "ios" ? "keyboardWillShow" : "keyboardDidShow")?.({
+        endCoordinates: { height: 300 },
+      });
+    });
+    await act(async () => button("entry-notes").props.onChangeText("typed with the keyboard open"));
+
+    // Android reports the keyboard above the 24dp navigation inset; the
+    // edge-to-edge sheet must clear both.
+    const sheet = renderer.root.find(
+      (node) => node.type === "View" && "accessibilityElementsHidden" in node.props,
+    );
+    expect(sheet.props.style.marginBottom).toBe(platform === "android" ? 324 : 300);
+
+    await act(async () => {
+      labeledButton("Save entry").props.onPress();
+      await Promise.resolve();
+    });
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ note: "typed with the keyboard open" }));
   });
 });

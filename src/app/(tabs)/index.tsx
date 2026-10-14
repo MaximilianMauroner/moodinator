@@ -259,6 +259,7 @@ function HomeScreenContent() {
         contextOptions={entrySettings.contextOptions}
         fieldConfig={entrySettings.quickEntryFieldConfig}
         initialValues={modals.keptInitialValues}
+        currentEntryId={modals.keptEntry?.id}
         onClose={modals.closeKeptEntry}
         onSubmit={handleKeptEntrySave}
         onUndo={handleKeptEntryUndo}
@@ -283,6 +284,7 @@ function HomeScreenContent() {
         contextOptions={entrySettings.contextOptions}
         fieldConfig={entrySettings.detailedFieldConfig}
         initialValues={modals.editingInitialValues}
+        currentEntryId={modals.editingEntry?.id}
         onClose={modals.closeEditEntry}
         onSubmit={handleEditEntrySave}
         onCreateEmotion={entrySettings.createEmotionOption}
