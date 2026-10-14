@@ -1,0 +1,102 @@
+name: One-shot prefill145 readiness
+on:
+  push:
+    branches: [qa/prefill145-readiness-20261014-r9]
+permissions:
+  contents: read
+concurrency:
+  group: prefill145-readiness-r9-once
+  cancel-in-progress: false
+jobs:
+  pending:
+    if: github.repository == 'MaximilianMauroner/moodinator' && github.event.repository.private == false && github.event.created == true && github.event.forced == false && github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    permissions:
+      contents: read
+      statuses: write
+    steps:
+      - name: Attach pending verification to exact product head
+        env:
+          GH_STATUS_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request
+          url = 'https://api.github.com/repos/MaximilianMauroner/moodinator/statuses/66b0bd570b75dd25433b98044cbe7a24068963eb'
+          data = json.dumps({'state':'pending','context':'prefill145/native-acceptance','description':'Exact-source Android build and disposable emulator verification','target_url':os.environ['RUN_URL']}).encode()
+          request = urllib.request.Request(url, data=data, method='POST', headers={'Authorization':'Bearer '+os.environ['GH_STATUS_TOKEN'],'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'})
+          with urllib.request.urlopen(request, timeout=20) as response:
+              result = json.load(response)
+          if result.get('state') != 'pending' or result.get('context') != 'prefill145/native-acceptance':
+              raise RuntimeError('Pending product status was not confirmed')
+          print('Pending verification linked to exact #145 source')
+          PY
+  readiness:
+    needs: pending
+    if: github.repository == 'MaximilianMauroner/moodinator' && github.event.repository.private == false && github.event.created == true && github.event.forced == false && github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          path: operator
+          persist-credentials: false
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: 66b0bd570b75dd25433b98044cbe7a24068963eb
+          path: source
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '24.13.1'
+          package-manager-cache: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: '1.3.14'
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Exact source native build and prefill acceptance
+        env:
+          MOODINATOR_SOURCE_ROOT: ${{ github.workspace }}/source
+        run: python3 operator/.github/qa-prefill145/driver.py
+      - name: Restore owned KVM access before evidence publication
+        if: always()
+        timeout-minutes: 1
+        run: timeout 40s nice -n 10 python3 operator/.github/qa-prefill145/kvm-access.py restore
+      - name: Retain bounded task evidence in logs
+        if: always()
+        env:
+          MOODINATOR_SOURCE_ROOT: ${{ github.workspace }}/source
+          XDG_RUNTIME_DIR: ${{ runner.temp }}/moodinator145-qa/runtime
+        run: bash operator/.github/qa-prefill145/heavy-check --repo "$MOODINATOR_SOURCE_ROOT" --lock-timeout 0 --timeout 90s -- nice -n 10 python3 operator/.github/qa-prefill145/log-evidence.py
+  result:
+    needs: [pending, readiness]
+    if: always() && needs.pending.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    permissions:
+      contents: read
+      statuses: write
+    steps:
+      - name: Record actual native and product verdict on exact head
+        env:
+          GH_STATUS_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          READINESS_RESULT: ${{ needs.readiness.result }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request
+          state = 'success' if os.environ['READINESS_RESULT'] == 'success' else 'failure'
+          description = 'Android build, actual manifest and emulator prefill checks passed' if state == 'success' else 'Native/product verification failed or was blocked; see run evidence'
+          url = 'https://api.github.com/repos/MaximilianMauroner/moodinator/statuses/66b0bd570b75dd25433b98044cbe7a24068963eb'
+          data = json.dumps({'state':state,'context':'prefill145/native-acceptance','description':description,'target_url':os.environ['RUN_URL']}).encode()
+          request = urllib.request.Request(url, data=data, method='POST', headers={'Authorization':'Bearer '+os.environ['GH_STATUS_TOKEN'],'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'})
+          with urllib.request.urlopen(request, timeout=20) as response:
+              result = json.load(response)
+          if result.get('state') != state or result.get('context') != 'prefill145/native-acceptance':
+              raise RuntimeError('Terminal product status was not confirmed')
+          print('Exact-source native/product status: '+state)
+          PY
