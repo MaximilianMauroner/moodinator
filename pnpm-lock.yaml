@@ -2,15 +2,7 @@ lockfileVersion: "9.0"
 settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
-overrides:
-  expo-image-loader: 55.0.1
 patchedDependencies:
-  expo-router@55.0.18:
-    hash: 03c8348bfabd53494aba733a9515b5eca3e5d10a484f12ec6b9c4168422fc18b
-    path: patches/expo-router@55.0.18.patch
-  expo-secure-store@55.0.18:
-    hash: 4bb6d51fe99e0a372c22cf9a8496cb39e2a789924390c7175baee2f10b3644bd
-    path: patches/expo-secure-store@55.0.18.patch
   expo-sqlite@55.0.20:
     hash: 27b1880ebb4ba03d77994930578924e510ed2391598842309e0a2b488c944b7c
     path: patches/expo-sqlite@55.0.20.patch
@@ -29,6 +21,9 @@ importers:
       "@react-navigation/bottom-tabs":
         specifier: ^7.15.5
         version: 7.18.13(@react-navigation/native@7.3.13(react-native@0.83.10(@babel/core@7.29.7(supports-color@8.1.1))(@types/react@19.2.17)(react@19.2.0)(supports-color@8.1.1))(react@19.2.0))(react-native-safe-area-context@5.6.2(react-native@0.83.10(@babel/core@7.29.7(supports-color@8.1.1))(@types/react@19.2.17)(react@19.2.0)(supports-color@8.1.1))(react@19.2.0))(react-native-screens@4.23.0(react-native@0.83.10(@babel/core@7.29.7(supports-color@8.1.1))(@types/react@19.2.17)(react@19.2.0)(supports-color@8.1.1))(react@19.2.0))(react-native@0.83.10(@babel/core@7.29.7(supports-color@8.1.1))(@types/react@19.2.17)(react@19.2.0)(supports-color@8.1.1))(react@19.2.0)
+      "@react-navigation/elements":
+        specifier: 2.9.35
+        version: 2.9.35(@react-navigation/native@7.3.13(react-native@0.83.10(@babel/core@7.29.7(supports-color@8.1.1))(@types/react@19.2.17)(react@19.2.0)(supports-color@8.1.1))(react@19.2.0))(react-native-safe-area-context@5.6.2(react-native@0.83.10(@babel/core@7.29.7(supports-color@8.1.1))(@types/react@19.2.17)(react@19.2.0)(supports-color@8.1.1))(react@19.2.0))(react-native@0.83.10(@babel/core@7.29.7(supports-color@8.1.1))(@types/react@19.2.17)(react@19.2.0)(supports-color@8.1.1))(react@19.2.0)
       "@react-navigation/native":
         specifier: ^7.1.33
         version: 7.3.13(react-native@0.83.10(@babel/core@7.29.7(supports-color@8.1.1))(@types/react@19.2.17)(react@19.2.0)(supports-color@8.1.1))(react@19.2.0)
@@ -88,10 +83,10 @@ importers:
         version: 55.0.27(expo@55.0.31)(react-native@0.83.10(@babel/core@7.29.7(supports-color@8.1.1))(@types/react@19.2.17)(react@19.2.0)(supports-color@8.1.1))(react@19.2.0)(supports-color@8.1.1)(typescript@6.0.3)
       expo-router:
         specifier: ~55.0.18
-        version: 55.0.18(patch_hash=03c8348bfabd53494aba733a9515b5eca3e5d10a484f12ec6b9c4168422fc18b)(700596cd22bab19d6f039ff8c2d2a570)
+        version: 55.0.18(700596cd22bab19d6f039ff8c2d2a570)
       expo-secure-store:
         specifier: ~55.0.18
-        version: 55.0.18(patch_hash=4bb6d51fe99e0a372c22cf9a8496cb39e2a789924390c7175baee2f10b3644bd)(expo@55.0.31)
+        version: 55.0.18(expo@55.0.31)
       expo-sharing:
         specifier: ~55.0.24
         version: 55.0.24(expo@55.0.31)(react-native@0.83.10(@babel/core@7.29.7(supports-color@8.1.1))(@types/react@19.2.17)(react@19.2.0)(supports-color@8.1.1))(react@19.2.0)(supports-color@8.1.1)
@@ -6710,7 +6705,7 @@ snapshots:
       ws: 8.21.1
       zod: 3.25.76
     optionalDependencies:
-      expo-router: 55.0.18(patch_hash=03c8348bfabd53494aba733a9515b5eca3e5d10a484f12ec6b9c4168422fc18b)(700596cd22bab19d6f039ff8c2d2a570)
+      expo-router: 55.0.18(700596cd22bab19d6f039ff8c2d2a570)
       react-native: 0.83.10(@babel/core@7.29.7(supports-color@8.1.1))(@types/react@19.2.17)(react@19.2.0)(supports-color@8.1.1)
     transitivePeerDependencies:
       - "@expo/dom-webview"
@@ -6951,7 +6946,7 @@ snapshots:
       react: 19.2.0
     optionalDependencies:
       "@expo/metro-runtime": 55.0.12(@expo/dom-webview@55.0.6)(expo@55.0.31)(react-dom@19.2.0(react@19.2.0))(react-native@0.83.10(@babel/core@7.29.7(supports-color@8.1.1))(@types/react@19.2.17)(react@19.2.0)(supports-color@8.1.1))(react@19.2.0)
-      expo-router: 55.0.18(patch_hash=03c8348bfabd53494aba733a9515b5eca3e5d10a484f12ec6b9c4168422fc18b)(700596cd22bab19d6f039ff8c2d2a570)
+      expo-router: 55.0.18(700596cd22bab19d6f039ff8c2d2a570)
       react-dom: 19.2.0(react@19.2.0)
     transitivePeerDependencies:
       - supports-color
@@ -8644,7 +8639,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
       - typescript
-  expo-router@55.0.18(patch_hash=03c8348bfabd53494aba733a9515b5eca3e5d10a484f12ec6b9c4168422fc18b)(700596cd22bab19d6f039ff8c2d2a570):
+  expo-router@55.0.18(700596cd22bab19d6f039ff8c2d2a570):
     dependencies:
       "@expo/log-box": 55.0.13(@expo/dom-webview@55.0.6)(expo@55.0.31)(react-native@0.83.10(@babel/core@7.29.7(supports-color@8.1.1))(@types/react@19.2.17)(react@19.2.0)(supports-color@8.1.1))(react@19.2.0)
       "@expo/metro-runtime": 55.0.12(@expo/dom-webview@55.0.6)(expo@55.0.31)(react-dom@19.2.0(react@19.2.0))(react-native@0.83.10(@babel/core@7.29.7(supports-color@8.1.1))(@types/react@19.2.17)(react@19.2.0)(supports-color@8.1.1))(react@19.2.0)
@@ -8691,7 +8686,7 @@ snapshots:
       - "@types/react-dom"
       - expo-font
       - supports-color
-  expo-secure-store@55.0.18(patch_hash=4bb6d51fe99e0a372c22cf9a8496cb39e2a789924390c7175baee2f10b3644bd)(expo@55.0.31):
+  expo-secure-store@55.0.18(expo@55.0.31):
     dependencies:
       expo: 55.0.31(@babel/core@7.29.7(supports-color@8.1.1))(@expo/dom-webview@55.0.6)(@expo/metro-runtime@55.0.12)(expo-router@55.0.18)(react-dom@19.2.0(react@19.2.0))(react-native-worklets@0.7.4(@babel/core@7.29.7(supports-color@8.1.1))(react-native@0.83.10(@babel/core@7.29.7(supports-color@8.1.1))(@types/react@19.2.17)(react@19.2.0)(supports-color@8.1.1))(react@19.2.0)(supports-color@8.1.1))(react-native@0.83.10(@babel/core@7.29.7(supports-color@8.1.1))(@types/react@19.2.17)(react@19.2.0)(supports-color@8.1.1))(react@19.2.0)(supports-color@8.1.1)(typescript@6.0.3)
   expo-server@55.0.12: {}
