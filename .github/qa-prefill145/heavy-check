@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage: heavy-check [--repo PATH] [--timeout DURATION] [--lock-timeout SECONDS] -- COMMAND [ARG...]
+
+Run one memory-heavy check at a time per Git repository. The command is
+terminated after 20 minutes by default. Git worktrees sharing a common Git
+directory also share one lock.
+
+Environment overrides:
+  HEAVY_CHECK_TIMEOUT       Command timeout (default: 20m)
+  HEAVY_CHECK_LOCK_TIMEOUT  Lock wait in seconds (default: 1200)
+EOF
+}
+
+command_timeout="${HEAVY_CHECK_TIMEOUT:-20m}"
+lock_timeout="${HEAVY_CHECK_LOCK_TIMEOUT:-1200}"
+repo_path=""
+
+while (($#)); do
+  case "$1" in
+    --repo)
+      (($# >= 2)) || { usage >&2; exit 64; }
+      repo_path=$2
+      shift 2
+      ;;
+    --timeout)
+      (($# >= 2)) || { usage >&2; exit 64; }
+      command_timeout=$2
+      shift 2
+      ;;
+    --lock-timeout)
+      (($# >= 2)) || { usage >&2; exit 64; }
+      lock_timeout=$2
+      shift 2
+      ;;
+    --)
+      shift
+      break
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+
+(($#)) || { usage >&2; exit 64; }
+[[ "$lock_timeout" =~ ^[0-9]+$ ]] || {
+  printf 'heavy-check: --lock-timeout must be a non-negative integer\n' >&2
+  exit 64
+}
+
+start_dir=${repo_path:-$PWD}
+[[ -d "$start_dir" ]] || {
+  printf 'heavy-check: repository path does not exist: %s\n' "$start_dir" >&2
+  exit 66
+}
+
+if repo_root=$(git -C "$start_dir" rev-parse --show-toplevel 2>/dev/null); then
+  common_dir=$(git -C "$repo_root" rev-parse --git-common-dir)
+  if [[ "$common_dir" != /* ]]; then
+    common_dir="$repo_root/$common_dir"
+  fi
+  lock_identity=$(realpath -m "$common_dir")
+else
+  repo_root=$(realpath "$start_dir")
+  lock_identity=$repo_root
+fi
+
+runtime_root=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}
+lock_dir="$runtime_root/codex-heavy-check"
+install -d -m 700 "$lock_dir"
+lock_key=$(printf '%s' "$lock_identity" | sha256sum | cut -d' ' -f1)
+lock_file="$lock_dir/$lock_key.lock"
+exec {lock_fd}>"$lock_file"
+
+printf 'heavy-check: waiting for repository lock (%s)\n' "$repo_root" >&2
+if ! flock --timeout "$lock_timeout" "$lock_fd"; then
+  printf 'heavy-check: repository remained busy for %ss\n' "$lock_timeout" >&2
+  exit 75
+fi
+
+printf 'heavy-check: running with timeout %s (%s)\n' "$command_timeout" "$repo_root" >&2
+set +e
+timeout --signal=TERM --kill-after=30s "$command_timeout" "$@"
+status=$?
+set -e
+
+if ((status == 124)); then
+  printf 'heavy-check: command exceeded %s and was terminated\n' "$command_timeout" >&2
+fi
+
+exit "$status"
