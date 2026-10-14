@@ -1,0 +1,52 @@
+// Task-owned resource/executable controls. No source, dependency or security override.
+def expectedAndroidRoot = new File(System.getenv('MOODINATOR_QA_ROOT'), 'android').canonicalPath
+def expectedQaRoot = new File(System.getenv('MOODINATOR_QA_ROOT')).canonicalPath
+def expectedNode = new File(System.getenv('MOODINATOR_CONTROL_ROOT'), 'tools/bin/node').canonicalPath
+def expectedNodeArgs = [expectedNode, '--max-old-space-size=1536']
+def expectedPackagerArgs = ['--max-workers', '1']
+
+gradle.beforeProject { project ->
+    if (project.path != ':app') {
+        return
+    }
+    assert project.rootDir.canonicalPath == expectedAndroidRoot
+    assert new File(expectedNode).isFile()
+    project.pluginManager.withPlugin('com.facebook.react') {
+        // ReactPlugin.apply has created the extension. The generated react block
+        // follows plugin application and does not assign these two properties.
+        def react = project.extensions.getByName('react')
+        react.nodeExecutableAndArgs.set(expectedNodeArgs)
+        react.extraPackagerArgs.set(expectedPackagerArgs)
+        react.nodeExecutableAndArgs.disallowChanges()
+        react.extraPackagerArgs.disallowChanges()
+
+        project.afterEvaluate {
+            assert react.nodeExecutableAndArgs.get() == expectedNodeArgs
+            assert react.extraPackagerArgs.get() == expectedPackagerArgs
+            assert react.root.get().asFile.canonicalPath == expectedQaRoot
+            assert react.bundleCommand.get() == 'export:embed'
+            assert !react.debuggableVariants.get().any { it.equalsIgnoreCase('release') }
+            assert System.getenv('NODE_ENV') == 'production'
+            assert System.getenv('NODE_OPTIONS') == '--max-old-space-size=1536'
+            assert System.getenv('BABEL_ENV') in [null, 'production']
+        }
+
+        // configureEach waits for the plugin's normal variant task registration.
+        // Only observe/validate its existing inputs; preserve its real producer action.
+        project.tasks.configureEach { task ->
+            if (task.name == 'createBundleReleaseJsAndAssets') {
+                task.doFirst {
+                    assert task.nodeExecutableAndArgs.get() == expectedNodeArgs
+                    assert task.extraPackagerArgs.get() == expectedPackagerArgs
+                    assert task.root.get().asFile.canonicalPath == expectedQaRoot
+                    assert task.bundleCommand.get() == 'export:embed'
+                    assert task.devEnabled.get() == false
+                    assert task.hermesEnabled.get() == true
+                    assert task.hermesFlags.get() == ['-O', '-output-source-map']
+                    project.logger.lifecycle('[PREFILL145_RESOURCE_CONTROLS] node=' + task.nodeExecutableAndArgs.get() + '; packager=' + task.extraPackagerArgs.get() + '; real export:embed; dev=false; hermes=true')
+                    project.logger.lifecycle('[PREFILL145_BUNDLE_OUTPUTS] bundle=' + task.jsBundleDir.get().asFile + '/' + task.bundleAssetName.get() + '; assets=' + task.resourcesDir.get().asFile + '; packagerMaps=' + task.jsIntermediateSourceMapsDir.get().asFile + '; finalMaps=' + task.jsSourceMapsDir.get().asFile)
+                }
+            }
+        }
+    }
+}
