@@ -49,14 +49,10 @@ remain bare-hex passphrases during conversion; this compatibility is needed
 while pre-V2 installs exist and must not be removed until those upgrades are no
 longer supported.
 
-The package-defaults reset removes the Android SecureStore commit patch. The
-unpatched `expo-secure-store` 55.0.18 implementation can return a failed
-SharedPreferences commit without rejecting its async caller. Readback alone can
-observe memory after a failed commit. Pending startup still repeats persistence
-and readback before conversion, but this does not prove durable key storage when
-the native commit fails. Android encryption acceptance remains blocked on that
-boundary until upstream persistence behavior and affected cold recovery are
-verified. Earlier evidence from a patched build does not accept this reset.
+The pnpm patch in `patches/expo-secure-store@55.0.18.patch` makes Android reject a
+failed SharedPreferences commit. Readback alone can observe memory after a failed
+commit. Pending startup repeats persistence and readback before conversion.
+Remove this patch only when the installed Expo version propagates that failure.
 
 Verification compares exact typed values through 16 KiB byte chunks. Int64 and
 precise real encoding stays in SQLite; text and BLOB chunks preserve NUL bytes

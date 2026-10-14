@@ -8,12 +8,9 @@ physical device or an existing simulator. No personal data or signing is needed.
 
 Use the exact reviewed PR #118 source SHA supplied with the handoff. A later
 source change needs its affected evidence refreshed before accepting that build.
-The package-defaults reset removes the Expo Router availability patch. The
-unpatched `expo-router` 55.0.18 source assigns the iOS 16-only action subtitle
-without an availability guard, while this procedure retains its declared iOS
-15.1 minimum. That build-compatibility boundary needs a new source-matched
-verification. Earlier patched simulator builds do not accept this reset; do not
-raise the deployment minimum or restore the patch to claim a pass.
+The pinned Expo Router patch guards its iOS 16-only action subtitle so the app
+can still build for its declared iOS 15.1 minimum. Remove that patch when the
+pinned upstream version includes the same availability guard.
 
 Prerequisites are existing Xcode with an installed iOS Simulator runtime,
 CocoaPods, Node 24 and pnpm 10.34.6. If one is missing, return that error; the runner
