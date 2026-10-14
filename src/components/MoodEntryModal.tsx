@@ -10,6 +10,7 @@ import {
     Platform,
 } from "react-native";
 import PagerView, { type PagerViewOnPageSelectedEvent } from "react-native-pager-view";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
@@ -149,6 +150,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     headerAction,
 }) => {
     const { isDark, get } = useThemeColors();
+    const insets = useSafeAreaInsets();
     const { height: windowHeight } = useWindowDimensions();
     const pagerRef = useRef<PagerView>(null);
     const scrollViewRef = useRef<ScrollView>(null);
@@ -1113,7 +1115,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                     : "rgba(250, 248, 244, 0.97)",
                                 paddingHorizontal: 20,
                                 paddingTop: 12,
-                                paddingBottom: 20,
+                                paddingBottom: 20 + (keyboardOffset > 0 ? 0 : insets.bottom),
                             }}
                         >
                             {/* ── Footer ─────────────────────────────────── */}

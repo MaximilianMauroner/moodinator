@@ -15,6 +15,11 @@ import { updateMoodEntryOrThrow } from "@/lib/moodEntryPersistence";
 import { createMoodEntryWorkflow } from "@/services/moodEntryWorkflow";
 
 const nativePlatform = vi.hoisted(() => ({ OS: "ios", Version: 18 }));
+const nativeInsets = vi.hoisted(() => ({ top: 0, right: 0, bottom: 0, left: 0 }));
+const keyboardListeners = vi.hoisted(() => new Map<
+  string,
+  (event: { endCoordinates: { height: number } }) => void
+>());
 const nativeFeedback = vi.hoisted(() => ({
   selectionAsync: vi.fn(async () => {}),
   performAndroidHapticsAsync: vi.fn(async () => {}),
@@ -42,7 +47,13 @@ vi.mock("react-native", () => ({
   Modal: "Modal",
   KeyboardAvoidingView: "KeyboardAvoidingView",
   TextInput: "TextInput",
-  Keyboard: { addListener: () => ({ remove: () => {} }), dismiss: vi.fn() },
+  Keyboard: {
+    addListener: (event: string, listener: (event: { endCoordinates: { height: number } }) => void) => {
+      keyboardListeners.set(event, listener);
+      return { remove: () => keyboardListeners.delete(event) };
+    },
+    dismiss: vi.fn(),
+  },
   useWindowDimensions: () => ({ width: 390, height: 844 }),
   View: "View",
   Text: "Text",
@@ -55,6 +66,7 @@ vi.mock("react-native", () => ({
   },
   useColorScheme: () => "dark",
 }));
+vi.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => nativeInsets }));
 vi.mock("react-native-pager-view", () => ({ default: "PagerView" }));
 vi.mock("@react-navigation/elements", () => ({ PlatformPressable: "Pressable" }));
 vi.mock("@/components/entry", () => ({ SameAsYesterdayButton: "CopyLastEntry" }));
@@ -118,6 +130,8 @@ beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => { callback(0); return 0; });
   setHapticsEnabled(true);
+  nativeInsets.bottom = 0;
+  keyboardListeners.clear();
 });
 
 afterEach(async () => {
@@ -254,6 +268,31 @@ describe.each(["android", "ios"])("entry modal feedback on %s", (platform) => {
   beforeEach(() => {
     nativePlatform.OS = platform;
     nativePlatform.Version = platform === "android" ? 35 : 18;
+  });
+
+  it.each([0, 34])("reserves bottom inset %s for Done only while the keyboard is hidden", async (bottomInset) => {
+    nativeInsets.bottom = bottomInset;
+    await render(<SaveEntryModal variant="kept" onClose={vi.fn()} onSubmit={vi.fn(async () => {})} />);
+    const footer = () => renderer.root.find((node) =>
+      node.type === "View" &&
+      node.props.style?.paddingBottom !== undefined &&
+      node.findAllByProps({ accessibilityLabel: "Done" }).length === 1,
+    );
+    expect(footer().props.style.paddingBottom).toBe(20 + bottomInset);
+
+    await act(async () => {
+      keyboardListeners.get(platform === "android" ? "keyboardDidShow" : "keyboardWillShow")!(
+        { endCoordinates: { height: 300 } },
+      );
+    });
+    expect(footer().props.style.paddingBottom).toBe(20);
+
+    await act(async () => {
+      keyboardListeners.get(platform === "android" ? "keyboardDidHide" : "keyboardWillHide")!(
+        { endCoordinates: { height: 0 } },
+      );
+    });
+    expect(footer().props.style.paddingBottom).toBe(20 + bottomInset);
   });
 
   it.each([true, false])("toggles context through the modal with haptics enabled=%s", async (enabled) => {
