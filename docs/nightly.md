@@ -1,11 +1,13 @@
 # GitHub-hosted Android nightly
 
 Moodinator builds an APK and AAB on a public `ubuntu-24.04` GitHub runner at
-midnight Europe/Vienna, including daylight-saving changes. Manual dispatch is
+midnight Europe/Vienna on Monday, Wednesday and Friday, including daylight-saving
+changes. Manual dispatch is
 available on `main` only. The EAS build job has a 90-minute limit, checks have 15 minutes, and publishing
 has 20 minutes. These phases have a 125-minute combined budget; hosted timing is
-not benchmarked. Workflow concurrency covers the whole app with
-`cancel-in-progress: false`. Production promotion remains manual.
+not benchmarked. Release workflow concurrency covers the whole app with
+`cancel-in-progress: false`. PR runs use a separate group per PR and cancel earlier
+runs on a new push or conversion to draft. Production promotion remains manual.
 The historical combined APK/AAB time was about 17–32 minutes on the earlier
 host. There is no hosted benchmark yet.
 
@@ -42,6 +44,16 @@ EAS 20.5.1, Android build-tools 36, and bundletool 1.18.2 with a SHA-256 check.
 It checks actual disk/RAM and removes only unused tool bundles on the disposable
 runner if disk is low. Preflight still requires 15 GiB free disk and 8 GiB RAM.
 
+The main-only build job restores an exact-key cache of public Android 36 SDK
+packages, npm's download cache and Gradle wrapper distributions. The key includes
+runner OS/architecture and hashes of the lockfile, setup script and workflow;
+there are no fallback restore keys or PR cache writers. The locked React Native
+Gradle wrapper downloads its distribution with `--version` before credentials.
+An explicit cache save runs before secret validation and reservation, with no
+post-build save. Gradle build/dependency caches, daemon logs, npm logs, signing
+keys, Expo state, Play files, release artifacts and private EAS logs are excluded.
+Publishing uses a separate runner and does not restore or save this cache.
+
 ## Source, checks and state
 
 Every normal build command uses `scripts/nightly-release.mjs`:
@@ -65,6 +77,13 @@ to the checked source. Local manual commands still prepare an isolated worktree,
 run checks before reserve, and preserve local work. Their child environments are
 narrowed, but a trusted local host is not hostile same-user process isolation. Use the coordinated
 entrypoint for tester releases; direct EAS/Play uploads bypass the ledger.
+
+PRs run the same full `checks` job in draft and ready states, with no path filter.
+Conversion back to draft cancels an older PR run and starts fresh checks.
+Promotion does not defer or start additional jobs. Require actual passing
+checks on the final revision before merge; a skipped or billing-blocked job is
+not test evidence. Schedule and main-only manual dispatch retain full checks
+and all release gates.
 
 All entrypoints, including local status and manual finish, use the same authority:
 `MaximilianMauroner/moodinator`, branch `release-state`, file `ledger.json`.
