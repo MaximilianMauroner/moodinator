@@ -87,4 +87,3 @@ def validate_result(root, expected, table):
             raise ValueError('Embedded acceptance differs from raw terminal result')
         snapshots['acceptance/result.json'] = hashlib.sha256(product_raw).hexdigest()
     return result, snapshots
-
