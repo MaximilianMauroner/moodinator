@@ -242,9 +242,10 @@ async function runProof(signal: AbortSignal) {
             let atKill: ReturnType<typeof partialExport> | undefined;
             await abruptStop(() => { atKill = partialExport(); }, exportPid);
             assert.ok(atKill);
+            const afterKill = partialExport();
             assert.ok(existsSync(path.join(path.dirname(exportTarget), "moodinator.db")), "Interrupted source must remain");
             evidence.results.push({ action: { proof: "export-interruption", shape }, runId: exportRun,
-              report: { status: "passed", first, atKill, signal: "SIGKILL", evidence: "partial native target below half payload size immediately before actual owned-process kill; cold recovery required" } });
+              report: { status: "passed", first, atKill, afterKill, signal: "SIGKILL", evidence: "partial native target remained incomplete after actual owned-process kill; cold recovery required" } });
             save();
             observedPartial = true;
             break;
