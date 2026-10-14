@@ -6,8 +6,9 @@ fabricated fixture and QA proof actions as the Android runner. It creates a new
 simulator and installs only `com.lab4code.moodinator.qa`. It never selects a
 physical device or an existing simulator. No personal data or signing is needed.
 
-Use the exact reviewed PR #118 source SHA supplied with the handoff. A later
-source change needs its affected evidence refreshed before accepting that build.
+Use the exact current PR #118 source SHA supplied with the handoff, and confirm
+that its tree includes merged reset PR #152. A later source change needs its
+affected evidence refreshed before accepting that build.
 The package-defaults reset removes the Expo Router availability patch. The
 unpatched `expo-router` 55.0.18 source assigns the iOS 16-only action subtitle
 without an availability guard, while this procedure retains its declared iOS

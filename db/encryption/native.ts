@@ -2,6 +2,7 @@ import * as Crypto from "expo-crypto";
 import { File } from "expo-file-system";
 import * as SecureStore from "expo-secure-store";
 import * as SQLite from "expo-sqlite";
+import { setDurableItemAsync } from "@/shared/storage/durableSecureStore";
 import type { EncryptionStorage } from "./startup";
 
 export const RAW_KEY_STORAGE_NAME = "dbEncryptionKeyV2";
@@ -38,7 +39,7 @@ export function createNativeEncryptionStorage(
       try { return handle.readBytes(16); } finally { handle.close(); }
     },
     loadKey: () => SecureStore.getItemAsync(keyName(RAW_KEY_STORAGE_NAME)),
-    saveKey: (key) => SecureStore.setItemAsync(keyName(RAW_KEY_STORAGE_NAME), key, {
+    saveKey: (key) => setDurableItemAsync(keyName(RAW_KEY_STORAGE_NAME), key, {
       keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
     }),
     createKey: () => Array.from(Crypto.getRandomBytes(32), (byte) => byte.toString(16).padStart(2, "0")).join(""),

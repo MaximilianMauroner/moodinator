@@ -51,12 +51,17 @@ longer supported.
 
 The package-defaults reset removes the Android SecureStore commit patch. The
 unpatched `expo-secure-store` 55.0.18 implementation can return a failed
-SharedPreferences commit without rejecting its async caller. Readback alone can
-observe memory after a failed commit. Pending startup still repeats persistence
-and readback before conversion, but this does not prove durable key storage when
-the native commit fails. Android encryption acceptance remains blocked on that
-boundary until upstream persistence behavior and affected cold recovery are
-verified. Earlier evidence from a patched build does not accept this reset.
+SharedPreferences commit without rejecting its non-null async write, and later
+SDK releases through 58.0.2 retain that behavior. Moodinator follows each key
+or PIN write with deletion of a per-key marker. SecureStore's Android delete
+path checks `commit()` and rejects on failure; a successful delete commits the
+complete in-memory preferences map, including the real value. Remove this
+compatibility sequence when the installed dependency rejects failed non-null
+commits itself. Readback alone is still insufficient. Native acceptance must
+make the owned QA preferences directory unwritable, observe rejected marker
+deletion after misleading in-memory readback, retain the source, then pass two
+separate cold recoveries. Earlier evidence from a patched build does not accept
+this reset.
 
 Verification compares exact typed values through 16 KiB byte chunks. Int64 and
 precise real encoding stays in SQLite; text and BLOB chunks preserve NUL bytes
@@ -146,13 +151,17 @@ iOS/Keychain evidence. Android ARM64 host support is a separate tooling change.
    missing active file with stale original, retained legacy orphan links and
    active FK enforcement, a crashed plaintext source with committed WAL data,
    independent native lock exclusion,
-   abrupt Android process stops at all ten phases, repeated recovery, and actual
+   abrupt Android process stops at all ten phases, repeated recovery, an actual
+   failed SecureStore durability commit with two cold recoveries, and actual
    `getDb` first-open/shared-handle initialization. JSON reports contain results,
    not mood contents or keys. Each crash case uses its own fixture namespace.
    The ten callbacks test phase boundaries. Do not report an interruption inside
    native export or native disk-full handling as proved by that boundary matrix;
    each needs a focused actual native failure case and retained/reopened data.
-   This runner does not run those focused cases. The 64 MiB export-interruption
+   The runner applies a target page limit for real `SQLITE_FULL`, then requires
+   cold recovery. It also observes partial target growth and kills the owned app
+   during both many-row and single-cell 64 MiB exports before two cold recoveries.
+   The 64 MiB export-interruption
    fixture previously needed a 512 MiB growth limit / 768 MiB heap on the older
    whole-table source. That retained result does not verify the replacement.
    Run both many-row and single-cell 64 MiB shapes under normal heap limits and

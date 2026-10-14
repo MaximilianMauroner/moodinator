@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   launchURL: vi.fn(), initialURL: vi.fn(), parse: vi.fn(), suite: vi.fn(), write: vi.fn(),
   writeFailure: vi.fn(), verifyWriteFailure: vi.fn(),
+  durableWriteFailure: vi.fn(),
   exportInterruption: vi.fn(),
 }));
 vi.mock("react-native", () => ({ View: "View", Text: "Text" }));
@@ -16,6 +17,7 @@ vi.mock("@/qa/encryption/proof", () => ({
   crashEncryptionProof: vi.fn(), loseProofKey: vi.fn(), prepareAppUpgrade: vi.fn(),
   prepareWalCrash: vi.fn(), resumeEncryptionProof: vi.fn(), verifyAppUpgrade: vi.fn(),
   verifyLostProofKey: vi.fn(),
+  prepareNativeDurableWriteFailure: mocks.durableWriteFailure,
   prepareNativeWriteFailure: mocks.writeFailure, verifyNativeWriteFailureRecovery: mocks.verifyWriteFailure,
   prepareNativeExportInterruption: mocks.exportInterruption,
 }));
@@ -46,25 +48,38 @@ afterEach(async () => { await act(async () => renderers.forEach((renderer) => re
 
 describe("native encryption proof initial execution", () => {
   it("publishes an in-flight export action without claiming completion", async () => {
-    mocks.parse.mockReturnValue({ queryParams: { proof: "export-interruption", runId: "export" } });
-    mocks.exportInterruption.mockImplementation(async (publish) => {
-      publish("running:native-export-interruption:export-started");
+    mocks.parse.mockReturnValue({ queryParams: { proof: "export-interruption", shape: "many-rows", runId: "export" } });
+    mocks.exportInterruption.mockImplementation(async (_shape, publish) => {
+      publish("running:native-export-interruption-many-rows:export-started");
       await new Promise<void>(() => {});
     });
     const renderer = await mount();
     await mount();
     expect(mocks.exportInterruption).toHaveBeenCalledOnce();
-    expect(progress(renderer)).toBe("running:native-export-interruption:export-started");
-    expect(published()).toEqual(["launch", "running:native-export-interruption:export-started"]);
+    expect(mocks.exportInterruption).toHaveBeenCalledWith("many-rows", expect.any(Function));
+    expect(progress(renderer)).toBe("running:native-export-interruption-many-rows:export-started");
+    expect(published()).toEqual(["launch", "running:native-export-interruption-many-rows:export-started"]);
   });
 
   it("reports a completed uninterrupted export as failed proof", async () => {
-    mocks.parse.mockReturnValue({ queryParams: { proof: "export-interruption" } });
+    mocks.parse.mockReturnValue({ queryParams: { proof: "export-interruption", shape: "single-cell" } });
     mocks.exportInterruption.mockRejectedValue(new Error("Native export completed before the external interruption"));
     const renderer = await mount();
     expect(progress(renderer)).toBe("failed");
     expect(report(renderer)).toContain("completed before the external interruption");
     expect(published()).toEqual(["launch", "failed"]);
+  });
+
+  it("keeps the native durable-write failure as a separate cold action", async () => {
+    mocks.parse.mockReturnValue({ queryParams: { proof: "durable-write-failure", runId: "durable" } });
+    mocks.durableWriteFailure.mockResolvedValue({ status: "passed", inMemoryReadback: true });
+
+    const renderer = await mount();
+
+    expect(progress(renderer)).toBe("complete");
+    expect(mocks.durableWriteFailure).toHaveBeenCalledOnce();
+    expect(report(renderer)).toContain('"inMemoryReadback":true');
+    expect(mocks.write.mock.calls[1][0].runId).toBe("durable");
   });
 
   it("runs the native write-failure preparation once and preserves its native error evidence", async () => {

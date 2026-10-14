@@ -267,6 +267,43 @@ export async function resumeEncryptionProof(caseName: string) {
   return { status: "passed", caseName, evidence: "cold reopen, exact data, recovery and subsequent open" };
 }
 
+// The Android driver makes only this owned QA package's SharedPreferences
+// directory read-only before launch. Stock SecureStore then resolves its two
+// non-null writes after commit=false, while the checked marker deletion must
+// reject. The in-memory readback proves why read-after-write alone is unsafe.
+export async function prepareNativeDurableWriteFailure() {
+  const caseName = "native-durable-write-failure";
+  const f = fixture(caseName);
+  await seed(f);
+  let nativeError = "";
+  try {
+    const unexpected = await openEncryptedDatabase(f.storage);
+    await unexpected.closeAsync();
+  } catch (error) {
+    if (!(error instanceof Error) || !/Could not delete the item from SecureStore/i.test(error.message)) throw error;
+    nativeError = error.message;
+  }
+  check(nativeError !== "", "The checked SecureStore commit did not reject the native write failure");
+  check(validateRawKey(await f.storage.loadKey()).length === 64, "Failed SecureStore write was not visible in memory");
+  check(await f.storage.exists(DATABASE_FILES.original), "Durability failure removed the recoverable original database");
+  check(!await f.storage.exists(DATABASE_FILES.active), "Durability failure published an encrypted database");
+  const original = await f.storage.open(DATABASE_FILES.original);
+  try { await requireExpected(f, original); }
+  finally { await original.closeAsync(); }
+  const coordinator = await f.storage.open(DATABASE_FILES.coordinator);
+  try {
+    check((await coordinator.getFirstAsync<{ status: string }>("SELECT status FROM encryption_state WHERE id = 1;"))?.status === "pending", "Durability failure was marked completed");
+  } finally { await coordinator.closeAsync(); }
+  return {
+    status: "passed",
+    caseName,
+    nativeError,
+    inMemoryReadback: true,
+    originalRetained: true,
+    evidence: "unchecked non-null commits resolved with in-memory readback; checked marker deletion rejected and retained pending recovery",
+  };
+}
+
 // Limit only the attached target in a disposable QA namespace. SQLCipher itself
 // must reject the actual export with SQLITE_FULL; no JS error substitutes for a
 // native write failure and no host/simulator volume is filled.
@@ -331,23 +368,27 @@ export async function verifyNativeWriteFailureRecovery() {
   return resumeEncryptionProof("native-write-failure");
 }
 
-export async function prepareNativeExportInterruption(progress: Progress) {
-  const caseName = "native-export-interruption";
+export async function prepareNativeExportInterruption(
+  shape: "many-rows" | "single-cell",
+  progress: Progress
+) {
+  const caseName = `native-export-interruption-${shape}`;
   const f = fixture(caseName);
   await seed(f);
   const original = await f.storage.open(DATABASE_FILES.original);
   try {
-    // 1024 native 64 KiB values exercise a 64 MiB export without a giant JS
-    // seed or expected payload. A separate single-64-MiB-cell run is required.
-    await original.execAsync(`CREATE TABLE qa_export_payload (id INTEGER PRIMARY KEY, value BLOB NOT NULL);
-      BEGIN;
-      WITH RECURSIVE rows(id) AS (VALUES(1) UNION ALL SELECT id + 1 FROM rows WHERE id < 1024)
-      INSERT INTO qa_export_payload SELECT id, zeroblob(65536) FROM rows;
-      COMMIT;`);
+    await original.execAsync(shape === "many-rows"
+      ? `CREATE TABLE qa_export_payload (id INTEGER PRIMARY KEY, value BLOB NOT NULL);
+        BEGIN;
+        WITH RECURSIVE rows(id) AS (VALUES(1) UNION ALL SELECT id + 1 FROM rows WHERE id < 1024)
+        INSERT INTO qa_export_payload SELECT id, zeroblob(65536) FROM rows;
+        COMMIT;`
+      : `CREATE TABLE qa_export_payload (id INTEGER PRIMARY KEY, value BLOB NOT NULL);
+        INSERT INTO qa_export_payload VALUES (1, zeroblob(67108864));`);
     check((await original.getFirstAsync<{ bytes: number }>("SELECT sum(length(value)) AS bytes FROM qa_export_payload;"))?.bytes === 64 * 1024 * 1024, "Native export payload size is incorrect");
     await saveExpected(f, original);
   } finally { await original.closeAsync(); }
-  f.file("export-interruption.json").write(JSON.stringify({ caseName, payloadBytes: 64 * 1024 * 1024,
+  f.file("export-interruption.json").write(JSON.stringify({ caseName, shape, payloadBytes: 64 * 1024 * 1024,
     target: DATABASE_FILES.active, evidence: "inside-export interruption requires externally observed partial target growth and actual process kill" }));
   const unexpectedlyCompleted = await openEncryptedDatabase(f.storage, async (phase) => {
     if (phase === "export-started" || phase === "export-closed") {

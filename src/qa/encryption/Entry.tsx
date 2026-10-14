@@ -4,7 +4,7 @@ import Constants from "expo-constants";
 import * as Linking from "expo-linking";
 import { App as RouterApp } from "expo-router/build/qualified-entry";
 import { STARTUP_PHASES } from "@db/encryption/startup";
-import { crashEncryptionProof, loseProofKey, prepareAppUpgrade, prepareWalCrash, prepareNativeWriteFailure, prepareNativeExportInterruption, resumeEncryptionProof, runEncryptionProof, verifyAppUpgrade, verifyLostProofKey, verifyNativeWriteFailureRecovery, writeEncryptionProofStatus, readEncryptionProofLaunchUrl } from "./proof";
+import { crashEncryptionProof, loseProofKey, prepareAppUpgrade, prepareWalCrash, prepareNativeDurableWriteFailure, prepareNativeWriteFailure, prepareNativeExportInterruption, resumeEncryptionProof, runEncryptionProof, verifyAppUpgrade, verifyLostProofKey, verifyNativeWriteFailureRecovery, writeEncryptionProofStatus, readEncryptionProofLaunchUrl } from "./proof";
 
 type ProofView = { progress: string; report: string; showApp: boolean };
 // Driver actions cold-start the app. Keep the initial URL's execution and its
@@ -41,9 +41,17 @@ async function executeInitialProof() {
       case "verify-app": result = await verifyAppUpgrade(); break;
       case "lose-key": result = await loseProofKey(); break;
       case "verify-lost-key": result = await verifyLostProofKey(); break;
+      case "durable-write-failure": result = await prepareNativeDurableWriteFailure(); break;
       case "write-failure": result = await prepareNativeWriteFailure(publish); break;
       case "verify-write-failure": result = await verifyNativeWriteFailureRecovery(); break;
-      case "export-interruption": await prepareNativeExportInterruption(publish); return;
+      case "export-interruption": {
+        const shape = params?.shape;
+        if (shape !== "many-rows" && shape !== "single-cell") {
+          throw new Error("A supported native export fixture shape is required");
+        }
+        await prepareNativeExportInterruption(shape, publish);
+        return;
+      }
       case "wal-crash": await prepareWalCrash(publish); return;
       case "resume":
         if (typeof caseName !== "string") throw new Error("A native recovery case is required");
