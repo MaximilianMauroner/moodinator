@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Emotion } from "@db/types";
+import type { Emotion, MoodEntry } from "@db/types";
 import { EmotionPicker } from "@/components/entry/EmotionPicker";
 import { EnergySlider } from "@/components/entry/EnergySlider";
 import {
@@ -13,15 +13,23 @@ import {
 import { setHapticsEnabled } from "@/lib/haptics";
 import { updateMoodEntryOrThrow } from "@/lib/moodEntryPersistence";
 import { createMoodEntryWorkflow } from "@/services/moodEntryWorkflow";
+import { useMoodModals } from "@/hooks/useMoodModals";
+import {
+  CURRENT_MOOD_SCALE_SNAPSHOT,
+  LEGACY_HIGHER_IS_BETTER_MOOD_SCALE_SNAPSHOT,
+} from "../../domain/moodScale";
 
 const nativePlatform = vi.hoisted(() => ({ OS: "ios", Version: 18 }));
+const nativeInsets = vi.hoisted(() => ({ top: 0, right: 0, bottom: 0, left: 0 }));
+const keyboardListeners = vi.hoisted(() => new Map<
+  string,
+  (event: { endCoordinates: { height: number } }) => void
+>());
 const nativeFeedback = vi.hoisted(() => ({
   selectionAsync: vi.fn(async () => {}),
   performAndroidHapticsAsync: vi.fn(async () => {}),
   impactAsync: vi.fn(async () => {}),
 }));
-type KeyboardListener = (event: { endCoordinates: { height: number } }) => void;
-const keyboardListeners = vi.hoisted(() => new Map<string, KeyboardListener>());
 const entryFeedback = vi.hoisted(() => ({
   alert: vi.fn(),
   crisisSupport: vi.fn(),
@@ -45,7 +53,7 @@ vi.mock("react-native", () => ({
   KeyboardAvoidingView: "KeyboardAvoidingView",
   TextInput: "TextInput",
   Keyboard: {
-    addListener: (event: string, listener: KeyboardListener) => {
+    addListener: (event: string, listener: (event: { endCoordinates: { height: number } }) => void) => {
       keyboardListeners.set(event, listener);
       return { remove: () => keyboardListeners.delete(event) };
     },
@@ -63,14 +71,12 @@ vi.mock("react-native", () => ({
   },
   useColorScheme: () => "dark",
 }));
+vi.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => nativeInsets }));
 vi.mock("react-native-pager-view", () => ({ default: "PagerView" }));
 vi.mock("@react-navigation/elements", () => ({ PlatformPressable: "Pressable" }));
-vi.mock("@/components/entry", () => ({ SameAsYesterdayButton: () => null }));
+vi.mock("@/components/entry", () => ({ SameAsYesterdayButton: "CopyLastEntry" }));
 vi.mock("@/components/ui/AppAlert", () => ({
   useModalAlert: () => ({ alert: entryFeedback.alert, alertView: null, hasAlert: false }),
-}));
-vi.mock("react-native-safe-area-context", () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 24, left: 0, right: 0 }),
 }));
 vi.mock("@/lib/showCrisisSupportAlert", () => ({ showCrisisSupportAlert: entryFeedback.crisisSupport }));
 vi.mock("@/services/toastService", () => ({
@@ -86,6 +92,7 @@ vi.mock("react-native-reanimated", async () => {
     useAnimatedStyle: (style: () => unknown) => style(),
     withSpring: (value: number) => value,
     withTiming: (value: number) => value,
+    withSequence: (...values: number[]) => values.at(-1),
     FadeIn: transition,
     FadeOut: transition,
   };
@@ -130,6 +137,8 @@ beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => { callback(0); return 0; });
   setHapticsEnabled(true);
+  nativeInsets.bottom = 0;
+  keyboardListeners.clear();
 });
 
 afterEach(async () => {
@@ -254,6 +263,37 @@ async function pressLabel(accessibilityLabel: string) {
 
 const NOTES_ONLY = { emotions: false, context: false, energy: false, notes: true };
 
+function StoredEntryModal({
+  entry, variant, fieldConfig, onClose, onSubmit,
+}: {
+  entry: MoodEntry;
+  variant: "kept" | "edit";
+  fieldConfig: React.ComponentProps<typeof EditMoodEntryModal>["fieldConfig"];
+  onClose: () => void;
+  onSubmit: (values: MoodEntryFormValues) => Promise<void>;
+}) {
+  const { setKeptEntry, setEditingEntry, keptEntry, editingEntry, keptInitialValues, editingInitialValues } = useMoodModals();
+  useEffect(() => {
+    if (variant === "kept") setKeptEntry(entry);
+    else setEditingEntry(entry);
+  }, [entry, variant, setKeptEntry, setEditingEntry]);
+  const initialValues = variant === "kept" ? keptInitialValues : editingInitialValues;
+  const props = {
+    visible: Boolean(variant === "kept" ? keptEntry : editingEntry),
+    initialMood: initialValues?.mood ?? 5,
+    initialValues,
+    currentEntryId: entry.id,
+    emotionOptions: options,
+    contextOptions: ["Work"],
+    fieldConfig,
+    onClose,
+    onSubmit,
+  };
+  return variant === "kept"
+    ? <KeptEntryDetailModal {...props} onUndo={vi.fn()} />
+    : <EditMoodEntryModal {...props} />;
+}
+
 async function addNoteAndPressDone() {
   await act(async () => button("entry-notes").props.onChangeText("a note"));
   await act(async () => {
@@ -266,6 +306,31 @@ describe.each(["android", "ios"])("entry modal feedback on %s", (platform) => {
   beforeEach(() => {
     nativePlatform.OS = platform;
     nativePlatform.Version = platform === "android" ? 35 : 18;
+  });
+
+  it.each([0, 34])("reserves bottom inset %s for Done only while the keyboard is hidden", async (bottomInset) => {
+    nativeInsets.bottom = bottomInset;
+    await render(<SaveEntryModal variant="kept" onClose={vi.fn()} onSubmit={vi.fn(async () => {})} />);
+    const footer = () => renderer.root.find((node) =>
+      node.type === "View" &&
+      node.props.style?.paddingBottom !== undefined &&
+      node.findAllByProps({ accessibilityLabel: "Done" }).length === 1,
+    );
+    expect(footer().props.style.paddingBottom).toBe(20 + bottomInset);
+
+    await act(async () => {
+      keyboardListeners.get(platform === "android" ? "keyboardDidShow" : "keyboardWillShow")!(
+        { endCoordinates: { height: 300 } },
+      );
+    });
+    expect(footer().props.style.paddingBottom).toBe(20);
+
+    await act(async () => {
+      keyboardListeners.get(platform === "android" ? "keyboardDidHide" : "keyboardWillHide")!(
+        { endCoordinates: { height: 0 } },
+      );
+    });
+    expect(footer().props.style.paddingBottom).toBe(20 + bottomInset);
   });
 
   it.each([true, false])("toggles context through the modal with haptics enabled=%s", async (enabled) => {
@@ -516,7 +581,11 @@ describe("entry save acknowledgement", () => {
       <SaveEntryModal
         variant="edit"
         onClose={onClose}
-        onSubmit={(values) => updateMoodEntryOrThrow(workflow.update, 42, values)}
+        onSubmit={async (values) => {
+          await updateMoodEntryOrThrow(
+            workflow.update, { id: 42, moodScale: CURRENT_MOOD_SCALE_SNAPSHOT }, values,
+          );
+        }}
       />,
     );
 
@@ -582,10 +651,180 @@ describe("entry save acknowledgement", () => {
   });
 });
 
+
+describe("last-entry prefill", () => {
+  const copied: MoodEntry = {
+    id: 41, mood: 0, timestamp: 300, utcOffsetMinutes: 0,
+    note: "  prior note \u0000 and café  ",
+    emotions: [{ name: "Custom calm", category: "positive", icon: null }],
+    contextTags: ["Custom place"], energy: 0,
+    moodScale: { version: 1, min: 0, max: 10, lowerIsBetter: true },
+    basedOnEntryId: null,
+  };
+
+  it.each([
+    ["kept", true, copied, 0, "Elated"],
+    ["edit", true, copied, 0, "Elated"],
+    ["kept", false, copied, 0, "Elated"],
+    ["edit", false, copied, 0, "Elated"],
+    ["kept", false, { ...copied, mood: 10, moodScale: LEGACY_HIGHER_IS_BETTER_MOOD_SCALE_SNAPSHOT }, 0, "Elated"],
+    ["edit", true, { ...copied, mood: 9, moodScale: LEGACY_HIGHER_IS_BETTER_MOOD_SCALE_SNAPSHOT }, 1, "Very Happy"],
+  ] as const)("copies exact values in the %s form with all fields visible=%s (case %#)", async (
+    variant, allFields, source, formMood, label,
+  ) => {
+    const onSubmit = vi.fn(async () => {});
+    const props = {
+      visible: true, initialMood: 5, currentEntryId: 77,
+      emotionOptions: options, contextOptions: ["Work"],
+      fieldConfig: { emotions: allFields, context: allFields, energy: allFields, notes: true },
+      onClose: vi.fn(), onSubmit,
+    };
+    await render(variant === "kept"
+      ? <KeptEntryDetailModal {...props} onUndo={vi.fn()} />
+      : <EditMoodEntryModal {...props} />);
+    const copy = renderer.root.find((node) => node.type === "CopyLastEntry");
+    expect(copy.props.excludeEntryId).toBe(77);
+    await act(async () => copy.props.onCopy(source));
+    expect(renderer.root.findAll((node) => node.type === "Text" && (
+      node.props.children === label ||
+      (Array.isArray(node.props.children) && node.props.children.includes(label))
+    )).length).toBeGreaterThan(0);
+    while (renderer.root.findAllByProps({ accessibilityLabel: "Next step" }).length > 0) {
+      await pressLabel("Next step");
+    }
+    await pressLabel(variant === "kept" ? "Done" : "Save entry");
+    expect(onSubmit).toHaveBeenCalledExactlyOnceWith({
+      mood: formMood, emotions: source.emotions, contextTags: source.contextTags,
+      energy: 0, note: source.note, basedOnEntryId: 41,
+    });
+    expect(entryFeedback.crisisSupport).not.toHaveBeenCalled();
+  });
+
+  it.each(["kept", "edit"] as const)("initializes a legacy %s row in the current scale and preserves its meaning on a note edit", async (variant) => {
+    const entry: MoodEntry = {
+      ...copied, id: 77, mood: 9, note: "original note", basedOnEntryId: 12,
+      moodScale: LEGACY_HIGHER_IS_BETTER_MOOD_SCALE_SNAPSHOT,
+    };
+    const update = vi.fn(async () => entry);
+    await render(
+      <StoredEntryModal
+        entry={entry} variant={variant}
+        fieldConfig={{ emotions: true, context: true, energy: true, notes: true }}
+        onClose={vi.fn()}
+        onSubmit={async (values) => { await updateMoodEntryOrThrow(update, entry, values); }}
+      />,
+    );
+    const modal = renderer.root.findByType(variant === "kept" ? KeptEntryDetailModal : EditMoodEntryModal);
+    expect(modal.props.initialMood).toBe(1);
+    expect(modal.props.initialValues.mood).toBe(1);
+    await act(async () => button("entry-notes").props.onChangeText("changed note"));
+    while (renderer.root.findAllByProps({ accessibilityLabel: "Next step" }).length > 0) {
+      await pressLabel("Next step");
+    }
+    await pressLabel(variant === "kept" ? "Done" : "Save entry");
+
+    expect(update).toHaveBeenCalledExactlyOnceWith(77, {
+      mood: 9, emotions: entry.emotions, contextTags: entry.contextTags,
+      energy: 0, note: "changed note", basedOnEntryId: 12,
+    });
+  });
+
+  it("saves the copied note even when notes are hidden", async () => {
+    const onSubmit = vi.fn(async () => {});
+    await render(
+      <KeptEntryDetailModal
+        visible initialMood={5} currentEntryId={77}
+        emotionOptions={options} contextOptions={["Work"]}
+        fieldConfig={{ emotions: false, context: false, energy: false, notes: false }}
+        onClose={vi.fn()} onSubmit={onSubmit} onUndo={vi.fn()}
+      />,
+    );
+
+    await act(async () => renderer.root.find((node) => node.type === "CopyLastEntry").props.onCopy(copied));
+    expect(renderer.root.findAllByProps({ testID: "entry-notes" })).toHaveLength(0);
+    await pressLabel("Done");
+
+    expect(onSubmit).toHaveBeenCalledExactlyOnceWith({
+      mood: 0, emotions: copied.emotions, contextTags: copied.contextTags,
+      energy: 0, note: copied.note, basedOnEntryId: 41,
+    });
+  });
+
+  it.each([null, 41])("restores normal submission after reopen with stored source ID %s", async (basedOnEntryId) => {
+    const onSubmit = vi.fn(async () => {});
+    const props = {
+      initialMood: 5, currentEntryId: 77,
+      initialValues: basedOnEntryId === null ? undefined : { basedOnEntryId },
+      emotionOptions: options, contextOptions: ["Work"], fieldConfig: NOTES_ONLY,
+      onClose: vi.fn(), onSubmit, onUndo: vi.fn(),
+    };
+    await render(<KeptEntryDetailModal {...props} visible />);
+    await act(async () => renderer.root.find((node) => node.type === "CopyLastEntry").props.onCopy(copied));
+    expect(button("entry-notes").props.value).toBe(copied.note);
+
+    await act(async () => renderer.update(<KeptEntryDetailModal {...props} visible={false} />));
+    await act(async () => renderer.update(<KeptEntryDetailModal {...props} visible />));
+    expect(button("entry-notes").props.value).toBe("");
+    await act(async () => button("entry-notes").props.onChangeText("  fresh note  "));
+    await pressLabel("Done");
+
+    expect(onSubmit).toHaveBeenCalledExactlyOnceWith({
+      mood: 5, emotions: [], contextTags: [], energy: null,
+      note: "fresh note", basedOnEntryId,
+    });
+  });
+
+  it("keeps current-scale edits through a failed save and retry into a legacy destination", async () => {
+    const entry: MoodEntry = {
+      ...copied, id: 77, mood: 9,
+      moodScale: LEGACY_HIGHER_IS_BETTER_MOOD_SCALE_SNAPSHOT,
+    };
+    const update = vi.fn(async () => entry).mockRejectedValueOnce(new Error("storage rejected"));
+    const onClose = vi.fn();
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await render(
+        <StoredEntryModal
+          entry={entry} variant="edit" fieldConfig={NOTES_ONLY}
+          onClose={onClose}
+          onSubmit={async (values) => { await updateMoodEntryOrThrow(update, entry, values); }}
+        />,
+      );
+      await act(async () => renderer.root.find((node) => node.type === "CopyLastEntry").props.onCopy(copied));
+      await pressLabel("Increase mood to 1");
+      await act(async () => button("entry-notes").props.onChangeText("  first edit  "));
+      while (renderer.root.findAllByProps({ accessibilityLabel: "Next step" }).length > 0) {
+        await pressLabel("Next step");
+      }
+      await pressLabel("Save entry");
+
+      expect(onClose).not.toHaveBeenCalled();
+      expect(button("entry-notes").props.value).toBe("  first edit  ");
+      await pressLabel("Increase mood to 2");
+      await act(async () => button("entry-notes").props.onChangeText("  retry edit  "));
+      await pressLabel("Save entry");
+
+      expect(update).toHaveBeenCalledTimes(2);
+      expect(update).toHaveBeenNthCalledWith(1, 77, {
+        mood: 9, emotions: copied.emotions, contextTags: copied.contextTags,
+        energy: 0, note: "  first edit  ", basedOnEntryId: 41,
+      });
+      expect(update).toHaveBeenNthCalledWith(2, 77, {
+        mood: 8, emotions: copied.emotions, contextTags: copied.contextTags,
+        energy: 0, note: "  retry edit  ", basedOnEntryId: 41,
+      });
+      expect(onClose).toHaveBeenCalledTimes(1);
+    } finally {
+      consoleSpy.mockRestore();
+    }
+  });
+});
+
 describe.each(["android", "ios"])("entry notes keyboard on %s", (platform) => {
   beforeEach(() => {
     nativePlatform.OS = platform;
     nativePlatform.Version = platform === "android" ? 35 : 18;
+    nativeInsets.bottom = 24;
   });
 
   it("keeps Save reachable above the keyboard while Notes has focus", async () => {

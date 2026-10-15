@@ -10,16 +10,16 @@ import {
     Platform,
 } from "react-native";
 import PagerView, { type PagerViewOnPageSelectedEvent } from "react-native-pager-view";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
     withSpring,
 } from "react-native-reanimated";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { PrivateModal } from "@/components/ui/PrivateModal";
 import { useModalAlert } from "@/components/ui/AppAlert";
-import { getMoodRatingDisplay } from "@/constants/moodScaleInterpretation";
+import { getInterpretedMoodRating, getMoodRatingDisplay } from "@/constants/moodScaleInterpretation";
 import { useThemeColors, colors } from "@/constants/colors";
 import { typography } from "@/constants/typography";
 import { getMoodWeatherColor, getMoodWeatherIcon } from "@/constants/moodWeather";
@@ -170,6 +170,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     const [energy, setEnergy] = useState<number | null>(null);
     const [note, setNote] = useState("");
     const [basedOnEntryId, setBasedOnEntryId] = useState<number | null>(null);
+    const [hasCopiedEntry, setHasCopiedEntry] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [keyboardHeight, setKeyboardHeight] = useState(0);
     const [isNotesFocused, setIsNotesFocused] = useState(false);
@@ -304,6 +305,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
             setEnergy(draft.energy);
             setNote(draft.note);
             setBasedOnEntryId(draft.basedOnEntryId);
+            setHasCopiedEntry(false);
             saveInFlightRef.current = false;
             setIsSaving(false);
             setCurrentStep(0);
@@ -339,11 +341,9 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
         setIsSaving(true);
 
         try {
+            const draft = { mood, emotions, contextTags, energy, note, basedOnEntryId };
             await onSubmit(
-                buildMoodEntrySubmitValues(
-                    { mood, emotions, contextTags, energy, note, basedOnEntryId },
-                    fieldConfig
-                )
+                hasCopiedEntry ? draft : buildMoodEntrySubmitValues(draft, fieldConfig)
             );
         } catch (error) {
             saveInFlightRef.current = false;
@@ -384,6 +384,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
         emotions,
         energy,
         fieldConfig,
+        hasCopiedEntry,
         mood,
         note,
         onClose,
@@ -455,12 +456,13 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     );
 
     const handleCopyYesterday = (entry: MoodEntry) => {
-        setMood(entry.mood);
+        setMood(getInterpretedMoodRating(entry));
         setEmotions(entry.emotions);
         setContextTags(entry.contextTags);
         setEnergy(entry.energy);
         setNote(entry.note ?? "");
         setBasedOnEntryId(entry.id);
+        setHasCopiedEntry(true);
     };
 
     const handleNoteChange = useCallback(

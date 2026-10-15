@@ -39,5 +39,4 @@ describe("moodService.getLastEntry", () => {
     const latest = db.__addMood({ timestamp: 400, note: "latest other entry" });
     expect(await moodService.getLastEntry(editing.id)).toMatchObject({ id: latest.id });
   });
-
 });
