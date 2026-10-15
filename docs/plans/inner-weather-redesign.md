@@ -100,9 +100,9 @@ Each phase is a working app on its own. Each phase ends with the checks in
 
 ## Verification
 
-- For each phase: `bun run lint`, `bun run typecheck`, `bun run test:run`,
-  `bun run test:qa`, and `bun run verify:color-tokens`.
-- `bun run verify` currently ends red at `verify:android-release-config`
+- For each phase: `pnpm run lint`, `pnpm run typecheck`, `pnpm run test:run`,
+  `pnpm run test:qa`, and `pnpm run verify:color-tokens`.
+- `pnpm run verify` currently ends red at `verify:android-release-config`
   because of an untracked local `android/app/build.gradle`. This failure is
   unrelated to the redesign, so run the tracked checks one by one.
 - For phases 2 to 7: screenshots from an Android emulator in dark and light

@@ -74,7 +74,7 @@ describe("Android privacy configuration", () => {
     );
   });
 
-  it("keeps SQLCipher disabled for the Android SQLite database", () => {
+  it("enables SQLCipher for the Android SQLite database", () => {
     const appConfig = JSON.parse(readFileSync("app.json", "utf8")) as {
       expo: { plugins: (string | [string, Record<string, unknown>])[] };
     };
@@ -87,6 +87,6 @@ describe("Android privacy configuration", () => {
       | undefined;
 
     expect(sqlitePlugin).toBeDefined();
-    expect(androidOptions?.useSQLCipher).toBe(false);
+    expect(androidOptions?.useSQLCipher).toBe(true);
   });
 });

@@ -10,6 +10,11 @@ import {
   updateMoodEntryOrThrow,
 } from "@/lib/moodEntryPersistence";
 import type { MoodEntryFormValues } from "@/components/entry/moodEntryDraft";
+import { getInterpretedMoodRating } from "@/constants/moodScaleInterpretation";
+import {
+  CURRENT_MOOD_SCALE_SNAPSHOT,
+  LEGACY_HIGHER_IS_BETTER_MOOD_SCALE_SNAPSHOT,
+} from "../../domain/moodScale";
 
 function makeMood(id: number): MoodEntry {
   return {
@@ -61,7 +66,7 @@ describe("mood entry persistence boundaries", () => {
     });
 
     await expect(
-      updateMoodEntryOrThrow(workflow.update, 1, values),
+      updateMoodEntryOrThrow(workflow.update, moods[0]!, values),
     ).rejects.toThrow("This entry is no longer available.");
 
     expect(repository.update).toHaveBeenCalledWith(1, {
@@ -74,6 +79,47 @@ describe("mood entry persistence boundaries", () => {
     });
     expect(applyMutation).not.toHaveBeenCalled();
     expect(moods).toEqual([makeMood(1)]);
+  });
+
+  it.each([
+    [CURRENT_MOOD_SCALE_SNAPSHOT, 0, CURRENT_MOOD_SCALE_SNAPSHOT, 0, 0],
+    [CURRENT_MOOD_SCALE_SNAPSHOT, 10, CURRENT_MOOD_SCALE_SNAPSHOT, 10, 10],
+    [CURRENT_MOOD_SCALE_SNAPSHOT, 1, LEGACY_HIGHER_IS_BETTER_MOOD_SCALE_SNAPSHOT, 1, 9],
+    [CURRENT_MOOD_SCALE_SNAPSHOT, 0, LEGACY_HIGHER_IS_BETTER_MOOD_SCALE_SNAPSHOT, 0, 10],
+    [CURRENT_MOOD_SCALE_SNAPSHOT, 10, LEGACY_HIGHER_IS_BETTER_MOOD_SCALE_SNAPSHOT, 10, 0],
+    [LEGACY_HIGHER_IS_BETTER_MOOD_SCALE_SNAPSHOT, 10, CURRENT_MOOD_SCALE_SNAPSHOT, 0, 0],
+    [LEGACY_HIGHER_IS_BETTER_MOOD_SCALE_SNAPSHOT, 0, CURRENT_MOOD_SCALE_SNAPSHOT, 10, 10],
+    [LEGACY_HIGHER_IS_BETTER_MOOD_SCALE_SNAPSHOT, 9, LEGACY_HIGHER_IS_BETTER_MOOD_SCALE_SNAPSHOT, 1, 9],
+    [LEGACY_HIGHER_IS_BETTER_MOOD_SCALE_SNAPSHOT, 10, LEGACY_HIGHER_IS_BETTER_MOOD_SCALE_SNAPSHOT, 0, 10],
+    [LEGACY_HIGHER_IS_BETTER_MOOD_SCALE_SNAPSHOT, 0, LEGACY_HIGHER_IS_BETTER_MOOD_SCALE_SNAPSHOT, 10, 0],
+  ] as const)("preserves copied mood meaning across stored scales (case %#)", async (
+    sourceScale, sourceMood, destinationScale, formMood, storedMood,
+  ) => {
+    const source = { ...makeMood(22), mood: sourceMood, moodScale: sourceScale };
+    const destination = { ...makeMood(1), moodScale: destinationScale };
+    const copiedValues: MoodEntryFormValues = {
+      mood: getInterpretedMoodRating(source),
+      emotions: [{ name: "Custom calm", category: "positive", icon: null }],
+      contextTags: ["Custom place"],
+      energy: 0,
+      note: "  copied \u0000 and café  ",
+      basedOnEntryId: source.id,
+    };
+    vi.mocked(repository.update).mockResolvedValue(destination);
+
+    expect(copiedValues.mood).toBe(formMood);
+    await updateMoodEntryOrThrow(repository.update, destination, copiedValues);
+
+    expect(repository.update).toHaveBeenCalledExactlyOnceWith(destination.id, {
+      mood: storedMood,
+      note: copiedValues.note,
+      emotions: copiedValues.emotions,
+      contextTags: copiedValues.contextTags,
+      energy: 0,
+      basedOnEntryId: source.id,
+    });
+    expect(destination).toEqual({ ...makeMood(1), moodScale: destinationScale });
+    expect(source).toEqual({ ...makeMood(22), mood: sourceMood, moodScale: sourceScale });
   });
 
   it("keeps post-commit presentation failures out of the save result", async () => {

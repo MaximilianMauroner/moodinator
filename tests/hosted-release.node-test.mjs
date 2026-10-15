@@ -32,8 +32,8 @@ async function release({ hosted = false, checkFailure, reservationFailure, verif
       calls.push([program, ...Array.from(args), cwd]);
       if (program === 'git' && args[0] === 'rev-parse') return 'a'.repeat(40);
       if (program === 'git' && args[0] === 'show') return '{"cli":{"version":">= 20.5.1"}}';
-      if (program === 'bun' && args[0] === 'install') diskGiB = diskAfterInstallGiB;
-      if (program === 'bun' && args[1] === 'verify' && checkFailure) throw new Error('Checks failed');
+      if (program === 'pnpm' && args[0] === 'install') diskGiB = diskAfterInstallGiB;
+      if (program === 'pnpm' && args[1] === 'verify' && checkFailure) throw new Error('Checks failed');
     },
     readHostedReservation,
     preflightBuild(root, env) { checkReleaseResources(root); return env; },
@@ -66,7 +66,7 @@ test('fetched main checks pass before reserve; verified copies precede Internal 
   const { calls, error } = await release();
   assert.equal(error, undefined);
   assert.ok(calls.some(([program, command, ref]) => program === 'git' && command === 'show' && ref === `${'a'.repeat(40)}:eas.json`));
-  const check = calls.findIndex(([program, command, name]) => program === 'bun' && command === 'run' && name === 'test:nightly');
+  const check = calls.findIndex(([program, command, name]) => program === 'pnpm' && command === 'run' && name === 'test:nightly');
   const reserve = calls.findIndex(([program, action]) => program === 'ledger' && action === 'reserve');
   assert.ok(check < reserve);
   const resource = calls.findIndex(([kind], index) => kind === 'resources' && index > check);
@@ -81,7 +81,7 @@ test('fetched main checks pass before reserve; verified copies precede Internal 
 test('disk lost to dependencies stops before reservation on the source filesystem', async () => {
   const { calls, records, error } = await release({ diskAfterInstallGiB: 14 });
   assert.match(error.message, /at least 15 GiB free disk space/);
-  const lastCheck = calls.findIndex(([program, command, name]) => program === 'bun' && command === 'run' && name === 'test:nightly');
+  const lastCheck = calls.findIndex(([program, command, name]) => program === 'pnpm' && command === 'run' && name === 'test:nightly');
   const denied = calls.findIndex(([kind, path, disk]) => kind === 'resources' && path === '/temporary/source' && disk === 14);
   assert.ok(lastCheck >= 0 && denied > lastCheck);
   assert.equal(calls.some(([kind]) => ['ledger', 'eas', 'upload'].includes(kind)), false);
@@ -129,7 +129,7 @@ test('bad certificates are never retained or uploaded; upload failure retains ve
 test('hosted build uses its checked persisted identity without project checks, ledger auth, or Play upload', async () => {
   const { calls, records, error } = await release({ hosted: true });
   assert.equal(error, undefined);
-  assert.equal(calls.some(([kind]) => ['bun', 'ledger', 'upload'].includes(kind)), false);
+  assert.equal(calls.some(([kind]) => ['pnpm', 'ledger', 'upload'].includes(kind)), false);
   assert.equal(records.at(-1).status, 'built');
   assert.equal(records.at(-1).sha, 'a'.repeat(40));
   assert.equal(calls.filter(([kind]) => kind === 'eas').length, 2);
@@ -144,9 +144,9 @@ test('actual dependency and EAS child calls receive only their operation credent
     releaseChildEnvironment: (operation) => releaseChildEnvironment(operation, env),
     spawnSync(program, args, options) { captured.push(options.env); return { status: 0, stdout: '' }; },
   });
-  run('bun', ['install', '--frozen-lockfile']);
-  run('bun', ['run', 'verify']);
-  run('bun', ['run', 'test:nightly']);
+  run('pnpm', ['install', '--frozen-lockfile']);
+  run('pnpm', ['run', 'verify']);
+  run('pnpm', ['run', 'test:nightly']);
   const easSource = source.slice(source.indexOf('async function runEas('), source.indexOf('function ledger('));
   const runEas = runInNewContext(`(${easSource})`, {
     eas: 'eas', process: { env }, releaseChildEnvironment: (operation) => releaseChildEnvironment(operation, env),

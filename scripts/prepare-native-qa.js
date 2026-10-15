@@ -45,10 +45,10 @@ if (require.main === module) {
   console.log(`QA workspace: ${result.destination}`);
   console.log(`QA source metadata: ${result.sourceMetadata}`);
   console.log(`Prepared source SHA: ${result.sourceSha}`);
-  console.log("In that directory: bun install --frozen-lockfile");
-  console.log("Then: MOODINATOR_VARIANT=qa MOODINATOR_QA_PREPARE_NATIVE=1 bunx expo prebuild --platform android --clean");
-  console.log("Then: bun run qa:seal-native");
-  console.log("Then: MOODINATOR_VARIANT=qa bunx expo run:android --variant release --device");
+  console.log("In that directory: pnpm install --frozen-lockfile");
+  console.log("Then: MOODINATOR_VARIANT=qa MOODINATOR_QA_PREPARE_NATIVE=1 pnpm exec expo prebuild --platform android --clean");
+  console.log("Then: pnpm run qa:seal-native");
+  console.log("Then: MOODINATOR_VARIANT=qa pnpm exec expo run:android --variant release --device");
   console.log("Select a disposable emulator. The QA package has separate local storage.");
 }
 

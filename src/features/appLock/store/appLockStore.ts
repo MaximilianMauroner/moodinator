@@ -7,6 +7,7 @@ import {
   APP_LOCK_PIN_LENGTH_KEY,
 } from "@/shared/storage/keys";
 import { getStringStrict, setBoolean, setString } from "@/shared/storage/asyncStorage";
+import { setDurableItemAsync } from "@/shared/storage/durableSecureStore";
 import { applyAppLockCaptureProtection } from "../services/captureProtection";
 
 const PIN_HASH_KEY = "appLockPinHash";
@@ -199,7 +200,7 @@ async function restorePinHash(storedHash: string | null): Promise<void> {
   if (storedHash === null) {
     await SecureStore.deleteItemAsync(PIN_HASH_KEY);
   } else {
-    await SecureStore.setItemAsync(PIN_HASH_KEY, storedHash, PIN_OPTIONS);
+    await setDurableItemAsync(PIN_HASH_KEY, storedHash, PIN_OPTIONS);
   }
 }
 
@@ -397,7 +398,7 @@ export const useAppLockStore = create<AppLockStore>((set, get) => ({
     ]);
     const nextHash = await hashPin(pin);
     try {
-      await SecureStore.setItemAsync(PIN_HASH_KEY, nextHash, PIN_OPTIONS);
+      await setDurableItemAsync(PIN_HASH_KEY, nextHash, PIN_OPTIONS);
       await persistAttemptState(0, null, previous);
       await setString(APP_LOCK_PIN_LENGTH_KEY, String(pin.length));
     } catch (error) {
@@ -436,7 +437,7 @@ export const useAppLockStore = create<AppLockStore>((set, get) => ({
         if (result.needsUpgrade) {
           const upgradedHash = await hashPin(pin);
           try {
-            await SecureStore.setItemAsync(PIN_HASH_KEY, upgradedHash, PIN_OPTIONS);
+            await setDurableItemAsync(PIN_HASH_KEY, upgradedHash, PIN_OPTIONS);
             await setString(APP_LOCK_PIN_LENGTH_KEY, String(pin.length));
           } catch (error) {
             console.warn("Failed to upgrade app lock PIN metadata:", error);

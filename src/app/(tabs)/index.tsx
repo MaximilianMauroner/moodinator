@@ -85,7 +85,7 @@ function HomeScreenContent() {
   const handleEditEntrySave = useCallback(
     async (values: MoodEntryFormValues) => {
       if (!modals.editingEntry) return;
-      await updateMoodEntryOrThrow(updateMood, modals.editingEntry.id, values);
+      await updateMoodEntryOrThrow(updateMood, modals.editingEntry, values);
     },
     [modals.editingEntry, updateMood]
   );
@@ -93,7 +93,7 @@ function HomeScreenContent() {
   const handleKeptEntrySave = useCallback(
     async (values: MoodEntryFormValues) => {
       if (!modals.keptEntry) return;
-      await updateMoodEntryOrThrow(updateMood, modals.keptEntry.id, values);
+      await updateMoodEntryOrThrow(updateMood, modals.keptEntry, values);
     },
     [modals.keptEntry, updateMood]
   );
@@ -254,11 +254,12 @@ function HomeScreenContent() {
       )}
       <KeptEntryDetailModal
         visible={Boolean(modals.keptEntry)}
-        initialMood={modals.keptEntry?.mood ?? modals.pendingMood}
+        initialMood={modals.keptInitialValues?.mood ?? modals.pendingMood}
         emotionOptions={entrySettings.emotionOptions}
         contextOptions={entrySettings.contextOptions}
         fieldConfig={entrySettings.quickEntryFieldConfig}
         initialValues={modals.keptInitialValues}
+        currentEntryId={modals.keptEntry?.id}
         onClose={modals.closeKeptEntry}
         onSubmit={handleKeptEntrySave}
         onUndo={handleKeptEntryUndo}
@@ -278,11 +279,12 @@ function HomeScreenContent() {
       />
       <EditMoodEntryModal
         visible={Boolean(modals.editingEntry)}
-        initialMood={modals.editingEntry?.mood ?? modals.pendingMood}
+        initialMood={modals.editingInitialValues?.mood ?? modals.pendingMood}
         emotionOptions={entrySettings.emotionOptions}
         contextOptions={entrySettings.contextOptions}
         fieldConfig={entrySettings.detailedFieldConfig}
         initialValues={modals.editingInitialValues}
+        currentEntryId={modals.editingEntry?.id}
         onClose={modals.closeEditEntry}
         onSubmit={handleEditEntrySave}
         onCreateEmotion={entrySettings.createEmotionOption}

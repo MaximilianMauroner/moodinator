@@ -1,4 +1,5 @@
 const { spawnSync } = require("node:child_process");
+const { randomUUID } = require("node:crypto");
 
 const DEFAULT_DUMP_TIMEOUT_MS = 800;
 const DEFAULT_POLL_INTERVAL_MS = 80;
@@ -168,26 +169,42 @@ function dumpUiHierarchy(serial, {
   adbPath = "adb",
   timeoutMs = DEFAULT_DUMP_TIMEOUT_MS,
 } = {}) {
-  let result;
+  const deadline = Date.now() + timeoutMs;
+  const dumpPath = `/data/local/tmp/moodinator-ui-hierarchy-${randomUUID()}.xml`;
+  const remainingMs = () => {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) throw new Error("Android UI inspection exceeded its timeout.");
+    return remaining;
+  };
+  let output;
   try {
-    result = spawnSync(
+    runAdb(serial, ["shell", "uiautomator", "dump", "--compressed", dumpPath], {
       adbPath,
-      ["-s", serial, "shell", "uiautomator", "dump", "--compressed", "/dev/tty"],
-      {
-        encoding: "utf8",
-        maxBuffer: 8 * 1024 * 1024,
-        timeout: timeoutMs,
-      },
-    );
+      timeoutMs: remainingMs(),
+    });
+    output = runAdb(serial, ["exec-out", "cat", dumpPath], {
+      adbPath,
+      timeoutMs: remainingMs(),
+    });
   } catch (error) {
     throw new Error(`Unable to inspect Android UI: ${error.message}`);
+  } finally {
+    const cleanupTimeoutMs = deadline - Date.now();
+    if (cleanupTimeoutMs > 0) {
+      try {
+        runAdb(serial, ["shell", "rm", "-f", dumpPath], {
+          adbPath,
+          timeoutMs: cleanupTimeoutMs,
+        });
+      } catch {
+        // Cleanup is best-effort; the unique path prevents stale evidence.
+      }
+    }
+  }
+  if (Date.now() > deadline) {
+    throw new Error("Unable to inspect Android UI: inspection exceeded its timeout.");
   }
 
-  if (result.error) {
-    throw new Error(`Unable to inspect Android UI: ${result.error.message}`);
-  }
-
-  const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
   const start = output.indexOf("<hierarchy");
   const end = output.lastIndexOf("</hierarchy>");
   if (start < 0 || end < start) {

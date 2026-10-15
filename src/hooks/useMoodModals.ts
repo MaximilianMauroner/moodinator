@@ -1,11 +1,12 @@
 import { useState, useCallback, useMemo } from "react";
 import type { MoodEntry } from "@db/types";
 import type { MoodEntryFormValues } from "@/components/entry/moodEntryDraft";
+import { getInterpretedMoodRating } from "@/constants/moodScaleInterpretation";
 
 function toInitialValues(entry: MoodEntry | null): Partial<MoodEntryFormValues> | undefined {
   return entry
     ? {
-        mood: entry.mood,
+        mood: getInterpretedMoodRating(entry),
         emotions: entry.emotions,
         contextTags: entry.contextTags,
         energy: entry.energy,

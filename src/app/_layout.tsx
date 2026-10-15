@@ -67,12 +67,34 @@ function AppLockRecovery({ retry, captureError }: { retry: () => void; captureEr
   );
 }
 
+function AppDatabaseRecovery({ retry }: { retry: () => void }) {
+  return (
+    <View accessibilityViewIsModal className="flex-1 bg-paper-100 dark:bg-paper-900 justify-center items-center px-8">
+      <Ionicons name="lock-closed-outline" size={30} color="#BDA77D" />
+      <Text accessibilityRole="header" className="text-xl font-bold text-paper-800 dark:text-paper-100 mt-5 text-center">
+        Your mood history could not be opened
+      </Text>
+      <Text className="text-sm text-paper-700 dark:text-paper-300 mt-2 mb-5 text-center">
+        Your saved files have been kept. Try again. If this continues, contact support before you reinstall the app or clear its storage.
+      </Text>
+      <Pressable onPress={retry} accessibilityRole="button" accessibilityLabel="Retry opening mood history" className="min-h-11 px-6 rounded-xl items-center justify-center bg-sage-600 dark:bg-sage-400">
+        <Text className="font-semibold text-white dark:text-paper-900">Try again</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 export default function Layout() {
   const router = useRouter();
   const navigationRef = useNavigationContainerRef();
   const isDark = useColorScheme() === "dark";
   const [bootstrapStatus, setBootstrapStatus] =
     useState<AppBootstrapStatus>("running");
+  const [bootstrapAttempt, setBootstrapAttempt] = useState(0);
+  const retryBootstrap = useCallback(() => {
+    setBootstrapStatus("running");
+    setBootstrapAttempt((attempt) => attempt + 1);
+  }, []);
   const [hasPendingReminderNavigation, setHasPendingReminderNavigation] =
     useState(false);
   const {
@@ -101,7 +123,8 @@ export default function Layout() {
   }, [hydrateLock, hydrateOnboarding, hydrateSettings]);
 
   const hydrated =
-    lockHydrated && onboardingHydrated && settingsHydrated && bootstrapStatus !== "running";
+    lockHydrated && onboardingHydrated && settingsHydrated &&
+    (bootstrapStatus === "ready" || bootstrapStatus === "ready-with-warning");
   const showLockScreen =
     hydrated && captureReady && !lockHydrationError && !captureError && hasCompletedOnboarding && isEnabled && isLocked;
   const shouldMountNavigator = hydrated && !lockHydrationError && hasCompletedOnboarding;
@@ -158,14 +181,14 @@ export default function Layout() {
       .catch((error) => {
         console.error("[layout] Failed to run app bootstrap:", error);
         if (isMounted) {
-          setBootstrapStatus("ready-with-warning");
+          setBootstrapStatus("blocked");
         }
       });
 
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [bootstrapAttempt]);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -201,7 +224,7 @@ export default function Layout() {
           )}
         </View>
 
-        {(!hydrated || !captureReady) && !lockHydrationError && !captureError && (
+        {(!hydrated || !captureReady) && !lockHydrationError && !captureError && bootstrapStatus !== "blocked" && (
           <View className="absolute inset-0">
             <AppBootSplash />
           </View>
@@ -222,6 +245,12 @@ export default function Layout() {
         {(lockHydrationError || captureError) && (
           <View className="absolute inset-0">
             <AppLockRecovery retry={() => void hydrateLock()} captureError={captureError} />
+          </View>
+        )}
+
+        {bootstrapStatus === "blocked" && !lockHydrationError && !captureError && (
+          <View className="absolute inset-0">
+            <AppDatabaseRecovery retry={retryBootstrap} />
           </View>
         )}
 

@@ -199,10 +199,11 @@ export async function getAllMoods(): Promise<MoodEntry[]> {
   return rows.map(toMoodEntry);
 }
 
-export async function getLatestMood(): Promise<MoodEntry | null> {
+export async function getLatestMood(excludeEntryId?: number): Promise<MoodEntry | null> {
   const db = await getDb();
   const row = await db.getFirstAsync<MoodRow>(
-    "SELECT * FROM moods ORDER BY timestamp DESC, id DESC LIMIT 1;"
+    `SELECT * FROM moods ${excludeEntryId === undefined ? "" : "WHERE id != ? "}ORDER BY timestamp DESC, id DESC LIMIT 1;`,
+    ...(excludeEntryId === undefined ? [] : [excludeEntryId])
   );
   return row ? toMoodEntry(row) : null;
 }
