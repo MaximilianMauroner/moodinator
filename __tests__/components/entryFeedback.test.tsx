@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Emotion, MoodEntry } from "@db/types";
@@ -13,6 +13,11 @@ import {
 import { setHapticsEnabled } from "@/lib/haptics";
 import { updateMoodEntryOrThrow } from "@/lib/moodEntryPersistence";
 import { createMoodEntryWorkflow } from "@/services/moodEntryWorkflow";
+import { useMoodModals } from "@/hooks/useMoodModals";
+import {
+  CURRENT_MOOD_SCALE_SNAPSHOT,
+  LEGACY_HIGHER_IS_BETTER_MOOD_SCALE_SNAPSHOT,
+} from "../../domain/moodScale";
 
 const nativePlatform = vi.hoisted(() => ({ OS: "ios", Version: 18 }));
 const nativeInsets = vi.hoisted(() => ({ top: 0, right: 0, bottom: 0, left: 0 }));
@@ -255,6 +260,37 @@ async function pressLabel(accessibilityLabel: string) {
 }
 
 const NOTES_ONLY = { emotions: false, context: false, energy: false, notes: true };
+
+function StoredEntryModal({
+  entry, variant, fieldConfig, onClose, onSubmit,
+}: {
+  entry: MoodEntry;
+  variant: "kept" | "edit";
+  fieldConfig: React.ComponentProps<typeof EditMoodEntryModal>["fieldConfig"];
+  onClose: () => void;
+  onSubmit: (values: MoodEntryFormValues) => Promise<void>;
+}) {
+  const { setKeptEntry, setEditingEntry, keptEntry, editingEntry, keptInitialValues, editingInitialValues } = useMoodModals();
+  useEffect(() => {
+    if (variant === "kept") setKeptEntry(entry);
+    else setEditingEntry(entry);
+  }, [entry, variant, setKeptEntry, setEditingEntry]);
+  const initialValues = variant === "kept" ? keptInitialValues : editingInitialValues;
+  const props = {
+    visible: Boolean(variant === "kept" ? keptEntry : editingEntry),
+    initialMood: initialValues?.mood ?? 5,
+    initialValues,
+    currentEntryId: entry.id,
+    emotionOptions: options,
+    contextOptions: ["Work"],
+    fieldConfig,
+    onClose,
+    onSubmit,
+  };
+  return variant === "kept"
+    ? <KeptEntryDetailModal {...props} onUndo={vi.fn()} />
+    : <EditMoodEntryModal {...props} />;
+}
 
 async function addNoteAndPressDone() {
   await act(async () => button("entry-notes").props.onChangeText("a note"));
@@ -543,7 +579,11 @@ describe("entry save acknowledgement", () => {
       <SaveEntryModal
         variant="edit"
         onClose={onClose}
-        onSubmit={(values) => updateMoodEntryOrThrow(workflow.update, 42, values)}
+        onSubmit={async (values) => {
+          await updateMoodEntryOrThrow(
+            workflow.update, { id: 42, moodScale: CURRENT_MOOD_SCALE_SNAPSHOT }, values,
+          );
+        }}
       />,
     );
 
@@ -621,8 +661,15 @@ describe("last-entry prefill", () => {
   };
 
   it.each([
-    ["kept", true], ["edit", true], ["kept", false], ["edit", false],
-  ] as const)("copies exact values in the %s form with all fields visible=%s", async (variant, allFields) => {
+    ["kept", true, copied, 0, "Elated"],
+    ["edit", true, copied, 0, "Elated"],
+    ["kept", false, copied, 0, "Elated"],
+    ["edit", false, copied, 0, "Elated"],
+    ["kept", false, { ...copied, mood: 10, moodScale: LEGACY_HIGHER_IS_BETTER_MOOD_SCALE_SNAPSHOT }, 0, "Elated"],
+    ["edit", true, { ...copied, mood: 9, moodScale: LEGACY_HIGHER_IS_BETTER_MOOD_SCALE_SNAPSHOT }, 1, "Very Happy"],
+  ] as const)("copies exact values in the %s form with all fields visible=%s (case %#)", async (
+    variant, allFields, source, formMood, label,
+  ) => {
     const onSubmit = vi.fn(async () => {});
     const props = {
       visible: true, initialMood: 5, currentEntryId: 77,
@@ -635,14 +682,48 @@ describe("last-entry prefill", () => {
       : <EditMoodEntryModal {...props} />);
     const copy = renderer.root.find((node) => node.type === "CopyLastEntry");
     expect(copy.props.excludeEntryId).toBe(77);
-    await act(async () => copy.props.onCopy(copied));
+    await act(async () => copy.props.onCopy(source));
+    expect(renderer.root.findAll((node) => node.type === "Text" && (
+      node.props.children === label ||
+      (Array.isArray(node.props.children) && node.props.children.includes(label))
+    )).length).toBeGreaterThan(0);
     while (renderer.root.findAllByProps({ accessibilityLabel: "Next step" }).length > 0) {
       await pressLabel("Next step");
     }
     await pressLabel(variant === "kept" ? "Done" : "Save entry");
     expect(onSubmit).toHaveBeenCalledExactlyOnceWith({
-      mood: 0, emotions: copied.emotions, contextTags: copied.contextTags,
-      energy: 0, note: copied.note, basedOnEntryId: 41,
+      mood: formMood, emotions: source.emotions, contextTags: source.contextTags,
+      energy: 0, note: source.note, basedOnEntryId: 41,
+    });
+    expect(entryFeedback.crisisSupport).not.toHaveBeenCalled();
+  });
+
+  it.each(["kept", "edit"] as const)("initializes a legacy %s row in the current scale and preserves its meaning on a note edit", async (variant) => {
+    const entry: MoodEntry = {
+      ...copied, id: 77, mood: 9, note: "original note", basedOnEntryId: 12,
+      moodScale: LEGACY_HIGHER_IS_BETTER_MOOD_SCALE_SNAPSHOT,
+    };
+    const update = vi.fn(async () => entry);
+    await render(
+      <StoredEntryModal
+        entry={entry} variant={variant}
+        fieldConfig={{ emotions: true, context: true, energy: true, notes: true }}
+        onClose={vi.fn()}
+        onSubmit={async (values) => { await updateMoodEntryOrThrow(update, entry, values); }}
+      />,
+    );
+    const modal = renderer.root.findByType(variant === "kept" ? KeptEntryDetailModal : EditMoodEntryModal);
+    expect(modal.props.initialMood).toBe(1);
+    expect(modal.props.initialValues.mood).toBe(1);
+    await act(async () => button("entry-notes").props.onChangeText("changed note"));
+    while (renderer.root.findAllByProps({ accessibilityLabel: "Next step" }).length > 0) {
+      await pressLabel("Next step");
+    }
+    await pressLabel(variant === "kept" ? "Done" : "Save entry");
+
+    expect(update).toHaveBeenCalledExactlyOnceWith(77, {
+      mood: 9, emotions: entry.emotions, contextTags: entry.contextTags,
+      energy: 0, note: "changed note", basedOnEntryId: 12,
     });
   });
 
@@ -691,34 +772,43 @@ describe("last-entry prefill", () => {
     });
   });
 
-  it("keeps copied fields and subsequent edits through a failed save and retry", async () => {
-    const onSubmit = vi.fn(async () => {}).mockRejectedValueOnce(new Error("storage rejected"));
+  it("keeps current-scale edits through a failed save and retry into a legacy destination", async () => {
+    const entry: MoodEntry = {
+      ...copied, id: 77, mood: 9,
+      moodScale: LEGACY_HIGHER_IS_BETTER_MOOD_SCALE_SNAPSHOT,
+    };
+    const update = vi.fn(async () => entry).mockRejectedValueOnce(new Error("storage rejected"));
     const onClose = vi.fn();
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
       await render(
-        <KeptEntryDetailModal
-          visible initialMood={5} currentEntryId={77}
-          emotionOptions={options} contextOptions={["Work"]} fieldConfig={NOTES_ONLY}
-          onClose={onClose} onSubmit={onSubmit} onUndo={vi.fn()}
+        <StoredEntryModal
+          entry={entry} variant="edit" fieldConfig={NOTES_ONLY}
+          onClose={onClose}
+          onSubmit={async (values) => { await updateMoodEntryOrThrow(update, entry, values); }}
         />,
       );
       await act(async () => renderer.root.find((node) => node.type === "CopyLastEntry").props.onCopy(copied));
+      await pressLabel("Increase mood to 1");
       await act(async () => button("entry-notes").props.onChangeText("  first edit  "));
-      await pressLabel("Done");
+      while (renderer.root.findAllByProps({ accessibilityLabel: "Next step" }).length > 0) {
+        await pressLabel("Next step");
+      }
+      await pressLabel("Save entry");
 
       expect(onClose).not.toHaveBeenCalled();
       expect(button("entry-notes").props.value).toBe("  first edit  ");
+      await pressLabel("Increase mood to 2");
       await act(async () => button("entry-notes").props.onChangeText("  retry edit  "));
-      await pressLabel("Done");
+      await pressLabel("Save entry");
 
-      expect(onSubmit).toHaveBeenCalledTimes(2);
-      expect(onSubmit).toHaveBeenNthCalledWith(1, {
-        mood: 0, emotions: copied.emotions, contextTags: copied.contextTags,
+      expect(update).toHaveBeenCalledTimes(2);
+      expect(update).toHaveBeenNthCalledWith(1, 77, {
+        mood: 9, emotions: copied.emotions, contextTags: copied.contextTags,
         energy: 0, note: "  first edit  ", basedOnEntryId: 41,
       });
-      expect(onSubmit).toHaveBeenNthCalledWith(2, {
-        mood: 0, emotions: copied.emotions, contextTags: copied.contextTags,
+      expect(update).toHaveBeenNthCalledWith(2, 77, {
+        mood: 8, emotions: copied.emotions, contextTags: copied.contextTags,
         energy: 0, note: "  retry edit  ", basedOnEntryId: 41,
       });
       expect(onClose).toHaveBeenCalledTimes(1);

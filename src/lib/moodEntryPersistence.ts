@@ -1,5 +1,6 @@
 import type { MoodEntry, MoodEntryInput } from "@db/types";
 import type { MoodEntryFormValues } from "@/components/entry/moodEntryDraft";
+import { CURRENT_MOOD_SCALE, normalizeMoodRating } from "@/constants/moodScaleInterpretation";
 
 type UpdateMoodEntry = (
   id: number,
@@ -27,10 +28,13 @@ export function getMoodEntryPersistenceValues(
 
 export async function updateMoodEntryOrThrow(
   updateMood: UpdateMoodEntry,
-  id: number,
+  entry: Pick<MoodEntry, "id" | "moodScale">,
   values: MoodEntryFormValues,
 ): Promise<MoodEntry> {
-  const updated = await updateMood(id, getMoodEntryPersistenceValues(values));
+  const updated = await updateMood(entry.id, {
+    ...getMoodEntryPersistenceValues(values),
+    mood: normalizeMoodRating(values.mood, CURRENT_MOOD_SCALE, entry.moodScale),
+  });
   if (!updated) {
     throw new Error("This entry is no longer available.");
   }

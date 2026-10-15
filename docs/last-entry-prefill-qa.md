@@ -28,6 +28,13 @@ offset and source lineage. Also check destination ID and timestamp. Do not use a
 screenshot, toast or visible field alone as saved-value proof. Preserve zero,
 NULL, empty and whitespace distinctions.
 
+Include supported version-2 records whose 0–10 scale is higher-is-better,
+alongside current version-1 records whose scale is lower-is-better. A legacy
+10 means Elated and must appear as current form value 0; legacy 0 means
+Emergency and must appear as current form value 10. Preview must retain the
+source's interpreted label. Save must encode the form value in the destination's
+existing scale, without changing its scale snapshot or any source record.
+
 ## Public journeys
 
 1. With no other record, quick-save an entry, add a note, and tap Copy last entry.
@@ -49,6 +56,17 @@ NULL, empty and whitespace distinctions.
    entry, then use the header Undo before Done. Wait for History to confirm the
    committed deletion. Cold readback must remove that destination only and
    leave all source rows unchanged.
+7. Tap-copy a legacy source into a newly kept current-scale destination. Check
+   the interpreted form label, then Save and cold-read the current-scale value,
+   exact hidden fields, zeros, note whitespace and lineage. Preview a current
+   source while editing a legacy destination, then use it and Save. The
+   destination must retain its ID, time and legacy snapshot while storing the
+   equivalent legacy value. Also copy between two legacy entries, including
+   the opposite endpoint. Verify all other rows stay unchanged in each case.
+8. Open a legacy entry without copying. Its initial form mood must be current
+   scale. Edit only its note and Save; cold readback must retain its original
+   raw mood and scale. Use rendered regressions to cover a later mood change
+   and rejected Save/retry in a legacy destination, without double conversion.
 
 On Android three-button navigation, record Done's bounds and a screenshot with
 the keyboard hidden. Its tap target must be above the system navigation bar,

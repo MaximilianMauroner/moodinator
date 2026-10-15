@@ -19,7 +19,7 @@ import Animated, {
 import { Ionicons } from "@expo/vector-icons";
 import { PrivateModal } from "@/components/ui/PrivateModal";
 import { Alert } from "@/components/ui/AppAlert";
-import { getMoodRatingDisplay } from "@/constants/moodScaleInterpretation";
+import { getInterpretedMoodRating, getMoodRatingDisplay } from "@/constants/moodScaleInterpretation";
 import { useThemeColors, colors } from "@/constants/colors";
 import { typography } from "@/constants/typography";
 import { getMoodWeatherColor, getMoodWeatherIcon } from "@/constants/moodWeather";
@@ -454,7 +454,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     );
 
     const handleCopyYesterday = (entry: MoodEntry) => {
-        setMood(entry.mood);
+        setMood(getInterpretedMoodRating(entry));
         setEmotions(entry.emotions);
         setContextTags(entry.contextTags);
         setEnergy(entry.energy);
