@@ -1,6 +1,7 @@
 import type { Emotion } from "@db/types";
 
 export type MoodEntryFormValues = {
+  /** Current lower-is-better scale, including when editing a stored legacy row. */
   mood: number;
   emotions: Emotion[];
   contextTags: string[];

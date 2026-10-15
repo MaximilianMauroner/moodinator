@@ -85,7 +85,7 @@ function HistoryScreenContent() {
   const handleEditEntrySave = useCallback(
     async (values: MoodEntryFormValues) => {
       if (!modals.editingEntry) return;
-      await updateMoodEntryOrThrow(updateMood, modals.editingEntry.id, values);
+      await updateMoodEntryOrThrow(updateMood, modals.editingEntry, values);
     },
     [modals.editingEntry, updateMood]
   );
@@ -227,11 +227,12 @@ function HistoryScreenContent() {
       )}
       <EditMoodEntryModal
         visible={Boolean(modals.editingEntry)}
-        initialMood={modals.editingEntry?.mood ?? modals.pendingMood}
+        initialMood={modals.editingInitialValues?.mood ?? modals.pendingMood}
         emotionOptions={entrySettings.emotionOptions}
         contextOptions={entrySettings.contextOptions}
         fieldConfig={entrySettings.detailedFieldConfig}
         initialValues={modals.editingInitialValues}
+        currentEntryId={modals.editingEntry?.id}
         onClose={modals.closeEditEntry}
         onSubmit={handleEditEntrySave}
         onCreateEmotion={entrySettings.createEmotionOption}
