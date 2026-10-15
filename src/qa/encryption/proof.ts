@@ -255,12 +255,14 @@ export async function crashEncryptionProof(caseName: string, phase: StartupPhase
   throw new Error("The requested native crash phase was not reached");
 }
 
-export async function resumeEncryptionProof(caseName: string) {
+export async function resumeEncryptionProof(caseName: string, progress?: Progress) {
   const f = fixture(caseName);
   const db = await openEncryptedDatabase(f.storage);
+  progress?.(`running:${caseName}:first-verification`);
   try { await requireExpected(f, db); }
   finally { await db.closeAsync(); }
   const reopened = await openEncryptedDatabase(f.storage);
+  progress?.(`running:${caseName}:second-verification`);
   try { await requireExpected(f, reopened); }
   finally { await reopened.closeAsync(); }
   check(!await f.storage.exists(DATABASE_FILES.original) && !await f.storage.exists(DATABASE_FILES.copy), "Recovered source cleanup is incomplete");

@@ -113,6 +113,7 @@ const {
 const {
   prepareEvidenceDirectory: prepareSmokeEvidenceDirectory,
 } = require("../scripts/run-native-smoke.js");
+const { createRecoveryProgressTracker } = require("../scripts/native-encryption-progress.js");
 
 const hierarchy = `
   <hierarchy rotation="0">
@@ -129,6 +130,24 @@ const hierarchy = `
       content-desc="Actions for Neutral entry" enabled="true" visible-to-user="true"
       bounds="[100,200][200,300]" />
   </hierarchy>`;
+
+test("native export recovery progress is monotonic and bounded to known phases", () => {
+  const tracker = createRecoveryProgressTracker("native-export-interruption-many-rows");
+  assert.deepEqual(tracker.observe("launch"), { changed: true, complete: false });
+  assert.deepEqual(tracker.observe("launch"), { changed: false, complete: false });
+  assert.deepEqual(tracker.observe("running:native-export-interruption-many-rows:first-verification"), {
+    changed: true, complete: false,
+  });
+  assert.deepEqual(tracker.observe("running:native-export-interruption-many-rows:second-verification"), {
+    changed: true, complete: false,
+  });
+  assert.deepEqual(tracker.observe("complete"), { changed: true, complete: true });
+  assert.throws(() => tracker.observe("launch"), /moved backwards/);
+  assert.throws(
+    () => createRecoveryProgressTracker("native-export-interruption-many-rows").observe("running:other"),
+    /Unexpected native recovery progress/,
+  );
+});
 
 test("reads the Android hierarchy from a device-local dump file", () => {
   const directory = mkdtempSync(join(tmpdir(), "moodinator-fake-adb-"));

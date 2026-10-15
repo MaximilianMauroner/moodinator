@@ -55,7 +55,7 @@ async function executeInitialProof() {
       case "wal-crash": await prepareWalCrash(publish); return;
       case "resume":
         if (typeof caseName !== "string") throw new Error("A native recovery case is required");
-        result = await resumeEncryptionProof(caseName); break;
+        result = await resumeEncryptionProof(caseName, publish); break;
       case "crash": {
         const phase = params?.phase;
         const supported = STARTUP_PHASES.find((candidate) => candidate === phase);
