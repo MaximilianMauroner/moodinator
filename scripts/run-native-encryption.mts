@@ -10,7 +10,7 @@ const { STARTUP_PHASES } = startup;
 
 const require = createRequire(import.meta.url);
 const { requirePreparedSourceSha, packageIsDebuggable } = require("./native-qa-common.js");
-const { createRecoveryProgressTracker, recoveryDeadlineRemaining } = require("./native-encryption-progress.js");
+const { createRecoveryProgressTracker, recoveryDeadlineRemaining, recoveryReadTimeout } = require("./native-encryption-progress.js");
 const { waitForNode } = require("./native-ui.js");
 const QA_ID = "com.lab4code.moodinator.qa";
 const options = Object.fromEntries(process.argv.slice(2).map((argument) => {
@@ -79,9 +79,10 @@ async function result(params: Record<string, string>) {
     const hardDeadline = Date.now() + 180000;
     let stallDeadline = Date.now() + 60000;
     let complete = false;
-    while (recoveryDeadlineRemaining(Date.now(), hardDeadline, stallDeadline) > 0) {
-      const remaining = recoveryDeadlineRemaining(Date.now(), hardDeadline, stallDeadline);
-      const status = readProofStatus(runId, Math.min(3000, remaining));
+    while (true) {
+      const readTimeout = recoveryReadTimeout(Date.now(), hardDeadline, stallDeadline);
+      if (readTimeout === null) break;
+      const status = readProofStatus(runId, readTimeout);
       if (recoveryDeadlineRemaining(Date.now(), hardDeadline, stallDeadline) === 0) break;
       if (status) {
         const observation = tracker.observe(status.progress);

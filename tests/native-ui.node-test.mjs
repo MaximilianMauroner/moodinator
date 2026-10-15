@@ -113,7 +113,11 @@ const {
 const {
   prepareEvidenceDirectory: prepareSmokeEvidenceDirectory,
 } = require("../scripts/run-native-smoke.js");
-const { createRecoveryProgressTracker, recoveryDeadlineRemaining } = require("../scripts/native-encryption-progress.js");
+const {
+  createRecoveryProgressTracker,
+  recoveryDeadlineRemaining,
+  recoveryReadTimeout,
+} = require("../scripts/native-encryption-progress.js");
 
 const hierarchy = `
   <hierarchy rotation="0">
@@ -155,6 +159,10 @@ test("native export recovery deadlines reject a read that finishes at or after e
   assert.equal(recoveryDeadlineRemaining(62_000, 180_000, 60_000), 0);
   assert.equal(recoveryDeadlineRemaining(179_999, 180_000, 240_000), 1);
   assert.equal(recoveryDeadlineRemaining(180_000, 180_000, 240_000), 0);
+  assert.equal(recoveryReadTimeout(59_999, 180_000, 60_000), 1);
+  assert.equal(recoveryReadTimeout(60_000, 180_000, 60_000), null);
+  assert.equal(recoveryReadTimeout(179_999, 180_000, 240_000), 1);
+  assert.equal(recoveryReadTimeout(180_000, 180_000, 240_000), null);
 });
 
 test("reads the Android hierarchy from a device-local dump file", () => {

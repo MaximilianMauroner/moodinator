@@ -23,4 +23,9 @@ function recoveryDeadlineRemaining(now, hardDeadline, stallDeadline) {
   return Math.max(0, Math.min(hardDeadline, stallDeadline) - now);
 }
 
-module.exports = { createRecoveryProgressTracker, recoveryDeadlineRemaining };
+function recoveryReadTimeout(now, hardDeadline, stallDeadline, maximum = 3000) {
+  const remaining = recoveryDeadlineRemaining(now, hardDeadline, stallDeadline);
+  return remaining > 0 ? Math.min(maximum, remaining) : null;
+}
+
+module.exports = { createRecoveryProgressTracker, recoveryDeadlineRemaining, recoveryReadTimeout };
