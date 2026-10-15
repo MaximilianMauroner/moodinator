@@ -16,12 +16,14 @@ import {
   linkEmotionsToMood,
 } from "../../db/moods/emotions";
 import type { Emotion } from "../../db/types";
+import { runInTransaction } from "../../db/writeQueue";
 
 // Mock the database client module
 const mockDb = createMockDb();
 
 vi.mock("../../db/client", () => ({
-  getDb: vi.fn(() => Promise.resolve(mockDb)),
+  readDb: vi.fn(() => Promise.resolve(mockDb)),
+  openDatabase: vi.fn(() => Promise.resolve(mockDb)),
 }));
 
 describe("Emotions", () => {
@@ -169,9 +171,9 @@ describe("linkEmotionsToMood", () => {
   });
 
   it("clears existing links before adding new ones", async () => {
-    await linkEmotionsToMood(mockDb.database, 1, [
+    await runInTransaction((tx) => linkEmotionsToMood(tx, 1, [
       { name: "Happy", category: "positive" },
-    ]);
+    ]));
 
     // Should delete existing links first
     expect(mockDb.runAsync).toHaveBeenCalledWith(
@@ -181,10 +183,10 @@ describe("linkEmotionsToMood", () => {
   });
 
   it("creates emotion entries and links them", async () => {
-    await linkEmotionsToMood(mockDb.database, 1, [
+    await runInTransaction((tx) => linkEmotionsToMood(tx, 1, [
       { name: "Happy", category: "positive" },
       { name: "Excited", category: "positive" },
-    ]);
+    ]));
 
     // Should have created/updated emotions and linked them
     const moodEmotions = mockDb.__getMoodEmotions();
@@ -194,7 +196,7 @@ describe("linkEmotionsToMood", () => {
   });
 
   it("handles empty emotions array", async () => {
-    await linkEmotionsToMood(mockDb.database, 1, []);
+    await runInTransaction((tx) => linkEmotionsToMood(tx, 1, []));
 
     // Should still clear existing links
     expect(mockDb.runAsync).toHaveBeenCalledWith(

@@ -15,6 +15,7 @@ import {
   QUICK_ENTRY_PREFS_KEY,
   SHOW_LABELS_KEY,
 } from "../../../src/shared/storage/keys";
+import { createMockDb } from "../../db/mockClient";
 
 const { setHapticsEnabledGlobal } = vi.hoisted(() => ({
   setHapticsEnabledGlobal: vi.fn(),
@@ -23,6 +24,33 @@ const { setHapticsEnabledGlobal } = vi.hoisted(() => ({
 vi.mock("@/lib/haptics", () => ({
   setHapticsEnabled: setHapticsEnabledGlobal,
 }));
+
+const moodDb = createMockDb();
+const dbEntryPoints = vi.hoisted(() => ({
+  readDb: vi.fn(),
+  openDatabase: vi.fn(),
+}));
+
+vi.mock("@db/client", () => dbEntryPoints);
+
+// A settings list edit is future-only. Rewriting stored mood snapshots, or
+// even reaching the database, would change what history already recorded.
+async function expectMoodSnapshotsUntouched(edit: () => Promise<void>) {
+  moodDb.__reset();
+  moodDb.__addMood({
+    emotions: JSON.stringify(DEFAULT_EMOTIONS.slice(0, 2)),
+    context_tags: JSON.stringify(DEFAULT_CONTEXTS.slice(0, 2)),
+  });
+  const seeded = moodDb.__getMoods();
+  dbEntryPoints.readDb.mockReset().mockResolvedValue(moodDb);
+  dbEntryPoints.openDatabase.mockReset().mockResolvedValue(moodDb);
+
+  await edit();
+
+  expect(dbEntryPoints.readDb).not.toHaveBeenCalled();
+  expect(dbEntryPoints.openDatabase).not.toHaveBeenCalled();
+  expect(moodDb.__getMoods()).toEqual(seeded);
+}
 
 import { useSettingsStore } from "../../../src/shared/state/settingsStore";
 
@@ -200,74 +228,42 @@ describe("useSettingsStore", () => {
   });
 
   test("removing an emotion from the list does not touch the moods table", async () => {
-    const getDbSpy = vi.fn(() => {
-      throw new Error(
-        "settings list deletion must not call the moods database — would rewrite history snapshots"
-      );
-    });
-    vi.doMock("@db/client", () => ({ getDb: getDbSpy }));
+    await expectMoodSnapshotsUntouched(() =>
+      useSettingsStore.getState().setEmotions([
+        { name: "Calm", category: "positive" as const },
+      ])
+    );
 
-    await useSettingsStore.getState().setEmotions([
-      { name: "Calm", category: "positive" as const },
-    ]);
-
-    expect(getDbSpy).not.toHaveBeenCalled();
     expect(useSettingsStore.getState().emotions).toEqual([
       { name: "Calm", category: "positive" },
     ]);
-
-    vi.doUnmock("@db/client");
   });
 
   test("removing a context tag from the list does not touch the moods table", async () => {
-    const getDbSpy = vi.fn(() => {
-      throw new Error(
-        "settings list deletion must not call the moods database — would rewrite history snapshots"
-      );
-    });
-    vi.doMock("@db/client", () => ({ getDb: getDbSpy }));
+    await expectMoodSnapshotsUntouched(() =>
+      useSettingsStore.getState().setContexts(["Home"])
+    );
 
-    await useSettingsStore.getState().setContexts(["Home"]);
-
-    expect(getDbSpy).not.toHaveBeenCalled();
     expect(useSettingsStore.getState().contexts).toEqual(["Home"]);
-
-    vi.doUnmock("@db/client");
   });
 
   test("renaming a context tag in the preset list does not touch the moods table (future-only default)", async () => {
-    const getDbSpy = vi.fn(() => {
-      throw new Error(
-        "context tag rename must not call the moods database — would rewrite history snapshots"
-      );
-    });
-    vi.doMock("@db/client", () => ({ getDb: getDbSpy }));
+    await expectMoodSnapshotsUntouched(() =>
+      useSettingsStore.getState().setContexts(["Workplace", "Home"])
+    );
 
-    await useSettingsStore.getState().setContexts(["Workplace", "Home"]);
-
-    expect(getDbSpy).not.toHaveBeenCalled();
     expect(useSettingsStore.getState().contexts).toEqual(["Workplace", "Home"]);
-
-    vi.doUnmock("@db/client");
   });
 
   test("renaming an emotion in the preset list does not touch the moods table (future-only default)", async () => {
-    const getDbSpy = vi.fn(() => {
-      throw new Error(
-        "emotion rename must not call the moods database — would rewrite history snapshots"
-      );
-    });
-    vi.doMock("@db/client", () => ({ getDb: getDbSpy }));
+    await expectMoodSnapshotsUntouched(() =>
+      useSettingsStore.getState().setEmotions([
+        { name: "Joyful", category: "positive" as const },
+      ])
+    );
 
-    await useSettingsStore.getState().setEmotions([
-      { name: "Joyful", category: "positive" as const },
-    ]);
-
-    expect(getDbSpy).not.toHaveBeenCalled();
     expect(useSettingsStore.getState().emotions).toEqual([
       { name: "Joyful", category: "positive" },
     ]);
-
-    vi.doUnmock("@db/client");
   });
 });

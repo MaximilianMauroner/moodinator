@@ -1,5 +1,6 @@
 const { defineConfig } = require("eslint/config");
 const expoConfig = require("eslint-config-expo/flat");
+const dbBoundaries = require("./eslint-rules/db-boundaries");
 
 module.exports = defineConfig([
   expoConfig.map((config) => config.files?.includes("**/*.ts")
@@ -14,6 +15,10 @@ module.exports = defineConfig([
       "build/**",
       "coverage/**",
     ],
+  },
+  {
+    plugins: { moodinator: { rules: { "db-boundaries": dbBoundaries } } },
+    rules: { "moodinator/db-boundaries": "error" },
   },
   {
     files: ["src/**/*.{ts,tsx}"],

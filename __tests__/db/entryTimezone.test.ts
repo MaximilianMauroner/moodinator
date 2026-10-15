@@ -11,7 +11,7 @@ import {
 import { exportMoods, importMoods, importOldBackup } from "../../db/moods/importExport";
 
 const db = createMockDb();
-vi.mock("../../db/client", () => ({ getDb: vi.fn(async () => db) }));
+vi.mock("../../db/client", () => ({ readDb: vi.fn(async () => db), openDatabase: vi.fn(async () => db) }));
 beforeEach(() => db.__reset());
 
 it("retains the captured day and hour across travel and DST offsets", () => {

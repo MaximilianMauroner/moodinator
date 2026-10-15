@@ -1,7 +1,7 @@
 import { getEntryLocalDayKey } from "../../src/lib/entryTimezone";
 import type { Emotion, MoodEntry, MoodEntryInput } from "../types";
 import type { MoodRow, CountResult, QueryParam } from "../types/rows";
-import { getDb } from "../client";
+import { readDb } from "../client";
 import { runInTransaction } from "../writeQueue";
 import { resolveDateRange, type MoodDateRange } from "./range";
 import {
@@ -60,7 +60,7 @@ export async function insertMoodEntry(entry: MoodEntryInput): Promise<MoodEntry>
 }
 
 export async function hasMoodBeenLoggedToday(): Promise<boolean> {
-  const db = await getDb();
+  const db = await readDb();
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
   const todayEnd = new Date();
@@ -117,7 +117,7 @@ export async function updateMoodEntry(
   id: number,
   updates: Partial<MoodEntryInput & { mood: number }>
 ): Promise<MoodEntry | undefined> {
-  const db = await getDb();
+  const db = await readDb();
   const fields: string[] = [];
   const params: QueryParam[] = [];
   let updateEmotions = false;
@@ -194,13 +194,13 @@ export async function updateMoodEntry(
 }
 
 export async function getAllMoods(): Promise<MoodEntry[]> {
-  const db = await getDb();
+  const db = await readDb();
   const rows = await db.getAllAsync<MoodRow>("SELECT * FROM moods ORDER BY timestamp DESC, id DESC;");
   return rows.map(toMoodEntry);
 }
 
 export async function getLatestMood(excludeEntryId?: number): Promise<MoodEntry | null> {
-  const db = await getDb();
+  const db = await readDb();
   const row = await db.getFirstAsync<MoodRow>(
     `SELECT * FROM moods ${excludeEntryId === undefined ? "" : "WHERE id != ? "}ORDER BY timestamp DESC, id DESC LIMIT 1;`,
     ...(excludeEntryId === undefined ? [] : [excludeEntryId])
@@ -233,7 +233,7 @@ export type PaginatedResult<T> = {
 export async function getMoodsPaginated(
   options: PaginationOptions
 ): Promise<PaginatedResult<MoodEntry>> {
-  const db = await getDb();
+  const db = await readDb();
   const { limit, offset, filters = {} } = options;
   if (!Number.isInteger(limit) || limit < 1 || !Number.isInteger(offset) || offset < 0) {
     throw new Error("Pagination requires a positive limit and nonnegative offset");
@@ -300,7 +300,7 @@ export async function deleteMood(id: number) {
 }
 
 export async function getMoodCount(): Promise<number> {
-  const db = await getDb();
+  const db = await readDb();
   const result = await db.getFirstAsync<CountResult>("SELECT COUNT(*) as count FROM moods");
   return result?.count ?? 0;
 }
@@ -314,7 +314,7 @@ export async function updateEmotionCategoryInMoods(
 }
 
 export async function getEmotionNamesFromMoods(): Promise<string[]> {
-  const db = await getDb();
+  const db = await readDb();
   const rows = await db.getAllAsync<Pick<MoodRow, "emotions">>(
     "SELECT emotions FROM moods;"
   );
@@ -429,7 +429,7 @@ function parseHistoryContextTags(value: unknown): string[] {
 }
 
 export async function getEmotionsFromMoods(): Promise<Emotion[]> {
-  const db = await getDb();
+  const db = await readDb();
   const rows = await db.getAllAsync<Pick<MoodRow, "emotions">>(
     "SELECT emotions FROM moods ORDER BY timestamp DESC, id DESC;"
   );
@@ -449,7 +449,7 @@ export async function getEmotionsFromMoods(): Promise<Emotion[]> {
 }
 
 export async function getContextTagsFromMoods(): Promise<string[]> {
-  const db = await getDb();
+  const db = await readDb();
   const rows = await db.getAllAsync<Pick<MoodRow, "context_tags">>(
     "SELECT context_tags FROM moods ORDER BY timestamp DESC, id DESC;"
   );
@@ -471,7 +471,7 @@ export async function getContextTagsFromMoods(): Promise<string[]> {
 export async function getMoodsWithinRange(
   range?: MoodDateRange
 ): Promise<MoodEntry[]> {
-  const db = await getDb();
+  const db = await readDb();
   const { startDate, endDate } = resolveDateRange(range);
   const conditions: string[] = [];
   const params: QueryParam[] = [];
@@ -503,7 +503,7 @@ export async function getMoodsByMonth(
   year: number,
   month: number
 ): Promise<Map<number, MoodEntry[]>> {
-  const db = await getDb();
+  const db = await readDb();
 
   // Get the first and last day of the month
   const monthKey = `${year}-${String(month + 1).padStart(2, "0")}`;
@@ -538,7 +538,7 @@ export async function getMoodHistorySummary(): Promise<{
   oldestTimestamp: number | null;
   days: { timestamp: number; utcOffsetMinutes: number | null }[];
 }> {
-  const db = await getDb();
+  const db = await readDb();
   const [summary, days] = await Promise.all([
     db.getFirstAsync<{ count: number; oldest: number | null }>(
       "SELECT COUNT(*) AS count, MIN(timestamp) AS oldest FROM moods;"

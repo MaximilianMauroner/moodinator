@@ -12,8 +12,6 @@ import {
   deleteEmotion,
   upsertEmotionCategory,
   ensureDefaultEmotions,
-  migrateEmotionsToTable,
-  hasEmotionTableMigrated,
   countMoodEntriesWithEmotionName,
   applyEmotionHistoricalUpdate,
 } from "@db/moods/emotions";
@@ -54,9 +52,7 @@ export interface EmotionServiceInterface {
 
   // Initialization and migration
   ensureDefaults: () => Promise<void>;
-  migrateToTable: () => Promise<{ migrated: number }>;
   migrateToCategories: () => Promise<{ migrated: number; skipped: number }>;
-  hasMigrated: () => Promise<boolean>;
 }
 
 function invalidateMoodEntryHistory() {
@@ -164,24 +160,10 @@ export const emotionService: EmotionServiceInterface = {
   },
 
   /**
-   * Migrate emotions from JSON columns to separate table
-   */
-  async migrateToTable(): Promise<{ migrated: number }> {
-    return migrateEmotionsToTable();
-  },
-
-  /**
    * Migrate old string-only emotions to include categories
    */
   async migrateToCategories(): Promise<{ migrated: number; skipped: number }> {
     return migrateEmotionsToCategories();
-  },
-
-  /**
-   * Check if emotion table migration has been completed
-   */
-  async hasMigrated(): Promise<boolean> {
-    return hasEmotionTableMigrated();
   },
 };
 

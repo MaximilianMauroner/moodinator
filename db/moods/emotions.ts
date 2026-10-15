@@ -1,14 +1,12 @@
-import type * as SQLite from "expo-sqlite";
-import { getDb } from "../client";
-import { runInTransaction, runInTransactionOn } from "../writeQueue";
+import { readDb, type InitDb, type QueryConnection } from "../client";
+import { runInitTransaction, runInTransaction, type WriteTx } from "../writeQueue";
 import type { Emotion } from "../types";
 import type { EmotionRow, MoodRow, CountResult } from "../types/rows";
 import { DEFAULT_EMOTIONS } from "../../domain/entrySettings";
 import { parseEmotionItem } from "./emotionUtils";
 import { serializeEmotions } from "./serialization";
 
-async function createEmotionsTableOn(database: SQLite.SQLiteDatabase) {
-  const db = database;
+export async function createEmotionsTable(db: InitDb) {
   await db.execAsync(`
         CREATE TABLE IF NOT EXISTS emotions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -18,17 +16,7 @@ async function createEmotionsTableOn(database: SQLite.SQLiteDatabase) {
     `);
 }
 
-export async function createEmotionsTable(database?: SQLite.SQLiteDatabase) {
-  // Database initialization passes its unpublished handle directly. A public
-  // no-argument call joins the normal write queue after initialization.
-  if (database) {
-    return createEmotionsTableOn(database);
-  }
-  return runInTransaction(createEmotionsTableOn);
-}
-
-async function createMoodEmotionsTableOn(database: SQLite.SQLiteDatabase) {
-  const db = database;
+export async function createMoodEmotionsTable(db: InitDb) {
   await db.execAsync(`
         CREATE TABLE IF NOT EXISTS mood_emotions (
             mood_id INTEGER NOT NULL,
@@ -40,17 +28,8 @@ async function createMoodEmotionsTableOn(database: SQLite.SQLiteDatabase) {
     `);
 }
 
-export async function createMoodEmotionsTable(database?: SQLite.SQLiteDatabase) {
-  // See createEmotionsTable: the passed handle is used during initialization;
-  // calls without one are ordinary queued writes.
-  if (database) {
-    return createMoodEmotionsTableOn(database);
-  }
-  return runInTransaction(createMoodEmotionsTableOn);
-}
-
 export async function getAllEmotions(): Promise<Emotion[]> {
-  const db = await getDb();
+  const db = await readDb();
   const rows = await db.getAllAsync<EmotionRow>(
     "SELECT id, name, category FROM emotions ORDER BY name ASC;"
   );
@@ -61,7 +40,7 @@ export async function getAllEmotions(): Promise<Emotion[]> {
 }
 
 async function addEmotionOn(
-  db: SQLite.SQLiteDatabase,
+  db: WriteTx,
   emotion: Emotion
 ): Promise<void> {
   const result = await db.runAsync(
@@ -80,7 +59,7 @@ export async function addEmotion(emotion: Emotion): Promise<void> {
 }
 
 async function updateEmotionOn(
-  db: SQLite.SQLiteDatabase,
+  db: WriteTx,
   oldName: string,
   newEmotion: Emotion
 ): Promise<void> {
@@ -110,7 +89,7 @@ export async function updateEmotion(
 }
 
 async function deleteEmotionOn(
-  db: SQLite.SQLiteDatabase,
+  db: WriteTx,
   name: string
 ): Promise<void> {
   await db.runAsync("DELETE FROM emotions WHERE name = ?;", name);
@@ -121,7 +100,7 @@ export async function deleteEmotion(name: string): Promise<void> {
 }
 
 async function upsertEmotionCategoryOn(
-  db: SQLite.SQLiteDatabase,
+  db: WriteTx,
   name: string,
   category: Emotion["category"]
 ): Promise<void> {
@@ -156,7 +135,7 @@ export async function upsertEmotionCategory(
 }
 
 async function getOrCreateEmotionId(
-  db: SQLite.SQLiteDatabase,
+  db: WriteTx,
   emotion: Emotion
 ): Promise<number> {
   const existing = await db.getFirstAsync<Pick<EmotionRow, "id">>(
@@ -188,7 +167,7 @@ async function getOrCreateEmotionId(
 }
 
 export async function linkEmotionsToMood(
-  db: SQLite.SQLiteDatabase,
+  db: WriteTx,
   moodId: number,
   emotions: Emotion[]
 ): Promise<void> {
@@ -205,14 +184,12 @@ export async function linkEmotionsToMood(
 }
 
 export async function migrateEmotionsToTable(
-  database?: SQLite.SQLiteDatabase
+  init: InitDb
 ): Promise<{ migrated: number }> {
   let migrated = 0;
   const emotionIds = new Map<string, number>();
 
-  // Runs from initializeDatabase with the connection passed in, and from tests
-  // without one, so it must not assume the queue is reachable.
-  return runInTransactionOn(database, async (db) => {
+  return runInitTransaction(init, async (db) => {
     const rows = await db.getAllAsync<Pick<MoodRow, "id" | "emotions">>(
       "SELECT id, emotions FROM moods;"
     );
@@ -269,9 +246,8 @@ export async function migrateEmotionsToTable(
 }
 
 export async function hasEmotionTableMigrated(
-  database?: SQLite.SQLiteDatabase
+  db: QueryConnection
 ): Promise<boolean> {
-  const db = database ?? (await getDb());
   const emotionCount = await db.getFirstAsync<CountResult>(
     "SELECT COUNT(*) as count FROM emotions;"
   );
@@ -286,7 +262,7 @@ export async function hasEmotionTableMigrated(
 }
 
 async function ensureDefaultEmotionsOn(
-  db: SQLite.SQLiteDatabase
+  db: WriteTx
 ): Promise<void> {
   if (!DEFAULT_EMOTIONS.length) {
     return;
@@ -317,7 +293,7 @@ export async function ensureDefaultEmotions(): Promise<void> {
  * Returns emotions from the normalized table structure.
  */
 export async function getEmotionsForMood(moodId: number): Promise<Emotion[]> {
-  const db = await getDb();
+  const db = await readDb();
   const rows = await db.getAllAsync<EmotionRow>(
     `SELECT e.id, e.name, e.category
      FROM emotions e
@@ -333,7 +309,7 @@ export async function getEmotionsForMood(moodId: number): Promise<Emotion[]> {
 }
 
 export async function countMoodEntriesWithEmotionName(name: string): Promise<number> {
-  const db = await getDb();
+  const db = await readDb();
   const normalizedTarget = name.trim().toLowerCase();
 
   if (!normalizedTarget) {

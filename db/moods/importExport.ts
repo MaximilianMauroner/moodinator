@@ -1,6 +1,5 @@
-import type * as SQLite from "expo-sqlite";
 import type { Emotion } from "../types";
-import { runInTransaction } from "../writeQueue";
+import { runInTransaction, type WriteTx } from "../writeQueue";
 import { getMoodsWithinRange } from "./repository";
 import type { MoodDateRange } from "./range";
 import {
@@ -109,7 +108,7 @@ function normalizeReplacementImportEntries(parsed: unknown[]): {
   return { entries, errors };
 }
 
-async function clearImportedMoodData(db: SQLite.SQLiteDatabase) {
+async function clearImportedMoodData(db: WriteTx) {
   await db.runAsync("DELETE FROM mood_emotions;");
   await db.runAsync("DELETE FROM moods;");
 }

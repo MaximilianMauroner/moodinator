@@ -1,0 +1,489 @@
+import type * as SQLite from "expo-sqlite";
+import { getDb } from "../client";
+import { runInTransaction, runInTransactionOn } from "../writeQueue";
+import type { Emotion } from "../types";
+import type { EmotionRow, MoodRow, CountResult } from "../types/rows";
+import { DEFAULT_EMOTIONS } from "../../domain/entrySettings";
+import { parseEmotionItem } from "./emotionUtils";
+import { serializeEmotions } from "./serialization";
+
+export async function createEmotionsTable(database?: SQLite.SQLiteDatabase) {
+  const db = database ?? (await getDb());
+  await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS emotions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+            category TEXT NOT NULL CHECK(category IN ('positive', 'negative', 'neutral'))
+        );
+    `);
+}
+
+export async function createMoodEmotionsTable(database?: SQLite.SQLiteDatabase) {
+  const db = database ?? (await getDb());
+  await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS mood_emotions (
+            mood_id INTEGER NOT NULL,
+            emotion_id INTEGER NOT NULL,
+            PRIMARY KEY (mood_id, emotion_id),
+            FOREIGN KEY (mood_id) REFERENCES moods(id) ON DELETE CASCADE,
+            FOREIGN KEY (emotion_id) REFERENCES emotions(id) ON DELETE CASCADE
+        );
+    `);
+}
+
+export async function getAllEmotions(): Promise<Emotion[]> {
+  const db = await getDb();
+  const rows = await db.getAllAsync<EmotionRow>(
+    "SELECT id, name, category FROM emotions ORDER BY name ASC;"
+  );
+  return rows.map((row) => ({
+    name: row.name,
+    category: row.category,
+  }));
+}
+
+export async function addEmotion(emotion: Emotion): Promise<void> {
+  const db = await getDb();
+  const result = await db.runAsync(
+    "INSERT OR IGNORE INTO emotions (name, category) VALUES (?, ?);",
+    emotion.name,
+    emotion.category
+  );
+
+  if (result.changes === 0) {
+    throw new Error("An emotion with this name already exists");
+  }
+}
+
+export async function updateEmotion(
+  oldName: string,
+  newEmotion: Emotion
+): Promise<void> {
+  const db = await getDb();
+
+  if (oldName !== newEmotion.name) {
+    const existing = await db.getFirstAsync(
+      "SELECT id FROM emotions WHERE name = ?;",
+      newEmotion.name
+    );
+    if (existing) {
+      throw new Error("An emotion with this name already exists");
+    }
+  }
+
+  await db.runAsync(
+    "UPDATE emotions SET name = ?, category = ? WHERE name = ?;",
+    newEmotion.name,
+    newEmotion.category,
+    oldName
+  );
+}
+
+export async function deleteEmotion(name: string): Promise<void> {
+  const db = await getDb();
+  await db.runAsync("DELETE FROM emotions WHERE name = ?;", name);
+}
+
+export async function upsertEmotionCategory(
+  name: string,
+  category: Emotion["category"]
+): Promise<void> {
+  const db = await getDb();
+  const existing = await db.getFirstAsync(
+    "SELECT id FROM emotions WHERE name = ?;",
+    name
+  );
+
+  if (existing) {
+    await db.runAsync(
+      "UPDATE emotions SET category = ? WHERE name = ?;",
+      category,
+      name
+    );
+    return;
+  }
+
+  await db.runAsync(
+    "INSERT INTO emotions (name, category) VALUES (?, ?);",
+    name,
+    category
+  );
+}
+
+async function getOrCreateEmotionId(
+  db: SQLite.SQLiteDatabase,
+  emotion: Emotion
+): Promise<number> {
+  const existing = await db.getFirstAsync<Pick<EmotionRow, "id">>(
+    "SELECT id FROM emotions WHERE name = ?;",
+    emotion.name
+  );
+
+  if (existing) {
+    await db.runAsync(
+      "UPDATE emotions SET category = ? WHERE name = ?;",
+      emotion.category,
+      emotion.name
+    );
+    return existing.id;
+  }
+
+  await db.runAsync(
+    "INSERT INTO emotions (name, category) VALUES (?, ?);",
+    emotion.name,
+    emotion.category
+  );
+
+  const inserted = await db.getFirstAsync<Pick<EmotionRow, "id">>(
+    "SELECT id FROM emotions WHERE name = ?;",
+    emotion.name
+  );
+
+  return inserted!.id;
+}
+
+export async function linkEmotionsToMood(
+  db: SQLite.SQLiteDatabase,
+  moodId: number,
+  emotions: Emotion[]
+): Promise<void> {
+  await db.runAsync("DELETE FROM mood_emotions WHERE mood_id = ?;", moodId);
+
+  for (const emotion of emotions) {
+    const emotionId = await getOrCreateEmotionId(db, emotion);
+    await db.runAsync(
+      "INSERT OR IGNORE INTO mood_emotions (mood_id, emotion_id) VALUES (?, ?);",
+      moodId,
+      emotionId
+    );
+  }
+}
+
+export async function migrateEmotionsToTable(
+  database?: SQLite.SQLiteDatabase
+): Promise<{ migrated: number }> {
+  let migrated = 0;
+  const emotionIds = new Map<string, number>();
+
+  // Runs from initializeDatabase with the connection passed in, and from tests
+  // without one, so it must not assume the queue is reachable.
+  return runInTransactionOn(database, async (db) => {
+    const rows = await db.getAllAsync<Pick<MoodRow, "id" | "emotions">>(
+      "SELECT id, emotions FROM moods;"
+    );
+
+    for (const row of rows) {
+      const rawEmotions = row.emotions;
+      if (!rawEmotions || rawEmotions === "[]") {
+        continue;
+      }
+
+      try {
+        const parsed = JSON.parse(rawEmotions);
+        if (!Array.isArray(parsed) || parsed.length === 0) {
+          continue;
+        }
+
+        const emotions: Emotion[] = parsed
+          .map(parseEmotionItem)
+          .filter((e): e is Emotion => e !== null);
+
+        for (const emotion of emotions) {
+          let emotionId: number;
+          if (emotionIds.has(emotion.name)) {
+            emotionId = emotionIds.get(emotion.name)!;
+          } else {
+            emotionId = await getOrCreateEmotionId(db, emotion);
+            emotionIds.set(emotion.name, emotionId);
+          }
+
+          await db.runAsync(
+            "INSERT OR IGNORE INTO mood_emotions (mood_id, emotion_id) VALUES (?, ?);",
+            row.id,
+            emotionId
+          );
+        }
+
+        migrated++;
+      } catch (error) {
+        console.error(
+          `Failed to migrate emotions for mood ${row.id}:`,
+          error
+        );
+      }
+    }
+
+    console.log(
+      `Emotion migration complete: ${migrated} moods migrated, ${emotionIds.size} unique emotions in table`
+    );
+    return { migrated };
+  }).catch((error: unknown) => {
+    console.error("Error during emotion table migration:", error);
+    throw error;
+  });
+}
+
+export async function hasEmotionTableMigrated(
+  database?: SQLite.SQLiteDatabase
+): Promise<boolean> {
+  const db = database ?? (await getDb());
+  const emotionCount = await db.getFirstAsync<CountResult>(
+    "SELECT COUNT(*) as count FROM emotions;"
+  );
+  const hasEmotions = (emotionCount?.count ?? 0) > 0;
+
+  const linkCount = await db.getFirstAsync<CountResult>(
+    "SELECT COUNT(*) as count FROM mood_emotions;"
+  );
+  const hasLinks = (linkCount?.count ?? 0) > 0;
+
+  return hasEmotions || hasLinks;
+}
+
+export async function ensureDefaultEmotions(): Promise<void> {
+  const db = await getDb();
+
+  if (!DEFAULT_EMOTIONS.length) {
+    return;
+  }
+
+  const placeholders = DEFAULT_EMOTIONS.map(() => "(?, ?)").join(", ");
+  const values: string[] = [];
+
+  for (const emotion of DEFAULT_EMOTIONS) {
+    values.push(emotion.name, emotion.category);
+  }
+
+  await db.runAsync(
+    `INSERT OR IGNORE INTO emotions (name, category) VALUES ${placeholders};`,
+    ...values
+  );
+}
+
+/**
+ * Get emotions for a specific mood entry from the junction table.
+ * Returns emotions from the normalized table structure.
+ */
+export async function getEmotionsForMood(moodId: number): Promise<Emotion[]> {
+  const db = await getDb();
+  const rows = await db.getAllAsync<EmotionRow>(
+    `SELECT e.id, e.name, e.category
+     FROM emotions e
+     INNER JOIN mood_emotions me ON e.id = me.emotion_id
+     WHERE me.mood_id = ?
+     ORDER BY e.name ASC;`,
+    moodId
+  );
+  return rows.map((row) => ({
+    name: row.name,
+    category: row.category,
+  }));
+}
+
+export async function countMoodEntriesWithEmotionName(name: string): Promise<number> {
+  const db = await getDb();
+  const normalizedTarget = name.trim().toLowerCase();
+
+  if (!normalizedTarget) {
+    return 0;
+  }
+
+  const rows = await db.getAllAsync<Pick<MoodRow, "id" | "emotions">>(
+    "SELECT id, emotions FROM moods;"
+  );
+
+  let affectedMoodEntryCount = 0;
+
+  for (const row of rows) {
+    if (!row.emotions || row.emotions === "[]") {
+      continue;
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(row.emotions);
+    } catch {
+      continue;
+    }
+
+    if (!Array.isArray(parsed)) {
+      continue;
+    }
+
+    const hasMatch = parsed
+      .map(parseEmotionItem)
+      .filter((emotion): emotion is Emotion => emotion !== null)
+      .some((emotion) => emotion.name.trim().toLowerCase() === normalizedTarget);
+
+    if (hasMatch) {
+      affectedMoodEntryCount++;
+    }
+  }
+
+  return affectedMoodEntryCount;
+}
+
+export type EmotionHistoricalUpdate =
+  | { type: "rename"; oldName: string; newName: string }
+  | { type: "category"; name: string; category: Emotion["category"] };
+
+function normalizeEmotionName(name: string): string {
+  return name.trim().toLowerCase();
+}
+
+function parseMoodRowEmotions(row: Pick<MoodRow, "emotions">): Emotion[] {
+  if (!row.emotions || row.emotions === "[]") {
+    return [];
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(row.emotions);
+  } catch {
+    return [];
+  }
+
+  if (!Array.isArray(parsed)) {
+    return [];
+  }
+
+  return parsed
+    .map(parseEmotionItem)
+    .filter((emotion): emotion is Emotion => emotion !== null);
+}
+
+/**
+ * Renaming an emotion or changing its category rewrites the emotions column of
+ * every mood row, so it reads the whole table and writes it back.
+ *
+ * Both the conflict check and that read happen inside the transaction. Reading
+ * first and then queueing the rewrite would let an entry edit commit in the gap
+ * while this call waits for its turn, and the rewrite would then restore the
+ * pre-edit emotions from its stale snapshot.
+ */
+export async function applyEmotionHistoricalUpdate(
+  update: EmotionHistoricalUpdate
+): Promise<{ updated: number }> {
+  if (update.type === "rename") {
+    const normalizedOldName = normalizeEmotionName(update.oldName);
+    const normalizedNewName = normalizeEmotionName(update.newName);
+
+    if (!normalizedOldName || !normalizedNewName) {
+      return { updated: 0 };
+    }
+  }
+
+  return runInTransaction(async (db) => {
+    let updated = 0;
+
+    if (update.type === "rename") {
+      const oldName = update.oldName.trim();
+      const newName = update.newName.trim();
+
+      if (normalizeEmotionName(oldName) !== normalizeEmotionName(newName)) {
+        const [existingOld, existingNew] = await Promise.all([
+          db.getFirstAsync<Pick<EmotionRow, "id">>(
+            "SELECT id FROM emotions WHERE name = ?;",
+            oldName
+          ),
+          db.getFirstAsync<Pick<EmotionRow, "id">>(
+            "SELECT id FROM emotions WHERE name = ?;",
+            newName
+          ),
+        ]);
+
+        if (existingNew && existingNew.id !== existingOld?.id) {
+          throw new Error("An emotion with this name already exists");
+        }
+      }
+    }
+
+    const rows = await db.getAllAsync<Pick<MoodRow, "id" | "emotions">>(
+      "SELECT id, emotions FROM moods;"
+    );
+
+    if (update.type === "rename") {
+      const oldName = update.oldName.trim();
+      const newName = update.newName.trim();
+
+      if (normalizeEmotionName(oldName) !== normalizeEmotionName(newName)) {
+        await db.runAsync(
+          "UPDATE emotions SET name = ? WHERE name = ?;",
+          newName,
+          oldName
+        );
+      }
+    } else {
+      const name = update.name.trim();
+      if (name) {
+        const existing = await db.getFirstAsync<Pick<EmotionRow, "id">>(
+          "SELECT id FROM emotions WHERE name = ?;",
+          name
+        );
+
+        if (existing) {
+          await db.runAsync(
+            "UPDATE emotions SET category = ? WHERE name = ?;",
+            update.category,
+            name
+          );
+        } else {
+          await db.runAsync(
+            "INSERT INTO emotions (name, category) VALUES (?, ?);",
+            name,
+            update.category
+          );
+        }
+      }
+    }
+
+    for (const row of rows) {
+      const emotions = parseMoodRowEmotions(row);
+      if (!emotions.length) {
+        continue;
+      }
+
+      let changed = false;
+      const rewritten = emotions.map((emotion) => {
+        if (update.type === "rename") {
+          const normalizedTarget = normalizeEmotionName(update.oldName);
+          if (emotion.name.trim().toLowerCase() !== normalizedTarget) {
+            return emotion;
+          }
+
+          changed = true;
+          return {
+            ...emotion,
+            name: update.newName.trim(),
+          };
+        }
+
+        const normalizedTarget = normalizeEmotionName(update.name);
+        if (emotion.name.trim().toLowerCase() !== normalizedTarget) {
+          return emotion;
+        }
+
+        changed = true;
+        return {
+          ...emotion,
+          category: update.category,
+        };
+      });
+
+      if (!changed) {
+        continue;
+      }
+
+      await db.runAsync(
+        "UPDATE moods SET emotions = ? WHERE id = ?;",
+        serializeEmotions(rewritten),
+        row.id
+      );
+      await linkEmotionsToMood(db, row.id, rewritten);
+      updated++;
+    }
+
+    return { updated };
+  });
+}
+

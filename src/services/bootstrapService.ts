@@ -1,4 +1,4 @@
-import { getDb } from "@db/client";
+import { readDb } from "@db/client";
 import { migrateEmotionsToCategories } from "@db/moods/migrations";
 
 import { getJson, getString, setJson } from "@/shared/storage/asyncStorage";
@@ -166,7 +166,7 @@ async function runLegacyEmotionCategoryMigration(
 export async function runAppBootstrap(): Promise<AppBootstrapResult> {
   // A completed legacy migration must not skip the database safety gate.
   // Only this open may reject; the layout then blocks the app.
-  await getDb();
+  await readDb();
   try {
     const state = await loadState();
     const warned = await runLegacyEmotionCategoryMigration(state);

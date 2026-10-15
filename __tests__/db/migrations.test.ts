@@ -6,7 +6,7 @@ import { backfillMoodScaleJson } from "../../db/moods/migrations";
 import { CURRENT_MOOD_SCALE_SNAPSHOT, serializeMoodScale } from "../../db/moods/serialization";
 
 const fixture = createMockDb();
-vi.mock("../../db/client", () => ({ getDb: vi.fn(() => Promise.resolve(fixture)) }));
+vi.mock("../../db/client", () => ({ readDb: vi.fn(() => Promise.resolve(fixture)), openDatabase: vi.fn(() => Promise.resolve(fixture)) }));
 
 describe("backfillMoodScaleJson with SQLite", () => {
   beforeEach(() => fixture.__reset());

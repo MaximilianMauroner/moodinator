@@ -5,7 +5,8 @@ import { createMockDb, createMockMoodEntry } from "../db/mockClient";
 const mockDb = createMockDb();
 
 vi.mock("../../db/client", () => ({
-  getDb: vi.fn(() => Promise.resolve(mockDb)),
+  readDb: vi.fn(() => Promise.resolve(mockDb)),
+  openDatabase: vi.fn(() => Promise.resolve(mockDb)),
 }));
 
 import { emotionService } from "../../src/services/emotionService";

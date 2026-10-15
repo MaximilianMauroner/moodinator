@@ -25,7 +25,8 @@ const higherIsBetterScale = {
 };
 
 vi.mock("../../db/client", () => ({
-  getDb: vi.fn(() => Promise.resolve(mockDb)),
+  readDb: vi.fn(() => Promise.resolve(mockDb)),
+  openDatabase: vi.fn(() => Promise.resolve(mockDb)),
 }));
 
 // Keep real emotion SQL, with spies for orchestration assertions and failures.

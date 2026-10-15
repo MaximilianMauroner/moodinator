@@ -1,5 +1,16 @@
 import type * as SQLite from "expo-sqlite";
-import { getDb } from "./client";
+import { openDatabase, type InitDb, type QueryConnection } from "./client";
+
+declare const queued: unique symbol;
+type Queued = { readonly [queued]: true };
+
+/**
+ * The connection inside one transaction. Only withTransaction creates one, so
+ * a function that takes a WriteTx cannot run outside a transaction.
+ */
+export type WriteTx = QueryConnection
+  & Pick<SQLite.SQLiteDatabase, "runAsync" | "execAsync">
+  & Queued;
 
 /**
  * Serializes every transaction in the app onto one chain.
@@ -16,16 +27,17 @@ import { getDb } from "./client";
 let writeQueue: Promise<unknown> = Promise.resolve();
 
 async function withTransaction<T>(
-  db: SQLite.SQLiteDatabase,
-  task: (db: SQLite.SQLiteDatabase) => Promise<T>
+  db: SQLite.SQLiteDatabase | InitDb,
+  task: (tx: WriteTx) => Promise<T>
 ): Promise<T> {
+  const tx: WriteTx = db as typeof db & Queued;
   // withTransactionAsync resolves only after COMMIT and rethrows otherwise, so
   // a collected entry means the task committed. Using an array avoids asserting
   // on a value the compiler cannot see being assigned inside the callback.
   const collected: T[] = [];
 
   await db.withTransactionAsync(async () => {
-    collected.push(await task(db));
+    collected.push(await task(tx));
   });
 
   if (collected.length === 0) {
@@ -36,9 +48,9 @@ async function withTransaction<T>(
 }
 
 export function runInTransaction<T>(
-  task: (db: SQLite.SQLiteDatabase) => Promise<T>
+  task: (tx: WriteTx) => Promise<T>
 ): Promise<T> {
-  const result = writeQueue.then(async () => withTransaction(await getDb(), task));
+  const result = writeQueue.then(async () => withTransaction(await openDatabase(), task));
 
   writeQueue = result.then(
     () => undefined,
@@ -49,14 +61,13 @@ export function runInTransaction<T>(
 }
 
 /**
- * For migrations that run inside `getDb` before the connection is published.
- * They already hold the handle and cannot join the queue without deadlocking,
- * and nothing else can be running yet, so they are serialized by construction.
- * Every other caller passes no database and queues normally.
+ * For initialization, which runs inside openDatabase before the connection is
+ * published. It cannot join the queue without deadlocking, and nothing else
+ * can be running yet, so it is serialized by construction.
  */
-export function runInTransactionOn<T>(
-  database: SQLite.SQLiteDatabase | undefined,
-  task: (db: SQLite.SQLiteDatabase) => Promise<T>
+export function runInitTransaction<T>(
+  init: InitDb,
+  task: (tx: WriteTx) => Promise<T>
 ): Promise<T> {
-  return database ? withTransaction(database, task) : runInTransaction(task);
+  return withTransaction(init, task);
 }

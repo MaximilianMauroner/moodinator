@@ -3,7 +3,7 @@ import { Directory, File, Paths } from "expo-file-system";
 import * as SecureStore from "expo-secure-store";
 import type * as SQLite from "expo-sqlite";
 import { Platform } from "react-native";
-import { getDb, initializeDatabase } from "@db/client";
+import { initializeDatabase, openDatabase } from "@db/client";
 import { legacyKeyPragma, rawKeyPragma, validateRawKey } from "@db/encryption/keys";
 import { createNativeEncryptionStorage, LEGACY_KEY_STORAGE_NAME, RAW_KEY_STORAGE_NAME } from "@db/encryption/native";
 import { inspectDatabase, requireMatchingDatabases } from "@db/encryption/verification";
@@ -414,8 +414,8 @@ export async function prepareAppUpgrade() {
 
 export async function verifyAppUpgrade() {
   requireQaPackage();
-  // Exercise the actual shared getDb startup path and actual app initializer.
-  const [first, second] = await Promise.all([getDb(), getDb()]);
+  // Exercise the actual shared openDatabase startup path and actual app initializer.
+  const [first, second] = await Promise.all([openDatabase(), openDatabase()]);
   check(first === second, "App startup published different handles to concurrent callers");
   check((await first.getFirstAsync<{ foreign_keys: number }>("PRAGMA foreign_keys;"))?.foreign_keys === 1, "Actual app handle has foreign keys disabled");
   check((await first.getFirstAsync<{ count: number }>("SELECT count(*) AS count FROM moods;"))?.count === 5, "App first-open migration lost mood records");
@@ -426,7 +426,7 @@ export async function verifyAppUpgrade() {
   const reopened = await storage.open(DATABASE_FILES.active);
   try { await reopened.execAsync(rawKeyPragma(key)); await inspectDatabase(reopened); }
   finally { await reopened.closeAsync(); }
-  return { status: "passed", evidence: "actual getDb, shared handle, initialization, data retention and keyed independent reopen" };
+  return { status: "passed", evidence: "actual openDatabase, shared handle, initialization, data retention and keyed independent reopen" };
 }
 
 export async function loseProofKey() {

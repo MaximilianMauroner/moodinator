@@ -5,14 +5,14 @@ import { BOOTSTRAP_MIGRATIONS_STATE_KEY } from "../../src/shared/storage/keys";
 import { runAppBootstrap } from "../../src/services/bootstrapService";
 
 const mocks = vi.hoisted(() => ({
-  getDb: vi.fn(),
+  readDb: vi.fn(),
   migrateEmotionsToCategories: vi.fn(),
   toastError: vi.fn(),
   invalidate: vi.fn(),
   ensureFresh: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock("@db/client", () => ({ getDb: mocks.getDb }));
+vi.mock("@db/client", () => ({ readDb: mocks.readDb }));
 
 vi.mock("@db/moods/migrations", () => ({
   migrateEmotionsToCategories: mocks.migrateEmotionsToCategories,
@@ -60,8 +60,8 @@ async function writeMigrationRecord(record: Record<string, unknown>) {
 describe("runAppBootstrap", () => {
   beforeEach(async () => {
     await AsyncStorage.clear();
-    mocks.getDb.mockReset();
-    mocks.getDb.mockResolvedValue({});
+    mocks.readDb.mockReset();
+    mocks.readDb.mockResolvedValue({});
     mocks.migrateEmotionsToCategories.mockReset();
     mocks.toastError.mockReset();
     mocks.invalidate.mockReset();
@@ -71,7 +71,7 @@ describe("runAppBootstrap", () => {
 
   it("waits for database startup before migrations and readiness", async () => {
     let finishOpening!: () => void;
-    mocks.getDb.mockReturnValue(new Promise<void>((resolve) => {
+    mocks.readDb.mockReturnValue(new Promise<void>((resolve) => {
       finishOpening = resolve;
     }));
     mocks.migrateEmotionsToCategories.mockResolvedValue({ migrated: 0, skipped: 0 });
@@ -87,7 +87,7 @@ describe("runAppBootstrap", () => {
   it("rejects a failed database open even when the legacy migration completed", async () => {
     await writeMigrationRecord({ status: "completed", attempts: 1 });
     const failure = new Error("Database unavailable");
-    mocks.getDb.mockRejectedValue(failure);
+    mocks.readDb.mockRejectedValue(failure);
     await expect(runAppBootstrap()).rejects.toBe(failure);
     expect(mocks.migrateEmotionsToCategories).not.toHaveBeenCalled();
     expect(mocks.invalidate).not.toHaveBeenCalled();

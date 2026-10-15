@@ -3,7 +3,7 @@ import { createMockDb } from "../db/mockClient";
 import { moodService } from "../../src/services/moodService";
 
 const db = createMockDb();
-vi.mock("../../db/client", () => ({ getDb: async () => db }));
+vi.mock("../../db/client", () => ({ readDb: async () => db, openDatabase: async () => db }));
 
 describe("moodService.getLastEntry", () => {
   beforeEach(() => { db.__reset(); });

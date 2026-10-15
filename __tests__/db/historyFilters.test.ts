@@ -4,7 +4,7 @@ import { getMoodsPaginated, getMoodsWithinRange, getAllMoods } from "../../db/mo
 import type { MoodHistoryFilters } from "../../db/moods/repository";
 import { LEGACY_HIGHER_IS_BETTER_MOOD_SCALE_SNAPSHOT } from "../../domain/moodScale";
 const db = createMockDb();
-vi.mock("../../db/client", () => ({ getDb: vi.fn(async () => db) }));
+vi.mock("../../db/client", () => ({ readDb: vi.fn(async () => db), openDatabase: vi.fn(async () => db) }));
 beforeEach(() => db.__reset());
 const query = (filters: MoodHistoryFilters = {}) => getMoodsPaginated({ limit: 20, offset: 0, filters });
 

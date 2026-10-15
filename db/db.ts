@@ -1,4 +1,3 @@
-export { createMoodTable } from "./moods/schema";
 export type { MoodDateRange, MoodRangePreset } from "./moods/range";
 export {
   deleteMood,
@@ -31,17 +30,13 @@ export {
   type ImportResult,
 } from "./moods/importExport";
 export { clearMoodData, clearMoods, seedMoods } from "./moods/seed";
-export { backfillMoodScaleJson, migrateEmotionsToCategories } from "./moods/migrations";
+export { migrateEmotionsToCategories } from "./moods/migrations";
 export {
-  createEmotionsTable,
-  createMoodEmotionsTable,
   getAllEmotions,
   addEmotion,
   updateEmotion,
   deleteEmotion,
   upsertEmotionCategory,
   ensureDefaultEmotions,
-  migrateEmotionsToTable,
-  hasEmotionTableMigrated,
   getEmotionsForMood,
 } from "./moods/emotions";

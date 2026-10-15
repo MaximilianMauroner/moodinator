@@ -6,7 +6,7 @@ import { useHistoryForecast } from "@/features/history/useHistoryForecast";
 import { useCalendarData } from "@/components/calendar/useCalendarData";
 
 const database = createMockDb();
-vi.mock("../../../db/client", () => ({ getDb: vi.fn(async () => database) }));
+vi.mock("../../../db/client", () => ({ readDb: vi.fn(async () => database), openDatabase: vi.fn(async () => database) }));
 vi.mock("react-native", () => ({
   AppState: { addEventListener: () => ({ remove: () => {} }) },
 }));

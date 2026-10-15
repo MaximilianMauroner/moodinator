@@ -8,7 +8,7 @@ import {
 import { getEntryLocalDayKey } from "../../src/lib/entryTimezone";
 
 const db = createMockDb();
-vi.mock("../../db/client", () => ({ getDb: vi.fn(async () => db) }));
+vi.mock("../../db/client", () => ({ readDb: vi.fn(async () => db), openDatabase: vi.fn(async () => db) }));
 
 const HOUR = 60 * 60 * 1000;
 const BASE = Date.UTC(2025, 0, 1);

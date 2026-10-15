@@ -1,9 +1,8 @@
-import type * as SQLite from "expo-sqlite";
-import { runInTransaction } from "../writeQueue";
+import type { InitDb } from "../client";
 import type { ColumnInfo } from "../types/rows";
 import { createEmotionsTable, createMoodEmotionsTable } from "./emotions";
 
-async function createMoodTableOn(db: SQLite.SQLiteDatabase) {
+export async function createMoodTable(db: InitDb) {
   await db.execAsync(`
         CREATE TABLE IF NOT EXISTS moods (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -22,19 +21,10 @@ async function createMoodTableOn(db: SQLite.SQLiteDatabase) {
   await createIndexes(db);
 }
 
-export async function createMoodTable(database?: SQLite.SQLiteDatabase) {
-  // Database initialization passes its unpublished handle directly. A public
-  // no-argument call joins the normal write queue after initialization.
-  if (database) {
-    return createMoodTableOn(database);
-  }
-  return runInTransaction(createMoodTableOn);
-}
-
 /**
  * Create database indexes for performance
  */
-async function createIndexes(database: SQLite.SQLiteDatabase) {
+async function createIndexes(database: InitDb) {
   // Index on timestamp for date range queries (most common)
   await database.execAsync(
     "CREATE INDEX IF NOT EXISTS idx_moods_timestamp ON moods(timestamp DESC);"
@@ -53,7 +43,7 @@ async function createIndexes(database: SQLite.SQLiteDatabase) {
   );
 }
 
-async function ensureMoodTableColumns(database: SQLite.SQLiteDatabase) {
+async function ensureMoodTableColumns(database: InitDb) {
   const columns = await database.getAllAsync<ColumnInfo>("PRAGMA table_info(moods);");
   const existing = new Set(columns.map((col) => col.name));
 
