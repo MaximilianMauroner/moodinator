@@ -20,7 +20,7 @@ type LegacyForeignKeyViolation = {
 };
 
 const identifier = (name: string) => `"${name.replaceAll('"', '""')}"`;
-const CHUNK_BYTES = 16 * 1024;
+const CHUNK_BYTES = 256 * 1024;
 const mismatch = () => new Error("Database conversion did not preserve all stored data. The original was retained.");
 
 async function legacyForeignKeyViolations(db: EncryptionDatabase): Promise<LegacyForeignKeyViolation[]> {

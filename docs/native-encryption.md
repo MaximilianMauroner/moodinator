@@ -63,12 +63,12 @@ deletion after misleading in-memory readback, retain the source, then pass two
 separate cold recoveries. Earlier evidence from a patched build does not accept
 this reset.
 
-Verification compares exact typed values through 16 KiB byte chunks. Int64 and
+Verification compares exact typed values through 256 KiB byte chunks. Int64 and
 precise real encoding stays in SQLite; text and BLOB chunks preserve NUL bytes
 and database encoding. JavaScript retains neither whole user rows nor tables.
 The pinned expo-sqlite patch adds the private, read-only `moodinator_blob_read`
 SQL primitive in both vendored engines. It uses SQLite's incremental BLOB API
-for TEXT/BLOB values in rowid tables, caps each buffer at 16 KiB, closes every
+for TEXT/BLOB values in rowid tables, caps each buffer at 256 KiB, closes every
 handle and is blocked in stored triggers/views. This also bounds a single large
 cell without repeatedly materializing it through SQL substr. Remove the patch
 when the installed Expo API exposes equivalent bounded reads and callers adopt it.

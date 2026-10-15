@@ -176,28 +176,33 @@ it.each([
 });
 
 it("compares individual multi-chunk text/BLOB values with bounded bridge results and detects their tail", async () => {
+  const chunkBytes = 256 * 1024;
+  const payloadBytes = chunkBytes + 1;
   const f = fixture();
   const seeded = new DatabaseSync(f.file("actual.db"));
   seeded.exec(`CREATE TABLE payload (id INTEGER PRIMARY KEY, text_value TEXT, blob_value BLOB);
-    INSERT INTO payload VALUES (1, 'before' || char(0) || printf('%.*c', 49153, 'z'), zeroblob(49153));`);
+    INSERT INTO payload VALUES (1, 'before' || char(0) || printf('%.*c', ${payloadBytes}, 'z'), zeroblob(${payloadBytes}));`);
   seeded.close();
   copyFileSync(f.file("actual.db"), f.file("expected.db"));
   const actual = await f.storage.open("actual.db");
   const expected = await f.storage.open("expected.db");
   const nativeRead = actual.getFirstAsync.bind(actual);
   let chunks = 0;
+  let largestRequestedChunk = 0;
   actual.getFirstAsync = async <Row,>(sql: string, ...params: (string | number | null)[]) => {
     const result = await nativeRead<Row>(sql, ...params);
-    if (sql.startsWith("SELECT hex(")) {
+    if (sql.startsWith("SELECT hex(moodinator_blob_read(")) {
       chunks++;
-      expect(JSON.stringify(result).length).toBeLessThan(33000);
+      largestRequestedChunk = Math.max(largestRequestedChunk, Number(params[4]));
+      expect(JSON.stringify(result).length).toBeLessThan(chunkBytes * 2 + 32);
     }
     return result;
   };
   try {
     await requireMatchingDatabases(actual, expected);
-    expect(chunks).toBeGreaterThan(6);
-    await actual.execAsync("UPDATE payload SET blob_value = CAST(substr(blob_value, 1, 49152) || x'01' AS BLOB);");
+    expect(chunks).toBe(4);
+    expect(largestRequestedChunk).toBe(chunkBytes);
+    await actual.execAsync(`UPDATE payload SET blob_value = CAST(substr(blob_value, 1, ${payloadBytes - 1}) || x'01' AS BLOB);`);
     await expect(requireMatchingDatabases(actual, expected)).rejects.toThrow("preserve all stored data");
   } finally { await actual.closeAsync(); await expected.closeAsync(); }
 });

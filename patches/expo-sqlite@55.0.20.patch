@@ -5,7 +5,7 @@ diff --git a/vendor/sqlite3/sqlite3.c b/vendor/sqlite3/sqlite3.c
  */
 +/* Private Moodinator verification primitive. Read-only, direct SQL only.
 +** Incremental BLOB reads avoid materializing a complete TEXT/BLOB value.
-+** Three arguments return byte length; five return at most 16 KiB of bytes.
++** Three arguments return byte length; five return at most 256 KiB of bytes.
 +*/
 +static void moodinatorBlobReadFunc(
 +  exsqlite3_context *context,
@@ -39,7 +39,7 @@ diff --git a/vendor/sqlite3/sqlite3.c b/vendor/sqlite3/sqlite3.c
 +    length = exsqlite3_value_int64(argv[4]);
 +    if( exsqlite3_value_type(argv[3])!=SQLITE_INTEGER
 +     || exsqlite3_value_type(argv[4])!=SQLITE_INTEGER
-+     || offset<0 || length<0 || length>16384
++     || offset<0 || length<0 || length>262144
 +    ){
 +      exsqlite3_result_error(context, "Invalid incremental verification range", -1);
 +      return;
@@ -91,7 +91,7 @@ diff --git a/vendor/sqlcipher/sqlite3.c b/vendor/sqlcipher/sqlite3.c
  */
 +/* Private Moodinator verification primitive. Read-only, direct SQL only.
 +** Incremental BLOB reads avoid materializing a complete TEXT/BLOB value.
-+** Three arguments return byte length; five return at most 16 KiB of bytes.
++** Three arguments return byte length; five return at most 256 KiB of bytes.
 +*/
 +static void moodinatorBlobReadFunc(
 +  exsqlite3_context *context,
@@ -125,7 +125,7 @@ diff --git a/vendor/sqlcipher/sqlite3.c b/vendor/sqlcipher/sqlite3.c
 +    length = exsqlite3_value_int64(argv[4]);
 +    if( exsqlite3_value_type(argv[3])!=SQLITE_INTEGER
 +     || exsqlite3_value_type(argv[4])!=SQLITE_INTEGER
-+     || offset<0 || length<0 || length>16384
++     || offset<0 || length<0 || length>262144
 +    ){
 +      exsqlite3_result_error(context, "Invalid incremental verification range", -1);
 +      return;
