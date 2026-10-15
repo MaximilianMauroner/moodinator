@@ -52,6 +52,7 @@ const {
   waitForRestorationEvidence,
 } = require("../scripts/native-qa-runner.js");
 const {
+  dumpUiHierarchy,
   findNodes,
   findNodeByContentDescription,
   findNodeByTestId,
@@ -128,6 +129,87 @@ const hierarchy = `
       content-desc="Actions for Neutral entry" enabled="true" visible-to-user="true"
       bounds="[100,200][200,300]" />
   </hierarchy>`;
+
+test("reads the Android hierarchy from a device-local dump file", () => {
+  const directory = mkdtempSync(join(tmpdir(), "moodinator-fake-adb-"));
+  const adb = join(directory, "adb.mjs");
+  const calls = join(directory, "calls.jsonl");
+  writeFileSync(adb, `#!/usr/bin/env node
+import { appendFileSync } from "node:fs";
+const args = process.argv.slice(2);
+const path = args.at(-1);
+appendFileSync(${JSON.stringify(calls)}, JSON.stringify(args) + "\\n");
+if (args.includes("uiautomator") && /^\\/data\\/local\\/tmp\\/moodinator-ui-hierarchy-[0-9a-f-]{36}\\.xml$/.test(path)) process.exit(0);
+if (args.includes("cat")) {
+  process.stdout.write(${JSON.stringify(hierarchy)});
+  process.exit(0);
+}
+if (args.includes("rm")) process.exit(0);
+process.exit(1);
+`);
+  chmodSync(adb, 0o755);
+
+  try {
+    assert.equal(parseUiHierarchy(dumpUiHierarchy("emulator-5554", {
+      adbPath: adb,
+      timeoutMs: 1000,
+    })).length, 4);
+    const [dump, read, cleanup] = readFileSync(calls, "utf8").trim().split("\n").map(JSON.parse);
+    assert.equal(dump.at(-1), read.at(-1));
+    assert.equal(read.at(-1), cleanup.at(-1));
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("a dump that creates no fresh hierarchy fails closed", () => {
+  const directory = mkdtempSync(join(tmpdir(), "moodinator-empty-dump-adb-"));
+  const adb = join(directory, "adb.mjs");
+  writeFileSync(adb, `#!/usr/bin/env node
+const args = process.argv.slice(2);
+if (args.includes("uiautomator") || args.includes("rm")) process.exit(0);
+process.exit(1);
+`);
+  chmodSync(adb, 0o755);
+
+  try {
+    assert.throws(() => dumpUiHierarchy("emulator-5554", {
+      adbPath: adb,
+      timeoutMs: 1000,
+    }), /exec-out cat/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("dump and read share one hierarchy timeout budget", () => {
+  const directory = mkdtempSync(join(tmpdir(), "moodinator-slow-dump-adb-"));
+  const adb = join(directory, "adb.mjs");
+  const calls = join(directory, "calls.jsonl");
+  writeFileSync(adb, `#!/usr/bin/env node
+import { appendFileSync } from "node:fs";
+const args = process.argv.slice(2);
+appendFileSync(${JSON.stringify(calls)}, JSON.stringify(args) + "\\n");
+if (args.includes("rm")) process.exit(0);
+await new Promise((resolve) => setTimeout(resolve, 300));
+if (args.includes("cat")) process.stdout.write(${JSON.stringify(hierarchy)});
+`);
+  chmodSync(adb, 0o755);
+
+  try {
+    assert.throws(() => dumpUiHierarchy("emulator-5554", {
+      adbPath: adb,
+      timeoutMs: 500,
+    }), /ETIMEDOUT/);
+    const inspections = readFileSync(calls, "utf8").trim().split("\n").map(JSON.parse)
+      .filter((args) => !args.includes("rm"));
+    assert.equal(inspections.length, 2);
+    assert.ok(inspections[0].includes("uiautomator"));
+    assert.ok(inspections[1].includes("cat"));
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
 
 const timezoneHierarchy = `
   <hierarchy rotation="0">

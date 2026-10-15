@@ -366,11 +366,12 @@ The Undo probe begins only after the final Maestro flow has completed at the
 open action menu. The runner captures an exact timestamp-based row/note/rating
 identity, clears any prior Undo control, taps Delete from the inspected bounds,
 waits for exact identity absence, and only then polls the five-second transient
-control. It uses `adb shell uiautomator dump --compressed /dev/tty`, matches
-stable resource IDs (with the existing accessibility label as a fallback), and
-derives every tap point from current bounds. Disabled/invisible controls,
-hierarchy failure, or a late control fail the evidence; no production toast
-duration is changed.
+control. It writes each `uiautomator dump --compressed` result to a unique
+device-local file and reads that file with `adb exec-out`, matches stable
+resource IDs (with the existing accessibility label as a fallback), and derives
+every tap point from current bounds. Disabled/invisible controls, hierarchy
+failure, or a late control fail the evidence; no production toast duration is
+changed.
 
 The Calendar legend is an accessible group with its complete label. QA-only
 exact-field markers have nonzero bounds, explicit labels and preserved native
