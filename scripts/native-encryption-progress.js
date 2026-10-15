@@ -19,4 +19,8 @@ function createRecoveryProgressTracker(caseName) {
   };
 }
 
-module.exports = { createRecoveryProgressTracker };
+function recoveryDeadlineRemaining(now, hardDeadline, stallDeadline) {
+  return Math.max(0, Math.min(hardDeadline, stallDeadline) - now);
+}
+
+module.exports = { createRecoveryProgressTracker, recoveryDeadlineRemaining };

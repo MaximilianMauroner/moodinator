@@ -113,7 +113,7 @@ const {
 const {
   prepareEvidenceDirectory: prepareSmokeEvidenceDirectory,
 } = require("../scripts/run-native-smoke.js");
-const { createRecoveryProgressTracker } = require("../scripts/native-encryption-progress.js");
+const { createRecoveryProgressTracker, recoveryDeadlineRemaining } = require("../scripts/native-encryption-progress.js");
 
 const hierarchy = `
   <hierarchy rotation="0">
@@ -147,6 +147,14 @@ test("native export recovery progress is monotonic and bounded to known phases",
     () => createRecoveryProgressTracker("native-export-interruption-many-rows").observe("running:other"),
     /Unexpected native recovery progress/,
   );
+});
+
+test("native export recovery deadlines reject a read that finishes at or after either boundary", () => {
+  assert.equal(recoveryDeadlineRemaining(59_999, 180_000, 60_000), 1);
+  assert.equal(recoveryDeadlineRemaining(60_000, 180_000, 60_000), 0);
+  assert.equal(recoveryDeadlineRemaining(62_000, 180_000, 60_000), 0);
+  assert.equal(recoveryDeadlineRemaining(179_999, 180_000, 240_000), 1);
+  assert.equal(recoveryDeadlineRemaining(180_000, 180_000, 240_000), 0);
 });
 
 test("reads the Android hierarchy from a device-local dump file", () => {

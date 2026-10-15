@@ -10,7 +10,7 @@ const { STARTUP_PHASES } = startup;
 
 const require = createRequire(import.meta.url);
 const { requirePreparedSourceSha, packageIsDebuggable } = require("./native-qa-common.js");
-const { createRecoveryProgressTracker } = require("./native-encryption-progress.js");
+const { createRecoveryProgressTracker, recoveryDeadlineRemaining } = require("./native-encryption-progress.js");
 const { waitForNode } = require("./native-ui.js");
 const QA_ID = "com.lab4code.moodinator.qa";
 const options = Object.fromEntries(process.argv.slice(2).map((argument) => {
@@ -79,8 +79,10 @@ async function result(params: Record<string, string>) {
     const hardDeadline = Date.now() + 180000;
     let stallDeadline = Date.now() + 60000;
     let complete = false;
-    while (Date.now() <= hardDeadline && Date.now() <= stallDeadline) {
-      const status = readProofStatus(runId);
+    while (recoveryDeadlineRemaining(Date.now(), hardDeadline, stallDeadline) > 0) {
+      const remaining = recoveryDeadlineRemaining(Date.now(), hardDeadline, stallDeadline);
+      const status = readProofStatus(runId, Math.min(3000, remaining));
+      if (recoveryDeadlineRemaining(Date.now(), hardDeadline, stallDeadline) === 0) break;
       if (status) {
         const observation = tracker.observe(status.progress);
         if (observation.changed) stallDeadline = Date.now() + 60000;
@@ -110,10 +112,10 @@ function commandErrorText(error: unknown) {
   const output = "stderr" in error ? String(error.stderr) : "";
   return `${error.message}\n${output}`;
 }
-function readProofStatus(runId: string): ProofStatus | null {
+function readProofStatus(runId: string, timeoutMs = 3000): ProofStatus | null {
   const statusFile = path.posix.join(appDataDirectory, "files/encryption-proof-status.json");
   try {
-    const status = JSON.parse(runAdb(["exec-out", "cat", statusFile], 3000)) as ProofStatus;
+    const status = JSON.parse(runAdb(["exec-out", "cat", statusFile], timeoutMs)) as ProofStatus;
     if (status.runId !== runId) return null;
     assert.equal(status.sourceSha, sourceSha, "Installed app does not match prepared source");
     assert.notEqual(status.progress, "failed", JSON.stringify(status));
