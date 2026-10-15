@@ -189,7 +189,7 @@ try {
   const packageDump = runAdb(["shell", "dumpsys", "package", QA_ID]);
   assert.equal(packageIsDebuggable(packageDump), false, "Native acceptance needs a non-debuggable QA release");
   appDataDirectory = packageDump.match(/\bdataDir=(\/\S+)/)?.[1] ?? "";
-  appUid = packageDump.match(/\buserId=(\d+)/)?.[1] ?? "";
+  appUid = packageDump.match(/\b(?:appId|userId)=(\d+)/)?.[1] ?? "";
   assert.equal(appDataDirectory, `/data/user/0/${QA_ID}`, "Unexpected owned QA data directory");
   assert.match(appUid, /^\d+$/, "Installed QA package UID is missing");
   assert.equal(runAdb(["shell", "pm", "clear", QA_ID]).trim(), "Success");
