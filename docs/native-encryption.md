@@ -153,8 +153,8 @@ iOS/Keychain evidence. Android ARM64 host support is a separate tooling change.
    independent native lock exclusion,
    abrupt Android process stops at all ten phases, repeated recovery, an actual
    failed SecureStore durability commit with two cold recoveries, and actual
-   `getDb` first-open/shared-handle initialization. JSON reports contain results,
-   not mood contents or keys. Each crash case uses its own fixture namespace.
+   first-open initialization and shared-connection handle identity. JSON reports
+   contain results, not mood contents or keys. Each crash case uses its own fixture namespace.
    The ten callbacks test phase boundaries. Do not report an interruption inside
    native export or native disk-full handling as proved by that boundary matrix;
    each needs a focused actual native failure case and retained/reopened data.

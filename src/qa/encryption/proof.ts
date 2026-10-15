@@ -414,7 +414,6 @@ export async function prepareAppUpgrade() {
 
 export async function verifyAppUpgrade() {
   requireQaPackage();
-  // Exercise the actual shared openDatabase startup path and actual app initializer.
   const [first, second] = await Promise.all([openDatabase(), openDatabase()]);
   check(first === second, "App startup published different handles to concurrent callers");
   check((await first.getFirstAsync<{ foreign_keys: number }>("PRAGMA foreign_keys;"))?.foreign_keys === 1, "Actual app handle has foreign keys disabled");

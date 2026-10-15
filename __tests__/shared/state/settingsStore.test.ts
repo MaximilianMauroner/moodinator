@@ -33,8 +33,6 @@ const dbEntryPoints = vi.hoisted(() => ({
 
 vi.mock("@db/client", () => dbEntryPoints);
 
-// A settings list edit is future-only. Rewriting stored mood snapshots, or
-// even reaching the database, would change what history already recorded.
 async function expectMoodSnapshotsUntouched(edit: () => Promise<void>) {
   moodDb.__reset();
   moodDb.__addMood({

@@ -80,7 +80,8 @@ unknown/missing state and native lock exclusion. Separate cold actions test
 committed WAL recovery and actual SIGKILL at all ten phase boundaries, followed
 by two exact reopen checks. The driver resolves the QA process inside its own
 simulator and verifies its executable path before signalling it. It also seeds
-the actual app database and exercises shared `getDb()` first-open startup twice.
+the actual app database and exercises actual first-open initialization twice,
+with a check for shared-connection handle identity.
 
 The runner also caps the attached destination's page count and requires a real
 SQLCipher `SQLITE_FULL` during export. It checks byte-identical original retention,

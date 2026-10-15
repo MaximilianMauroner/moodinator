@@ -10,8 +10,6 @@ import ts from "typescript";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const eslint = new ESLint({ cwd: root });
 
-// db/moods/emotions.ts at 4330f30, the parent of the #59 fix. Its addEmotion
-// wrote through the shared connection outside the write queue.
 const pre59Emotions = readFileSync(path.join(root, "tests/fixtures/pre-59-emotions.ts.txt"), "utf8");
 const pre59AddEmotion = pre59Emotions.match(/export async function addEmotion\(emotion: Emotion\): Promise<void> \{.*?\n\}/s)?.[0];
 
