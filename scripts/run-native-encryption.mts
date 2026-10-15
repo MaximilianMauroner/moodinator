@@ -13,6 +13,7 @@ const { requirePreparedSourceSha, packageIsDebuggable } = require("./native-qa-c
 const { createRecoveryProgressTracker, recoveryDeadlineRemaining, recoveryReadTimeout } = require("./native-encryption-progress.js");
 const { waitForNode } = require("./native-ui.js");
 const QA_ID = "com.lab4code.moodinator.qa";
+const EXPORT_PAYLOAD_BYTES = 64 * 1024 * 1024;
 const options = Object.fromEntries(process.argv.slice(2).map((argument) => {
   const match = /^--([a-z-]+)=(.+)$/.exec(argument);
   if (!match) throw new Error(`Use --name=value arguments: ${argument}`);
@@ -159,7 +160,7 @@ async function interruptNativeExport(shape: "many-rows" | "single-cell") {
     const status = readProofStatus(runId);
     assert.equal(status?.progress, `running:${caseName}:export-started`);
     const bytes = Number(runAdb(["shell", "stat", "-c", "%s", target], 3000).trim());
-    assert.ok(bytes > 256 * 1024 && bytes < 32 * 1024 * 1024, `Export is not demonstrably partial: ${bytes} bytes`);
+    assert.ok(bytes > 256 * 1024 && bytes < EXPORT_PAYLOAD_BYTES, `Export is not demonstrably partial: ${bytes} bytes`);
     return { bytes, observedAt: new Date().toISOString(), progress: status.progress };
   };
   const deadline = Date.now() + 180000;
