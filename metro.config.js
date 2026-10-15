@@ -14,8 +14,11 @@ if (process.env.MOODINATOR_METRO_MAX_WORKERS !== undefined) {
 
 const isIosQaConfig =
   process.env.EAS_BUILD_PLATFORM === "ios" || process.env.EXPO_OS === "ios";
-if (process.env.MOODINATOR_VARIANT === "qa" && !isIosQaConfig) {
-  require("./scripts/qa-source-provenance").readPreparedSourceSha(__dirname, process.env);
+if (process.env.MOODINATOR_VARIANT === "qa"
+  && (!isIosQaConfig || process.env.MOODINATOR_QA_ENCRYPTION_PROOF === "1")) {
+  require("./scripts/qa-source-provenance").readPreparedSourceSha(
+    __dirname, process.env, isIosQaConfig ? "ios" : "android",
+  );
 }
 
 config.resolver.assetExts = Array.from(
