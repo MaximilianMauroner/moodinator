@@ -325,12 +325,63 @@ test("derives the tap point from the inspected bounds", () => {
   assert.equal(nodeCenter({ bounds: "[0,0][0,10]" }), null);
 });
 
+test("native selectors keep their distinct empty and falsey value rules", () => {
+  for (const value of [undefined, null, false, 0, ""]) {
+    assert.equal(nodeMatches({}, { testId: value }), false);
+    assert.equal(nodeMatches({}, { testIdPrefix: value }), false);
+    assert.equal(nodeMatches({ text: "Undo" }, { testId: value, text: "Undo" }), true);
+  }
+  assert.equal(nodeMatches({}, { text: "" }), true);
+  assert.equal(nodeMatches({}, { contentDescription: "" }), true);
+  assert.equal(nodeMatches({}, { className: undefined }), false);
+  assert.equal(nodeMatches({ class: "" }, { className: "" }), true);
+  assert.equal(nodeMatches({}, { contains: true }), false);
+  assert.equal(nodeMatches({}, { unknown: "Undo" }), false);
+});
+
+test("native text comparisons apply contains only when requested", () => {
+  const node = { text: "QA & synthetic", "content-desc": "Actions for Neutral entry" };
+  assert.equal(nodeMatches(node, { text: "synthetic" }), false);
+  assert.equal(nodeMatches(node, { text: "synthetic", contains: true }), true);
+  assert.equal(nodeMatches(node, { contentDescription: "Neutral" }), false);
+  assert.equal(nodeMatches(node, { contentDescription: "Neutral", contains: true }), true);
+  assert.equal(nodeMatches(node, { text: "synthetic", contentDescription: "missing", contains: true }), false);
+});
+
+test("native resource IDs normalize the node prefix and keep exact matcher values", () => {
+  for (const resourceId of ["undo-delete", "app:id/undo-delete", "outer:id/app:id/undo-delete"]) {
+    const node = { "resource-id": resourceId };
+    assert.equal(nodeMatches(node, { testId: "undo-delete" }), true);
+    assert.equal(nodeMatches(node, { testIdPrefix: "undo-" }), true);
+    assert.equal(nodeMatches(node, { testId: "app:id/undo-delete" }), false);
+  }
+});
+
+test("native composition preserves precedence and function matcher results", () => {
+  const node = { text: "Undo", enabled: "false", "visible-to-user": "false" };
+  assert.equal(nodeMatches(node, (value) => value.text), "Undo");
+  assert.equal(nodeMatches(node, { text: "Undo" }), false);
+  assert.equal(nodeMatches(node, { text: "Undo" }, { visibleOnly: false }), true);
+  assert.equal(nodeMatches(node, { anyOf: [() => true] }), false);
+  assert.equal(nodeMatches(node, { allOf: [] }), false);
+  const visible = { text: "Undo" };
+  assert.equal(nodeMatches(visible, { allOf: [] }), true);
+  assert.equal(nodeMatches(visible, { anyOf: [], allOf: [], text: "Undo" }), false);
+  assert.equal(nodeMatches(visible, { anyOf: [{ text: "Undo" }], text: "missing" }), true);
+  assert.equal(nodeMatches(visible, { allOf: [{ text: "Undo" }], text: "missing" }), true);
+  assert.equal(nodeMatches(visible, { allOf: [{ text: "Undo" }, { text: "missing" }] }), false);
+});
+
 test("native switch checks cannot infer checked state from selected", () => {
   const node = { class: "android.widget.Switch", checkable: "true", checked: "true", selected: "false" };
   assert.equal(nodeMatches(node, { className: "android.widget.Switch", checked: true }), true);
   assert.equal(nodeMatches(node, { checked: false }), false);
   assert.equal(nodeMatches({ ...node, checked: undefined }, { checked: false }), false);
   assert.equal(nodeMatches({ ...node, checkable: "false" }, { checked: true }), false);
+  assert.equal(nodeMatches({ ...node, checked: undefined }, { checked: true }), false);
+  assert.equal(nodeMatches({ ...node, checkable: undefined }, { checked: true }), false);
+  assert.equal(nodeMatches({ ...node, checked: "false", selected: "true" }, { checked: false }), true);
+  assert.equal(nodeMatches(node, { checked: "true" }), true);
 });
 
 test("a typed preset name cannot satisfy the saved-list oracle", () => {
