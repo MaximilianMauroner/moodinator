@@ -16,19 +16,36 @@ const pre59AddEmotion = pre59Emotions.match(/export async function addEmotion\(e
 const RAW = "The raw connection is private. Use readDb for queries or runInTransaction for writes.";
 const SQLITE = "Only db/encryption/native.ts may import Expo SQLite at runtime. Use readDb for queries or runInTransaction for writes.";
 
-async function boundaryMessages(file, code) {
-  const [result] = await eslint.lintText(code, { filePath: path.join(root, file) });
-  assert.deepEqual(result.messages.filter((message) => message.fatal), [], `${file} parses`);
+async function boundaryMessages(file, code, linter = eslint) {
+  const filePath = path.join(root, file);
+  assert.equal(await linter.isPathIgnored(filePath), false, `${file} must not be ignored or unconfigured`);
+  const config = await linter.calculateConfigForFile(filePath);
+  assert.ok(config, `${file} must have an effective ESLint config`);
+  assert.equal(config.rules?.["moodinator/db-boundaries"]?.[0], 2, `${file} must enable the boundary rule at error`);
+  const results = await linter.lintText(code, { filePath });
+  assert.equal(results.length, 1, `${file} must have one lint result`);
+  const [result] = results;
+  assert.deepEqual(
+    result.messages.filter((message) => message.fatal || message.ruleId == null),
+    [],
+    `${file} must have no lint setup or fatal diagnostics`,
+  );
   return result.messages
     .filter((message) => message.ruleId === "moodinator/db-boundaries")
     .map((message) => message.message);
 }
 
-function typeErrors(sources) {
+function typeErrors(sources, configSystem = ts.sys) {
   const parsed = ts.getParsedCommandLineOfConfigFile(path.join(root, "tsconfig.json"), { noEmit: true }, {
-    ...ts.sys,
-    onUnRecoverableConfigFileDiagnostic: (diagnostic) => assert.fail(ts.flattenDiagnosticMessageText(diagnostic.messageText, " ")),
+    ...configSystem,
+    onUnRecoverableConfigFileDiagnostic: (diagnostic) => assert.fail(`TypeScript config setup failed: ${ts.flattenDiagnosticMessageText(diagnostic.messageText, " ")}`),
   });
+  assert.ok(parsed, "TypeScript config setup failed: no parsed config");
+  assert.deepEqual(
+    parsed.errors.map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, " ")),
+    [],
+    "TypeScript config setup failed",
+  );
   const virtual = new Map(Object.entries(sources).map(([file, source]) => [path.join(root, file), source]));
   const host = ts.createCompilerHost(parsed.options);
   const { fileExists, getSourceFile } = host;
@@ -38,16 +55,57 @@ function typeErrors(sources) {
     : getSourceFile.call(host, name, languageVersion, ...rest);
   const ambient = parsed.fileNames.filter((file) => file.endsWith(".d.ts"));
   const program = ts.createProgram({ rootNames: [...virtual.keys(), ...ambient], options: parsed.options, host });
+  assert.deepEqual(
+    program.getOptionsDiagnostics().map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, " ")),
+    [],
+    "TypeScript option setup failed",
+  );
+  assert.deepEqual(
+    program.getGlobalDiagnostics().map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, " ")),
+    [],
+    "TypeScript global setup failed",
+  );
   return Object.fromEntries([...virtual.keys()].map((file) => {
     const sourceFile = program.getSourceFile(file);
+    assert.ok(sourceFile, `TypeScript source setup failed: ${file} is missing`);
     const diagnostics = [...program.getSyntacticDiagnostics(sourceFile), ...program.getSemanticDiagnostics(sourceFile)];
-    return [path.relative(root, file), diagnostics.map((diagnostic) => ({
-      line: sourceFile.getLineAndCharacterOfPosition(diagnostic.start).line + 1,
-      code: diagnostic.code,
-      message: ts.flattenDiagnosticMessageText(diagnostic.messageText, " "),
-    }))];
+    return [path.relative(root, file), diagnostics.map((diagnostic) => {
+      assert.equal(diagnostic.file, sourceFile, `${file} must own its diagnostic`);
+      assert.ok(Number.isInteger(diagnostic.start), `${file} diagnostic must have a source position`);
+      return {
+        line: sourceFile.getLineAndCharacterOfPosition(diagnostic.start).line + 1,
+        code: diagnostic.code,
+        message: ts.flattenDiagnosticMessageText(diagnostic.messageText, " "),
+      };
+    })];
   }));
 }
+
+for (const [name, options, expected] of [
+  ["ignored", { overrideConfig: { ignores: ["db/moods/probe.ts"] } }, /must not be ignored or unconfigured/],
+  ["unconfigured", { overrideConfigFile: true }, /must not be ignored or unconfigured/],
+  ["missing rule", { overrideConfigFile: true, overrideConfig: { files: ["**/*.ts"] } }, /must enable the boundary rule at error/],
+  ["disabled rule", { overrideConfig: { rules: { "moodinator/db-boundaries": "off" } } }, /must enable the boundary rule at error/],
+  ["warning rule", { overrideConfig: { rules: { "moodinator/db-boundaries": "warn" } } }, /must enable the boundary rule at error/],
+]) {
+  test(`allowed lint probes reject ${name} setup`, async () => {
+    const linter = new ESLint({ cwd: root, ...options });
+    await assert.rejects(boundaryMessages("db/moods/probe.ts", 'import { readDb } from "../client";', linter), expected);
+  });
+}
+
+test("positive type probes reject a recoverable config error", () => {
+  const configFile = path.join(root, "tsconfig.json");
+  assert.throws(() => typeErrors({ "db/moods/probe.ts": "export const allowed = true;" }, {
+    ...ts.sys,
+    readFile(file) {
+      const source = ts.sys.readFile(file);
+      if (path.resolve(file) !== configFile) return source;
+      const config = JSON.parse(source);
+      return JSON.stringify({ ...config, compilerOptions: { ...config.compilerOptions, p2InvalidOption: true } });
+    },
+  }), /TypeScript config setup failed[\s\S]*Unknown compiler option 'p2InvalidOption'/);
+});
 
 test("the fixture is the unchanged pre-#59 emotions module", () => {
   assert.equal(
@@ -104,13 +162,14 @@ for (const [name, file, code] of [
   });
 }
 
-test("types reject every unqueued write in the actual pre-#59 module on the read handle", () => {
+test("types reject the unchanged pre-#59 addEmotion on readDb and allow its writes on WriteTx", () => {
   const errors = typeErrors({
     "db/moods/emotions.ts": readFileSync(path.join(root, "db/moods/emotions.ts"), "utf8"),
-    "db/moods/pre59Emotions.ts": pre59Emotions.replace(
-      'import { getDb } from "../client";',
+    "db/moods/pre59AddEmotion.ts": [
       'import { readDb as getDb } from "../client";',
-    ),
+      'import type { Emotion } from "../types";',
+      pre59AddEmotion,
+    ].join("\n"),
     "db/moods/pre59AddEmotionQueued.ts": [
       'import type { WriteTx } from "../writeQueue";',
       'import type { Emotion } from "../types";',
@@ -120,18 +179,11 @@ test("types reject every unqueued write in the actual pre-#59 module on the read
     ].join("\n"),
   });
 
-  assert.deepEqual(errors["db/moods/emotions.ts"], [], "current module compiles");
-  assert.deepEqual(errors["db/moods/pre59AddEmotionQueued.ts"], [], "old addEmotion statements compile on a queued WriteTx");
-
-  const missingWrites = errors["db/moods/pre59Emotions.ts"].filter((error) => error.code === 2339);
-  assert.deepEqual(
-    missingWrites.map((error) => error.line),
-    [12, 23, 47, 74, 84, 98, 106, 257],
-    JSON.stringify(errors["db/moods/pre59Emotions.ts"], null, 2),
-  );
-  assert.deepEqual(
-    missingWrites.find((error) => error.line === 47),
-    { line: 47, code: 2339, message: "Property 'runAsync' does not exist on type 'QueryConnection'." },
-    "old addEmotion cannot write through readDb",
-  );
+  assert.deepEqual(errors, {
+    "db/moods/emotions.ts": [],
+    "db/moods/pre59AddEmotion.ts": [
+      { line: 5, code: 2339, message: "Property 'runAsync' does not exist on type 'QueryConnection'." },
+    ],
+    "db/moods/pre59AddEmotionQueued.ts": [],
+  });
 });
