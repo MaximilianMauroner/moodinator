@@ -81,6 +81,25 @@ function normalizeResourceId(resourceId) {
   return markerIndex >= 0 ? resourceId.slice(markerIndex + marker.length) : resourceId;
 }
 
+const NATIVE_MATCHERS = Object.values({
+  testId: (node, matcher) => matcher.testId
+    ? normalizeResourceId(node["resource-id"]) === matcher.testId : undefined,
+  testIdPrefix: (node, matcher) => matcher.testIdPrefix
+    ? normalizeResourceId(node["resource-id"]).startsWith(matcher.testIdPrefix) : undefined,
+  className: (node, matcher) => matcher.className !== undefined
+    ? node.class === matcher.className : undefined,
+  checked: (node, matcher) => matcher.checked !== undefined
+    ? node.checkable === "true" && node.checked === String(matcher.checked) : undefined,
+  text: (node, matcher) => matcher.text !== undefined
+    ? matcher.contains ? (node.text ?? "").includes(matcher.text) : (node.text ?? "") === matcher.text
+    : undefined,
+  contentDescription: (node, matcher) => matcher.contentDescription !== undefined
+    ? matcher.contains
+      ? (node["content-desc"] ?? "").includes(matcher.contentDescription)
+      : (node["content-desc"] ?? "") === matcher.contentDescription
+    : undefined,
+});
+
 function nodeMatches(node, matcher, { visibleOnly = true } = {}) {
   if (typeof matcher === "function") return matcher(node);
   if (!matcher || typeof matcher !== "object") return false;
@@ -88,26 +107,11 @@ function nodeMatches(node, matcher, { visibleOnly = true } = {}) {
   if (matcher.anyOf) return matcher.anyOf.some((alternative) => nodeMatches(node, alternative, { visibleOnly }));
   if (matcher.allOf) return matcher.allOf.every((alternative) => nodeMatches(node, alternative, { visibleOnly }));
 
-  const testId = normalizeResourceId(node["resource-id"]);
-  const text = node.text ?? "";
-  const contentDescription = node["content-desc"] ?? "";
-  const hasSelector = Boolean(
-    matcher.testId || matcher.testIdPrefix || matcher.text !== undefined ||
-    matcher.contentDescription !== undefined || matcher.className !== undefined || matcher.checked !== undefined,
-  );
-
-  if (matcher.testId && testId !== matcher.testId) return false;
-  if (matcher.testIdPrefix && !testId.startsWith(matcher.testIdPrefix)) return false;
-  if (matcher.className !== undefined && node.class !== matcher.className) return false;
-  if (matcher.checked !== undefined &&
-      (node.checkable !== "true" || node.checked !== String(matcher.checked))) return false;
-  if (matcher.text !== undefined) {
-    if (matcher.contains ? !text.includes(matcher.text) : text !== matcher.text) return false;
-  }
-  if (matcher.contentDescription !== undefined) {
-    if (matcher.contains
-      ? !contentDescription.includes(matcher.contentDescription)
-      : contentDescription !== matcher.contentDescription) return false;
+  let hasSelector = false;
+  for (const compare of NATIVE_MATCHERS) {
+    const result = compare(node, matcher);
+    if (result === false) return false;
+    if (result !== undefined) hasSelector = true;
   }
 
   return hasSelector;
