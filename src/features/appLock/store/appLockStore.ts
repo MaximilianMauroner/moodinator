@@ -8,6 +8,7 @@ import {
 } from "@/shared/storage/keys";
 import { getStringStrict, setBoolean, setString } from "@/shared/storage/asyncStorage";
 import { setDurableItemAsync } from "@/shared/storage/durableSecureStore";
+import { applyAppLockCaptureProtection } from "../services/captureProtection";
 
 const PIN_HASH_KEY = "appLockPinHash";
 const PIN_FAILED_ATTEMPTS_KEY = "appLockFailedAttempts";
@@ -204,10 +205,22 @@ async function restorePinHash(storedHash: string | null): Promise<void> {
 }
 
 let pinAttemptInFlight = false;
+let lockEpoch = 0;
+let captureUpdate: Promise<void> = Promise.resolve();
+
+// Keep native capture and the persisted preference in order during overlapping
+// hydration or setting changes. A failed operation does not block a later retry.
+function serializeCaptureUpdate(operation: () => Promise<void>): Promise<void> {
+  const result = captureUpdate.then(operation);
+  captureUpdate = result.catch(() => undefined);
+  return result;
+}
 
 export type AppLockStore = {
   hydrated: boolean;
   hydrationError: string | null;
+  captureReady: boolean;
+  captureError: string | null;
   isEnabled: boolean;
   biometricsEnabled: boolean;
   pinLength: PinLength;
@@ -228,9 +241,20 @@ export type AppLockStore = {
   resetFailedAttempts: () => Promise<void>;
 };
 
+async function applyCapture(enabled: boolean): Promise<void> {
+  try {
+    await applyAppLockCaptureProtection(enabled);
+  } catch (error) {
+    useAppLockStore.setState({ captureReady: false, captureError: "Capture protection could not be applied." });
+    throw error;
+  }
+}
+
 export const useAppLockStore = create<AppLockStore>((set, get) => ({
   hydrated: false,
   hydrationError: null,
+  captureReady: false,
+  captureError: null,
   isEnabled: false,
   biometricsEnabled: false,
   pinLength: 4,
@@ -239,8 +263,8 @@ export const useAppLockStore = create<AppLockStore>((set, get) => ({
   lockoutUntil: null,
   hasPinSet: false,
 
-  hydrate: async () => {
-    set({ hydrated: false, hydrationError: null });
+  hydrate: () => serializeCaptureUpdate(async () => {
+    set({ hydrated: false, hydrationError: null, captureReady: false, captureError: null });
     try {
       const [
         enabledValue,
@@ -286,9 +310,12 @@ export const useAppLockStore = create<AppLockStore>((set, get) => ({
       const parsedLockoutUntil = attemptState.lockoutUntil ?? 0;
       const lockoutUntil = parsedLockoutUntil > Date.now() ? parsedLockoutUntil : null;
 
+      await applyCapture(enabledPreference);
       set({
         hydrated: true,
         hydrationError: null,
+        captureReady: true,
+        captureError: null,
         isEnabled: enabledPreference,
         biometricsEnabled,
         pinLength,
@@ -311,32 +338,42 @@ export const useAppLockStore = create<AppLockStore>((set, get) => ({
         hasPinSet: true,
       });
     }
-  },
+  }),
 
-  setEnabled: async (enabled) => {
+  setEnabled: (enabled) => serializeCaptureUpdate(async () => {
     const previous = get();
+    const epochBeforeChange = lockEpoch;
     if (enabled && !previous.hasPinSet) {
       throw new Error("Set a PIN before enabling app lock.");
     }
+    set({ captureReady: false, captureError: null });
     try {
+      if (enabled) await applyCapture(true);
       await setBoolean(APP_LOCK_ENABLED_KEY, enabled);
       if (!enabled) {
         await persistAttemptState(0, null, previous);
+        await applyCapture(false);
       }
     } catch (error) {
       await Promise.allSettled([
         setBoolean(APP_LOCK_ENABLED_KEY, previous.isEnabled),
         writeAttemptState(previous.failedAttempts, previous.lockoutUntil),
       ]);
+      set({
+        captureReady: false,
+        captureError: get().captureError ?? "App Lock settings could not be updated.",
+      });
       throw error;
     }
     set({
       isEnabled: enabled,
-      isLocked: enabled ? previous.isLocked : false,
+      isLocked: enabled ? get().isLocked || lockEpoch !== epochBeforeChange : false,
       failedAttempts: enabled ? previous.failedAttempts : 0,
       lockoutUntil: enabled ? previous.lockoutUntil : null,
+      captureReady: true,
+      captureError: null,
     });
-  },
+  }),
 
   setBiometricsEnabled: async (enabled) => {
     await setBoolean(APP_LOCK_BIOMETRICS_KEY, enabled);
@@ -438,25 +475,37 @@ export const useAppLockStore = create<AppLockStore>((set, get) => ({
     }
   },
 
-  clearPin: async () => {
+  clearPin: () => serializeCaptureUpdate(async () => {
     const previous = get();
     const storedHash = await SecureStore.getItemAsync(PIN_HASH_KEY);
+    set({ captureReady: false, captureError: null });
     try {
       await setBoolean(APP_LOCK_ENABLED_KEY, false);
       await SecureStore.deleteItemAsync(PIN_HASH_KEY);
       await persistAttemptState(0, null, previous);
+      await applyCapture(false);
     } catch (error) {
       await Promise.allSettled([
         setBoolean(APP_LOCK_ENABLED_KEY, previous.isEnabled),
         restorePinHash(storedHash),
         writeAttemptState(previous.failedAttempts, previous.lockoutUntil),
       ]);
+      set({
+        captureReady: false,
+        captureError: get().captureError ?? "App Lock settings could not be updated.",
+      });
       throw error;
     }
-    set({ hasPinSet: false, isEnabled: false, isLocked: false, failedAttempts: 0, lockoutUntil: null });
-  },
+    set({
+      hasPinSet: false, isEnabled: false, isLocked: false, failedAttempts: 0, lockoutUntil: null,
+      captureReady: true, captureError: null,
+    });
+  }),
 
   lock: () => {
+    // A background event during enablement must survive its awaited writes,
+    // even before the enabled preference has been published.
+    lockEpoch += 1;
     const { isEnabled, hasPinSet } = get();
     if (isEnabled && hasPinSet) set({ isLocked: true });
   },

@@ -2074,6 +2074,7 @@ test("generated QA manifest validation preserves production source and release s
     "android.permission.INTERNET", "android.permission.USE_BIOMETRIC", "android.permission.USE_FINGERPRINT",
     "android.permission.VIBRATE", "android.permission.ACCESS_NETWORK_STATE", "android.permission.RECEIVE_BOOT_COMPLETED",
     "android.permission.POST_NOTIFICATIONS", "android.permission.WAKE_LOCK",
+    "android.permission.DETECT_SCREEN_CAPTURE",
   ];
   const generated = ({ packageName = qaPackage, scheme = "moodinator-qa", receiverPackage = packageName, debuggable = false, extraPermission = "" } = {}) =>
     `<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="${packageName}">
@@ -2101,6 +2102,11 @@ test("generated QA manifest validation preserves production source and release s
     assert.equal(run(["--variant", "qa"]).status, 0);
     assert.equal(run([], "qa").status, 0);
     assert.notEqual(run(["--variant", "unknown"]).status, 0);
+
+    writeFileSync(manifestPath, generated().replace(
+      '<uses-permission android:name="android.permission.DETECT_SCREEN_CAPTURE" />', "",
+    ));
+    assert.match(run(["--variant", "qa"]).stderr, /Missing: android\.permission\.DETECT_SCREEN_CAPTURE/);
 
     writeFileSync(manifestPath, generated({ packageName: productionPackage }));
     assert.match(run(["--variant", "qa"]).stderr, /must use package com\.lab4code\.moodinator\.qa/);

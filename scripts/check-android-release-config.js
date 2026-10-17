@@ -13,12 +13,14 @@ const nativeIdentity = nativeVariant === "qa"
   ? { package: "com.lab4code.moodinator.qa", scheme: "moodinator-qa", name: "Moodinator QA" }
   : { package: "com.lab4code.moodinator", scheme: "moodinator", name: "Moodinator" };
 const systemAlertWindowPermission = "android.permission.SYSTEM_ALERT_WINDOW";
+const captureProtectionPlugin = "./plugins/withAndroidCaptureProtection";
 const advertisingIdPermission = "com.google.android.gms.permission.AD_ID";
 const requiredBlockedPermissions = new Set([
   systemAlertWindowPermission,
   advertisingIdPermission,
   "android.permission.FOREGROUND_SERVICE",
   "android.permission.READ_EXTERNAL_STORAGE",
+  "android.permission.READ_MEDIA_IMAGES",
   "android.permission.WRITE_EXTERNAL_STORAGE",
   "com.google.android.c2dm.permission.RECEIVE",
   "com.google.android.finsky.permission.BIND_GET_INSTALL_REFERRER_SERVICE",
@@ -40,6 +42,7 @@ const requiredBlockedPermissions = new Set([
   "me.everything.badger.permission.BADGE_COUNT_WRITE",
 ]);
 const approvedReleasePermissions = new Set([
+  "android.permission.DETECT_SCREEN_CAPTURE",
   "android.permission.INTERNET",
   "android.permission.USE_BIOMETRIC",
   "android.permission.USE_FINGERPRINT",
@@ -167,6 +170,9 @@ const app = readJson("app.json");
 const eas = readJson("eas.json");
 const gradle = readOptionalText("android/app/build.gradle");
 const mainManifest = readOptionalText("android/app/src/main/AndroidManifest.xml");
+const mainActivity = readOptionalText(
+  `android/app/src/main/java/${nativeIdentity.package.replaceAll(".", "/")}/MainActivity.kt`
+);
 const strings = readOptionalText("android/app/src/main/res/values/strings.xml");
 const developerRoute = readText("src/app/settings/developer.tsx");
 const generatedReleaseManifests = findGeneratedReleaseManifests();
@@ -198,6 +204,10 @@ assert(
 assert(
   !androidPermissions.includes(systemAlertWindowPermission),
   "app.json Android permissions must not request SYSTEM_ALERT_WINDOW"
+);
+assert(
+  app.expo.plugins?.includes(captureProtectionPlugin),
+  `app.json plugins must include ${captureProtectionPlugin}, which protects capture until App Lock hydration`
 );
 assert(
   androidBlockedPermissions.includes(systemAlertWindowPermission),
@@ -272,6 +282,19 @@ if (mainManifest) {
   assert(
     hasScheme(mainManifest, nativeIdentity.scheme),
     `Main Android manifest must use the ${nativeIdentity.scheme} deep-link scheme`
+  );
+}
+
+if (mainActivity) {
+  assert(
+    mainActivity.includes("window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)") &&
+      mainActivity.indexOf("window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)") <
+        mainActivity.indexOf("super.onCreate(null)"),
+    "MainActivity must start secure before onCreate; regenerate stale native files"
+  );
+  assert(
+    !mainActivity.includes("setRecentsScreenshotEnabled(false)"),
+    "MainActivity must not disable Recents unconditionally; run a clean Android prebuild"
   );
 }
 
