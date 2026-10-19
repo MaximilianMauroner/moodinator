@@ -2,9 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const secure = vi.hoisted(() => ({ values: new Map<string, string>() }));
-const capture = vi.hoisted(() => ({ apply: vi.fn<(enabled: boolean) => Promise<void>>(() => Promise.resolve()) }));
+const capture = vi.hoisted(() => ({
+  applies: true,
+  apply: vi.fn<(enabled: boolean) => Promise<void>>(() => Promise.resolve()),
+}));
 
 vi.mock("@/features/appLock/services/captureProtection", () => ({
+  get appLockCaptureProtectionApplies() { return capture.applies; },
   applyAppLockCaptureProtection: capture.apply,
 }));
 
@@ -48,6 +52,7 @@ describe("appLockStore", () => {
       lockoutUntil: null,
       hasPinSet: false,
     });
+    capture.applies = true;
     capture.apply.mockReset();
     capture.apply.mockResolvedValue(undefined);
   });
@@ -216,6 +221,21 @@ describe("appLockStore", () => {
     await useAppLockStore.getState().hydrate();
     expect(useAppLockStore.getState()).toMatchObject({ captureReady: true, captureError: null });
     expect(capture.apply).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps the navigator visible through App Lock changes where capture protection does not apply", async () => {
+    capture.applies = false;
+    useAppLockStore.setState({ hasPinSet: true, hydrated: true, captureReady: true });
+    const seenReady: boolean[] = [];
+    const unsubscribe = useAppLockStore.subscribe((state) => seenReady.push(state.captureReady));
+
+    await useAppLockStore.getState().setEnabled(true);
+    await useAppLockStore.getState().setEnabled(false);
+    await useAppLockStore.getState().clearPin();
+    unsubscribe();
+
+    expect(seenReady).not.toContain(false);
+    expect(useAppLockStore.getState()).toMatchObject({ isEnabled: false, hasPinSet: false, captureReady: true });
   });
 
   it("serializes overlapping enabled-setting changes", async () => {

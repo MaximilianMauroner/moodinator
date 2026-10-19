@@ -3,9 +3,11 @@ import { allowScreenCaptureAsync, preventScreenCaptureAsync } from "expo-screen-
 
 const APP_LOCK_CAPTURE_KEY = "moodinator-app-lock";
 
+export const appLockCaptureProtectionApplies = Platform.OS === "android";
+
 /** The caller hides private windows until this operation succeeds. */
 export async function applyAppLockCaptureProtection(enabled: boolean): Promise<void> {
-  if (Platform.OS !== "android") return;
+  if (!appLockCaptureProtectionApplies) return;
 
   if (!enabled) {
     await allowScreenCaptureAsync(APP_LOCK_CAPTURE_KEY);

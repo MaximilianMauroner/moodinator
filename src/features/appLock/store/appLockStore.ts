@@ -8,7 +8,7 @@ import {
 } from "@/shared/storage/keys";
 import { getStringStrict, setBoolean, setString } from "@/shared/storage/asyncStorage";
 import { setDurableItemAsync } from "@/shared/storage/durableSecureStore";
-import { applyAppLockCaptureProtection } from "../services/captureProtection";
+import { appLockCaptureProtectionApplies, applyAppLockCaptureProtection } from "../services/captureProtection";
 
 const PIN_HASH_KEY = "appLockPinHash";
 const PIN_FAILED_ATTEMPTS_KEY = "appLockFailedAttempts";
@@ -346,7 +346,7 @@ export const useAppLockStore = create<AppLockStore>((set, get) => ({
     if (enabled && !previous.hasPinSet) {
       throw new Error("Set a PIN before enabling app lock.");
     }
-    set({ captureReady: false, captureError: null });
+    if (appLockCaptureProtectionApplies) set({ captureReady: false, captureError: null });
     try {
       if (enabled) await applyCapture(true);
       await setBoolean(APP_LOCK_ENABLED_KEY, enabled);
@@ -478,7 +478,7 @@ export const useAppLockStore = create<AppLockStore>((set, get) => ({
   clearPin: () => serializeCaptureUpdate(async () => {
     const previous = get();
     const storedHash = await SecureStore.getItemAsync(PIN_HASH_KEY);
-    set({ captureReady: false, captureError: null });
+    if (appLockCaptureProtectionApplies) set({ captureReady: false, captureError: null });
     try {
       await setBoolean(APP_LOCK_ENABLED_KEY, false);
       await SecureStore.deleteItemAsync(PIN_HASH_KEY);
