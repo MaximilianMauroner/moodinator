@@ -21,6 +21,7 @@ const requiredBlockedPermissions = new Set([
   "android.permission.FOREGROUND_SERVICE",
   "android.permission.READ_EXTERNAL_STORAGE",
   "android.permission.READ_MEDIA_IMAGES",
+  "android.permission.DETECT_SCREEN_CAPTURE",
   "android.permission.WRITE_EXTERNAL_STORAGE",
   "com.google.android.c2dm.permission.RECEIVE",
   "com.google.android.finsky.permission.BIND_GET_INSTALL_REFERRER_SERVICE",
@@ -42,7 +43,6 @@ const requiredBlockedPermissions = new Set([
   "me.everything.badger.permission.BADGE_COUNT_WRITE",
 ]);
 const approvedReleasePermissions = new Set([
-  "android.permission.DETECT_SCREEN_CAPTURE",
   "android.permission.INTERNET",
   "android.permission.USE_BIOMETRIC",
   "android.permission.USE_FINGERPRINT",

@@ -57,10 +57,12 @@ pickers/share activities. Inspect live screenshots and Recents independently;
 screen recording needs its own observation. External activities have their own
 windows, so MainActivity protection does not prove their capture policy.
 
-The screen-capture package's photo-read permissions are blocked. This app does
-not request screenshot-listener permissions or consume screenshot events. Its
-Android 14+ native package declares the normal screenshot-detection permission.
-Check the merged manifest during native verification.
+A pinned patch removes the screen-capture package's screenshot-detection
+callback and its media observer. Android 14+ shows a system notice for each
+detected screenshot, and this app uses no screenshot events. The package's
+photo-read and screenshot-detection permissions are blocked. Remove the patch
+when upstream registers these listeners only on request. Native verification
+checks that the merged manifest does not contain these permissions.
 
 The pinned date/time picker patch copies the Activity secure flag to each
 app-owned picker dialog before it appears. Android does not inherit this flag
