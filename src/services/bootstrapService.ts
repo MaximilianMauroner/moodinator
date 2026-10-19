@@ -1,3 +1,4 @@
+import { getDb } from "@db/client";
 import { migrateEmotionsToCategories } from "@db/moods/migrations";
 
 import { getJson, getString, setJson } from "@/shared/storage/asyncStorage";
@@ -9,10 +10,10 @@ import {
 import { useMoodsStore } from "@/shared/state/moodsStore";
 import { toastService } from "@/services/toastService";
 
-export type AppBootstrapStatus = "running" | "ready" | "ready-with-warning";
+export type AppBootstrapStatus = "running" | "blocked" | "ready" | "ready-with-warning";
 
 export type AppBootstrapResult = {
-  status: Exclude<AppBootstrapStatus, "running">;
+  status: Exclude<AppBootstrapStatus, "running" | "blocked">;
 };
 
 /**
@@ -163,7 +164,16 @@ async function runLegacyEmotionCategoryMigration(
 }
 
 export async function runAppBootstrap(): Promise<AppBootstrapResult> {
-  const state = await loadState();
-  const warned = await runLegacyEmotionCategoryMigration(state);
-  return { status: warned ? "ready-with-warning" : "ready" };
+  // A completed legacy migration must not skip the database safety gate.
+  // Only this open may reject; the layout then blocks the app.
+  await getDb();
+  try {
+    const state = await loadState();
+    const warned = await runLegacyEmotionCategoryMigration(state);
+    return { status: warned ? "ready-with-warning" : "ready" };
+  } catch (error) {
+    // The database is open, so a failed bookkeeping write must not block it.
+    console.error("[bootstrap] Failed to record migration state:", error);
+    return { status: "ready-with-warning" };
+  }
 }

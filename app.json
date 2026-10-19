@@ -82,7 +82,7 @@
           "useSQLCipher": true,
           "android": {
             "enableFTS": false,
-            "useSQLCipher": false
+            "useSQLCipher": true
           },
           "ios": {
             "customBuildFlags": [

@@ -3,10 +3,11 @@ import { Buffer } from "node:buffer";
 import { execFileSync, spawnSync } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { createRequire } from "node:module";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { runInNewContext } from "node:vm";
 
 const require = createRequire(import.meta.url);
 const {
@@ -51,6 +52,7 @@ const {
   waitForRestorationEvidence,
 } = require("../scripts/native-qa-runner.js");
 const {
+  dumpUiHierarchy,
   findNodes,
   findNodeByContentDescription,
   findNodeByTestId,
@@ -111,6 +113,11 @@ const {
 const {
   prepareEvidenceDirectory: prepareSmokeEvidenceDirectory,
 } = require("../scripts/run-native-smoke.js");
+const {
+  createRecoveryProgressTracker,
+  recoveryDeadlineRemaining,
+  recoveryReadTimeout,
+} = require("../scripts/native-encryption-progress.js");
 
 const hierarchy = `
   <hierarchy rotation="0">
@@ -127,6 +134,117 @@ const hierarchy = `
       content-desc="Actions for Neutral entry" enabled="true" visible-to-user="true"
       bounds="[100,200][200,300]" />
   </hierarchy>`;
+
+test("native export recovery progress is monotonic and bounded to known phases", () => {
+  const tracker = createRecoveryProgressTracker("native-export-interruption-many-rows");
+  assert.deepEqual(tracker.observe("launch"), { changed: true, complete: false });
+  assert.deepEqual(tracker.observe("launch"), { changed: false, complete: false });
+  assert.deepEqual(tracker.observe("running:native-export-interruption-many-rows:first-verification"), {
+    changed: true, complete: false,
+  });
+  assert.deepEqual(tracker.observe("running:native-export-interruption-many-rows:second-verification"), {
+    changed: true, complete: false,
+  });
+  assert.deepEqual(tracker.observe("complete"), { changed: true, complete: true });
+  assert.throws(() => tracker.observe("launch"), /moved backwards/);
+  assert.throws(
+    () => createRecoveryProgressTracker("native-export-interruption-many-rows").observe("running:other"),
+    /Unexpected native recovery progress/,
+  );
+});
+
+test("native export recovery deadlines reject a read that finishes at or after either boundary", () => {
+  assert.equal(recoveryDeadlineRemaining(59_999, 180_000, 60_000), 1);
+  assert.equal(recoveryDeadlineRemaining(60_000, 180_000, 60_000), 0);
+  assert.equal(recoveryDeadlineRemaining(62_000, 180_000, 60_000), 0);
+  assert.equal(recoveryDeadlineRemaining(179_999, 180_000, 240_000), 1);
+  assert.equal(recoveryDeadlineRemaining(180_000, 180_000, 240_000), 0);
+  assert.equal(recoveryReadTimeout(59_999, 180_000, 60_000), 1);
+  assert.equal(recoveryReadTimeout(60_000, 180_000, 60_000), null);
+  assert.equal(recoveryReadTimeout(179_999, 180_000, 240_000), 1);
+  assert.equal(recoveryReadTimeout(180_000, 180_000, 240_000), null);
+});
+
+test("reads the Android hierarchy from a device-local dump file", () => {
+  const directory = mkdtempSync(join(tmpdir(), "moodinator-fake-adb-"));
+  const adb = join(directory, "adb.mjs");
+  const calls = join(directory, "calls.jsonl");
+  writeFileSync(adb, `#!/usr/bin/env node
+import { appendFileSync } from "node:fs";
+const args = process.argv.slice(2);
+const path = args.at(-1);
+appendFileSync(${JSON.stringify(calls)}, JSON.stringify(args) + "\\n");
+if (args.includes("uiautomator") && /^\\/data\\/local\\/tmp\\/moodinator-ui-hierarchy-[0-9a-f-]{36}\\.xml$/.test(path)) process.exit(0);
+if (args.includes("cat")) {
+  process.stdout.write(${JSON.stringify(hierarchy)});
+  process.exit(0);
+}
+if (args.includes("rm")) process.exit(0);
+process.exit(1);
+`);
+  chmodSync(adb, 0o755);
+
+  try {
+    assert.equal(parseUiHierarchy(dumpUiHierarchy("emulator-5554", {
+      adbPath: adb,
+      timeoutMs: 1000,
+    })).length, 4);
+    const [dump, read, cleanup] = readFileSync(calls, "utf8").trim().split("\n").map(JSON.parse);
+    assert.equal(dump.at(-1), read.at(-1));
+    assert.equal(read.at(-1), cleanup.at(-1));
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("a dump that creates no fresh hierarchy fails closed", () => {
+  const directory = mkdtempSync(join(tmpdir(), "moodinator-empty-dump-adb-"));
+  const adb = join(directory, "adb.mjs");
+  writeFileSync(adb, `#!/usr/bin/env node
+const args = process.argv.slice(2);
+if (args.includes("uiautomator") || args.includes("rm")) process.exit(0);
+process.exit(1);
+`);
+  chmodSync(adb, 0o755);
+
+  try {
+    assert.throws(() => dumpUiHierarchy("emulator-5554", {
+      adbPath: adb,
+      timeoutMs: 1000,
+    }), /exec-out cat/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("dump and read share one hierarchy timeout budget", () => {
+  const directory = mkdtempSync(join(tmpdir(), "moodinator-slow-dump-adb-"));
+  const adb = join(directory, "adb.mjs");
+  const calls = join(directory, "calls.jsonl");
+  writeFileSync(adb, `#!/usr/bin/env node
+import { appendFileSync } from "node:fs";
+const args = process.argv.slice(2);
+appendFileSync(${JSON.stringify(calls)}, JSON.stringify(args) + "\\n");
+if (args.includes("rm")) process.exit(0);
+await new Promise((resolve) => setTimeout(resolve, 300));
+if (args.includes("cat")) process.stdout.write(${JSON.stringify(hierarchy)});
+`);
+  chmodSync(adb, 0o755);
+
+  try {
+    assert.throws(() => dumpUiHierarchy("emulator-5554", {
+      adbPath: adb,
+      timeoutMs: 500,
+    }), /ETIMEDOUT/);
+    const inspections = readFileSync(calls, "utf8").trim().split("\n").map(JSON.parse)
+      .filter((args) => !args.includes("rm"));
+    assert.equal(inspections.length, 2);
+    assert.ok(inspections[0].includes("uiautomator"));
+    assert.ok(inspections[1].includes("cat"));
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
 
 const timezoneHierarchy = `
   <hierarchy rotation="0">
@@ -207,12 +325,63 @@ test("derives the tap point from the inspected bounds", () => {
   assert.equal(nodeCenter({ bounds: "[0,0][0,10]" }), null);
 });
 
+test("native selectors keep their distinct empty and falsey value rules", () => {
+  for (const value of [undefined, null, false, 0, ""]) {
+    assert.equal(nodeMatches({}, { testId: value }), false);
+    assert.equal(nodeMatches({}, { testIdPrefix: value }), false);
+    assert.equal(nodeMatches({ text: "Undo" }, { testId: value, text: "Undo" }), true);
+  }
+  assert.equal(nodeMatches({}, { text: "" }), true);
+  assert.equal(nodeMatches({}, { contentDescription: "" }), true);
+  assert.equal(nodeMatches({}, { className: undefined }), false);
+  assert.equal(nodeMatches({ class: "" }, { className: "" }), true);
+  assert.equal(nodeMatches({}, { contains: true }), false);
+  assert.equal(nodeMatches({}, { unknown: "Undo" }), false);
+});
+
+test("native text comparisons apply contains only when requested", () => {
+  const node = { text: "QA & synthetic", "content-desc": "Actions for Neutral entry" };
+  assert.equal(nodeMatches(node, { text: "synthetic" }), false);
+  assert.equal(nodeMatches(node, { text: "synthetic", contains: true }), true);
+  assert.equal(nodeMatches(node, { contentDescription: "Neutral" }), false);
+  assert.equal(nodeMatches(node, { contentDescription: "Neutral", contains: true }), true);
+  assert.equal(nodeMatches(node, { text: "synthetic", contentDescription: "missing", contains: true }), false);
+});
+
+test("native resource IDs normalize the node prefix and keep exact matcher values", () => {
+  for (const resourceId of ["undo-delete", "app:id/undo-delete", "outer:id/app:id/undo-delete"]) {
+    const node = { "resource-id": resourceId };
+    assert.equal(nodeMatches(node, { testId: "undo-delete" }), true);
+    assert.equal(nodeMatches(node, { testIdPrefix: "undo-" }), true);
+    assert.equal(nodeMatches(node, { testId: "app:id/undo-delete" }), false);
+  }
+});
+
+test("native composition preserves precedence and function matcher results", () => {
+  const node = { text: "Undo", enabled: "false", "visible-to-user": "false" };
+  assert.equal(nodeMatches(node, (value) => value.text), "Undo");
+  assert.equal(nodeMatches(node, { text: "Undo" }), false);
+  assert.equal(nodeMatches(node, { text: "Undo" }, { visibleOnly: false }), true);
+  assert.equal(nodeMatches(node, { anyOf: [() => true] }), false);
+  assert.equal(nodeMatches(node, { allOf: [] }), false);
+  const visible = { text: "Undo" };
+  assert.equal(nodeMatches(visible, { allOf: [] }), true);
+  assert.equal(nodeMatches(visible, { anyOf: [], allOf: [], text: "Undo" }), false);
+  assert.equal(nodeMatches(visible, { anyOf: [{ text: "Undo" }], text: "missing" }), true);
+  assert.equal(nodeMatches(visible, { allOf: [{ text: "Undo" }], text: "missing" }), true);
+  assert.equal(nodeMatches(visible, { allOf: [{ text: "Undo" }, { text: "missing" }] }), false);
+});
+
 test("native switch checks cannot infer checked state from selected", () => {
   const node = { class: "android.widget.Switch", checkable: "true", checked: "true", selected: "false" };
   assert.equal(nodeMatches(node, { className: "android.widget.Switch", checked: true }), true);
   assert.equal(nodeMatches(node, { checked: false }), false);
   assert.equal(nodeMatches({ ...node, checked: undefined }, { checked: false }), false);
   assert.equal(nodeMatches({ ...node, checkable: "false" }, { checked: true }), false);
+  assert.equal(nodeMatches({ ...node, checked: undefined }, { checked: true }), false);
+  assert.equal(nodeMatches({ ...node, checkable: undefined }, { checked: true }), false);
+  assert.equal(nodeMatches({ ...node, checked: "false", selected: "true" }, { checked: false }), true);
+  assert.equal(nodeMatches(node, { checked: "true" }), true);
 });
 
 test("a typed preset name cannot satisfy the saved-list oracle", () => {
@@ -1529,6 +1698,144 @@ test("prepared QA provenance rejects unmanifested Metro and changed native input
   }
 });
 
+test("prepared iOS provenance seals native inputs while excluding Pods and build outputs", () => {
+  const directory = mkdtempSync(join(tmpdir(), "moodinator-ios-provenance-test-"));
+  const sourceSha = "a".repeat(40);
+  const prebuild = { MOODINATOR_QA_PREPARE_NATIVE: "1" };
+  try {
+    writeFileSync(join(directory, "tracked.js"), "source\n");
+    writePreparedSourceMetadata(directory, sourceSha, ["tracked.js"]);
+    assert.throws(() => readPreparedSourceSha(directory, {}, "ios"), /iOS source is not sealed/);
+    assert.equal(readPreparedSourceSha(directory, prebuild, "ios"), sourceSha);
+    mkdirSync(join(directory, "ios", "Moodinator.xcodeproj"), { recursive: true });
+    writeFileSync(join(directory, "ios", "Moodinator.xcodeproj", "project.pbxproj"), "native project\n");
+    writeFileSync(join(directory, "ios", "Podfile"), "native dependency configuration\n");
+    writeFileSync(join(directory, "ios", "Podfile.lock"), "locked dependencies\n");
+    mkdirSync(join(directory, "ios", "Pods"), { recursive: true });
+    writeFileSync(join(directory, "ios", "Pods", "dependency"), "installed dependency\n");
+    sealPreparedNativeSource(directory, "ios");
+    const metadata = JSON.parse(readFileSync(join(directory, QA_SOURCE_METADATA), "utf8"));
+    assert.equal(metadata.nativePlatform, "ios");
+    assert.ok(Object.hasOwn(metadata.files, "ios/Podfile.lock"));
+    assert.equal(Object.hasOwn(metadata.files, "ios/Pods/dependency"), false);
+    mkdirSync(join(directory, "ios", "build"), { recursive: true });
+    writeFileSync(join(directory, "ios", "build", "output"), "build output\n");
+    writeFileSync(join(directory, "ios", "Pods", "dependency"), "updated dependency output\n");
+    assert.equal(readPreparedSourceSha(directory, {}, "ios"), sourceSha);
+    assert.throws(() => readPreparedSourceSha(directory, prebuild, "ios"), /may only be used before iOS source is sealed/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("prepared iOS provenance rejects source and native tampering and missing inputs", () => {
+  const directory = mkdtempSync(join(tmpdir(), "moodinator-ios-tampering-test-"));
+  try {
+    writeFileSync(join(directory, "tracked.js"), "source\n");
+    writePreparedSourceMetadata(directory, "b".repeat(40), ["tracked.js"]);
+    mkdirSync(join(directory, "ios", "Moodinator"), { recursive: true });
+    const nativeFile = join(directory, "ios", "Moodinator", "AppDelegate.swift");
+    writeFileSync(nativeFile, "native source\n");
+    writeFileSync(join(directory, "tracked.js"), "changed before seal\n");
+    assert.throws(() => sealPreparedNativeSource(directory, "ios"), /tracked\.js differs from source/);
+    assert.equal(JSON.parse(readFileSync(join(directory, QA_SOURCE_METADATA), "utf8")).nativeSealed, false);
+    writeFileSync(join(directory, "tracked.js"), "source\n");
+    sealPreparedNativeSource(directory, "ios");
+    for (const [file, original, expected] of [
+      [nativeFile, "native source\n", /AppDelegate\.swift differs from source/],
+      [join(directory, "tracked.js"), "source\n", /tracked\.js differs from source/],
+    ]) {
+      writeFileSync(file, "tampered\n");
+      assert.throws(() => readPreparedSourceSha(directory, {}, "ios"), expected);
+      writeFileSync(file, original);
+    }
+    const additional = join(directory, "ios", "Moodinator", "Extra.swift");
+    writeFileSync(additional, "unsealed native source\n");
+    assert.throws(() => readPreparedSourceSha(directory, {}, "ios"), /unexpected input ios\/Moodinator\/Extra\.swift/);
+    rmSync(additional);
+    rmSync(nativeFile);
+    assert.throws(() => readPreparedSourceSha(directory, {}, "ios"), /AppDelegate\.swift is missing/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("prepared provenance rejects mismatched native platforms and preserves legacy Android seals", () => {
+  for (const platform of ["android", "ios"]) {
+    const directory = mkdtempSync(join(tmpdir(), "moodinator-platform-seal-test-"));
+    try {
+      writeFileSync(join(directory, "tracked.js"), "source\n");
+      writePreparedSourceMetadata(directory, "c".repeat(40), ["tracked.js"]);
+      mkdirSync(join(directory, platform));
+      writeFileSync(join(directory, platform, "native-source"), "native\n");
+      sealPreparedNativeSource(directory, platform);
+      const other = platform === "ios" ? "android" : "ios";
+      assert.throws(() => readPreparedSourceSha(directory, {}, other), /sealed for .* requested/);
+      if (platform === "android") {
+        const filePath = join(directory, QA_SOURCE_METADATA);
+        const metadata = JSON.parse(readFileSync(filePath, "utf8"));
+        delete metadata.nativePlatform;
+        chmodSync(filePath, 0o644);
+        writeFileSync(filePath, JSON.stringify(metadata));
+        chmodSync(filePath, 0o444);
+        assert.equal(readPreparedSourceSha(directory, {}), metadata.sourceSha);
+        assert.throws(() => readPreparedSourceSha(directory, {}, "ios"), /sealed for android, requested ios/);
+      } else {
+        const filePath = join(directory, QA_SOURCE_METADATA);
+        const metadata = JSON.parse(readFileSync(filePath, "utf8"));
+        metadata.nativePlatform = "android";
+        chmodSync(filePath, 0o644);
+        writeFileSync(filePath, JSON.stringify(metadata));
+        chmodSync(filePath, 0o444);
+        assert.throws(() => readPreparedSourceSha(directory, {}, "android"), /invalid native platform inputs/);
+      }
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  }
+});
+
+test("iOS seal requires its own generated source and rejects unrelated native inputs", () => {
+  const directory = mkdtempSync(join(tmpdir(), "moodinator-ios-missing-source-test-"));
+  try {
+    writeFileSync(join(directory, "tracked.js"), "source\n");
+    writePreparedSourceMetadata(directory, "d".repeat(40), ["tracked.js"]);
+    mkdirSync(join(directory, "ios", "Pods"), { recursive: true });
+    writeFileSync(join(directory, "ios", "Pods", "dependency"), "dependency\n");
+    assert.throws(() => sealPreparedNativeSource(directory, "ios"), /No generated iOS source found/);
+    mkdirSync(join(directory, "android"));
+    writeFileSync(join(directory, "android", "settings.gradle"), "other platform\n");
+    assert.throws(() => sealPreparedNativeSource(directory, "ios"), /unexpected input android\/settings\.gradle/);
+    assert.throws(() => sealPreparedNativeSource(directory, "web"), /Unsupported native QA platform/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("native seal CLI accepts iOS and keeps Android as its default", () => {
+  for (const platform of ["android", "ios"]) {
+    const directory = mkdtempSync(join(tmpdir(), "moodinator-seal-cli-test-"));
+    try {
+      mkdirSync(join(directory, "scripts"));
+      const files = ["scripts/seal-native-qa.js", "scripts/qa-source-provenance.js"];
+      for (const file of files) writeFileSync(join(directory, file), readFileSync(join(process.cwd(), file)));
+      writePreparedSourceMetadata(directory, "e".repeat(40), files);
+      mkdirSync(join(directory, platform));
+      writeFileSync(join(directory, platform, "native-source"), "native\n");
+      const args = platform === "ios" ? ["--platform=ios"] : [];
+      const output = execFileSync(process.execPath, [join(directory, files[0]), ...args], { encoding: "utf8" });
+      assert.match(output, platform === "ios" ? /Prepared iOS source sealed/ : /Prepared Android source sealed/);
+      assert.equal(readPreparedSourceSha(directory, {}, platform), "e".repeat(40));
+      assert.throws(
+        () => execFileSync(process.execPath, [join(directory, files[0]), "--platform=web"], { stdio: "pipe" }),
+        /Usage: qa:seal-native/,
+      );
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  }
+});
+
 test("QA preparation copies committed HEAD blobs despite assume-unchanged worktree edits", () => {
   const directory = mkdtempSync(
     join(tmpdir(), "moodinator-prepare-source-test-"),
@@ -1614,9 +1921,9 @@ test("QA config derives its embedded SHA from prepared provenance", () => {
   const configSource = readFileSync(new URL("../app.config.js", import.meta.url), "utf8");
   const metroSource = readFileSync(new URL("../metro.config.js", import.meta.url), "utf8");
   const prepareSource = readFileSync(new URL("../scripts/prepare-native-qa.js", import.meta.url), "utf8");
-  assert.match(configSource, /readPreparedSourceSha\(__dirname, process\.env\)/);
+  assert.match(configSource, /readPreparedSourceSha\(__dirname, process\.env, isIosConfig \? "ios" : "android"\)/);
   assert.match(metroSource, /MOODINATOR_VARIANT === "qa"/);
-  assert.match(metroSource, /readPreparedSourceSha\(__dirname, process\.env\)/);
+  assert.match(metroSource, /readPreparedSourceSha\(\s*__dirname, process\.env, isIosQaConfig \? "ios" : "android"/);
   assert.match(metroSource, /MOODINATOR_METRO_MAX_WORKERS/);
   assert.match(prepareSource, /writePreparedSourceMetadata\(destination, sourceSha, copiedTracked\)/);
   assert.doesNotMatch(configSource, /const sourceSha = process\.env\.MOODINATOR_SOURCE_SHA/);
@@ -1625,8 +1932,10 @@ test("QA config derives its embedded SHA from prepared provenance", () => {
 test("QA iOS config does not require Android-sealed provenance", () => {
   const previousVariant = process.env.MOODINATOR_VARIANT;
   const previousPlatform = process.env.EAS_BUILD_PLATFORM;
+  const previousProof = process.env.MOODINATOR_QA_ENCRYPTION_PROOF;
   process.env.MOODINATOR_VARIANT = "qa";
   process.env.EAS_BUILD_PLATFORM = "ios";
+  delete process.env.MOODINATOR_QA_ENCRYPTION_PROOF;
   try {
     const configure = require("../app.config.js");
     const configured = configure({
@@ -1651,6 +1960,85 @@ test("QA iOS config does not require Android-sealed provenance", () => {
     else process.env.MOODINATOR_VARIANT = previousVariant;
     if (previousPlatform === undefined) delete process.env.EAS_BUILD_PLATFORM;
     else process.env.EAS_BUILD_PLATFORM = previousPlatform;
+    if (previousProof === undefined) delete process.env.MOODINATOR_QA_ENCRYPTION_PROOF;
+    else process.env.MOODINATOR_QA_ENCRYPTION_PROOF = previousProof;
+  }
+});
+
+function evaluateQaConfig(filename, workspace, env) {
+  const module = { exports: {} };
+  const source = readFileSync(join(process.cwd(), filename), "utf8");
+  runInNewContext(source, {
+    __dirname: workspace,
+    process: { env },
+    module,
+    require(specifier) {
+      // Test the real config/provenance boundary without running Expo or Metro.
+      if (specifier === "expo/metro-config") return { getDefaultConfig: () => ({ resolver: {}, transformer: {} }) };
+      if (specifier === "nativewind/metro") return { withNativeWind: (config) => config };
+      if (specifier === "./scripts/qa-source-provenance") return require("../scripts/qa-source-provenance.js");
+      return require(specifier);
+    },
+  }, { filename });
+  return filename === "app.config.js"
+    ? module.exports({ config: { extra: { retained: true } } })
+    : module.exports;
+}
+
+test("iOS encryption proof config binds source and native seal through either declared platform", () => {
+  for (const platformKey of ["EAS_BUILD_PLATFORM", "EXPO_OS"]) {
+    const directory = mkdtempSync(join(tmpdir(), "moodinator-ios-proof-config-test-"));
+    const sourceSha = "f".repeat(40);
+    const env = { MOODINATOR_VARIANT: "qa", MOODINATOR_QA_ENCRYPTION_PROOF: "1", [platformKey]: "ios" };
+    try {
+      for (const filename of ["app.config.js", "metro.config.js"]) {
+        assert.throws(() => evaluateQaConfig(filename, directory, env), /require prepared source metadata/);
+      }
+      writeFileSync(join(directory, "tracked.js"), "source\n");
+      writePreparedSourceMetadata(directory, sourceSha, ["tracked.js"]);
+      for (const filename of ["app.config.js", "metro.config.js"]) {
+        assert.throws(() => evaluateQaConfig(filename, directory, env), /iOS source is not sealed/);
+        assert.doesNotThrow(() => evaluateQaConfig(filename, directory, { ...env, MOODINATOR_QA_PREPARE_NATIVE: "1" }));
+      }
+      mkdirSync(join(directory, "ios"));
+      const nativeFile = join(directory, "ios", "Podfile");
+      writeFileSync(nativeFile, "native configuration\n");
+      sealPreparedNativeSource(directory, "ios");
+      const configured = evaluateQaConfig("app.config.js", directory, env);
+      assert.equal(configured.extra.qaSourceSha, sourceSha);
+      assert.equal(configured.extra.qaEncryptionProof, true);
+      assert.equal(configured.extra.retained, true);
+      assert.doesNotThrow(() => evaluateQaConfig("metro.config.js", directory, env));
+      for (const filename of ["app.config.js", "metro.config.js"]) {
+        assert.throws(
+          () => evaluateQaConfig(filename, directory, { ...env, MOODINATOR_QA_PREPARE_NATIVE: "1" }),
+          /may only be used before iOS source is sealed/,
+        );
+      }
+      writeFileSync(nativeFile, "changed native configuration\n");
+      for (const filename of ["app.config.js", "metro.config.js"]) {
+        assert.throws(() => evaluateQaConfig(filename, directory, env), /Podfile differs from source/);
+      }
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  }
+});
+
+test("iOS encryption proof config rejects an Android seal", () => {
+  const directory = mkdtempSync(join(tmpdir(), "moodinator-ios-wrong-seal-config-test-"));
+  try {
+    writeFileSync(join(directory, "tracked.js"), "source\n");
+    writePreparedSourceMetadata(directory, "a".repeat(40), ["tracked.js"]);
+    mkdirSync(join(directory, "android"));
+    writeFileSync(join(directory, "android", "settings.gradle"), "native configuration\n");
+    sealPreparedNativeSource(directory);
+    const env = { MOODINATOR_VARIANT: "qa", MOODINATOR_QA_ENCRYPTION_PROOF: "1", EXPO_OS: "ios" };
+    for (const filename of ["app.config.js", "metro.config.js"]) {
+      assert.throws(() => evaluateQaConfig(filename, directory, env), /sealed for android, requested ios/);
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
   }
 });
 
@@ -1742,7 +2130,7 @@ test("README enters the prepared workspace before native QA installation", () =>
   const source = readFileSync(new URL("../README.md", import.meta.url), "utf8");
   assert.match(
     source,
-    /QA_WORKSPACE="\$\(bun run qa:prepare \| tee \/dev\/stderr \| sed -n '[^']+'\)"\ncd "\$QA_WORKSPACE"\nbun install --frozen-lockfile/,
+    /QA_WORKSPACE="\$\(pnpm run qa:prepare \| tee \/dev\/stderr \| sed -n '[^']+'\)"\ncd "\$QA_WORKSPACE"\npnpm install --frozen-lockfile/,
   );
 });
 

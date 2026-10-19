@@ -1,4 +1,5 @@
 const { spawnSync } = require("node:child_process");
+const { randomUUID } = require("node:crypto");
 
 const DEFAULT_DUMP_TIMEOUT_MS = 800;
 const DEFAULT_POLL_INTERVAL_MS = 80;
@@ -80,6 +81,25 @@ function normalizeResourceId(resourceId) {
   return markerIndex >= 0 ? resourceId.slice(markerIndex + marker.length) : resourceId;
 }
 
+const NATIVE_MATCHERS = Object.values({
+  testId: (node, matcher) => matcher.testId
+    ? normalizeResourceId(node["resource-id"]) === matcher.testId : undefined,
+  testIdPrefix: (node, matcher) => matcher.testIdPrefix
+    ? normalizeResourceId(node["resource-id"]).startsWith(matcher.testIdPrefix) : undefined,
+  className: (node, matcher) => matcher.className !== undefined
+    ? node.class === matcher.className : undefined,
+  checked: (node, matcher) => matcher.checked !== undefined
+    ? node.checkable === "true" && node.checked === String(matcher.checked) : undefined,
+  text: (node, matcher) => matcher.text !== undefined
+    ? matcher.contains ? (node.text ?? "").includes(matcher.text) : (node.text ?? "") === matcher.text
+    : undefined,
+  contentDescription: (node, matcher) => matcher.contentDescription !== undefined
+    ? matcher.contains
+      ? (node["content-desc"] ?? "").includes(matcher.contentDescription)
+      : (node["content-desc"] ?? "") === matcher.contentDescription
+    : undefined,
+});
+
 function nodeMatches(node, matcher, { visibleOnly = true } = {}) {
   if (typeof matcher === "function") return matcher(node);
   if (!matcher || typeof matcher !== "object") return false;
@@ -87,26 +107,11 @@ function nodeMatches(node, matcher, { visibleOnly = true } = {}) {
   if (matcher.anyOf) return matcher.anyOf.some((alternative) => nodeMatches(node, alternative, { visibleOnly }));
   if (matcher.allOf) return matcher.allOf.every((alternative) => nodeMatches(node, alternative, { visibleOnly }));
 
-  const testId = normalizeResourceId(node["resource-id"]);
-  const text = node.text ?? "";
-  const contentDescription = node["content-desc"] ?? "";
-  const hasSelector = Boolean(
-    matcher.testId || matcher.testIdPrefix || matcher.text !== undefined ||
-    matcher.contentDescription !== undefined || matcher.className !== undefined || matcher.checked !== undefined,
-  );
-
-  if (matcher.testId && testId !== matcher.testId) return false;
-  if (matcher.testIdPrefix && !testId.startsWith(matcher.testIdPrefix)) return false;
-  if (matcher.className !== undefined && node.class !== matcher.className) return false;
-  if (matcher.checked !== undefined &&
-      (node.checkable !== "true" || node.checked !== String(matcher.checked))) return false;
-  if (matcher.text !== undefined) {
-    if (matcher.contains ? !text.includes(matcher.text) : text !== matcher.text) return false;
-  }
-  if (matcher.contentDescription !== undefined) {
-    if (matcher.contains
-      ? !contentDescription.includes(matcher.contentDescription)
-      : contentDescription !== matcher.contentDescription) return false;
+  let hasSelector = false;
+  for (const compare of NATIVE_MATCHERS) {
+    const result = compare(node, matcher);
+    if (result === false) return false;
+    if (result !== undefined) hasSelector = true;
   }
 
   return hasSelector;
@@ -168,26 +173,42 @@ function dumpUiHierarchy(serial, {
   adbPath = "adb",
   timeoutMs = DEFAULT_DUMP_TIMEOUT_MS,
 } = {}) {
-  let result;
+  const deadline = Date.now() + timeoutMs;
+  const dumpPath = `/data/local/tmp/moodinator-ui-hierarchy-${randomUUID()}.xml`;
+  const remainingMs = () => {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) throw new Error("Android UI inspection exceeded its timeout.");
+    return remaining;
+  };
+  let output;
   try {
-    result = spawnSync(
+    runAdb(serial, ["shell", "uiautomator", "dump", "--compressed", dumpPath], {
       adbPath,
-      ["-s", serial, "shell", "uiautomator", "dump", "--compressed", "/dev/tty"],
-      {
-        encoding: "utf8",
-        maxBuffer: 8 * 1024 * 1024,
-        timeout: timeoutMs,
-      },
-    );
+      timeoutMs: remainingMs(),
+    });
+    output = runAdb(serial, ["exec-out", "cat", dumpPath], {
+      adbPath,
+      timeoutMs: remainingMs(),
+    });
   } catch (error) {
     throw new Error(`Unable to inspect Android UI: ${error.message}`);
+  } finally {
+    const cleanupTimeoutMs = deadline - Date.now();
+    if (cleanupTimeoutMs > 0) {
+      try {
+        runAdb(serial, ["shell", "rm", "-f", dumpPath], {
+          adbPath,
+          timeoutMs: cleanupTimeoutMs,
+        });
+      } catch {
+        // Cleanup is best-effort; the unique path prevents stale evidence.
+      }
+    }
+  }
+  if (Date.now() > deadline) {
+    throw new Error("Unable to inspect Android UI: inspection exceeded its timeout.");
   }
 
-  if (result.error) {
-    throw new Error(`Unable to inspect Android UI: ${result.error.message}`);
-  }
-
-  const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
   const start = output.indexOf("<hierarchy");
   const end = output.lastIndexOf("</hierarchy>");
   if (start < 0 || end < start) {
