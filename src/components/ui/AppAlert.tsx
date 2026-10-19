@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   AccessibilityInfo,
   findNodeHandle,
+  Keyboard,
   ScrollView,
   useWindowDimensions,
   Pressable,
@@ -139,6 +140,7 @@ export function useModalAlert(visible: boolean) {
   }, [visible, clear]);
   const alert = useCallback<AlertStatic["alert"]>((title, message, buttons, options) => {
     if (!visibleRef.current || sessionRef.current !== session) return;
+    Keyboard.dismiss();
     show({ title, message, buttons: buttons?.length ? buttons : [{ text: "OK" }], options });
   }, [session, show]);
   return {

@@ -31,6 +31,7 @@ import { ExportModal } from "@/features/settings/components/ExportModal";
 
 const nativeFocus = vi.hoisted(() => vi.fn());
 const scrollTo = vi.hoisted(() => vi.fn());
+const keyboardDismiss = vi.hoisted(() => vi.fn());
 const dimensions = vi.hoisted(() => ({ width: 393, height: 851, fontScale: 1 }));
 vi.mock("react-native", () => ({
   TouchableOpacity: "TouchableOpacity", ActivityIndicator: "ActivityIndicator",
@@ -43,6 +44,7 @@ vi.mock("react-native", () => ({
   useWindowDimensions: () => dimensions,
   AccessibilityInfo: { setAccessibilityFocus: nativeFocus },
   findNodeHandle: () => 42,
+  Keyboard: { dismiss: keyboardDismiss },
 }));
 vi.mock("react-native-safe-area-context", () => ({ SafeAreaView: "SafeAreaView" }));
 vi.mock("@expo/vector-icons", () => ({ Ionicons: "Ionicons" }));
@@ -69,6 +71,7 @@ beforeEach(() => {
   vi.stubGlobal("cancelAnimationFrame", vi.fn());
   dimensions.width = 393;
   dimensions.fontScale = 1;
+  keyboardDismiss.mockClear();
 });
 afterEach(async () => {
   if (renderer) await act(async () => renderer.unmount());
@@ -216,6 +219,7 @@ describe("alerts inside native modals", () => {
     await act(async () => renderer.root.findByProps({ testID: "modal-trigger" }).props.onPress());
     expect(renderer.root.findAllByType("Modal")).toHaveLength(1);
     expect(titles()).toEqual(["Local first"]);
+    expect(keyboardDismiss).toHaveBeenCalledOnce();
     await act(async () => renderer.root.findByType("Modal").props.onRequestClose());
     expect(titles()).toEqual(["Local first"]);
     await press("Next");
@@ -232,6 +236,7 @@ describe("alerts inside native modals", () => {
     await act(async () => trigger());
     await act(async () => renderer.update(<ModalHarness />));
     expect(titles()).toEqual([]);
+    expect(keyboardDismiss).toHaveBeenCalledOnce();
   });
 });
 

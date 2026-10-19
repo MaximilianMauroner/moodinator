@@ -971,12 +971,13 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
         >
             <View
                 className="flex-1 justify-end"
+                accessibilityElementsHidden={hasAlert}
+                importantForAccessibility={hasAlert ? "no-hide-descendants" : "auto"}
                 style={{ backgroundColor: colors.overlay }}
             >
                 <View
+                    testID="entry-sheet"
                     className="rounded-t-3xl"
-                    accessibilityElementsHidden={hasAlert}
-                    importantForAccessibility={hasAlert ? "no-hide-descendants" : "auto"}
                     style={{
                         backgroundColor: get("background"),
                         height: sheetHeight,
@@ -1126,7 +1127,6 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                             }}
                         >
                             {/* ── Footer ─────────────────────────────────── */}
-                            {/* It stays while Notes has the keyboard, so Save remains reachable. */}
                         {/* Primary row */}
                         <View className="flex-row gap-3">
                             {/* Back / Cancel */}
@@ -1287,8 +1287,8 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                         void submitCreatePresetModal();
                     }}
                 />
-                {alertView}
             </View>
+            {alertView}
         </PrivateModal>
     );
 };
