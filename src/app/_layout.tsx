@@ -38,7 +38,7 @@ function AppBootSplash() {
   );
 }
 
-function AppLockRecovery({ retry }: { retry: () => void }) {
+function AppLockRecovery({ retry, captureError }: { retry: () => void; captureError: string | null }) {
   return (
     <View
       accessibilityViewIsModal
@@ -51,7 +51,9 @@ function AppLockRecovery({ retry }: { retry: () => void }) {
         App lock needs attention
       </Text>
       <Text className="text-sm text-paper-700 dark:text-paper-300 mt-2 mb-5 text-center">
-        Moodinator could not safely read your security settings. Your private content remains hidden.
+        {captureError
+          ? `${captureError} Your private content remains hidden.`
+          : "Moodinator could not safely read your security settings. Your private content remains hidden."}
       </Text>
       <Pressable
         onPress={retry}
@@ -98,6 +100,8 @@ export default function Layout() {
   const {
     hydrated: lockHydrated,
     hydrationError: lockHydrationError,
+    captureReady,
+    captureError,
     hydrate: hydrateLock,
     isEnabled,
     isLocked,
@@ -122,9 +126,11 @@ export default function Layout() {
     lockHydrated && onboardingHydrated && settingsHydrated &&
     (bootstrapStatus === "ready" || bootstrapStatus === "ready-with-warning");
   const showLockScreen =
-    hydrated && !lockHydrationError && hasCompletedOnboarding && isEnabled && isLocked;
+    hydrated && captureReady && !lockHydrationError && !captureError && hasCompletedOnboarding && isEnabled && isLocked;
   const shouldMountNavigator = hydrated && !lockHydrationError && hasCompletedOnboarding;
-  const blocksNavigator = !hydrated || Boolean(lockHydrationError) || !hasCompletedOnboarding || showLockScreen;
+  const blocksNavigator =
+    !hydrated || !captureReady || Boolean(lockHydrationError) || Boolean(captureError) ||
+    !hasCompletedOnboarding || showLockScreen;
 
   useEffect(() => {
     if (!hasPendingReminderNavigation || !shouldMountNavigator || blocksNavigator) {
@@ -218,13 +224,13 @@ export default function Layout() {
           )}
         </View>
 
-        {!hydrated && !lockHydrationError && bootstrapStatus !== "blocked" && (
+        {(!hydrated || !captureReady) && !lockHydrationError && !captureError && bootstrapStatus !== "blocked" && (
           <View className="absolute inset-0">
             <AppBootSplash />
           </View>
         )}
 
-        {hydrated && !lockHydrationError && !hasCompletedOnboarding && (
+        {hydrated && captureReady && !lockHydrationError && !captureError && !hasCompletedOnboarding && (
           <View className="absolute inset-0">
             <OnboardingScreen />
           </View>
@@ -236,13 +242,13 @@ export default function Layout() {
           </View>
         )}
 
-        {lockHydrationError && (
+        {(lockHydrationError || captureError) && (
           <View className="absolute inset-0">
-            <AppLockRecovery retry={() => void hydrateLock()} />
+            <AppLockRecovery retry={() => void hydrateLock()} captureError={captureError} />
           </View>
         )}
 
-        {bootstrapStatus === "blocked" && !lockHydrationError && (
+        {bootstrapStatus === "blocked" && !lockHydrationError && !captureError && (
           <View className="absolute inset-0">
             <AppDatabaseRecovery retry={retryBootstrap} />
           </View>

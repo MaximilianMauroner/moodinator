@@ -1,0 +1,42 @@
+diff --git a/android/src/main/java/expo/modules/screencapture/ScreenCaptureModule.kt b/android/src/main/java/expo/modules/screencapture/ScreenCaptureModule.kt
+--- a/android/src/main/java/expo/modules/screencapture/ScreenCaptureModule.kt
++++ b/android/src/main/java/expo/modules/screencapture/ScreenCaptureModule.kt
+@@ -48,16 +48,2 @@
+ 
+-    OnCreate {
+-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+-        screenCaptureCallback = Activity.ScreenCaptureCallback {
+-          emitEvent()
+-        }
+-        // Let's try to register the callback
+-        registerCallback()
+-      } else {
+-        screenshotEventEmitter = ScreenshotEventEmitter(context) {
+-          emitEvent()
+-        }
+-      }
+-    }
+-
+     AsyncFunction("getPermissionsAsync") { promise: Promise ->
+@@ -95,4 +81,2 @@
+     OnActivityEntersForeground {
+-      // Call registerCallback once more as a fallback if activity wasn't available in onCreate
+-      registerCallback()
+       screenshotEventEmitter?.onHostResume()
+diff --git a/expo-module.config.json b/expo-module.config.json
+--- a/expo-module.config.json
++++ b/expo-module.config.json
+@@ -4,12 +4,6 @@
+     "modules": ["ScreenCaptureModule"]
+   },
+   "android": {
+-    "modules": ["expo.modules.screencapture.ScreenCaptureModule"],
+-    "publication": {
+-      "groupId": "host.exp.exponent",
+-      "artifactId": "expo.modules.screencapture",
+-      "version": "55.0.18",
+-      "repository": "local-maven-repo"
+-    }
++    "modules": ["expo.modules.screencapture.ScreenCaptureModule"]
+   }
+ }

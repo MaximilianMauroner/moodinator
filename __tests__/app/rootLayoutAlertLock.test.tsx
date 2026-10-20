@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => {
   const lockState = {
     hydrated: true,
     hydrationError: null,
+    captureReady: true,
+    captureError: null as string | null,
     hydrate: () => {},
     isEnabled: true,
     isLocked: false,
@@ -70,6 +72,8 @@ beforeEach(async () => {
   vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => { callback(0); return 1; });
   vi.stubGlobal("cancelAnimationFrame", vi.fn());
   mocks.lockState.isLocked = false;
+  mocks.lockState.captureReady = true;
+  mocks.lockState.captureError = null;
   mocks.lockState.lock = () => { mocks.lockState.isLocked = true; };
   await act(async () => {
     renderer = create(<Layout />);
@@ -99,5 +103,29 @@ describe("root layout app alert behind App Lock", () => {
 
     expect(alertModal().props).toMatchObject({ visible: true, animationType: "fade" });
     expect(alertTitles()).toEqual(["Delete \"Therapy check-in\"?"]);
+  });
+
+  it("hides private windows during capture updates without discarding the alert", async () => {
+    await act(async () => Alert.alert("Private reminder", "Saved detail"));
+    mocks.lockState.captureReady = false;
+    await rerender();
+    expect(alertModal().props).toMatchObject({ visible: false, animationType: "none" });
+
+    mocks.lockState.captureReady = true;
+    await rerender();
+    expect(alertModal().props.visible).toBe(true);
+    expect(alertTitles()).toEqual(["Private reminder"]);
+  });
+
+  it("shows truthful recovery and keeps alerts hidden after a capture API failure", async () => {
+    await act(async () => Alert.alert("Private reminder", "Saved detail"));
+    mocks.lockState.captureReady = false;
+    mocks.lockState.captureError = "Capture protection could not be applied.";
+    await rerender();
+
+    expect(alertModal().props.visible).toBe(false);
+    expect(alertTitles()).toContain("App lock needs attention");
+    expect(renderer.root.findAllByType("Text").map((node) => node.props.children).join(" "))
+      .toContain("Capture protection could not be applied. Your private content remains hidden.");
   });
 });
