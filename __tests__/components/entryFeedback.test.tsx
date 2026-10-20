@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { act, create, type ReactTestRenderer } from "react-test-renderer";
+import { View } from "react-native";
+import { act, create, type ReactTestInstance, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Emotion, MoodEntry } from "@db/types";
 import { EmotionPicker } from "@/components/entry/EmotionPicker";
 import { EnergySlider } from "@/components/entry/EnergySlider";
+import { CreatePresetModal } from "@/components/entry/CreatePresetModal";
 import {
   DetailedMoodEntryModal,
   EditMoodEntryModal,
@@ -32,6 +34,8 @@ const nativeFeedback = vi.hoisted(() => ({
 }));
 const entryFeedback = vi.hoisted(() => ({
   alert: vi.fn(),
+  alertView: null as React.ReactNode,
+  hasAlert: false,
   crisisSupport: vi.fn(),
   toastSuccess: vi.fn(),
 }));
@@ -75,7 +79,9 @@ vi.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => nati
 vi.mock("react-native-pager-view", () => ({ default: "PagerView" }));
 vi.mock("@react-navigation/elements", () => ({ PlatformPressable: "Pressable" }));
 vi.mock("@/components/entry", () => ({ SameAsYesterdayButton: "CopyLastEntry" }));
-vi.mock("@/components/ui/AppAlert", () => ({ Alert: { alert: entryFeedback.alert } }));
+vi.mock("@/components/ui/AppAlert", () => ({
+  useModalAlert: () => ({ alert: entryFeedback.alert, alertView: entryFeedback.alertView, hasAlert: entryFeedback.hasAlert }),
+}));
 vi.mock("@/lib/showCrisisSupportAlert", () => ({ showCrisisSupportAlert: entryFeedback.crisisSupport }));
 vi.mock("@/services/toastService", () => ({
   toastService: { success: entryFeedback.toastSuccess },
@@ -137,6 +143,8 @@ beforeEach(() => {
   setHapticsEnabled(true);
   nativeInsets.bottom = 0;
   keyboardListeners.clear();
+  entryFeedback.alertView = null;
+  entryFeedback.hasAlert = false;
 });
 
 afterEach(async () => {
@@ -815,5 +823,54 @@ describe("last-entry prefill", () => {
     } finally {
       consoleSpy.mockRestore();
     }
+  });
+});
+
+describe.each(["android", "ios"])("entry notes keyboard on %s", (platform) => {
+  beforeEach(() => {
+    nativePlatform.OS = platform;
+    nativePlatform.Version = platform === "android" ? 35 : 18;
+    nativeInsets.bottom = 24;
+  });
+
+  it("keeps Save reachable above the keyboard while Notes has focus", async () => {
+    const onSubmit = vi.fn(async () => {});
+    await render(
+      <SaveEntryModal variant="detailed" fieldConfig={NOTES_ONLY} onClose={vi.fn()} onSubmit={onSubmit} />,
+    );
+
+    await act(async () => button("entry-notes").props.onFocus());
+    await act(async () => {
+      keyboardListeners.get(platform === "ios" ? "keyboardWillShow" : "keyboardDidShow")?.({
+        endCoordinates: { height: 300 },
+      });
+    });
+    await act(async () => button("entry-notes").props.onChangeText("typed with the keyboard open"));
+
+    // Android reports the keyboard above the 24dp navigation inset; the
+    // edge-to-edge sheet must clear both.
+    expect(button("entry-sheet").props.style.marginBottom).toBe(platform === "android" ? 324 : 300);
+
+    await act(async () => {
+      labeledButton("Save entry").props.onPress();
+      await Promise.resolve();
+    });
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ note: "typed with the keyboard open" }));
+  });
+});
+
+describe("inline entry alerts", () => {
+  it("covers the sheet and the preset form and hides both from assistive tech", async () => {
+    entryFeedback.hasAlert = true;
+    entryFeedback.alertView = <View testID="entry-alert" />;
+    await render(<SaveEntryModal variant="detailed" onClose={vi.fn()} onSubmit={vi.fn(async () => {})} />);
+
+    const [content, alert] = renderer.root.findByType("Modal").children as ReactTestInstance[];
+    expect(alert.props.testID).toBe("entry-alert");
+    expect(content.props.accessibilityElementsHidden).toBe(true);
+    expect(content.props.importantForAccessibility).toBe("no-hide-descendants");
+    expect(content.findAllByProps({ testID: "entry-sheet" })).toHaveLength(1);
+    expect(content.findAllByType(CreatePresetModal)).toHaveLength(1);
   });
 });
