@@ -60,9 +60,11 @@ windows, so MainActivity protection does not prove their capture policy.
 A pinned patch removes the screen-capture package's screenshot-detection
 callback and its media observer. Android 14+ shows a system notice for each
 detected screenshot, and this app uses no screenshot events. The package's
-photo-read and screenshot-detection permissions are blocked. Remove the patch
-when upstream registers these listeners only on request. Native verification
-checks that the merged manifest does not contain these permissions.
+photo-read and screenshot-detection permissions are blocked. The patch also
+removes the package's Android publication, because Expo otherwise links a
+prebuilt copy that does not contain the patch. Remove the patch when upstream
+registers these listeners only on request. Native verification checks that the
+merged manifest does not contain these permissions.
 
 The pinned date/time picker patch copies the Activity secure flag to each
 app-owned picker dialog before it appears. Android does not inherit this flag
