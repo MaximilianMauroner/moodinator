@@ -918,7 +918,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
         <View key={stepId} style={{ flex: 1 }}>
             <ScrollView
                 ref={stepId === "details" ? scrollViewRef : undefined}
-                className="px-5 pt-5"
+                className="px-5 pt-3"
                 contentContainerStyle={{ paddingBottom: scrollBottomPadding }}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
@@ -1065,25 +1065,23 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                             onAdjust={setMood}
                                             isDark={isDark}
                                         />
-                                        <View className="items-end">
+                                        <View className="flex-row items-center justify-between gap-3">
+                                            <StepDots
+                                                total={steps.length}
+                                                current={currentStep}
+                                                isDark={isDark}
+                                            />
                                             <SameAsYesterdayButton onCopy={handleCopyYesterday} excludeEntryId={currentEntryId} />
                                         </View>
                                     </View>
 
-                                    {/* Step dots */}
-                                    <View className="pb-3">
-                                        <StepDots
-                                            total={steps.length}
-                                            current={currentStep}
-                                            isDark={isDark}
-                                        />
-                                        {/* Step title — matches step body direction */}
+                                    <View className="px-4 pb-2">
                                         <Animated.Text
                                             style={{
-                                                ...typography.eyebrow,
+                                                ...typography.bodySm,
                                                 textAlign: "center",
                                                 color: get("textSubtle"),
-                                                marginTop: 6,
+                                                marginTop: 4,
                                             }}
                                         >
                                             {currentStepTitle}

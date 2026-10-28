@@ -98,7 +98,7 @@ const MoodAdjustRow: React.FC<{
     }));
 
     return (
-        <View className="flex-row items-center justify-center gap-3 py-2">
+        <View className="flex-row items-center justify-center gap-3 py-1">
             {/* Decrease (better) */}
             <Animated.View style={decAnimatedStyle}>
                 <HapticTab
@@ -139,10 +139,14 @@ const MoodAdjustRow: React.FC<{
                         backgroundColor: bgHex,
                         minWidth: 120,
                         flexShrink: 1,
-                        paddingHorizontal: 20,
+                        paddingHorizontal: 12,
                         paddingVertical: 8,
+                        minHeight: 48,
                         borderRadius: 16,
+                        flexDirection: "row",
                         alignItems: "center",
+                        justifyContent: "center",
+                        gap: 8,
                         shadowColor: textHex,
                         shadowOffset: { width: 0, height: 3 },
                         shadowOpacity: isDark ? 0.3 : 0.18,
@@ -158,6 +162,7 @@ const MoodAdjustRow: React.FC<{
                         color: textHex,
                         fontSize: 26,
                         lineHeight: 30,
+                        flexShrink: 0,
                     }}
                 >
                     {mood}
@@ -167,7 +172,7 @@ const MoodAdjustRow: React.FC<{
                         fontSize: 12,
                         fontWeight: "600",
                         color: textHex,
-                        marginTop: 1,
+                        flexShrink: 1,
                     }}
                 >
                     {moodData.label}
@@ -256,7 +261,7 @@ const StepDots: React.FC<{
 }> = ({ total, current, isDark }) => {
     if (total <= 1) return null;
     return (
-        <View className="flex-row items-center justify-center gap-1.5 mt-2">
+        <View className="flex-row items-center justify-center gap-1.5">
             {Array.from({ length: total }, (_, i) => (
                 <AnimatedDot key={i} isActive={i === current} isDark={isDark} />
             ))}
