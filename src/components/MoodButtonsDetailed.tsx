@@ -7,12 +7,12 @@ import {
 	getMoodButtonLabel,
 	getMoodButtonHint,
 } from "@/constants/accessibility";
-import { useThemeColors, colors } from "@/constants/colors";
+import { useThemeColors } from "@/constants/colors";
 import { getMoodWeatherColor, getMoodWeatherIcon } from "@/constants/moodWeather";
 
-const THREE_COLUMN_CARD_HEIGHT = 78;
+const THREE_COLUMN_CARD_MIN_HEIGHT = 78;
 const THREE_COLUMN_CARD_WIDTH = "31.5%";
-const TWO_COLUMN_CARD_HEIGHT = 84;
+const TWO_COLUMN_CARD_MIN_HEIGHT = 84;
 const TWO_COLUMN_CARD_WIDTH = "48%";
 
 interface MoodButtonsDetailedProps {
@@ -40,11 +40,11 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
 	const renderMoodCard = (
 		mood: (typeof moodData)[number],
 		width: ViewStyle["width"],
-		height: number,
+		minHeight: number,
 	) => {
 		const cardStyle: ViewStyle = {
 			width,
-			height,
+			minHeight,
 			backgroundColor: get("background"),
 			borderWidth: 1,
 			borderColor: get("border"),
@@ -53,7 +53,7 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
 		return (
 		<HapticTab
 			key={`${isDark ? "dark" : "light"}-${mood.value}`}
-			className="items-center justify-center rounded-2xl"
+			className="items-center justify-center rounded-2xl py-[8px]"
 			style={cardStyle}
 			onPress={() => onMoodPress(mood.value)}
 			onLongPress={() => onLongPress(mood.value)}
@@ -73,9 +73,8 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
 				</Text>
 			</View>
 			<Text
-				className="mb-0.5 text-xs font-semibold"
+				className="mb-0.5 self-stretch text-center text-xs font-semibold"
 				style={{ color: get("textMuted") }}
-				numberOfLines={1}
 			>
 				{mood.label}
 			</Text>
@@ -92,24 +91,6 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
 
 	return (
 		<View className="mb-2">
-			{/* Soft header */}
-			<View className="mb-2 flex-row items-center justify-center">
-				<View
-					className="h-px flex-1"
-					style={{ backgroundColor: get("border") }}
-				/>
-				<Text
-					className="text-xs font-medium mx-3 tracking-wide"
-					style={{ color: isDark ? colors.sand.textMuted.dark : "#6B5C4A" }}
-				>
-					How are you feeling?
-				</Text>
-				<View
-					className="h-px flex-1"
-					style={{ backgroundColor: get("border") }}
-				/>
-			</View>
-
 			<View
 				className="flex-row flex-wrap justify-between"
 				style={{ rowGap: 8 }}
@@ -118,11 +99,11 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
 					renderMoodCard(
 						mood,
 						THREE_COLUMN_CARD_WIDTH,
-						THREE_COLUMN_CARD_HEIGHT,
+						THREE_COLUMN_CARD_MIN_HEIGHT,
 					),
 				)}
 				{remainingMoods.map((mood) =>
-					renderMoodCard(mood, TWO_COLUMN_CARD_WIDTH, TWO_COLUMN_CARD_HEIGHT),
+					renderMoodCard(mood, TWO_COLUMN_CARD_WIDTH, TWO_COLUMN_CARD_MIN_HEIGHT),
 				)}
 			</View>
 
