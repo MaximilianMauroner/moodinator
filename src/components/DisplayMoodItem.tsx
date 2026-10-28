@@ -521,7 +521,7 @@ function MoodEntryCard(
                         </Text>
                         <Text
                           className="text-sm font-semibold uppercase tracking-wide"
-                          style={{ color: `${moodData.textHex}BB` }}
+                          style={{ color: moodData.textHex }}
                         >
                           {moodData.label}
                         </Text>
