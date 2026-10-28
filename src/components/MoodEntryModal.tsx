@@ -695,23 +695,19 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
           })
         : undefined;
 
-    const emotionSelectionGuidance = (
-        <Text style={{ ...typography.bodySm, color: get("textSubtle") }}>
-            Optional · Choose up to 3 · {emotions.length}/3 selected
-        </Text>
-    );
-
     const renderEmotionsStep = () => (
         <View>
             {singlePage && (
-                <View className="mb-3">
-                    <SectionLabel
-                        label="Emotions"
-                        isDark={isDark}
-                        action={addEmotionAction}
-                    />
-                    {emotionSelectionGuidance}
-                </View>
+                <SectionLabel
+                    label="Emotions"
+                    isDark={isDark}
+                    badge={
+                        emotions.length > 0
+                            ? `${emotions.length}/3 selected`
+                            : undefined
+                    }
+                    action={addEmotionAction}
+                />
             )}
             <EmotionPicker
                 options={emotionOptions}
@@ -1069,32 +1065,35 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                     </View>
                                 ) : (
                                     <>
-                                    <View className="px-4 pb-4">
+                                    <View className="px-4 pb-1">
                                         <MoodAdjustRow
                                             mood={mood}
                                             onAdjust={setMood}
                                             isDark={isDark}
                                         />
-                                        <View className="items-center">
+                                        <View className="items-end">
                                             <SameAsYesterdayButton onCopy={handleCopyYesterday} excludeEntryId={currentEntryId} />
                                         </View>
                                     </View>
 
                                     <View className="flex-row items-center gap-3 px-4 pb-2">
-                                        <View className="flex-1">
-                                            <Animated.Text
-                                                accessibilityRole="header"
-                                                style={{
-                                                    ...typography.bodyMd,
-                                                    fontWeight: "600",
-                                                    color: get("text"),
-                                                    marginTop: 4,
-                                                }}
-                                            >
-                                                {currentStepTitle}
-                                            </Animated.Text>
-                                            {currentStepId === "emotions" && emotionSelectionGuidance}
-                                        </View>
+                                        <Animated.Text
+                                            accessibilityRole="header"
+                                            style={{
+                                                ...typography.bodyMd,
+                                                flex: 1,
+                                                fontWeight: "600",
+                                                color: get("text"),
+                                                marginTop: 4,
+                                            }}
+                                        >
+                                            {currentStepTitle}
+                                        </Animated.Text>
+                                        {currentStepId === "emotions" && (
+                                            <Text style={{ ...typography.bodySm, color: get("textSubtle") }}>
+                                                {emotions.length}/3 selected
+                                            </Text>
+                                        )}
                                         {currentStepId === "emotions" && addEmotionAction}
                                     </View>
                                     </>

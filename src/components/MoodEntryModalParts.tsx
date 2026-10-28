@@ -144,8 +144,6 @@ const MoodAdjustRow: React.FC<{
                         paddingVertical: 8,
                         minHeight: 48,
                         borderRadius: 16,
-                        borderWidth: isDark ? 0 : 1,
-                        borderColor: textHex,
                         flexDirection: "row",
                         alignItems: "center",
                         justifyContent: "center",

@@ -4,6 +4,7 @@ import Animated, {
     useSharedValue,
     useAnimatedStyle,
     withSpring,
+    FadeIn,
 } from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
 import { useThemeColors, getThemedColor } from "@/constants/colors";
@@ -268,8 +269,8 @@ export const EmotionPicker: React.FC<EmotionPickerProps> = ({
 
     return (
         <View>
-            {selected.length > 0 && (
-                <View className="mb-2" style={{ minHeight: 34, justifyContent: "center" }}>
+            <View className="mb-2" style={{ minHeight: 34, justifyContent: "center" }}>
+                {selected.length > 0 ? (
                     <ScrollView
                         horizontal
                         showsHorizontalScrollIndicator={false}
@@ -292,8 +293,21 @@ export const EmotionPicker: React.FC<EmotionPickerProps> = ({
                             );
                         })}
                     </ScrollView>
-                </View>
-            )}
+                ) : (
+                    <Animated.View entering={FadeIn.duration(160)}>
+                        <Text
+                            className="text-xs"
+                            style={{
+                                color: labelColor,
+                                fontStyle: "italic",
+                                opacity: 0.95,
+                            }}
+                        >
+                            Pick up to {maxSelections}
+                        </Text>
+                    </Animated.View>
+                )}
+            </View>
 
             {/* Energy bands. Colour still carries valence, so both axes read at once. */}
             {GROUP_ORDER.map((group) => {
