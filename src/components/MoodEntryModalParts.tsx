@@ -110,7 +110,7 @@ const MoodAdjustRow: React.FC<{
                         decScale.value = withSpring(1, { damping: 14, stiffness: 350 });
                     }}
                     disabled={!canDecrease}
-                    className="w-9 h-9 rounded-full items-center justify-center"
+                    className="w-[48px] h-[48px] rounded-full items-center justify-center"
                     style={{
                         backgroundColor: isDark
                             ? "rgba(42, 37, 32, 0.7)"
@@ -138,6 +138,7 @@ const MoodAdjustRow: React.FC<{
                     {
                         backgroundColor: bgHex,
                         minWidth: 120,
+                        flexShrink: 1,
                         paddingHorizontal: 20,
                         paddingVertical: 8,
                         borderRadius: 16,
@@ -184,7 +185,7 @@ const MoodAdjustRow: React.FC<{
                         incScale.value = withSpring(1, { damping: 14, stiffness: 350 });
                     }}
                     disabled={!canIncrease}
-                    className="w-9 h-9 rounded-full items-center justify-center"
+                    className="w-[48px] h-[48px] rounded-full items-center justify-center"
                     style={{
                         backgroundColor: isDark
                             ? "rgba(42, 37, 32, 0.7)"

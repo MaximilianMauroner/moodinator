@@ -1059,16 +1059,13 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                     </View>
                                 ) : (
                                     <>
-                                    {/* Mood adjust row + Last Entry */}
-                                    <View className="flex-row items-center px-4 pb-1">
-                                        <View className="flex-1">
-                                            <MoodAdjustRow
-                                                mood={mood}
-                                                onAdjust={setMood}
-                                                isDark={isDark}
-                                            />
-                                        </View>
-                                        <View className="ml-2">
+                                    <View className="px-4 pb-1">
+                                        <MoodAdjustRow
+                                            mood={mood}
+                                            onAdjust={setMood}
+                                            isDark={isDark}
+                                        />
+                                        <View className="items-end">
                                             <SameAsYesterdayButton onCopy={handleCopyYesterday} excludeEntryId={currentEntryId} />
                                         </View>
                                     </View>
