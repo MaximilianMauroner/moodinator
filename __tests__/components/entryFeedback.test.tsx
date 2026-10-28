@@ -142,6 +142,7 @@ beforeEach(() => {
   vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => { callback(0); return 0; });
   setHapticsEnabled(true);
   nativeInsets.bottom = 0;
+  nativeInsets.top = 0;
   keyboardListeners.clear();
   entryFeedback.alertView = null;
   entryFeedback.hasAlert = false;
@@ -831,6 +832,7 @@ describe.each(["android", "ios"])("entry notes keyboard on %s", (platform) => {
     nativePlatform.OS = platform;
     nativePlatform.Version = platform === "android" ? 35 : 18;
     nativeInsets.bottom = 24;
+    nativeInsets.top = 48;
   });
 
   it("keeps Save reachable above the keyboard while Notes has focus", async () => {
@@ -850,6 +852,8 @@ describe.each(["android", "ios"])("entry notes keyboard on %s", (platform) => {
     // Android reports the keyboard above the 24dp navigation inset; the
     // edge-to-edge sheet must clear both.
     expect(button("entry-sheet").props.style.marginBottom).toBe(platform === "android" ? 324 : 300);
+    const sheet = button("entry-sheet").props.style;
+    expect(844 - sheet.marginBottom - sheet.height).toBeGreaterThanOrEqual(nativeInsets.top);
 
     await act(async () => {
       labeledButton("Save entry").props.onPress();

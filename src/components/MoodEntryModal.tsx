@@ -954,7 +954,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
         Math.round(windowHeight * 0.92),
         Math.max(
             1,
-            Math.round(availableHeight - (isNotesKeyboardActive ? 0 : 24))
+            Math.round(availableHeight - Math.max(24, insets.top))
         )
     );
 
