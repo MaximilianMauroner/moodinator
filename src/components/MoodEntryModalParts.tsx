@@ -121,7 +121,7 @@ const MoodAdjustRow: React.FC<{
                             : "rgba(229, 217, 191, 0.8)",
                         opacity: canDecrease ? 1 : 0.25,
                     }}
-                    accessibilityLabel={canDecrease ? `Decrease mood to ${mood - 1}` : "Mood is already 0, Elated"}
+                    accessibilityLabel={canDecrease ? `Decrease mood to ${mood - 1}` : `Mood is already ${mood}, ${moodData.label}`}
                     accessibilityState={{ disabled: !canDecrease }}
                     accessibilityRole="button"
                 >
@@ -202,7 +202,7 @@ const MoodAdjustRow: React.FC<{
                             : "rgba(229, 217, 191, 0.8)",
                         opacity: canIncrease ? 1 : 0.25,
                     }}
-                    accessibilityLabel={canIncrease ? `Increase mood to ${mood + 1}` : "Mood is already 10, Emergency"}
+                    accessibilityLabel={canIncrease ? `Increase mood to ${mood + 1}` : `Mood is already ${mood}, ${moodData.label}`}
                     accessibilityState={{ disabled: !canIncrease }}
                     accessibilityRole="button"
                 >
@@ -265,7 +265,7 @@ const StepDots: React.FC<{
             accessible
             accessibilityRole="progressbar"
             accessibilityLabel="Entry progress"
-            accessibilityValue={{ min: 1, max: total, now: current + 1 }}
+            accessibilityValue={{ min: 1, max: total, now: current + 1, text: `Step ${current + 1} of ${total}` }}
         >
             {Array.from({ length: total }, (_, i) => (
                 <AnimatedDot key={i} isActive={i === current} isDark={isDark} />

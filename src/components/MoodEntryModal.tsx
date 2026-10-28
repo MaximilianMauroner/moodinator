@@ -1089,6 +1089,11 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                         >
                                             {currentStepTitle}
                                         </Animated.Text>
+                                        {currentStepId === "emotions" && (
+                                            <Text style={{ ...typography.bodySm, color: get("textSubtle") }}>
+                                                {emotions.length}/3 selected
+                                            </Text>
+                                        )}
                                         {currentStepId === "emotions" && addEmotionAction}
                                     </View>
                                     </>
