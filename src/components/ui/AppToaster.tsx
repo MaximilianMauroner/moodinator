@@ -37,6 +37,7 @@ export function AppToaster() {
       ToasterOverlayWrapper={ToasterSafeAreaOverlay}
       theme={isDark ? "dark" : "light"}
       position="bottom-center"
+      positionerStyle={{ top: 0 }}
       offset={offset}
       gap={8}
       visibleToasts={3}
