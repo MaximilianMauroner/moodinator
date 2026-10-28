@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import { Pressable, Text, View } from "react-native";
-import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from "react-native-reanimated";
+import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring } from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
 import { HapticTab } from "./HapticTab";
 import { colors } from "@/constants/colors";
@@ -121,7 +121,8 @@ const MoodAdjustRow: React.FC<{
                             : "rgba(229, 217, 191, 0.8)",
                         opacity: canDecrease ? 1 : 0.25,
                     }}
-                    accessibilityLabel={`Decrease mood to ${mood - 1}`}
+                    accessibilityLabel={canDecrease ? `Decrease mood to ${mood - 1}` : "Mood is already 0, Elated"}
+                    accessibilityState={{ disabled: !canDecrease }}
                     accessibilityRole="button"
                 >
                     <Ionicons
@@ -201,7 +202,8 @@ const MoodAdjustRow: React.FC<{
                             : "rgba(229, 217, 191, 0.8)",
                         opacity: canIncrease ? 1 : 0.25,
                     }}
-                    accessibilityLabel={`Increase mood to ${mood + 1}`}
+                    accessibilityLabel={canIncrease ? `Increase mood to ${mood + 1}` : "Mood is already 10, Emergency"}
+                    accessibilityState={{ disabled: !canIncrease }}
                     accessibilityRole="button"
                 >
                     <Ionicons
@@ -221,7 +223,6 @@ const AnimatedDot: React.FC<{ isActive: boolean; isDark: boolean }> = ({
     isDark,
 }) => {
     const width = useSharedValue(isActive ? 16 : 6);
-    const opacity = useSharedValue(isActive ? 1 : 0.35);
 
     useEffect(() => {
         width.value = withSpring(isActive ? 16 : 6, {
@@ -229,12 +230,10 @@ const AnimatedDot: React.FC<{ isActive: boolean; isDark: boolean }> = ({
             stiffness: 380,
             overshootClamping: true,
         });
-        opacity.value = withTiming(isActive ? 1 : 0.35, { duration: 200 });
-    }, [isActive, opacity, width]);
+    }, [isActive, width]);
 
     const animatedStyle = useAnimatedStyle(() => ({
         width: width.value,
-        opacity: opacity.value,
     }));
 
     return (
@@ -261,7 +260,13 @@ const StepDots: React.FC<{
 }> = ({ total, current, isDark }) => {
     if (total <= 1) return null;
     return (
-        <View className="flex-row items-center justify-center gap-1.5">
+        <View
+            className="flex-row items-center justify-center gap-1.5"
+            accessible
+            accessibilityRole="progressbar"
+            accessibilityLabel="Entry progress"
+            accessibilityValue={{ min: 1, max: total, now: current + 1 }}
+        >
             {Array.from({ length: total }, (_, i) => (
                 <AnimatedDot key={i} isActive={i === current} isDark={isDark} />
             ))}

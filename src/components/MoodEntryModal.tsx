@@ -107,7 +107,7 @@ type BaseMoodEntryModalProps = {
 // ─── Step title map ────────────────────────────────────────────────────────
 const STEP_TITLES: Record<MoodEntryStepId, string> = {
     mood: "How are you feeling?",
-    emotions: "What emotions are present?",
+    emotions: "Emotions",
     details: "Any more context?",
 };
 
@@ -673,8 +673,8 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
             onPress={onPress}
             className="items-center justify-center rounded-xl"
             style={{
-                width: 32,
-                height: 32,
+                width: 48,
+                height: 48,
                 backgroundColor: color,
             }}
             accessibilityRole="button"
@@ -686,31 +686,29 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
 
 
 
+    const addEmotionAction = onCreateEmotion
+        ? renderAddPresetButton({
+              onPress: openCreateEmotionModal,
+              color: get("primaryBg"),
+              textColor: get("primary"),
+              label: "Add new emotion",
+          })
+        : undefined;
+
     const renderEmotionsStep = () => (
         <View>
-            <SectionLabel
-                label="Emotions"
-                isDark={isDark}
-                badge={
-                    emotions.length > 0
-                        ? `${emotions.length}/3 selected`
-                        : undefined
-                }
-                action={
-                    onCreateEmotion
-                        ? renderAddPresetButton({
-                              onPress: openCreateEmotionModal,
-                              color: isDark
-                                  ? colors.negative.bgSelected.dark
-                                  : colors.negative.bgSelected.light,
-                              textColor: isDark
-                                  ? colors.negative.textSelected.dark
-                                  : colors.negative.textSelected.light,
-                              label: "Add new emotion",
-                          })
-                        : undefined
-                }
-            />
+            {singlePage && (
+                <SectionLabel
+                    label="Emotions"
+                    isDark={isDark}
+                    badge={
+                        emotions.length > 0
+                            ? `${emotions.length}/3 selected`
+                            : undefined
+                    }
+                    action={addEmotionAction}
+                />
+            )}
             <EmotionPicker
                 options={emotionOptions}
                 selected={emotions}
@@ -1009,13 +1007,21 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                     />
                                 </View>
 
-                                <View className="flex-row items-center px-4 pb-2">
+                                <View className="flex-row items-center gap-3 px-4 pb-2">
                                     <Text
                                         className="flex-1 text-lg font-bold"
                                         style={{ color: get("text") }}
+                                        accessibilityRole="header"
                                     >
                                         {title}
                                     </Text>
+                                    {!singlePage && (
+                                        <StepDots
+                                            total={steps.length}
+                                            current={currentStep}
+                                            isDark={isDark}
+                                        />
+                                    )}
                                     {headerAction ? (
                                         <Pressable
                                             onPress={headerAction.onPress}
@@ -1065,27 +1071,25 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                             onAdjust={setMood}
                                             isDark={isDark}
                                         />
-                                        <View className="flex-row items-center justify-between gap-3">
-                                            <StepDots
-                                                total={steps.length}
-                                                current={currentStep}
-                                                isDark={isDark}
-                                            />
+                                        <View className="items-end">
                                             <SameAsYesterdayButton onCopy={handleCopyYesterday} excludeEntryId={currentEntryId} />
                                         </View>
                                     </View>
 
-                                    <View className="px-4 pb-2">
+                                    <View className="flex-row items-center gap-3 px-4 pb-2">
                                         <Animated.Text
+                                            accessibilityRole="header"
                                             style={{
-                                                ...typography.bodySm,
-                                                textAlign: "center",
-                                                color: get("textSubtle"),
+                                                ...typography.bodyMd,
+                                                flex: 1,
+                                                fontWeight: "600",
+                                                color: get("text"),
                                                 marginTop: 4,
                                             }}
                                         >
                                             {currentStepTitle}
                                         </Animated.Text>
+                                        {currentStepId === "emotions" && addEmotionAction}
                                     </View>
                                     </>
                                 )}

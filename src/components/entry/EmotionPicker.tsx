@@ -269,9 +269,7 @@ export const EmotionPicker: React.FC<EmotionPickerProps> = ({
 
     return (
         <View>
-            {/* Selected summary. Fixed height so the grid never shifts when the
-                selection changes, but only one row tall. */}
-            <View style={{ height: 34, justifyContent: "center" }}>
+            <View className="mb-2" style={{ minHeight: 34, justifyContent: "center" }}>
                 {selected.length > 0 ? (
                     <ScrollView
                         horizontal
@@ -311,18 +309,6 @@ export const EmotionPicker: React.FC<EmotionPickerProps> = ({
                 )}
             </View>
 
-            {/* Reserved line, so reaching the limit never shifts the bands below. */}
-            <View className="mb-3" style={{ height: 15, justifyContent: "center" }}>
-                {atLimit && (
-                    <Animated.Text
-                        entering={FadeIn.duration(160)}
-                        style={{ fontSize: 12, color: labelColor, fontStyle: "italic" }}
-                    >
-                        Tap a selected emotion to remove it
-                    </Animated.Text>
-                )}
-            </View>
-
             {/* Energy bands. Colour still carries valence, so both axes read at once. */}
             {GROUP_ORDER.map((group) => {
                 const list = grouped[group];
@@ -347,7 +333,7 @@ export const EmotionPicker: React.FC<EmotionPickerProps> = ({
                             >
                                 {GROUP_LABELS[group]}
                             </Text>
-                            <Text style={{ fontSize: 11, color: labelColor, opacity: 0.7 }}>
+                            <Text style={{ fontSize: 11, color: labelColor }}>
                                 {list.length}
                             </Text>
                             <View

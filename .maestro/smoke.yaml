@@ -12,7 +12,7 @@ name: Isolated Android entry lifecycle
 - tapOn: "Undo this entry"
 - assertVisible: "No check-in yet today"
 - longPressOn: "Mood Rating 5 of 10, Neutral. Lower numbers are better."
-- assertVisible: "(?i)What emotions are present[?]"
+- assertVisible: "(?i)Emotions"
 - scrollUntilVisible:
     element:
       id: "emotion-option-Happy"
