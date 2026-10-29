@@ -1102,6 +1102,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                     )}
 
                     {/* ── Step content ────────────────────────────────────── */}
+                    <View style={{ flex: 1 }}>
                     {singlePage ? renderSinglePage() : (
                     <PagerView
                         ref={pagerRef}
@@ -1114,6 +1115,19 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                         {steps.map(renderStepPage)}
                     </PagerView>
                     )}
+                        {/* Fades content into the footer so a cut-off row reads as "more below". */}
+                        <View
+                            pointerEvents="none"
+                            style={{
+                                position: "absolute",
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                height: 24,
+                                experimental_backgroundImage: `linear-gradient(to bottom, ${get("background")}00, ${get("background")})`,
+                            }}
+                        />
+                    </View>
 
                         <View
                             style={{
