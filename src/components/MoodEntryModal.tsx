@@ -1031,7 +1031,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                                     <Text style={{ color: get("textSubtle") }}>{mood}</Text>
                                                 </Text>
                                                 <Text style={[typography.bodySm, { color: get("textSubtle") }]}>
-                                                    Kept. Add detail if you like.
+                                                    Add detail if you like, then tap Done.
                                                 </Text>
                                             </View>
                                         </View>
@@ -1064,7 +1064,10 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                         >
                                             {currentStepTitle}
                                         </Animated.Text>
-                                        <SameAsYesterdayButton onCopy={handleCopyYesterday} excludeEntryId={currentEntryId} />
+                                        {/* The text button's padding sits in the gutter so its text lines up with the margin. */}
+                                        <View className="-mr-2">
+                                            <SameAsYesterdayButton onCopy={handleCopyYesterday} excludeEntryId={currentEntryId} />
+                                        </View>
                                     </View>
                                     </>
                                 )}
