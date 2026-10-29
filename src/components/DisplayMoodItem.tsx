@@ -433,9 +433,9 @@ function MoodEntryCard(
               >
                 {historyCardStyle === "compact" ? (
                   <View className="px-4 py-3">
-                    <View className="flex-row items-center gap-3">
+                    <View className="flex-row items-center gap-2">
                       <View
-                        className="h-8 w-8 items-center justify-center rounded-full"
+                        className="min-h-[32px] min-w-[32px] shrink-0 items-center justify-center rounded-full px-2 py-1"
                         style={{
                           backgroundColor: moodData.bgHex,
                           borderColor: moodData.textHex,
@@ -451,34 +451,13 @@ function MoodEntryCard(
                         </Text>
                       </View>
 
-                      <View className="flex-1">
-                        <View className="flex-row flex-wrap items-center gap-1.5">
-                          <Text className="text-sm font-semibold" style={{ color: get("text") }}>
-                            {moodData.label}
-                          </Text>
-                          {allCompactTags.map((tag) => (
-                          <MoodTag
-                              key={tag.key}
-                              label={tag.label}
-                              backgroundColor={tag.colorSet.bg}
-                            textColor={tag.colorSet.text}
-                            />
-                          ))}
-                        </View>
-                      </View>
-
-                      <View className="items-end">
+                      <View className="min-w-0 flex-1">
+                        <Text className="text-sm font-semibold" style={{ color: get("text") }}>
+                          {moodData.label}
+                        </Text>
                         <Text className="text-xs font-medium" style={{ color: get("textMuted") }}>
                           {formattedTime}
                         </Text>
-                        <Text className="text-[10px]" style={{ color: get("textMuted") }}>
-                          {formattedDate}
-                        </Text>
-                        {typeof mood.energy === "number" ? (
-                          <Text className="text-[10px]" style={{ color: get("textMuted") }}>
-                            Energy {mood.energy}/10
-                          </Text>
-                        ) : null}
                       </View>
 
                       <Pressable
@@ -486,7 +465,7 @@ function MoodEntryCard(
                           event.stopPropagation();
                           showActions();
                         }}
-                        className="h-11 w-11 items-center justify-center rounded-full"
+                        className="min-h-[48px] min-w-[48px] shrink-0 items-center justify-center rounded-full"
                         accessibilityRole="button"
                         testID={`mood-entry-actions-${mood.timestamp}`}
                         accessibilityLabel={`Actions for ${moodData.label} entry`}
@@ -495,6 +474,24 @@ function MoodEntryCard(
                         <Ionicons name="ellipsis-horizontal" size={22} color={get("textMuted")} />
                       </Pressable>
                     </View>
+
+                    <Text className="mt-1 text-xs" style={{ color: get("textMuted") }}>
+                      {formattedDate}
+                      {typeof mood.energy === "number" ? ` · Energy ${mood.energy}/10` : ""}
+                    </Text>
+
+                    {allCompactTags.length > 0 && (
+                      <View className="mt-2 flex-row flex-wrap gap-1.5">
+                        {allCompactTags.map((tag) => (
+                          <MoodTag
+                            key={tag.key}
+                            label={tag.label}
+                            backgroundColor={tag.colorSet.bg}
+                            textColor={tag.colorSet.text}
+                          />
+                        ))}
+                      </View>
+                    )}
 
                     <CommentBlock
                       note={mood.note}
@@ -535,7 +532,7 @@ function MoodEntryCard(
                             event.stopPropagation();
                             showActions();
                           }}
-                          className="ml-1 h-11 w-11 items-center justify-center rounded-full"
+                          className="ml-1 min-h-[48px] min-w-[48px] shrink-0 items-center justify-center rounded-full"
                           accessibilityRole="button"
                           testID={`mood-entry-actions-${mood.timestamp}`}
                           accessibilityLabel={`Actions for ${moodData.label} entry`}
