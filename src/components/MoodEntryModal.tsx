@@ -1101,7 +1101,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                     <PagerView
                         ref={pagerRef}
                         style={{ flex: 1 }}
-                        initialPage={currentStep}
+                        initialPage={0}
                         scrollEnabled={!isSaving && !isNotesKeyboardActive}
                         onPageSelected={handlePageSelected}
                         offscreenPageLimit={1}
