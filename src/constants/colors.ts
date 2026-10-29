@@ -26,7 +26,7 @@ export const colors = {
   primaryBgHover: { light: "#D1DFD1", dark: "#26332A" },
 
   // Border colors
-  border: { light: "#E5E1D6", dark: "#2E3A31" },
+  border: { light: "#D6CEBD", dark: "#3B4A40" },
   borderSubtle: { light: "#EFECE3", dark: "#232B25" },
 
   // Overlay

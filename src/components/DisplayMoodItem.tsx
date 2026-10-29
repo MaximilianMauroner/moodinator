@@ -417,11 +417,8 @@ function MoodEntryCard(
                   borderRadius: 16,
                   backgroundColor:
                     historyCardStyle === "compact" ? get("surfaceAlt") : get("surface"),
-                  borderWidth: StyleSheet.hairlineWidth,
-                  borderColor:
-                    historyCardStyle === "compact"
-                      ? isDark ? "rgba(78, 101, 86, 0.55)" : "rgba(229, 217, 191, 0.55)"
-                      : isDark ? "rgba(224, 201, 147, 0.18)" : "rgba(157, 134, 96, 0.22)",
+                  borderWidth: 1,
+                  borderColor: get("border"),
                   shadowColor: isDark ? colors.background.dark : colors.sand.text.light,
                   shadowOffset: { width: 0, height: historyCardStyle === "compact" ? 3 : 2 },
                   shadowOpacity: historyCardStyle === "compact"
