@@ -50,7 +50,7 @@ export function SegmentedControl<T extends string>({
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === "dark";
   const [trackWidth, setTrackWidth] = useState(0);
-  const segmentWidth = trackWidth > 0 ? (trackWidth - padding * 2) / items.length : 0;
+  const segmentWidth = trackWidth > 0 ? (trackWidth - (padding + 1) * 2) / items.length : 0;
   const activeIndex = Math.max(0, items.findIndex((item) => item.id === value));
   const translateX = useSharedValue(padding);
 
@@ -147,7 +147,7 @@ function getPalette(isDark: boolean, variant: SegmentedControlVariant) {
       trackBg: isDark ? colors.surface.dark : colors.surfaceAlt.light,
       trackBorder: isDark ? "rgba(166, 227, 155, 0.10)" : "rgba(229, 217, 191, 0.7)",
       sliderBg: isDark ? colors.positive.bgSelected.dark : colors.primary.light,
-      activeFg: isDark ? colors.textInverse.dark : colors.background.dark,
+      activeFg: isDark ? colors.textInverse.dark : colors.onPrimary.light,
       inactiveFg: isDark ? colors.textSubtle.dark : colors.textMuted.light,
     };
   }
@@ -165,12 +165,12 @@ const styles = StyleSheet.create({
   track: {
     borderWidth: 1,
     flexDirection: "row",
-    minHeight: 48,
     overflow: "hidden",
     position: "relative",
   },
   button: {
-    minHeight: 40,
+    minHeight: 48,
+    minWidth: 48,
     zIndex: 1,
   },
   slider: {

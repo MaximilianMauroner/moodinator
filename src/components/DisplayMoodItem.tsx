@@ -502,7 +502,7 @@ function MoodEntryCard(
                   </View>
                 ) : (
                   <View className="p-4">
-                    <View className="mb-2 flex-row items-center justify-between">
+                    <View className="flex-row items-center justify-between">
                       <View className="flex-row items-baseline gap-2">
                         <Text
                           testID={`mood-entry-rating-${mood.timestamp}`}
