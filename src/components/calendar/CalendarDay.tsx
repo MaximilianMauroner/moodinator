@@ -59,6 +59,8 @@ export function CalendarDay({
         onPress={handlePress}
         onLongPress={onLongPress ? handleLongPress : undefined}
         delayLongPress={400}
+        // The cell stays 44 x 46 so 7 columns fit narrow screens; the slop makes a 48 dp target.
+        hitSlop={{ top: 1, bottom: 1, left: 2, right: 2 }}
         className="active:opacity-70"
         style={{
           width: 44,
