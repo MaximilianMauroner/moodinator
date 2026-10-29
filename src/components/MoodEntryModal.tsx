@@ -844,11 +844,11 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                     minHeight: 100,
                                     textAlignVertical: "top",
                                     backgroundColor: isDark
-                                        ? "rgba(48, 42, 34, 0.5)"
+                                        ? colors.surface.dark
                                         : "rgba(249, 245, 237, 0.8)",
                                     borderWidth: 1,
                                     borderColor: isDark
-                                        ? "rgba(61, 53, 42, 0.4)"
+                                        ? colors.border.dark
                                         : "rgba(229, 217, 191, 0.6)",
                                     borderRadius: 14,
                                     padding: 14,
@@ -986,7 +986,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                 style={{
                                     borderBottomWidth: singlePage ? 1 : 0,
                                     borderBottomColor: isDark
-                                        ? "rgba(61, 53, 42, 0.25)"
+                                        ? colors.border.dark
                                         : "rgba(229, 217, 191, 0.5)",
                                 }}
                             >
@@ -998,7 +998,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                             height: 4,
                                             borderRadius: 2,
                                             backgroundColor: isDark
-                                                ? "rgba(61, 53, 42, 0.5)"
+                                                ? colors.border.dark
                                                 : "rgba(180, 160, 130, 0.4)",
                                         }}
                                     />
@@ -1119,10 +1119,10 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                             style={{
                                 borderTopWidth: 1,
                                 borderTopColor: isDark
-                                    ? "rgba(61, 53, 42, 0.25)"
+                                    ? colors.border.dark
                                     : "rgba(229, 217, 191, 0.5)",
                                 backgroundColor: isDark
-                                    ? "rgba(28, 25, 22, 0.97)"
+                                    ? colors.background.dark
                                     : "rgba(250, 248, 244, 0.97)",
                                 paddingHorizontal: 20,
                                 paddingTop: 12,
@@ -1147,11 +1147,11 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                     className="rounded-2xl py-4 items-center flex-row justify-center gap-1.5"
                                     style={{
                                         backgroundColor: isDark
-                                            ? "rgba(42, 37, 32, 0.8)"
+                                            ? colors.surface.dark
                                             : "rgba(245, 241, 232, 0.9)",
                                         borderWidth: 1,
                                         borderColor: isDark
-                                            ? "rgba(61, 53, 42, 0.5)"
+                                            ? colors.border.dark
                                             : "rgba(229, 217, 191, 0.6)",
                                     }}
                                     accessibilityRole="button"
