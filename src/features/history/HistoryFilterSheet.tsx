@@ -162,6 +162,8 @@ export function HistoryFilterSheet() {
         accessibilityRole="button"
         accessibilityLabel="Filter history"
         onPress={open}
+        // The pill stays 32 dp tall to keep the list header short; the slop makes a 48 dp target.
+        hitSlop={{ top: 8, bottom: 8 }}
         className="flex-row items-center gap-1.5 rounded-full px-3"
         style={{
           backgroundColor: activeCount ? palette.band : palette.chipBg,

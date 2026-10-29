@@ -1035,7 +1035,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                     ) : null}
                                     <Pressable
                                         onPress={closeWithConfirmation}
-                                        className="h-11 w-11 items-center justify-center rounded-full"
+                                        className="h-[48px] w-[48px] items-center justify-center rounded-full"
                                         accessibilityRole="button"
                                         accessibilityLabel={`Close ${title}`}
                                     >
