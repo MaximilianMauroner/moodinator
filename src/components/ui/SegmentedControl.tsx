@@ -112,11 +112,7 @@ export function SegmentedControl<T extends string>({
           <Pressable
             key={item.id}
             onPress={() => onChange(item.id)}
-            className="flex-1 flex-row items-center justify-center rounded-xl"
-            style={({ pressed }) => [
-              styles.button,
-              pressed ? { opacity: 0.82, transform: [{ scale: 0.99 }] } : null,
-            ]}
+            className="min-h-[48px] min-w-[48px] flex-1 flex-row items-center justify-center rounded-xl z-[1] active:opacity-70"
             accessibilityRole="tab"
             accessibilityState={{ selected: isActive }}
             accessibilityLabel={`${item.label} view`}
@@ -167,11 +163,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     overflow: "hidden",
     position: "relative",
-  },
-  button: {
-    minHeight: 48,
-    minWidth: 48,
-    zIndex: 1,
   },
   slider: {
     left: 0,

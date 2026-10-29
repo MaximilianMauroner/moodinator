@@ -49,7 +49,7 @@ export function ForecastCard({ days, ready, onSelectDay }: ForecastCardProps) {
             <Pressable
               key={day.dayKey}
               onPress={() => onSelectDay(day)}
-              className="w-1/4 items-center py-2 active:opacity-70"
+              className="w-1/4 items-center px-[8px] py-2 active:opacity-70"
               style={{ minWidth: 48, minHeight: 48, borderTopWidth: 1, borderTopColor: get("borderSubtle") }}
               accessibilityRole="button"
               accessibilityLabel={dayLabel(day)}
@@ -57,58 +57,56 @@ export function ForecastCard({ days, ready, onSelectDay }: ForecastCardProps) {
               testID={`forecast-day-${day.dayKey}`}
             >
               <Text style={[typography.bodyMd, { color: get("text"), textAlign: "center" }]}>{dayName(day, index)}</Text>
-              <View className="w-full flex-row items-center" style={{ gap: 4 }}>
-                <View style={{ width: 24, alignItems: "center" }}>
-                  {average === null ? (
-                    <Text style={{ color: get("textSubtle") }}>–</Text>
-                  ) : (
-                    <Ionicons name={getMoodWeatherIcon(average)} size={24} color={getMoodWeatherColor(average, isDark)} />
-                  )}
+              <View style={{ height: 24, alignItems: "center", justifyContent: "center" }}>
+                {average === null ? (
+                  <Text style={{ color: get("textSubtle") }}>–</Text>
+                ) : (
+                  <Ionicons name={getMoodWeatherIcon(average)} size={24} color={getMoodWeatherColor(average, isDark)} />
+                )}
+              </View>
+              <View className="w-full">
+                <View testID={`forecast-track-${day.dayKey}`} style={{ height: 14, justifyContent: "center" }}>
+                  <View style={{ height: 6, borderRadius: 3, backgroundColor: get("border") }} />
+                  <View style={{ position: "absolute", left: 3, right: 3, top: 0, bottom: 0, justifyContent: "center" }}>
+                    {day.lightest !== null && day.heaviest !== null && average !== null ? (
+                      <View
+                        testID={`forecast-range-${day.dayKey}`}
+                        style={{
+                          position: "absolute",
+                          left: `${day.lightest * 10}%`,
+                          right: `${100 - day.heaviest * 10}%`,
+                          marginHorizontal: -3,
+                          height: 6,
+                          borderRadius: 3,
+                          backgroundColor: getMoodWeatherColor(average, isDark),
+                        }}
+                      />
+                    ) : null}
+                    {day.entries.map((entry) => (
+                      <View
+                        key={entry.id}
+                        testID={`forecast-tick-${day.dayKey}-${entry.id}`}
+                        style={{
+                          position: "absolute",
+                          left: `${getInterpretedMoodRating(entry) * 10}%`,
+                          marginLeft: -2,
+                          width: 4,
+                          height: 14,
+                          borderRadius: 2,
+                          backgroundColor: get("text"),
+                          opacity: 0.8,
+                        }}
+                      />
+                    ))}
+                  </View>
                 </View>
-                <View className="flex-1">
-                  <View testID={`forecast-track-${day.dayKey}`} style={{ height: 14, justifyContent: "center" }}>
-                    <View style={{ height: 6, borderRadius: 3, backgroundColor: get("border") }} />
-                    <View style={{ position: "absolute", left: 3, right: 3, top: 0, bottom: 0, justifyContent: "center" }}>
-                      {day.lightest !== null && day.heaviest !== null && average !== null ? (
-                        <View
-                          testID={`forecast-range-${day.dayKey}`}
-                          style={{
-                            position: "absolute",
-                            left: `${day.lightest * 10}%`,
-                            right: `${100 - day.heaviest * 10}%`,
-                            marginHorizontal: -3,
-                            height: 6,
-                            borderRadius: 3,
-                            backgroundColor: getMoodWeatherColor(average, isDark),
-                          }}
-                        />
-                      ) : null}
-                      {day.entries.map((entry) => (
-                        <View
-                          key={entry.id}
-                          testID={`forecast-tick-${day.dayKey}-${entry.id}`}
-                          style={{
-                            position: "absolute",
-                            left: `${getInterpretedMoodRating(entry) * 10}%`,
-                            marginLeft: -2,
-                            width: 4,
-                            height: 14,
-                            borderRadius: 2,
-                            backgroundColor: get("text"),
-                            opacity: 0.8,
-                          }}
-                        />
-                      ))}
-                    </View>
-                  </View>
-                  <View className="flex-row">
-                    <Text style={[typography.bodySm, { flex: 1, color: get("textSubtle") }]}>
-                      {day.lightest ?? ""}
-                    </Text>
-                    <Text style={[typography.bodySm, { flex: 1, textAlign: "right", color: get("textSubtle") }]}>
-                      {day.heaviest ?? ""}
-                    </Text>
-                  </View>
+                <View className="flex-row">
+                  <Text style={[typography.bodySm, { flex: 1, color: get("textSubtle") }]}>
+                    {day.lightest ?? ""}
+                  </Text>
+                  <Text style={[typography.bodySm, { flex: 1, textAlign: "right", color: get("textSubtle") }]}>
+                    {day.heaviest ?? ""}
+                  </Text>
                 </View>
               </View>
             </Pressable>
