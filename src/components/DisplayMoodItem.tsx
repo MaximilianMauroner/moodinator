@@ -97,13 +97,13 @@ function CommentBlock({
 
   return (
     <View
-      className={variant === "compact" ? "mt-3 rounded-xl px-3 py-2.5" : "mb-3 rounded-xl px-3 py-2.5"}
+      className={variant === "compact" ? "mt-2" : "mb-3 rounded-xl px-2 py-2"}
       style={{
         backgroundColor: get("surfaceAlt"),
       }}
     >
       <Text
-        className="mb-2 text-[10px] font-bold uppercase tracking-wide"
+        className="mb-1 text-[10px] font-bold uppercase tracking-wide"
         style={{ color: get("textMuted") }}
       >
         Notes
@@ -111,7 +111,7 @@ function CommentBlock({
       <Text
         testID={`mood-entry-note-${timestamp}`}
         className="text-sm leading-5"
-        style={{ color: get("textSubtle") }}
+        style={{ color: get("text") }}
         numberOfLines={variant === "compact" ? 3 : 4}
       >
         {note}
