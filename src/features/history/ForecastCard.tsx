@@ -49,7 +49,7 @@ export function ForecastCard({ days, ready, onSelectDay }: ForecastCardProps) {
             <Pressable
               key={day.dayKey}
               onPress={() => onSelectDay(day)}
-              className="w-1/4 items-center py-2 active:opacity-70"
+              className="w-1/4 items-center py-1 active:opacity-70"
               style={{ minWidth: 48, minHeight: 48, borderTopWidth: 1, borderTopColor: get("borderSubtle") }}
               accessibilityRole="button"
               accessibilityLabel={dayLabel(day)}
