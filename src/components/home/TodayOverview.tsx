@@ -76,7 +76,7 @@ export function TodayNow({ latest, loaded, onOpen }: TodayNowProps) {
         </Text>
         <Text style={[typography.bodySm, { color: get("textSubtle") }]}>Last check-in at {time}</Text>
         {detail ? (
-          <Text numberOfLines={1} style={{ color: get("textSubtle"), fontSize: 13, marginTop: 4 }}>{detail}</Text>
+          <Text numberOfLines={2} style={{ color: get("textSubtle"), fontSize: 13, marginTop: 4 }}>{detail}</Text>
         ) : null}
         {note ? (
           <Text numberOfLines={1} style={{ color: get("text"), fontSize: 13, marginTop: 2, opacity: 0.9 }}>{note}</Text>
