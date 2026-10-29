@@ -257,6 +257,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
     wallClockParts && (!originalParts || !sameWallClock(wallClockParts, originalParts)),
   );
   const canSave = hasChanged && !saving && !saveConsumed;
+  const hasDetails = Boolean(mood.note) || sortedEmotions.length > 0 || (mood.contextTags?.length ?? 0) > 0;
 
   return (
     <SafeAreaView>
@@ -388,7 +389,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
                   >
                     <Text
                       className="text-sm leading-5"
-                      style={{ color: get("textSubtle") }}
+                      style={{ color: get("text") }}
                     >
                       {mood.note}
                     </Text>
@@ -472,14 +473,15 @@ export const DateTimePickerModal: React.FC<Props> = ({
                 </View>
               )}
 
-              {/* Divider */}
-              <View
-                className="h-px my-5"
-                style={{ backgroundColor: get("border") }}
-              />
+              {hasDetails ? (
+                <View
+                  className="h-px my-5"
+                  style={{ backgroundColor: get("border") }}
+                />
+              ) : null}
 
               {/* Date & Time Section */}
-              <View className="mb-4">
+              <View className={hasDetails ? "mb-4" : "mt-5 mb-4"}>
                 <View className="flex-row items-center mb-3">
                   <Ionicons
                     name="calendar"
