@@ -74,8 +74,8 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
 				{mood.label}
 			</Text>
 			<Text
-				className="px-1.5 text-center text-[12px] leading-tight"
-				style={{ color: get("textMuted") }}
+				className="px-1.5 text-center text-xs leading-tight"
+				style={{ color: get("textSubtle") }}
 			>
 				{mood.description}
 			</Text>
