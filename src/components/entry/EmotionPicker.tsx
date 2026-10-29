@@ -216,7 +216,7 @@ export const EmotionPicker: React.FC<EmotionPickerProps> = ({
 
     const labelColor = getThemedColor("textSubtle", isDark);
     const meterDimColor = isDark ? "rgba(158, 184, 148, 0.28)" : "rgba(122, 107, 85, 0.25)";
-    const ruleColor = isDark ? "rgba(61, 53, 42, 0.25)" : "rgba(229, 217, 191, 0.5)";
+    const ruleColor = getThemedColor("border", isDark);
 
     const grouped = useMemo(() => {
         const map: Record<EmotionGroup, Emotion[]> = {
@@ -294,12 +294,12 @@ export const EmotionPicker: React.FC<EmotionPickerProps> = ({
                         })}
                     </ScrollView>
                 ) : (
-                    <Text className="flex-1 text-xs" style={{ color: labelColor }} accessible={false}>
+                    <Text className="flex-1 text-sm" style={{ color: labelColor }} accessible={false}>
                         Optional
                     </Text>
                 )}
                 <Text
-                    className="text-xs"
+                    className="text-sm"
                     style={{ color: labelColor }}
                     accessibilityLabel={`Emotions are optional. ${selected.length} of ${maxSelections} selected.`}
                 >
@@ -331,7 +331,7 @@ export const EmotionPicker: React.FC<EmotionPickerProps> = ({
                             >
                                 {GROUP_LABELS[group]}
                             </Text>
-                            <Text style={{ fontSize: 11, color: labelColor }}>
+                            <Text style={{ fontSize: 12, color: labelColor }}>
                                 {list.length}
                             </Text>
                             <View
