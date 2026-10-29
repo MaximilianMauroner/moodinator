@@ -278,6 +278,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
           <View
             className="rounded-3xl w-full max-w-sm overflow-hidden"
             style={{
+              maxHeight: "90%",
               backgroundColor: get("surface"),
               shadowColor: isDark ? "#000" : colors.sand.text.light,
               shadowOffset: { width: 0, height: 8 },
@@ -379,7 +380,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
 
             <ScrollView
               className="px-5"
-              style={{ maxHeight: 400 }}
+              style={{ flexGrow: 0, flexShrink: 1 }}
               showsVerticalScrollIndicator={false}
             >
               {/* Note */}
@@ -612,7 +613,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
                     onEdit(mood);
                   }}
                   disabled={saving}
-                  className="flex-1 py-3.5 rounded-xl items-center"
+                  className="flex-1 min-h-[48px] py-3.5 rounded-xl items-center justify-center"
                   style={{ backgroundColor: get("surfaceAlt") }}
                   accessibilityRole="button"
                   accessibilityLabel="Edit this entry"
@@ -627,7 +628,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
               <Pressable
                 onPress={handleSave}
                 disabled={!canSave}
-                className="flex-1 py-3.5 rounded-xl items-center"
+                className="flex-1 min-h-[48px] py-3.5 rounded-xl items-center justify-center"
                 style={{
                   backgroundColor: canSave
                     ? (isDark ? colors.primary.dark : colors.primary.light)
