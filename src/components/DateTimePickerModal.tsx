@@ -305,7 +305,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
                         onDelete(mood);
                       }}
                       disabled={saving}
-                      className="h-12 w-12 items-center justify-center rounded-full"
+                      className="h-[48px] w-[48px] items-center justify-center rounded-full"
                       accessibilityRole="button"
                       accessibilityLabel="Delete this entry"
                       accessibilityState={{ disabled: saving }}
@@ -316,7 +316,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
                   <Pressable
                     onPress={handleCancel}
                     disabled={saving}
-                    className="h-11 w-11 items-center justify-center rounded-full"
+                    className="h-[48px] w-[48px] items-center justify-center rounded-full"
                     accessibilityRole="button"
                     accessibilityLabel="Close entry details"
                     accessibilityState={{ disabled: saving }}
