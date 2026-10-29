@@ -18,7 +18,7 @@ const SIZES = {
   /** Inside the entry form, where a tap only selects the level. */
   form: { minHeight: 68, icon: 24, number: 17 },
   /** Docked on Today, where a tap keeps the entry. */
-  dock: { minHeight: 80, icon: 30, number: 18 },
+  dock: { minHeight: 60, icon: 26, number: 18 },
 };
 
 type WeatherMoodGridProps = {
@@ -37,7 +37,7 @@ export function WeatherMoodGrid({ selected, onPress, onLongPress, size = "form" 
   const rows = isDock ? DOCK_WEATHER_ROWS : MOOD_WEATHER_ROWS;
 
   return (
-    <View style={{ gap: 8 }}>
+    <View style={{ gap: isDock ? 6 : 8 }}>
       {rows.map((row) => (
         <View key={row[0]} style={{ flexDirection: "row", justifyContent: "center" }}>
           {row.map((level) => {
@@ -75,7 +75,7 @@ export function WeatherMoodGrid({ selected, onPress, onLongPress, size = "form" 
                   width: isDock ? "31.5%" : "23.5%",
                   marginHorizontal: "0.75%",
                   minHeight: dims.minHeight,
-                  paddingVertical: 8,
+                  paddingVertical: isDock ? 6 : 8,
                   paddingHorizontal: 2,
                   alignItems: "center",
                   justifyContent: "center",

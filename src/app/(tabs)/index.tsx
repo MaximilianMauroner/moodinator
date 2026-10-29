@@ -214,7 +214,8 @@ function HomeScreenContent() {
 
           <View
             style={{
-              maxHeight: "65%",
+              // The Detailed list always fills its cap, so a lower cap leaves room for today's entries.
+              maxHeight: entrySettings.showDetailedLabels ? "50%" : "65%",
               flexShrink: 1,
               backgroundColor: get("surface"),
               borderTopLeftRadius: 24,

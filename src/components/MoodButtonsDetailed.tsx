@@ -40,7 +40,7 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
 		return (
 		<HapticTab
 			key={`${isDark ? "dark" : "light"}-${mood.value}`}
-			className="flex-row items-center rounded-2xl px-3 py-2"
+			className="flex-row items-center rounded-2xl px-3 py-1.5"
 			style={rowStyle}
 			onPress={() => onMoodPress(mood.value)}
 			onLongPress={() => onLongPress(mood.value)}
@@ -73,7 +73,7 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
 
 	return (
 		<View className="mb-2">
-			<View style={{ rowGap: 6 }}>
+			<View style={{ rowGap: 4 }}>
 				{moodData.map(renderMoodRow)}
 			</View>
 		</View>
