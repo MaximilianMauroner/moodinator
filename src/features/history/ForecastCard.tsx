@@ -100,14 +100,9 @@ export function ForecastCard({ days, ready, onSelectDay }: ForecastCardProps) {
                     ))}
                   </View>
                 </View>
-                <View className="flex-row">
-                  <Text style={[typography.bodySm, { flex: 1, color: get("textSubtle") }]}>
-                    {day.lightest ?? ""}
-                  </Text>
-                  <Text style={[typography.bodySm, { flex: 1, textAlign: "right", color: get("textSubtle") }]}>
-                    {day.heaviest ?? ""}
-                  </Text>
-                </View>
+                <Text style={[typography.bodySm, { textAlign: "center", color: get("textSubtle") }]}>
+                  {day.lightest === null ? "" : day.lightest === day.heaviest ? day.lightest : `${day.lightest}–${day.heaviest}`}
+                </Text>
               </View>
             </Pressable>
           );
