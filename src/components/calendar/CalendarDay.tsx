@@ -59,20 +59,17 @@ export function CalendarDay({
         onPress={handlePress}
         onLongPress={onLongPress ? handleLongPress : undefined}
         delayLongPress={400}
-        style={({ pressed }) => ({
+        className="active:opacity-70"
+        style={{
           width: 44,
           height: 46,
           borderRadius: 14,
           alignItems: "center",
           justifyContent: "center",
-          backgroundColor: pressed
-            ? isDark
-              ? "rgba(91, 138, 91, 0.3)"
-              : "rgba(91, 138, 91, 0.2)"
-            : backgroundColor,
+          backgroundColor,
           borderWidth: isToday ? 2 : hasMood ? 1 : 0,
           borderColor: isToday ? get("primary") : get("borderSubtle"),
-        })}
+        }}
         accessibilityRole="button"
         accessibilityLabel={`Day ${day}${hasMood ? `, has ${data!.entries.length} mood entries${moodSummary}` : ", no mood entries"}`}
         accessibilityHint={accessibilityHint}
