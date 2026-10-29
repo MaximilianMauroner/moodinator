@@ -73,7 +73,7 @@ function MoodTag({
       className="rounded-lg px-2.5 py-1"
       style={{ backgroundColor }}
     >
-      <Text className="text-xs font-medium" style={{ color: textColor }}>
+      <Text className="text-sm font-medium" style={{ color: textColor }}>
         {label}
       </Text>
     </View>
@@ -441,7 +441,7 @@ function MoodEntryCard(
                       >
                         <Text
                           testID={`mood-entry-rating-${mood.timestamp}`}
-                          className="text-sm font-bold"
+                          className="text-base font-bold"
                           style={{ color: moodData.textHex, fontVariant: ["tabular-nums"] }}
                         >
                           {mood.mood}
@@ -449,10 +449,10 @@ function MoodEntryCard(
                       </View>
 
                       <View className="min-w-0 flex-1">
-                        <Text className="text-sm font-semibold" style={{ color: get("text") }}>
+                        <Text className="text-base font-semibold" style={{ color: get("text") }}>
                           {moodData.label}
                         </Text>
-                        <Text className="text-xs font-medium" style={{ color: get("textMuted") }}>
+                        <Text className="text-sm font-medium" style={{ color: get("textMuted") }}>
                           {formattedTime}
                         </Text>
                       </View>
@@ -472,7 +472,7 @@ function MoodEntryCard(
                       </Pressable>
                     </View>
 
-                    <Text className="mt-1 text-xs" style={{ color: get("textMuted") }}>
+                    <Text className="mt-1 text-sm" style={{ color: get("textMuted") }}>
                       {formattedDate}
                       {typeof mood.energy === "number" ? ` · Energy ${mood.energy}/10` : ""}
                     </Text>
@@ -540,7 +540,7 @@ function MoodEntryCard(
                       </View>
                     </View>
 
-                    <Text className="mb-3 text-xs" style={{ color: get("textMuted") }}>
+                    <Text className="mb-3 text-sm" style={{ color: get("textMuted") }}>
                       {formattedDate}
                       {typeof mood.energy === "number" ? ` · Energy ${mood.energy}/10` : ""}
                     </Text>
