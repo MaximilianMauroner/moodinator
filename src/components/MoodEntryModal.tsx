@@ -227,6 +227,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
 
     useEffect(() => {
         if (!visible) {
+            setCurrentStep(0);
             setKeyboardHeight(0);
             setIsNotesFocused(false);
             notesFocusedRef.current = false;
@@ -446,13 +447,14 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
 
     const handlePageSelected = useCallback(
         (event: PagerViewOnPageSelectedEvent) => {
+            if (!visible) return;
             const nextStep = event.nativeEvent.position;
             if (nextStep === currentStep) return;
 
             haptics.tick();
             setCurrentStep(nextStep);
         },
-        [currentStep]
+        [currentStep, visible]
     );
 
     const handleCopyYesterday = (entry: MoodEntry) => {
@@ -1101,7 +1103,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                     <PagerView
                         ref={pagerRef}
                         style={{ flex: 1 }}
-                        initialPage={0}
+                        initialPage={currentStep}
                         scrollEnabled={!isSaving && !isNotesKeyboardActive}
                         onPageSelected={handlePageSelected}
                         offscreenPageLimit={1}

@@ -16,6 +16,7 @@ import { setHapticsEnabled } from "@/lib/haptics";
 import { updateMoodEntryOrThrow } from "@/lib/moodEntryPersistence";
 import { createMoodEntryWorkflow } from "@/services/moodEntryWorkflow";
 import { useMoodModals } from "@/hooks/useMoodModals";
+import { NavigatorHiddenProvider } from "@/components/ui/PrivateModal";
 import {
   CURRENT_MOOD_SCALE_SNAPSHOT,
   LEGACY_HIGHER_IS_BETTER_MOOD_SCALE_SNAPSHOT,
@@ -830,6 +831,62 @@ describe("last-entry prefill", () => {
     } finally {
       consoleSpy.mockRestore();
     }
+  });
+});
+
+describe("paged entry sessions", () => {
+  const fields = { emotions: true, context: false, energy: false, notes: true };
+
+  it("prepares the first native page after close and ignores closing page events", async () => {
+    const props = {
+      initialMood: 5, emotionOptions: options, contextOptions: ["Work"], fieldConfig: fields,
+      onClose: vi.fn(), onSubmit: vi.fn(async () => {}),
+    };
+    await render(<DetailedMoodEntryModal {...props} visible />);
+    await act(async () => renderer.root.findByType("PagerView").props.onPageSelected({
+      nativeEvent: { position: 1 },
+    }));
+
+    await act(async () => renderer.update(<DetailedMoodEntryModal {...props} visible={false} />));
+    expect(renderer.root.findByType("PagerView").props.initialPage).toBe(0);
+    await act(async () => renderer.root.findByType("PagerView").props.onPageSelected({
+      nativeEvent: { position: 1 },
+    }));
+    expect(renderer.root.findByType("PagerView").props.initialPage).toBe(0);
+
+    await act(async () => renderer.update(<DetailedMoodEntryModal {...props} visible />));
+    expect(renderer.root.findByProps({ accessibilityLabel: "Entry progress" }).props.accessibilityValue.text)
+      .toBe("Step 1 of 2");
+    expect(props.onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("restores the active page and draft when App Lock hides an open native window", async () => {
+    const props = {
+      initialMood: 5, emotionOptions: options, contextOptions: ["Work"], fieldConfig: fields,
+      onClose: vi.fn(), onSubmit: vi.fn(async () => {}),
+    };
+    const form = (hidden: boolean) => (
+      <NavigatorHiddenProvider value={hidden}>
+        <DetailedMoodEntryModal {...props} visible />
+      </NavigatorHiddenProvider>
+    );
+    await render(form(false));
+    await act(async () => renderer.root.findByType("PagerView").props.onPageSelected({
+      nativeEvent: { position: 1 },
+    }));
+    await act(async () => button("entry-notes").props.onChangeText("private draft"));
+
+    await act(async () => renderer.update(form(true)));
+    expect(renderer.root.findByType("Modal").props.visible).toBe(false);
+    expect(renderer.root.findByType("PagerView").props.initialPage).toBe(1);
+
+    await act(async () => renderer.update(form(false)));
+    expect(renderer.root.findByType("Modal").props.visible).toBe(true);
+    expect(renderer.root.findByType("PagerView").props.initialPage).toBe(1);
+    expect(renderer.root.findByProps({ accessibilityLabel: "Entry progress" }).props.accessibilityValue.text)
+      .toBe("Step 2 of 2");
+    expect(button("entry-notes").props.value).toBe("private draft");
+    expect(props.onSubmit).not.toHaveBeenCalled();
   });
 });
 
