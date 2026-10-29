@@ -62,7 +62,6 @@ export function CalendarDay({
         className="active:opacity-70"
         style={{
           width: 44,
-          maxWidth: "100%",
           height: 46,
           borderRadius: 14,
           alignItems: "center",

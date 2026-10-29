@@ -254,10 +254,8 @@ export function MoodCalendar({
 
   return (
     <View
-      className="rounded-3xl py-4"
+      className="rounded-3xl p-4"
       style={{
-        marginHorizontal: -12,
-        paddingHorizontal: 26,
         backgroundColor: get("surface"),
         shadowColor: getThemedColor("shadowSand", isDark),
         shadowOffset: { width: 0, height: 4 },
@@ -277,7 +275,7 @@ export function MoodCalendar({
       />
 
       <GestureDetector gesture={swipeGesture}>
-        <View style={{ overflow: "hidden", marginHorizontal: -26 }}>
+        <View style={{ overflow: "hidden" }}>
           <CalendarWeekHeader />
 
           {loading ? (
