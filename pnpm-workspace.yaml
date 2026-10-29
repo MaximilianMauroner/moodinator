@@ -2,3 +2,7 @@ patchedDependencies:
   expo-sqlite@55.0.20: patches/expo-sqlite@55.0.20.patch
   "@react-native-community/datetimepicker@8.6.0": patches/datetimepicker@8.6.0.patch
   expo-screen-capture@55.0.18: patches/expo-screen-capture@55.0.18.patch
+
+allowBuilds:
+  esbuild: false
+  unrs-resolver: false
