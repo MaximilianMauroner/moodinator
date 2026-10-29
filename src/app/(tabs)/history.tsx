@@ -133,7 +133,7 @@ function HistoryScreenContent() {
         onChange={setView}
         variant="primary"
         padding={4}
-        style={view === "month" ? { marginHorizontal: 26 } : undefined}
+        style={view === "month" ? { marginLeft: 26, marginRight: 26 } : undefined}
       />
       {view === "days" ? (
         <>
