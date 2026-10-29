@@ -75,11 +75,12 @@ export function TodayNow({ latest, loaded, onOpen }: TodayNowProps) {
           {display.label} <Text style={{ color: get("textSubtle") }}>{display.value}</Text>
         </Text>
         <Text style={[typography.bodySm, { color: get("textSubtle") }]}>Last check-in at {time}</Text>
-        {detail ? (
-          <Text numberOfLines={2} style={{ color: get("textSubtle"), fontSize: 13, marginTop: 4 }}>{detail}</Text>
-        ) : null}
-        {note ? (
-          <Text numberOfLines={1} style={{ color: get("text"), fontSize: 13, marginTop: 2, opacity: 0.9 }}>{note}</Text>
+        {detail || note ? (
+          <Text numberOfLines={2} style={{ color: get("textSubtle"), fontSize: 13, marginTop: 4 }}>
+            {detail}
+            {detail && note ? <Text> · </Text> : null}
+            {note ? <Text style={{ color: get("text"), opacity: 0.9 }}>{note}</Text> : null}
+          </Text>
         ) : null}
       </View>
     </Pressable>
