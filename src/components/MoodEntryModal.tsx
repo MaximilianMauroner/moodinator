@@ -913,7 +913,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
         <View key={stepId} style={{ flex: 1 }}>
             <ScrollView
                 ref={stepId === "details" ? scrollViewRef : undefined}
-                className="px-5 pt-3"
+                className="px-5 pt-1"
                 contentContainerStyle={{ paddingBottom: scrollBottomPadding }}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
@@ -1066,7 +1066,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                     </View>
                                 ) : (
                                     <>
-                                    <View className="px-4 pb-[16px]">
+                                    <View className="px-4 pb-2">
                                         <MoodAdjustRow
                                             mood={mood}
                                             onAdjust={setMood}
