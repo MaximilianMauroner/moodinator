@@ -78,13 +78,15 @@ jobs:
             ${{ steps.sdk.outputs.path }}/build-tools/36.0.0
             ~/.npm/_cacache
             ~/.gradle/wrapper/dists
-          key: moodinator-android-public-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock', 'scripts/setup-hosted-android.sh', '.github/workflows/nightly.yml') }}
+          key: moodinator-android-public-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'scripts/setup-hosted-android.sh', '.github/workflows/nightly.yml') }}
       - name: Install locked dependencies without lifecycle scripts or release credentials
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Prepare tools without release credentials
         run: bash scripts/setup-hosted-android.sh build
       - name: Download the locked Gradle distribution without release credentials
-        run: node_modules/@react-native/gradle-plugin/gradlew --version --no-daemon
+        run: |
+          gradle_wrapper=$(node -p "require.resolve('@react-native/gradle-plugin/gradlew', { paths: [require.resolve('react-native/package.json')] })")
+          "$gradle_wrapper" --version --no-daemon
       # Snapshot before any credential-bearing step. No post-build cache save.
       - name: Save public build tools before release credentials
         if: steps.tools.outputs.cache-hit != 'true'
