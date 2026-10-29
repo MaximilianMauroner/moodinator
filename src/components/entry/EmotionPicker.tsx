@@ -21,6 +21,8 @@ interface EmotionPickerProps {
     selected: Emotion[];
     onChange: (emotions: Emotion[]) => void;
     maxSelections?: number;
+    /** Control shown at the end of the selection line, for example Add. */
+    action?: React.ReactNode;
 }
 
 // Chips are drawn at 36 and the press target is extended to 48 with hitSlop, so
@@ -205,6 +207,7 @@ export const EmotionPicker: React.FC<EmotionPickerProps> = ({
     selected,
     onChange,
     maxSelections = 3,
+    action,
 }) => {
     const { isDark, getCategoryColors } = useThemeColors();
 
@@ -305,6 +308,7 @@ export const EmotionPicker: React.FC<EmotionPickerProps> = ({
                 >
                     {selected.length} of {maxSelections} selected
                 </Text>
+                {action}
             </View>
 
             {/* Energy bands. Colour still carries valence, so both axes read at once. */}

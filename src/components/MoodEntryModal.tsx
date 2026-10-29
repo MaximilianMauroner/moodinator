@@ -711,6 +711,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                 selected={emotions}
                 onChange={setEmotions}
                 maxSelections={3}
+                action={singlePage ? undefined : addEmotionAction}
             />
         </View>
     );
@@ -1066,15 +1067,12 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                     </View>
                                 ) : (
                                     <>
-                                    <View className="px-4 pb-2">
+                                    <View className="px-4 pb-3">
                                         <MoodAdjustRow
                                             mood={mood}
                                             onAdjust={setMood}
                                             isDark={isDark}
                                         />
-                                        <View className="items-center mt-[12px]">
-                                            <SameAsYesterdayButton onCopy={handleCopyYesterday} excludeEntryId={currentEntryId} />
-                                        </View>
                                     </View>
 
                                     <View className="flex-row items-center gap-3 px-4">
@@ -1088,12 +1086,11 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                                 flex: 1,
                                                 fontWeight: "700",
                                                 color: get("text"),
-                                                marginTop: 4,
                                             }}
                                         >
                                             {currentStepTitle}
                                         </Animated.Text>
-                                        {currentStepId === "emotions" && addEmotionAction}
+                                        <SameAsYesterdayButton onCopy={handleCopyYesterday} excludeEntryId={currentEntryId} />
                                     </View>
                                     </>
                                 )}
