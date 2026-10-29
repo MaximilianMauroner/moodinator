@@ -520,28 +520,23 @@ function MoodEntryCard(
                           {moodData.label}
                         </Text>
                       </View>
-                      <View className="flex-row items-center">
-                        <Text className="text-xs" style={{ color: get("textMuted") }}>
-                          {formattedTime}
-                        </Text>
-                        <Pressable
-                          onPress={(event) => {
-                            event.stopPropagation();
-                            showActions();
-                          }}
-                          className="ml-1 min-h-[48px] min-w-[48px] shrink-0 items-center justify-center rounded-full"
-                          accessibilityRole="button"
-                          testID={`mood-entry-actions-${mood.timestamp}`}
-                          accessibilityLabel={`Actions for ${moodData.label} entry`}
-                          accessibilityHint="Edit, change date and time, or delete this entry"
-                        >
-                          <Ionicons name="ellipsis-horizontal" size={22} color={get("textMuted")} />
-                        </Pressable>
-                      </View>
+                      <Pressable
+                        onPress={(event) => {
+                          event.stopPropagation();
+                          showActions();
+                        }}
+                        className="ml-1 min-h-[48px] min-w-[48px] shrink-0 items-center justify-center rounded-full"
+                        accessibilityRole="button"
+                        testID={`mood-entry-actions-${mood.timestamp}`}
+                        accessibilityLabel={`Actions for ${moodData.label} entry`}
+                        accessibilityHint="Edit, change date and time, or delete this entry"
+                      >
+                        <Ionicons name="ellipsis-horizontal" size={22} color={get("textMuted")} />
+                      </Pressable>
                     </View>
 
                     <Text className="mb-3 text-sm" style={{ color: get("textMuted") }}>
-                      {formattedDate}
+                      {formattedDate} · {formattedTime}
                       {typeof mood.energy === "number" ? ` · Energy ${mood.energy}/10` : ""}
                     </Text>
 
