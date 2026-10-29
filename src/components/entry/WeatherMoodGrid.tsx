@@ -16,9 +16,9 @@ const DOCK_WEATHER_ROWS = Array.from(
 
 const SIZES = {
   /** Inside the entry form, where a tap only selects the level. */
-  form: { minHeight: 68, icon: 24, number: 17 },
+  form: { minHeight: 68, icon: 24, number: 17, label: 11, inset: 2, minLabelScale: 0.75 },
   /** Docked on Today, where a tap keeps the entry. */
-  dock: { minHeight: 80, icon: 30, number: 18 },
+  dock: { minHeight: 80, icon: 30, number: 18, label: 12, inset: 6, minLabelScale: 0.8 },
 };
 
 type WeatherMoodGridProps = {
@@ -76,7 +76,7 @@ export function WeatherMoodGrid({ selected, onPress, onLongPress, size = "form" 
                   marginHorizontal: "0.75%",
                   minHeight: dims.minHeight,
                   paddingVertical: 8,
-                  paddingHorizontal: 2,
+                  paddingHorizontal: dims.inset,
                   alignItems: "center",
                   justifyContent: "center",
                   borderRadius: 16,
@@ -101,11 +101,11 @@ export function WeatherMoodGrid({ selected, onPress, onLongPress, size = "form" 
                   </>
                 )}
                 <Text
-                  numberOfLines={isDock ? undefined : 1}
-                  adjustsFontSizeToFit={!isDock}
-                  minimumFontScale={isDock ? undefined : 0.75}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={dims.minLabelScale}
                   maxFontSizeMultiplier={1.5}
-                  style={{ fontSize: 11, fontWeight: "500", color: get("textSubtle"), alignSelf: "stretch", textAlign: "center" }}
+                  style={{ fontSize: dims.label, fontWeight: "500", color: get("textSubtle"), alignSelf: "stretch", textAlign: "center" }}
                 >
                   {display.label}
                 </Text>
