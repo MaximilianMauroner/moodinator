@@ -272,7 +272,7 @@ export const EmotionPicker: React.FC<EmotionPickerProps> = ({
                 {selected.length > 0 ? (
                     <ScrollView
                         horizontal
-                        style={{ flex: 1 }}
+                        style={{ flex: 1, alignSelf: "stretch" }}
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={{
                             flexDirection: "row",

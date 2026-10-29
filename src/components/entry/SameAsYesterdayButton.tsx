@@ -270,18 +270,15 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
         accessibilityRole="button"
         accessibilityLabel="Copy last entry"
         accessibilityHint="Tap to copy the previous entry into this draft. Long press to preview it."
-        accessibilityState={{ disabled: loading }}
+        accessibilityState={{ disabled: loading, busy: loading }}
       >
-        {loading ? (
-          <ActivityIndicator size="small" color={get("primary")} style={{ marginRight: 5 }} />
-        ) : (
-          <Ionicons
-            name="copy-outline"
-            size={14}
-            color={get("primary")}
-            style={{ marginRight: 5 }}
-          />
-        )}
+        <View style={{ width: 20, height: 20, marginRight: 5, alignItems: "center", justifyContent: "center" }}>
+          {loading ? (
+            <ActivityIndicator size="small" color={get("primary")} />
+          ) : (
+            <Ionicons name="copy-outline" size={14} color={get("primary")} />
+          )}
+        </View>
         <Text
           className="text-[11px] font-bold tracking-wide"
           style={{ color: isDark ? get("primary") : colors.positive.textDark.light, flexShrink: 1 }}

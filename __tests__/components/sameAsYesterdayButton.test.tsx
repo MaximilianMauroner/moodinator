@@ -132,7 +132,7 @@ describe("SameAsYesterdayButton", () => {
 
     expect(visibleText()).toContain("Copy last entry");
     expect(copyButton().props.disabled).toBe(true);
-    expect(copyButton().props.accessibilityState).toEqual({ disabled: true });
+    expect(copyButton().props.accessibilityState).toEqual({ disabled: true, busy: true });
     expect(onCopy).not.toHaveBeenCalled();
 
     await act(async () => completeRead(entry));
