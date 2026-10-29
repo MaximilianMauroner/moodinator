@@ -93,15 +93,9 @@ type BaseMoodEntryModalProps = {
     supportShownForMood?: number;
     /**
      * Shows every enabled field on one page with a single Done action, for
-     * detail on an entry that is already kept. Otherwise fields are steps.
+     * detail on a tapped mood. Otherwise fields are steps.
      */
     singlePage?: boolean;
-    /** Optional text action beside the close button, for example Undo. */
-    headerAction?: {
-        label: string;
-        accessibilityLabel: string;
-        onPress: () => void;
-    };
 };
 
 // ─── Step title map ────────────────────────────────────────────────────────
@@ -147,7 +141,6 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     successMessage,
     supportShownForMood,
     singlePage = false,
-    headerAction,
 }) => {
     const { isDark, get } = useThemeColors();
     const insets = useSafeAreaInsets();
@@ -405,19 +398,13 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
     }, [currentStep, goToStep, handleSave, isLastStep]);
 
     const handlePrimaryAction = useCallback(() => {
-        // The entry is already kept, so Done without changes only closes.
-        if (singlePage && !isDirty) {
-            haptics.tap();
-            onClose();
-            return;
-        }
         if (primaryActionSaves) {
             handleSave();
             return;
         }
 
         handleNext();
-    }, [handleNext, handleSave, isDirty, onClose, primaryActionSaves, singlePage]);
+    }, [handleNext, handleSave, primaryActionSaves]);
 
     const closeWithConfirmation = useCallback(() => {
         if (!isDirty) {
@@ -1020,19 +1007,6 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                             isDark={isDark}
                                         />
                                     )}
-                                    {headerAction ? (
-                                        <Pressable
-                                            onPress={headerAction.onPress}
-                                            disabled={isSaving}
-                                            className="h-11 items-center justify-center px-3"
-                                            accessibilityRole="button"
-                                            accessibilityLabel={headerAction.accessibilityLabel}
-                                        >
-                                            <Text className="text-base font-semibold" style={{ color: get("primary") }}>
-                                                {headerAction.label}
-                                            </Text>
-                                        </Pressable>
-                                    ) : null}
                                     <Pressable
                                         onPress={closeWithConfirmation}
                                         className="h-[48px] w-[48px] items-center justify-center rounded-full"
@@ -1311,31 +1285,25 @@ type MoodEntryModalVariantProps = MoodEntryModalSharedProps & {
     fieldConfig: MoodEntryFieldConfig;
 };
 
-export type KeptEntryDetailModalProps = MoodEntryModalVariantProps & {
-    /** Removes the entry that one tap already kept. */
-    onUndo: () => void;
-};
+export type QuickEntryDetailModalProps = MoodEntryModalVariantProps;
 export type DetailedMoodEntryModalProps = MoodEntryModalVariantProps;
 export type EditMoodEntryModalProps = MoodEntryModalVariantProps;
 
 /**
- * Optional detail for an entry that one tap on the picker already saved. It
- * follows the quick-entry field settings and updates that entry.
+ * Optional detail for a mood that one tap on the picker chose. It follows the
+ * quick-entry field settings and saves the entry on Done; Close saves nothing.
  */
-export const KeptEntryDetailModal: React.FC<KeptEntryDetailModalProps> = ({
-    onUndo,
-    ...props
-}) => (
+export const QuickEntryDetailModal: React.FC<QuickEntryDetailModalProps> = (
+    props
+) => (
     <BaseMoodEntryModal
         {...props}
         title="Add detail"
         showMoodSelector={false}
         flow="quick"
-        successMessage="Detail added"
         // One tap already offered support for a severe rating before this sheet.
         supportShownForMood={props.initialMood}
         singlePage
-        headerAction={{ label: "Undo", accessibilityLabel: "Undo this entry", onPress: onUndo }}
     />
 );
 

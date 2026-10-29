@@ -33,7 +33,8 @@ export type KeepMoodTapDeps = {
   afterCommit: readonly (() => void)[];
   /** True when any quick-entry field is on. */
   offersDetail: boolean;
-  openDetail: (entry: MoodEntry) => void;
+  /** Opens the detail sheet for the tapped mood; the sheet saves on Done. */
+  openDetail: (mood: number) => void;
   showUndoToast: (entry: MoodEntry) => void;
   /** Shows the support sheet; `onDecline` runs on "Not now". */
   showSupport: (onDecline: () => void) => void;
@@ -42,10 +43,10 @@ export type KeepMoodTapDeps = {
 };
 
 /**
- * One tap keeps a mood-only entry. Severe ratings show support first and
- * continue after "Not now"; other ratings continue at once. The follow-up is
- * the optional detail sheet, or a toast with Undo when every quick-entry field
- * is off.
+ * With any quick-entry field on, one tap opens the detail sheet and saves
+ * nothing until Done. With every field off, one tap keeps a mood-only entry
+ * and shows a toast with Undo. Severe ratings show support first and continue
+ * after "Not now"; other ratings continue at once.
  */
 export async function keepMoodTap(mood: number, deps: KeepMoodTapDeps): Promise<void> {
   if (deps.state.inFlight) return;
@@ -56,25 +57,28 @@ export async function keepMoodTap(mood: number, deps: KeepMoodTapDeps): Promise<
     if (ownsFlow()) deps.state.inFlight = false;
   };
 
-  let entry: MoodEntry;
-  try {
-    entry = await commitThenRunPostCommitEffects(
-      () => deps.create(getMoodEntryPersistenceValues(createMoodOnlyEntryValues(mood))),
-      deps.afterCommit,
-    );
-  } catch (error) {
-    release();
-    deps.feedback.reject();
-    deps.onSaveError(error);
-    return;
+  let followUp: () => void;
+  if (deps.offersDetail) {
+    followUp = () => deps.openDetail(mood);
+  } else {
+    let entry: MoodEntry;
+    try {
+      entry = await commitThenRunPostCommitEffects(
+        () => deps.create(getMoodEntryPersistenceValues(createMoodOnlyEntryValues(mood))),
+        deps.afterCommit,
+      );
+    } catch (error) {
+      release();
+      deps.feedback.reject();
+      deps.onSaveError(error);
+      return;
+    }
+    if (!ownsFlow()) return;
+    followUp = () => deps.showUndoToast(entry);
   }
 
-  if (!ownsFlow()) return;
-
   const continueAfterKeep = () => {
-    if (!ownsFlow()) return;
-    if (deps.offersDetail) deps.openDetail(entry);
-    else deps.showUndoToast(entry);
+    if (ownsFlow()) followUp();
   };
 
   // A delayed link failure can outlive this entry. Only its current flow may
@@ -105,7 +109,7 @@ export async function keepMoodTap(mood: number, deps: KeepMoodTapDeps): Promise<
     return;
   }
 
-  deps.feedback.commit();
+  if (!deps.offersDetail) deps.feedback.commit();
   try {
     continueAfterKeep();
   } finally {

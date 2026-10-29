@@ -11,7 +11,7 @@ import { DateTimePickerModal } from "@/components/DateTimePickerModal";
 import {
   DetailedMoodEntryModal,
   EditMoodEntryModal,
-  KeptEntryDetailModal,
+  QuickEntryDetailModal,
   MoodEntryFormValues,
 } from "@/components/MoodEntryModal";
 import { WeatherMoodGrid } from "@/components/entry/WeatherMoodGrid";
@@ -92,24 +92,6 @@ function HomeScreenContent() {
     [modals.editingEntry, updateMood]
   );
 
-  const handleKeptEntrySave = useCallback(
-    async (values: MoodEntryFormValues) => {
-      if (!modals.keptEntry) return;
-      await updateMoodEntryOrThrow(updateMood, modals.keptEntry, values);
-    },
-    [modals.keptEntry, updateMood]
-  );
-
-  const handleKeptEntryUndo = useCallback(() => {
-    const entry = modals.keptEntry;
-    modals.closeKeptEntry();
-    if (!entry) return;
-    void removeMood(entry.id).catch((error: unknown) => {
-      console.error("Failed to undo kept entry:", error);
-      toastService.error("Undo failed", "The entry could not be removed.");
-    });
-  }, [modals, removeMood]);
-
   const handleDateTimeSave = useCallback(
     async (moodId: number, newTimestamp: number, utcOffsetMinutes?: number | null) => {
       await updateMoodTimestampOrThrow(updateMoodTimestamp, moodId, newTimestamp, utcOffsetMinutes);
@@ -140,7 +122,7 @@ function HomeScreenContent() {
         create: createMood,
         afterCommit: [scrollToTop],
         offersDetail: offersDetailAfterKeep,
-        openDetail: modals.setKeptEntry,
+        openDetail: modals.setQuickMood,
         showUndoToast: (entry) =>
           toastService.showKeptMood(entry, async () => {
             await removeMood(entry.id);
@@ -152,7 +134,7 @@ function HomeScreenContent() {
           Alert.alert("Save failed", "Unable to save your entry. Please try again.");
         },
       }),
-    [createMood, modals.setKeptEntry, offersDetailAfterKeep, removeMood, scrollToTop]
+    [createMood, modals.setQuickMood, offersDetailAfterKeep, removeMood, scrollToTop]
   );
 
   useEffect(
@@ -260,17 +242,14 @@ function HomeScreenContent() {
           onDelete={handleDeleteMood}
         />
       )}
-      <KeptEntryDetailModal
-        visible={Boolean(modals.keptEntry)}
-        initialMood={modals.keptInitialValues?.mood ?? modals.pendingMood}
+      <QuickEntryDetailModal
+        visible={modals.quickMood !== null}
+        initialMood={modals.quickMood ?? modals.pendingMood}
         emotionOptions={entrySettings.emotionOptions}
         contextOptions={entrySettings.contextOptions}
         fieldConfig={entrySettings.quickEntryFieldConfig}
-        initialValues={modals.keptInitialValues}
-        currentEntryId={modals.keptEntry?.id}
-        onClose={modals.closeKeptEntry}
-        onSubmit={handleKeptEntrySave}
-        onUndo={handleKeptEntryUndo}
+        onClose={modals.closeQuickEntry}
+        onSubmit={handleEntrySave}
         onCreateEmotion={entrySettings.createEmotionOption}
         onCreateContextTag={entrySettings.createContextOption}
       />

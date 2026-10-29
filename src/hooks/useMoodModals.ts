@@ -18,9 +18,9 @@ function toInitialValues(entry: MoodEntry | null): Partial<MoodEntryFormValues> 
 
 /**
  * Hook for managing modal visibility and related state.
- * Handles the detail sheet for a kept entry, detailed entry, editing, and the
- * date picker. Competing opens notify the caller before changing modal state;
- * the kept-entry continuation and closing a modal retain their current flow.
+ * Handles the quick detail sheet, detailed entry, editing, and the date
+ * picker. Competing opens notify the caller before changing modal state; the
+ * quick-tap continuation and closing a modal retain their current flow.
  *
  * Mood selectors own their press feedback, so opening a modal does not add a
  * second haptic for the same gesture.
@@ -31,7 +31,8 @@ export function useMoodModals(onOpen?: () => void) {
   const [detailedEntryVisible, setDetailedEntryVisible] = useState(false);
   const [pendingMood, setPendingMood] = useState(5);
   const [editingEntry, updateEditingEntry] = useState<MoodEntry | null>(null);
-  const [keptEntry, setKeptEntry] = useState<MoodEntry | null>(null);
+  /** The tapped mood while the quick detail sheet is open; nothing is saved until Done. */
+  const [quickMood, setQuickMood] = useState<number | null>(null);
 
   const handleLongPress = useCallback((mood: number) => {
     onOpen?.();
@@ -47,8 +48,8 @@ export function useMoodModals(onOpen?: () => void) {
     updateEditingEntry(null);
   }, []);
 
-  const closeKeptEntry = useCallback(() => {
-    setKeptEntry(null);
+  const closeQuickEntry = useCallback(() => {
+    setQuickMood(null);
   }, []);
 
   const openDateModal = useCallback((mood: MoodEntry) => {
@@ -67,7 +68,6 @@ export function useMoodModals(onOpen?: () => void) {
   }, []);
 
   const editingInitialValues = useMemo(() => toInitialValues(editingEntry), [editingEntry]);
-  const keptInitialValues = useMemo(() => toInitialValues(keptEntry), [keptEntry]);
 
   return {
     // Date modal
@@ -76,11 +76,10 @@ export function useMoodModals(onOpen?: () => void) {
     openDateModal,
     closeDateModal,
 
-    // Detail for an entry that one tap kept
-    keptEntry,
-    setKeptEntry,
-    closeKeptEntry,
-    keptInitialValues,
+    // Quick detail for a tapped mood
+    quickMood,
+    setQuickMood,
+    closeQuickEntry,
 
     // Detailed entry
     detailedEntryVisible,

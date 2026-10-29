@@ -39,7 +39,7 @@ vi.mock("@/components/ErrorBoundary", () => ({ ErrorBoundary: "ErrorBoundary" })
 vi.mock("@/components/ScreenErrorFallback", () => ({ createScreenErrorFallback: () => "ScreenFallback" }));
 vi.mock("@/components/DateTimePickerModal", () => ({ DateTimePickerModal: "DateTimePicker" }));
 vi.mock("@/components/MoodEntryModal", () => ({
-  DetailedMoodEntryModal: "DetailedEntry", EditMoodEntryModal: "EditEntry", KeptEntryDetailModal: "KeptDetail",
+  DetailedMoodEntryModal: "DetailedEntry", EditMoodEntryModal: "EditEntry", QuickEntryDetailModal: "QuickDetail",
 }));
 vi.mock("@/components/ui/EmptyState", () => ({ EmptyState: "EmptyState" }));
 vi.mock("@/components/layout/ScreenBackgroundAccent", () => ({ ScreenBackgroundAccent: "Accent" }));
@@ -86,7 +86,7 @@ afterEach(async () => {
   vi.useRealTimers();
 });
 
-it.each(["DetailedPicker", "WeatherPicker"])("does not reopen an old kept entry while a newer %s form is being filled", async (picker) => {
+it.each(["DetailedPicker", "WeatherPicker"])("does not reopen an old quick detail while a newer %s form is being filled", async (picker) => {
   mocks.detailedLabels = picker === "DetailedPicker";
   await act(async () => { renderer = create(<HomeScreen />); });
   await act(async () => host(picker).props[picker === "DetailedPicker" ? "onMoodPress" : "onPress"](9));
@@ -100,7 +100,7 @@ it.each(["DetailedPicker", "WeatherPicker"])("does not reopen an old kept entry 
     vi.advanceTimersByTime(SUPPORT_HANDOFF_MS * 2);
   });
 
-  expect(host("KeptDetail").props.visible).toBe(false);
+  expect(host("QuickDetail").props.visible).toBe(false);
   expect(host("DetailedEntry").props.visible).toBe(true);
   await act(async () => {
     await host("DetailedEntry").props.onSubmit({
@@ -108,9 +108,10 @@ it.each(["DetailedPicker", "WeatherPicker"])("does not reopen an old kept entry 
     });
     host("DetailedEntry").props.onClose();
   });
-  expect(mocks.store.create).toHaveBeenCalledTimes(2);
+  // The severe tap opened detail without saving; only the newer form saved.
+  expect(mocks.store.create).toHaveBeenCalledTimes(1);
   expect(host("DetailedEntry").props.visible).toBe(false);
-  expect(host("KeptDetail").props.visible).toBe(false);
+  expect(host("QuickDetail").props.visible).toBe(false);
 });
 
 
@@ -128,11 +129,11 @@ it.each(["TodayNow", "EarlierToday"])(
       oldDecline();
       vi.advanceTimersByTime(SUPPORT_HANDOFF_MS * 2);
     });
-    expect(host("KeptDetail").props.visible).toBe(false);
+    expect(host("QuickDetail").props.visible).toBe(false);
     expect(host("DateTimePicker").props.visible).toBe(true);
     await act(async () => host("DateTimePicker").props.onEdit(entry));
     expect(host("EditEntry").props.visible).toBe(true);
-    expect(host("KeptDetail").props.visible).toBe(false);
+    expect(host("QuickDetail").props.visible).toBe(false);
   }
 );
 
@@ -146,5 +147,5 @@ it("does not resume old support detail after Home loses focus", async () => {
     mocks.blur!();
     vi.advanceTimersByTime(SUPPORT_HANDOFF_MS * 2);
   });
-  expect(host("KeptDetail").props.visible).toBe(false);
+  expect(host("QuickDetail").props.visible).toBe(false);
 });

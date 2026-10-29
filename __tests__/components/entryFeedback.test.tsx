@@ -9,7 +9,7 @@ import { CreatePresetModal } from "@/components/entry/CreatePresetModal";
 import {
   DetailedMoodEntryModal,
   EditMoodEntryModal,
-  KeptEntryDetailModal,
+  QuickEntryDetailModal,
   type MoodEntryFormValues,
 } from "@/components/MoodEntryModal";
 import { setHapticsEnabled } from "@/lib/haptics";
@@ -221,9 +221,8 @@ describe.each(["android", "ios"])("entry field feedback on %s", (platform) => {
 
 function EntryModal() {
   return (
-    <KeptEntryDetailModal
+    <QuickEntryDetailModal
       visible
-      onUndo={() => {}}
       initialMood={4}
       emotionOptions={options}
       contextOptions={["Work", "Family"]}
@@ -235,7 +234,7 @@ function EntryModal() {
   );
 }
 
-type SaveVariant = "kept" | "detailed" | "edit";
+type SaveVariant = "quick" | "detailed" | "edit";
 
 function SaveEntryModal({
   variant,
@@ -260,8 +259,8 @@ function SaveEntryModal({
     onSubmit,
     onCreateEmotion: () => null,
   };
-  if (variant === "kept") {
-    return <KeptEntryDetailModal {...shared} onUndo={() => {}} />;
+  if (variant === "quick") {
+    return <QuickEntryDetailModal {...shared} />;
   }
   const Modal = variant === "edit" ? EditMoodEntryModal : DetailedMoodEntryModal;
   return <Modal {...shared} />;
@@ -278,34 +277,30 @@ async function pressLabel(accessibilityLabel: string) {
 const NOTES_ONLY = { emotions: false, context: false, energy: false, notes: true };
 
 function StoredEntryModal({
-  entry, variant, fieldConfig, onClose, onSubmit,
+  entry, fieldConfig, onClose, onSubmit,
 }: {
   entry: MoodEntry;
-  variant: "kept" | "edit";
   fieldConfig: React.ComponentProps<typeof EditMoodEntryModal>["fieldConfig"];
   onClose: () => void;
   onSubmit: (values: MoodEntryFormValues) => Promise<void>;
 }) {
-  const { setKeptEntry, setEditingEntry, keptEntry, editingEntry, keptInitialValues, editingInitialValues } = useMoodModals();
+  const { setEditingEntry, editingEntry, editingInitialValues } = useMoodModals();
   useEffect(() => {
-    if (variant === "kept") setKeptEntry(entry);
-    else setEditingEntry(entry);
-  }, [entry, variant, setKeptEntry, setEditingEntry]);
-  const initialValues = variant === "kept" ? keptInitialValues : editingInitialValues;
-  const props = {
-    visible: Boolean(variant === "kept" ? keptEntry : editingEntry),
-    initialMood: initialValues?.mood ?? 5,
-    initialValues,
-    currentEntryId: entry.id,
-    emotionOptions: options,
-    contextOptions: ["Work"],
-    fieldConfig,
-    onClose,
-    onSubmit,
-  };
-  return variant === "kept"
-    ? <KeptEntryDetailModal {...props} onUndo={vi.fn()} />
-    : <EditMoodEntryModal {...props} />;
+    setEditingEntry(entry);
+  }, [entry, setEditingEntry]);
+  return (
+    <EditMoodEntryModal
+      visible={Boolean(editingEntry)}
+      initialMood={editingInitialValues?.mood ?? 5}
+      initialValues={editingInitialValues}
+      currentEntryId={entry.id}
+      emotionOptions={options}
+      contextOptions={["Work"]}
+      fieldConfig={fieldConfig}
+      onClose={onClose}
+      onSubmit={onSubmit}
+    />
+  );
 }
 
 async function addNoteAndPressDone() {
@@ -324,7 +319,7 @@ describe.each(["android", "ios"])("entry modal feedback on %s", (platform) => {
 
   it.each([0, 34])("reserves bottom inset %s for Done only while the keyboard is hidden", async (bottomInset) => {
     nativeInsets.bottom = bottomInset;
-    await render(<SaveEntryModal variant="kept" onClose={vi.fn()} onSubmit={vi.fn(async () => {})} />);
+    await render(<SaveEntryModal variant="quick" onClose={vi.fn()} onSubmit={vi.fn(async () => {})} />);
     const footer = () => renderer.root.find((node) =>
       node.type === "View" &&
       node.props.style?.paddingBottom !== undefined &&
@@ -379,13 +374,13 @@ describe.each(["android", "ios"])("entry modal feedback on %s", (platform) => {
   });
 });
 
-describe("kept entry detail", () => {
-  it("shows all fields on one page and closes on Done without changes", async () => {
+describe("quick entry detail", () => {
+  it("shows all fields on one page and saves the tapped mood on Done without changes", async () => {
     const onClose = vi.fn();
     const onSubmit = vi.fn(async () => {});
     await render(
       <SaveEntryModal
-        variant="kept"
+        variant="quick"
         fieldConfig={{ emotions: true, context: true, energy: false, notes: true }}
         onClose={onClose}
         onSubmit={onSubmit}
@@ -396,40 +391,31 @@ describe("kept entry detail", () => {
     expect(button("emotion-option-Happy")).toBeTruthy();
     expect(button("entry-notes")).toBeTruthy();
 
-    await pressLabel("Done");
+    await act(async () => {
+      labeledButton("Done").props.onPress();
+      await Promise.resolve();
+    });
+
+    expect(onSubmit).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ mood: 4, note: "" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(entryFeedback.toastSuccess).toHaveBeenCalledWith("Entry saved");
+  });
+
+  it("saves nothing on Close", async () => {
+    const onClose = vi.fn();
+    const onSubmit = vi.fn(async () => {});
+    await render(<SaveEntryModal variant="quick" fieldConfig={NOTES_ONLY} onClose={onClose} onSubmit={onSubmit} />);
+
+    await pressLabel("Close Add detail");
 
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onSubmit).not.toHaveBeenCalled();
-    expect(entryFeedback.toastSuccess).not.toHaveBeenCalled();
-  });
-
-  it("removes the kept entry on Undo without saving the form", async () => {
-    const onUndo = vi.fn();
-    const onSubmit = vi.fn(async () => {});
-    await render(
-      <KeptEntryDetailModal
-        visible
-        initialMood={4}
-        emotionOptions={options}
-        contextOptions={["Work"]}
-        fieldConfig={{ emotions: true, context: false, energy: false, notes: false }}
-        onClose={() => {}}
-        onSubmit={onSubmit}
-        onUndo={onUndo}
-      />,
-    );
-
-    await pressLabel("Undo this entry");
-
-    expect(onUndo).toHaveBeenCalledTimes(1);
-    expect(onSubmit).not.toHaveBeenCalled();
-    expect(entryFeedback.toastSuccess).not.toHaveBeenCalled();
   });
 });
 
 describe("entry save acknowledgement", () => {
   it.each([
-    ["kept", "Detail added"],
+    ["quick", "Entry saved"],
     ["detailed", "Entry saved"],
     ["edit", "Entry updated"],
   ] as const)("announces one committed %s result", async (variant, expectedTitle) => {
@@ -438,14 +424,13 @@ describe("entry save acknowledgement", () => {
     await render(
       <SaveEntryModal
         variant={variant}
-        fieldConfig={variant === "kept" ? NOTES_ONLY : undefined}
+        fieldConfig={variant === "quick" ? NOTES_ONLY : undefined}
         onClose={onClose}
         onSubmit={onSubmit}
       />,
     );
 
-    // Done on the kept sheet only writes when something was added.
-    if (variant === "kept") {
+    if (variant === "quick") {
       await addNoteAndPressDone();
     } else {
       await pressLabel("Save entry");
@@ -492,7 +477,7 @@ describe("entry save acknowledgement", () => {
     });
     await render(
       <SaveEntryModal
-        variant="kept"
+        variant="quick"
         fieldConfig={{ emotions: false, context: false, energy: false, notes: true }}
         onClose={onClose}
         onSubmit={onSubmit}
@@ -617,12 +602,12 @@ describe("entry save acknowledgement", () => {
     );
   });
 
-  it("does not repeat support when adding detail to a severe entry already shown support", async () => {
+  it("does not repeat support on Done for a severe tap that already showed support", async () => {
     vi.useFakeTimers();
     try {
       const onSubmit = vi.fn(async () => {});
       await render(
-        <SaveEntryModal variant="kept" mood={9} fieldConfig={NOTES_ONLY} onClose={vi.fn()} onSubmit={onSubmit} />,
+        <SaveEntryModal variant="quick" mood={9} fieldConfig={NOTES_ONLY} onClose={vi.fn()} onSubmit={onSubmit} />,
       );
 
       await addNoteAndPressDone();
@@ -632,7 +617,7 @@ describe("entry save acknowledgement", () => {
 
       expect(onSubmit).toHaveBeenCalledTimes(1);
       expect(entryFeedback.crisisSupport).not.toHaveBeenCalled();
-      expect(entryFeedback.toastSuccess).toHaveBeenCalledWith("Detail added");
+      expect(entryFeedback.toastSuccess).toHaveBeenCalledWith("Entry saved");
     } finally {
       vi.useRealTimers();
     }
@@ -677,11 +662,11 @@ describe("last-entry prefill", () => {
   };
 
   it.each([
-    ["kept", true, copied, 0, "Elated"],
+    ["quick", true, copied, 0, "Elated"],
     ["edit", true, copied, 0, "Elated"],
-    ["kept", false, copied, 0, "Elated"],
+    ["quick", false, copied, 0, "Elated"],
     ["edit", false, copied, 0, "Elated"],
-    ["kept", false, { ...copied, mood: 10, moodScale: LEGACY_HIGHER_IS_BETTER_MOOD_SCALE_SNAPSHOT }, 0, "Elated"],
+    ["quick", false, { ...copied, mood: 10, moodScale: LEGACY_HIGHER_IS_BETTER_MOOD_SCALE_SNAPSHOT }, 0, "Elated"],
     ["edit", true, { ...copied, mood: 9, moodScale: LEGACY_HIGHER_IS_BETTER_MOOD_SCALE_SNAPSHOT }, 1, "Very Happy"],
   ] as const)("copies exact values in the %s form with all fields visible=%s (case %#)", async (
     variant, allFields, source, formMood, label,
@@ -693,8 +678,8 @@ describe("last-entry prefill", () => {
       fieldConfig: { emotions: allFields, context: allFields, energy: allFields, notes: true },
       onClose: vi.fn(), onSubmit,
     };
-    await render(variant === "kept"
-      ? <KeptEntryDetailModal {...props} onUndo={vi.fn()} />
+    await render(variant === "quick"
+      ? <QuickEntryDetailModal {...props} />
       : <EditMoodEntryModal {...props} />);
     const copy = renderer.root.find((node) => node.type === "CopyLastEntry");
     expect(copy.props.excludeEntryId).toBe(77);
@@ -706,7 +691,7 @@ describe("last-entry prefill", () => {
     while (renderer.root.findAllByProps({ accessibilityLabel: "Next step" }).length > 0) {
       await pressLabel("Next step");
     }
-    await pressLabel(variant === "kept" ? "Done" : "Save entry");
+    await pressLabel(variant === "quick" ? "Done" : "Save entry");
     expect(onSubmit).toHaveBeenCalledExactlyOnceWith({
       mood: formMood, emotions: source.emotions, contextTags: source.contextTags,
       energy: 0, note: source.note, basedOnEntryId: 41,
@@ -714,7 +699,7 @@ describe("last-entry prefill", () => {
     expect(entryFeedback.crisisSupport).not.toHaveBeenCalled();
   });
 
-  it.each(["kept", "edit"] as const)("initializes a legacy %s row in the current scale and preserves its meaning on a note edit", async (variant) => {
+  it("initializes a legacy edit row in the current scale and preserves its meaning on a note edit", async () => {
     const entry: MoodEntry = {
       ...copied, id: 77, mood: 9, note: "original note", basedOnEntryId: 12,
       moodScale: LEGACY_HIGHER_IS_BETTER_MOOD_SCALE_SNAPSHOT,
@@ -722,20 +707,20 @@ describe("last-entry prefill", () => {
     const update = vi.fn(async () => entry);
     await render(
       <StoredEntryModal
-        entry={entry} variant={variant}
+        entry={entry}
         fieldConfig={{ emotions: true, context: true, energy: true, notes: true }}
         onClose={vi.fn()}
         onSubmit={async (values) => { await updateMoodEntryOrThrow(update, entry, values); }}
       />,
     );
-    const modal = renderer.root.findByType(variant === "kept" ? KeptEntryDetailModal : EditMoodEntryModal);
+    const modal = renderer.root.findByType(EditMoodEntryModal);
     expect(modal.props.initialMood).toBe(1);
     expect(modal.props.initialValues.mood).toBe(1);
     await act(async () => button("entry-notes").props.onChangeText("changed note"));
     while (renderer.root.findAllByProps({ accessibilityLabel: "Next step" }).length > 0) {
       await pressLabel("Next step");
     }
-    await pressLabel(variant === "kept" ? "Done" : "Save entry");
+    await pressLabel("Save entry");
 
     expect(update).toHaveBeenCalledExactlyOnceWith(77, {
       mood: 9, emotions: entry.emotions, contextTags: entry.contextTags,
@@ -746,11 +731,11 @@ describe("last-entry prefill", () => {
   it("saves the copied note even when notes are hidden", async () => {
     const onSubmit = vi.fn(async () => {});
     await render(
-      <KeptEntryDetailModal
+      <QuickEntryDetailModal
         visible initialMood={5} currentEntryId={77}
         emotionOptions={options} contextOptions={["Work"]}
         fieldConfig={{ emotions: false, context: false, energy: false, notes: false }}
-        onClose={vi.fn()} onSubmit={onSubmit} onUndo={vi.fn()}
+        onClose={vi.fn()} onSubmit={onSubmit}
       />,
     );
 
@@ -770,14 +755,14 @@ describe("last-entry prefill", () => {
       initialMood: 5, currentEntryId: 77,
       initialValues: basedOnEntryId === null ? undefined : { basedOnEntryId },
       emotionOptions: options, contextOptions: ["Work"], fieldConfig: NOTES_ONLY,
-      onClose: vi.fn(), onSubmit, onUndo: vi.fn(),
+      onClose: vi.fn(), onSubmit,
     };
-    await render(<KeptEntryDetailModal {...props} visible />);
+    await render(<QuickEntryDetailModal {...props} visible />);
     await act(async () => renderer.root.find((node) => node.type === "CopyLastEntry").props.onCopy(copied));
     expect(button("entry-notes").props.value).toBe(copied.note);
 
-    await act(async () => renderer.update(<KeptEntryDetailModal {...props} visible={false} />));
-    await act(async () => renderer.update(<KeptEntryDetailModal {...props} visible />));
+    await act(async () => renderer.update(<QuickEntryDetailModal {...props} visible={false} />));
+    await act(async () => renderer.update(<QuickEntryDetailModal {...props} visible />));
     expect(button("entry-notes").props.value).toBe("");
     await act(async () => button("entry-notes").props.onChangeText("  fresh note  "));
     await pressLabel("Done");
@@ -799,7 +784,7 @@ describe("last-entry prefill", () => {
     try {
       await render(
         <StoredEntryModal
-          entry={entry} variant="edit" fieldConfig={NOTES_ONLY}
+          entry={entry} fieldConfig={NOTES_ONLY}
           onClose={onClose}
           onSubmit={async (values) => { await updateMoodEntryOrThrow(update, entry, values); }}
         />,
