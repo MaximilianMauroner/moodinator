@@ -268,7 +268,7 @@ export const EmotionPicker: React.FC<EmotionPickerProps> = ({
 
     return (
         <View>
-            <View className="flex-row items-center gap-3 mb-2" style={{ minHeight: 34 }}>
+            <View className="flex-row items-center gap-3" style={{ minHeight: 34 }}>
                 {selected.length > 0 ? (
                     <ScrollView
                         horizontal

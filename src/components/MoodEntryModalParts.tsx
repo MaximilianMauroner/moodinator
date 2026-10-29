@@ -67,6 +67,7 @@ const MoodAdjustRow: React.FC<{
     const moodData = getMoodRatingDisplay(mood, isDark);
     const bgHex = moodData.backgroundHex;
     const textHex = moodData.colorHex;
+    const pillBorderWidth = isDark ? 0 : 1;
     const canDecrease = mood > 0;
     const canIncrease = mood < 10;
 
@@ -127,7 +128,7 @@ const MoodAdjustRow: React.FC<{
                 >
                     <Ionicons
                         name="chevron-back"
-                        size={16}
+                        size={20}
                         color={isDark ? colors.primary.dark : colors.primary.light}
                     />
                 </HapticTab>
@@ -140,10 +141,12 @@ const MoodAdjustRow: React.FC<{
                         backgroundColor: bgHex,
                         minWidth: 120,
                         flexShrink: 1,
-                        paddingHorizontal: 12,
-                        paddingVertical: 8,
+                        paddingHorizontal: 12 - pillBorderWidth,
+                        paddingVertical: 8 - pillBorderWidth,
                         minHeight: 48,
                         borderRadius: 16,
+                        borderWidth: pillBorderWidth,
+                        borderColor: `${textHex}40`,
                         flexDirection: "row",
                         alignItems: "center",
                         justifyContent: "center",
@@ -208,7 +211,7 @@ const MoodAdjustRow: React.FC<{
                 >
                     <Ionicons
                         name="chevron-forward"
-                        size={16}
+                        size={20}
                         color={isDark ? colors.negative.text.dark : colors.negative.text.light}
                     />
                 </HapticTab>

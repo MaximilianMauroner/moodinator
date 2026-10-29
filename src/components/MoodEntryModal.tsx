@@ -21,7 +21,7 @@ import { PrivateModal } from "@/components/ui/PrivateModal";
 import { useModalAlert } from "@/components/ui/AppAlert";
 import { getInterpretedMoodRating, getMoodRatingDisplay } from "@/constants/moodScaleInterpretation";
 import { useThemeColors, colors } from "@/constants/colors";
-import { typography } from "@/constants/typography";
+import { fontFamilies, typography } from "@/constants/typography";
 import { getMoodWeatherColor, getMoodWeatherIcon } from "@/constants/moodWeather";
 import type { Emotion, MoodEntry } from "../../db/types";
 import { SameAsYesterdayButton } from "./entry";
@@ -984,7 +984,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                             {/* ── Header ─────────────────────────────────── */}
                             <View
                                 style={{
-                                    borderBottomWidth: 1,
+                                    borderBottomWidth: singlePage ? 1 : 0,
                                     borderBottomColor: isDark
                                         ? "rgba(61, 53, 42, 0.25)"
                                         : "rgba(229, 217, 191, 0.5)",
@@ -1072,7 +1072,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                             onAdjust={setMood}
                                             isDark={isDark}
                                         />
-                                        <View className="items-center mt-1">
+                                        <View className="items-center mt-[12px]">
                                             <SameAsYesterdayButton onCopy={handleCopyYesterday} excludeEntryId={currentEntryId} />
                                         </View>
                                     </View>
@@ -1082,8 +1082,11 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                             accessibilityRole="header"
                                             style={{
                                                 ...typography.bodyMd,
+                                                fontFamily: fontFamilies.bodyMedium,
+                                                fontSize: 18,
+                                                lineHeight: 24,
                                                 flex: 1,
-                                                fontWeight: "600",
+                                                fontWeight: "700",
                                                 color: get("text"),
                                                 marginTop: 4,
                                             }}
