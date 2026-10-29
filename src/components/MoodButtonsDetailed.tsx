@@ -10,8 +10,6 @@ import {
 import { useThemeColors } from "@/constants/colors";
 import { getMoodWeatherColor, getMoodWeatherIcon } from "@/constants/moodWeather";
 
-const THREE_COLUMN_CARD_MIN_HEIGHT = 78;
-const THREE_COLUMN_CARD_WIDTH = "31.5%";
 const TWO_COLUMN_CARD_MIN_HEIGHT = 84;
 const TWO_COLUMN_CARD_WIDTH = "48%";
 
@@ -34,17 +32,14 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
 		}));
 	}, [isDark]);
 
-	const topRowMoods = moodData.slice(0, 3);
-	const remainingMoods = moodData.slice(3);
-
 	const renderMoodCard = (
 		mood: (typeof moodData)[number],
-		width: ViewStyle["width"],
-		minHeight: number,
+		index: number,
 	) => {
 		const cardStyle: ViewStyle = {
-			width,
-			minHeight,
+			width: TWO_COLUMN_CARD_WIDTH,
+			minHeight: TWO_COLUMN_CARD_MIN_HEIGHT,
+			marginLeft: index === moodData.length - 1 ? "26%" : 0,
 			backgroundColor: get("background"),
 			borderWidth: 1,
 			borderColor: get("border"),
@@ -95,18 +90,8 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
 				className="flex-row flex-wrap justify-between"
 				style={{ rowGap: 8 }}
 			>
-				{topRowMoods.map((mood) =>
-					renderMoodCard(
-						mood,
-						THREE_COLUMN_CARD_WIDTH,
-						THREE_COLUMN_CARD_MIN_HEIGHT,
-					),
-				)}
-				{remainingMoods.map((mood) =>
-					renderMoodCard(mood, TWO_COLUMN_CARD_WIDTH, TWO_COLUMN_CARD_MIN_HEIGHT),
-				)}
+				{moodData.map(renderMoodCard)}
 			</View>
-
 		</View>
 	);
 };

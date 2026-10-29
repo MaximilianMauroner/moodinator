@@ -222,14 +222,18 @@ function HomeScreenContent() {
               borderTopWidth: 1,
               borderColor: get("border"),
               paddingTop: 14,
-              paddingHorizontal: 12,
               paddingBottom: dockBottomPadding,
             }}
           >
-            <Text style={[typography.titleMd, { color: get("text"), fontSize: 18, lineHeight: 24, marginHorizontal: 8, marginBottom: 10 }]}>
+            <Text accessibilityRole="header" style={[typography.titleMd, { color: get("text"), fontSize: 18, lineHeight: 24, marginHorizontal: 20, marginBottom: 10 }]}>
               How is it now?
             </Text>
-            <ScrollView style={{ flexGrow: 0, flexShrink: 1 }}>
+            <ScrollView
+              style={{ flexGrow: 0, flexShrink: 1 }}
+              contentContainerStyle={{ paddingHorizontal: 12 }}
+              showsVerticalScrollIndicator
+              scrollIndicatorInsets={{ right: 0 }}
+            >
               {entrySettings.showDetailedLabels ? (
                 <DetailedMoodButtonSelector onMoodPress={handleMoodTap} onLongPress={modals.handleLongPress} />
               ) : (
