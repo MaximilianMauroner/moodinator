@@ -49,7 +49,7 @@ export function ForecastCard({ days, ready, onSelectDay }: ForecastCardProps) {
             <Pressable
               key={day.dayKey}
               onPress={() => onSelectDay(day)}
-              className="w-1/4 items-center px-[8px] py-2 active:opacity-70"
+              className="w-1/4 items-center py-2 active:opacity-70"
               style={{ minWidth: 48, minHeight: 48, borderTopWidth: 1, borderTopColor: get("borderSubtle") }}
               accessibilityRole="button"
               accessibilityLabel={dayLabel(day)}
@@ -64,7 +64,7 @@ export function ForecastCard({ days, ready, onSelectDay }: ForecastCardProps) {
                   <Ionicons name={getMoodWeatherIcon(average)} size={24} color={getMoodWeatherColor(average, isDark)} />
                 )}
               </View>
-              <View className="w-full">
+              <View className="w-full px-[8px]">
                 <View testID={`forecast-track-${day.dayKey}`} style={{ height: 14, justifyContent: "center" }}>
                   <View style={{ height: 6, borderRadius: 3, backgroundColor: get("border") }} />
                   <View style={{ position: "absolute", left: 3, right: 3, top: 0, bottom: 0, justifyContent: "center" }}>
