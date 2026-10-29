@@ -79,7 +79,7 @@ export function TodayNow({ latest, loaded, onOpen }: TodayNowProps) {
           <Text numberOfLines={2} style={{ color: get("textSubtle"), fontSize: 13, marginTop: 4 }}>{detail}</Text>
         ) : null}
         {note ? (
-          <Text numberOfLines={1} style={{ color: get("text"), fontSize: 13, marginTop: 2, opacity: 0.9 }}>{note}</Text>
+          <Text numberOfLines={3} style={{ color: get("text"), fontSize: 13, marginTop: 2, opacity: 0.9 }}>{note}</Text>
         ) : null}
       </View>
     </Pressable>
@@ -139,7 +139,7 @@ export function EarlierToday({ entries, onOpen, onShowAll }: EarlierTodayProps) 
                 </Text>
               ) : null}
               {note ? (
-                <Text numberOfLines={1} style={{ color: get("text"), fontSize: 13, marginTop: 2, opacity: 0.9 }}>
+                <Text numberOfLines={2} style={{ color: get("text"), fontSize: 13, marginTop: 2, opacity: 0.9 }}>
                   {note}
                 </Text>
               ) : null}

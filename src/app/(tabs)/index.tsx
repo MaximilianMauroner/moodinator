@@ -26,6 +26,7 @@ import { useRecentMoodEntries } from "@/features/history/useRecentMoodEntries";
 import { buildForecastDays } from "@/features/history/forecast";
 import { useMoodsStore } from "@/shared/state/moodsStore";
 import { useEntrySettings } from "@/hooks/useEntrySettings";
+import { useMoodItemActions } from "@/hooks/useMoodItemActions";
 import { useMoodModals } from "@/hooks/useMoodModals";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { haptics } from "@/lib/haptics";
@@ -80,6 +81,7 @@ function HomeScreenContent() {
     beginMoodEntryFlow(tapStateRef.current);
   }, []);
   const modals = useMoodModals(invalidateEntryFlow);
+  const { handleDeleteMood } = useMoodItemActions({ setEditingEntry: modals.setEditingEntry });
   useFocusEffect(useCallback(() => invalidateEntryFlow, [invalidateEntryFlow]));
 
   const handleEditEntrySave = useCallback(
@@ -255,6 +257,7 @@ function HomeScreenContent() {
             modals.closeDateModal();
             modals.setEditingEntry(mood);
           }}
+          onDelete={handleDeleteMood}
         />
       )}
       <KeptEntryDetailModal

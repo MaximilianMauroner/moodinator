@@ -7,7 +7,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { PrivateModal } from "@/components/ui/PrivateModal";
 import { PrivateDateTimePicker } from "@/components/ui/PrivateDateTimePicker";
 import { getMoodRatingDisplay } from "@/constants/moodScaleInterpretation";
-import { useThemeColors, colors } from "@/constants/colors";
+import { useThemeColors, colors, getThemedColor } from "@/constants/colors";
 import { haptics } from "@/lib/haptics";
 import { Alert } from "@/components/ui/AppAlert";
 import { commitThenRunPostCommitEffects } from "@/lib/moodEntryPersistence";
@@ -27,6 +27,7 @@ interface Props {
     utcOffsetMinutes?: number | null,
   ) => Promise<void> | void;
   onEdit?: (mood: MoodEntry) => void;
+  onDelete?: (mood: MoodEntry) => void;
 }
 
 function getPickerDate(parts: EntryLocalDateParts, recordedOffset = false): Date {
@@ -112,6 +113,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
   onClose,
   onSave,
   onEdit,
+  onDelete,
 }) => {
   const { isDark, get, getCategoryColors } = useThemeColors();
   const recordedOffset = mood ? getRecordedOffset(mood) !== undefined : false;
@@ -293,20 +295,38 @@ export const DateTimePickerModal: React.FC<Props> = ({
                 >
                   Entry Details
                 </Text>
-                <Pressable
-                  onPress={handleCancel}
-                  disabled={saving}
-                  className="h-11 w-11 items-center justify-center rounded-full"
-                  accessibilityRole="button"
-                  accessibilityLabel="Close entry details"
-                  accessibilityState={{ disabled: saving }}
-                >
-                  <Ionicons
-                    name="close-circle"
-                    size={24}
-                    color={get("textMuted")}
-                  />
-                </Pressable>
+                <View className="flex-row items-center">
+                  {onDelete ? (
+                    <Pressable
+                      onPress={() => {
+                        if (saving) return;
+                        onClose();
+                        onDelete(mood);
+                      }}
+                      disabled={saving}
+                      className="h-12 w-12 items-center justify-center rounded-full"
+                      accessibilityRole="button"
+                      accessibilityLabel="Delete this entry"
+                      accessibilityState={{ disabled: saving }}
+                    >
+                      <Ionicons name="trash-outline" size={22} color={getThemedColor("dangerText", isDark)} />
+                    </Pressable>
+                  ) : null}
+                  <Pressable
+                    onPress={handleCancel}
+                    disabled={saving}
+                    className="h-11 w-11 items-center justify-center rounded-full"
+                    accessibilityRole="button"
+                    accessibilityLabel="Close entry details"
+                    accessibilityState={{ disabled: saving }}
+                  >
+                    <Ionicons
+                      name="close-circle"
+                      size={24}
+                      color={get("textMuted")}
+                    />
+                  </Pressable>
+                </View>
               </View>
 
               {/* Mood pill */}

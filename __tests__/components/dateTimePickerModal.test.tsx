@@ -48,6 +48,7 @@ vi.mock("@/constants/colors", () => ({
     positive: { textDark: { light: "#000" } },
     sand: { text: { dark: "#000", light: "#000" } },
   },
+  getThemedColor: () => "#000",
   useThemeColors: () => ({
     isDark: false,
     get: () => "#000",
@@ -575,5 +576,29 @@ describe("DateTimePickerModal timestamp round trips", () => {
     await act(async () => button("Save date and time changes").props.onPress());
 
     expect(onSave).toHaveBeenCalledWith(7, Date.parse("2026-04-05T07:15:00.000Z"), -120);
+  });
+});
+
+describe("DateTimePickerModal delete", () => {
+  it("closes and deletes the shown entry", async () => {
+    const mood = entry(Date.parse("2026-03-31T12:00:00.000Z"), 0);
+    const onClose = vi.fn();
+    const onDelete = vi.fn();
+    await act(async () => {
+      renderer = create(
+        <DateTimePickerModal visible mood={mood} onClose={onClose} onSave={vi.fn()} onDelete={onDelete} />,
+      );
+    });
+
+    await act(async () => button("Delete this entry").props.onPress());
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onDelete).toHaveBeenCalledWith(mood);
+  });
+
+  it("offers no delete when the screen gives no delete action", async () => {
+    await renderModal(entry(Date.parse("2026-03-31T12:00:00.000Z"), 0));
+
+    expect(renderer.root.findAllByProps({ accessibilityLabel: "Delete this entry" })).toHaveLength(0);
   });
 });

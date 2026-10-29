@@ -233,6 +233,7 @@ function HistoryScreenContent() {
             modals.closeDateModal();
             modals.setEditingEntry(mood);
           }}
+          onDelete={itemActions.handleDeleteMood}
         />
       )}
       <EditMoodEntryModal
