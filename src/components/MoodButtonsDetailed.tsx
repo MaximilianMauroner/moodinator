@@ -10,9 +10,6 @@ import {
 import { useThemeColors } from "@/constants/colors";
 import { getMoodWeatherColor, getMoodWeatherIcon } from "@/constants/moodWeather";
 
-const TWO_COLUMN_CARD_MIN_HEIGHT = 84;
-const TWO_COLUMN_CARD_WIDTH = "48%";
-
 interface MoodButtonsDetailedProps {
 	onMoodPress: (mood: number) => void;
 	onLongPress: (mood: number) => void;
@@ -32,14 +29,9 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
 		}));
 	}, [isDark]);
 
-	const renderMoodCard = (
-		mood: (typeof moodData)[number],
-		index: number,
-	) => {
-		const cardStyle: ViewStyle = {
-			width: TWO_COLUMN_CARD_WIDTH,
-			minHeight: TWO_COLUMN_CARD_MIN_HEIGHT,
-			marginLeft: index === moodData.length - 1 ? "26%" : 0,
+	const renderMoodRow = (mood: (typeof moodData)[number]) => {
+		const rowStyle: ViewStyle = {
+			minHeight: 48,
 			backgroundColor: get("background"),
 			borderWidth: 1,
 			borderColor: get("border"),
@@ -48,8 +40,8 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
 		return (
 		<HapticTab
 			key={`${isDark ? "dark" : "light"}-${mood.value}`}
-			className="items-center justify-center rounded-2xl py-[8px]"
-			style={cardStyle}
+			className="flex-row items-center rounded-2xl px-3 py-2"
+			style={rowStyle}
 			onPress={() => onMoodPress(mood.value)}
 			onLongPress={() => onLongPress(mood.value)}
 			delayLongPress={500}
@@ -57,7 +49,7 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
 			accessibilityLabel={getMoodButtonLabel(mood.value, mood.label)}
 			accessibilityHint={getMoodButtonHint()}
 		>
-			<View className="mb-0.5 flex-row items-center">
+			<View className="min-w-[56px] flex-row items-center">
 				<Ionicons
 					name={getMoodWeatherIcon(mood.value)}
 					size={20}
@@ -67,29 +59,22 @@ export const MoodButtonsDetailed: React.FC<MoodButtonsDetailedProps> = ({
 					{mood.value}
 				</Text>
 			</View>
-			<Text
-				className="mb-0.5 self-stretch text-center text-xs font-semibold"
-				style={{ color: get("textMuted") }}
-			>
-				{mood.label}
-			</Text>
-			<Text
-				className="px-1.5 text-center text-xs leading-tight"
-				style={{ color: get("textSubtle") }}
-			>
-				{mood.description}
-			</Text>
+			<View className="ml-2 flex-1">
+				<Text className="text-sm font-semibold" style={{ color: get("text") }}>
+					{mood.label}
+				</Text>
+				<Text className="text-sm leading-tight" style={{ color: get("textSubtle") }}>
+					{mood.description}
+				</Text>
+			</View>
 		</HapticTab>
 		);
 	};
 
 	return (
 		<View className="mb-2">
-			<View
-				className="flex-row flex-wrap justify-between"
-				style={{ rowGap: 8 }}
-			>
-				{moodData.map(renderMoodCard)}
+			<View style={{ rowGap: 6 }}>
+				{moodData.map(renderMoodRow)}
 			</View>
 		</View>
 	);
