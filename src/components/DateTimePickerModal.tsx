@@ -300,22 +300,6 @@ export const DateTimePickerModal: React.FC<Props> = ({
                   Entry Details
                 </Text>
                 <View className="flex-row items-center">
-                  {onDelete ? (
-                    <Pressable
-                      onPress={() => {
-                        if (saving) return;
-                        onClose();
-                        onDelete(mood);
-                      }}
-                      disabled={saving}
-                      className="h-[48px] w-[48px] items-center justify-center rounded-full"
-                      accessibilityRole="button"
-                      accessibilityLabel="Delete this entry"
-                      accessibilityState={{ disabled: saving }}
-                    >
-                      <Ionicons name="trash-outline" size={22} color={getThemedColor("dangerText", isDark)} />
-                    </Pressable>
-                  ) : null}
                   <Pressable
                     onPress={handleCancel}
                     disabled={saving}
@@ -595,6 +579,30 @@ export const DateTimePickerModal: React.FC<Props> = ({
                   </Pressable>
                 </View>
               </View>
+
+              {/* Kept away from Close so one wrong tap does not delete; Undo follows. */}
+              {onDelete ? (
+                <Pressable
+                  onPress={() => {
+                    if (saving) return;
+                    onClose();
+                    onDelete(mood);
+                  }}
+                  disabled={saving}
+                  className="min-h-[48px] mb-2 flex-row items-center justify-center self-center px-4 rounded-xl"
+                  accessibilityRole="button"
+                  accessibilityLabel="Delete this entry"
+                  accessibilityState={{ disabled: saving }}
+                >
+                  <Ionicons name="trash-outline" size={18} color={getThemedColor("dangerText", isDark)} />
+                  <Text
+                    className="ml-2 text-sm font-semibold"
+                    style={{ color: getThemedColor("dangerText", isDark) }}
+                  >
+                    Delete entry
+                  </Text>
+                </Pressable>
+              ) : null}
             </ScrollView>
 
             {/* Action buttons */}
