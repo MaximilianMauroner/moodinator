@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef } from "react";
-import { View, Text, Pressable, Platform, ScrollView } from "react-native";
+import { View, Text, Pressable, Platform, ScrollView, useWindowDimensions } from "react-native";
 import type { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
 import { MoodEntry } from "@db/types";
@@ -116,6 +116,8 @@ export const DateTimePickerModal: React.FC<Props> = ({
   onDelete,
 }) => {
   const { isDark, get, getCategoryColors } = useThemeColors();
+  // Scale with the system font size so large text puts date and time on separate rows.
+  const pickerBasis = 120 * useWindowDimensions().fontScale;
   const recordedOffset = mood ? getRecordedOffset(mood) !== undefined : false;
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [wallClockParts, setWallClockParts] = useState<EntryLocalDateParts | null>(null);
@@ -514,8 +516,9 @@ export const DateTimePickerModal: React.FC<Props> = ({
                   <Pressable
                     onPress={() => setShowDatePicker(true)}
                     disabled={saving}
-                    className="grow shrink basis-[120px] max-w-full min-w-0 flex-row items-center p-3 rounded-xl"
+                    className="grow shrink max-w-full min-w-0 flex-row items-center p-3 rounded-xl"
                     style={{
+                      flexBasis: pickerBasis,
                       backgroundColor: get("surfaceAlt"),
                       borderWidth: 1.5,
                       borderColor: get("border"),
@@ -554,8 +557,9 @@ export const DateTimePickerModal: React.FC<Props> = ({
                   <Pressable
                     onPress={() => setShowTimePicker(true)}
                     disabled={saving}
-                    className="grow shrink basis-[120px] max-w-full min-w-0 flex-row items-center p-3 rounded-xl"
+                    className="grow shrink max-w-full min-w-0 flex-row items-center p-3 rounded-xl"
                     style={{
+                      flexBasis: pickerBasis,
                       backgroundColor: get("surfaceAlt"),
                       borderWidth: 1.5,
                       borderColor: get("border"),
@@ -600,23 +604,6 @@ export const DateTimePickerModal: React.FC<Props> = ({
                 borderTopColor: get("borderSubtle"),
               }}
             >
-              <Pressable
-                onPress={handleCancel}
-                disabled={saving}
-                className="flex-1 py-3.5 rounded-xl items-center"
-                style={{ backgroundColor: get("surfaceAlt") }}
-                accessibilityRole="button"
-                accessibilityLabel="Cancel date and time changes"
-                accessibilityState={{ disabled: saving }}
-              >
-                <Text
-                  className="font-semibold text-sm"
-                  style={{ color: get("textSubtle") }}
-                >
-                  Cancel
-                </Text>
-              </Pressable>
-
               {onEdit ? (
                 <Pressable
                   onPress={() => {

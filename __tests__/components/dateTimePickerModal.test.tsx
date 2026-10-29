@@ -23,6 +23,7 @@ vi.mock("react-native", () => ({
   ScrollView: "ScrollView",
   Text: "Text",
   View: "View",
+  useWindowDimensions: () => ({ width: 400, height: 800, scale: 1, fontScale: 1 }),
 }));
 vi.mock("@react-native-community/datetimepicker", () => ({ default: "DateTimePicker" }));
 vi.mock("@expo/vector-icons", () => ({ Ionicons: "Ionicons" }));
@@ -551,11 +552,13 @@ describe("DateTimePickerModal timestamp round trips", () => {
     expect(onSave).toHaveBeenCalledWith(7, normalized.getTime(), 240);
   });
 
-  it("does not write when cancelled", async () => {
+  it("does not write a changed date when closed", async () => {
     process.env.TZ = "UTC";
     const { onSave, onClose } = await renderModal(entry(Date.parse("2026-04-01T12:00:00Z"), 0));
 
-    await act(async () => button("Cancel date and time changes").props.onPress());
+    await act(async () => button("Change entry date").props.onPress());
+    await act(async () => setPickerValue("date", new Date("2026-04-03T12:00:00.000Z")));
+    await act(async () => button("Close entry details").props.onPress());
 
     expect(onSave).not.toHaveBeenCalled();
     expect(onClose).toHaveBeenCalledTimes(1);
