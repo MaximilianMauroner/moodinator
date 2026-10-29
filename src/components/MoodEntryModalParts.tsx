@@ -67,7 +67,7 @@ const MoodAdjustRow: React.FC<{
     const moodData = getMoodRatingDisplay(mood, isDark);
     const bgHex = moodData.backgroundHex;
     const textHex = moodData.colorHex;
-    const pillBorderWidth = isDark ? 0 : 1;
+    const pillBorderWidth = 1;
     const canDecrease = mood > 0;
     const canIncrease = mood < 10;
 
@@ -114,11 +114,11 @@ const MoodAdjustRow: React.FC<{
                     className="w-[48px] h-[48px] rounded-full items-center justify-center"
                     style={{
                         backgroundColor: isDark
-                            ? "rgba(42, 37, 32, 0.7)"
+                            ? colors.surface.dark
                             : "rgba(245, 241, 232, 0.9)",
                         borderWidth: 1,
                         borderColor: isDark
-                            ? "rgba(61, 53, 42, 0.4)"
+                            ? colors.border.dark
                             : "rgba(229, 217, 191, 0.8)",
                         opacity: canDecrease ? 1 : 0.25,
                     }}
@@ -197,11 +197,11 @@ const MoodAdjustRow: React.FC<{
                     className="w-[48px] h-[48px] rounded-full items-center justify-center"
                     style={{
                         backgroundColor: isDark
-                            ? "rgba(42, 37, 32, 0.7)"
+                            ? colors.surface.dark
                             : "rgba(245, 241, 232, 0.9)",
                         borderWidth: 1,
                         borderColor: isDark
-                            ? "rgba(61, 53, 42, 0.4)"
+                            ? colors.border.dark
                             : "rgba(229, 217, 191, 0.8)",
                         opacity: canIncrease ? 1 : 0.25,
                     }}
