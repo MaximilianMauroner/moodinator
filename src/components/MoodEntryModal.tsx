@@ -701,11 +701,6 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                 <SectionLabel
                     label="Emotions"
                     isDark={isDark}
-                    badge={
-                        emotions.length > 0
-                            ? `${emotions.length}/3 selected`
-                            : undefined
-                    }
                     action={addEmotionAction}
                 />
             )}
@@ -994,7 +989,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                 }}
                             >
                                 {/* Drag handle */}
-                                <View className="items-center pt-3 pb-1">
+                                <View className="items-center pt-2 pb-1">
                                     <View
                                         style={{
                                             width: 36,
@@ -1007,7 +1002,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                     />
                                 </View>
 
-                                <View className="flex-row items-center gap-3 px-4 pb-2">
+                                <View className="flex-row items-center gap-3 px-4">
                                     <Text
                                         className="flex-1 text-lg font-bold"
                                         style={{ color: get("text") }}
@@ -1046,37 +1041,41 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                 </View>
 
                                 {singlePage ? (
-                                    <View className="flex-row items-center px-4 pb-3" style={{ gap: 12 }}>
-                                        <Ionicons
-                                            name={getMoodWeatherIcon(mood)}
-                                            size={36}
-                                            color={getMoodWeatherColor(mood, isDark)}
-                                        />
-                                        <View className="flex-1">
-                                            <Text style={[typography.titleMd, { color: get("text"), fontSize: 22, lineHeight: 26 }]}>
-                                                {moodData.label}{" "}
-                                                <Text style={{ color: get("textSubtle") }}>{mood}</Text>
-                                            </Text>
-                                            <Text style={[typography.bodySm, { color: get("textSubtle") }]}>
-                                                Kept. Add detail if you like.
-                                            </Text>
+                                    <View className="px-4 pb-3">
+                                        <View className="flex-row items-center gap-3">
+                                            <Ionicons
+                                                name={getMoodWeatherIcon(mood)}
+                                                size={36}
+                                                color={getMoodWeatherColor(mood, isDark)}
+                                            />
+                                            <View className="flex-1">
+                                                <Text style={[typography.titleMd, { color: get("text"), fontSize: 22, lineHeight: 26 }]}>
+                                                    {moodData.label}{" "}
+                                                    <Text style={{ color: get("textSubtle") }}>{mood}</Text>
+                                                </Text>
+                                                <Text style={[typography.bodySm, { color: get("textSubtle") }]}>
+                                                    Kept. Add detail if you like.
+                                                </Text>
+                                            </View>
                                         </View>
-                                        <SameAsYesterdayButton onCopy={handleCopyYesterday} excludeEntryId={currentEntryId} />
+                                        <View className="items-center mt-1">
+                                            <SameAsYesterdayButton onCopy={handleCopyYesterday} excludeEntryId={currentEntryId} />
+                                        </View>
                                     </View>
                                 ) : (
                                     <>
-                                    <View className="px-4 pb-1">
+                                    <View className="px-4 pb-4">
                                         <MoodAdjustRow
                                             mood={mood}
                                             onAdjust={setMood}
                                             isDark={isDark}
                                         />
-                                        <View className="items-end">
+                                        <View className="items-center mt-1">
                                             <SameAsYesterdayButton onCopy={handleCopyYesterday} excludeEntryId={currentEntryId} />
                                         </View>
                                     </View>
 
-                                    <View className="flex-row items-center gap-3 px-4 pb-2">
+                                    <View className="flex-row items-center gap-3 px-4">
                                         <Animated.Text
                                             accessibilityRole="header"
                                             style={{
@@ -1089,11 +1088,6 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                         >
                                             {currentStepTitle}
                                         </Animated.Text>
-                                        {currentStepId === "emotions" && (
-                                            <Text style={{ ...typography.bodySm, color: get("textSubtle") }}>
-                                                {emotions.length}/3 selected
-                                            </Text>
-                                        )}
                                         {currentStepId === "emotions" && addEmotionAction}
                                     </View>
                                     </>

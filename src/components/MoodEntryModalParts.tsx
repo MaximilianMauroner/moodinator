@@ -98,7 +98,7 @@ const MoodAdjustRow: React.FC<{
     }));
 
     return (
-        <View className="flex-row items-center justify-center gap-3 py-1">
+        <View className="flex-row items-center justify-center gap-3">
             {/* Decrease (better) */}
             <Animated.View style={decAnimatedStyle}>
                 <HapticTab

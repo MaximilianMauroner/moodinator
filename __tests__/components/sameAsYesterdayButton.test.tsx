@@ -123,6 +123,24 @@ describe("SameAsYesterdayButton", () => {
     expect(onCopy).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps the Copy label visible and disables the button while reading", async () => {
+    let completeRead!: (value: typeof entry) => void;
+    mocks.getLastEntry.mockReturnValue(new Promise((resolve) => { completeRead = resolve; }));
+    const onCopy = await render();
+
+    await act(async () => { void copyButton().props.onPress(); });
+
+    expect(visibleText()).toContain("Copy last entry");
+    expect(copyButton().props.disabled).toBe(true);
+    expect(copyButton().props.accessibilityState).toEqual({ disabled: true });
+    expect(onCopy).not.toHaveBeenCalled();
+
+    await act(async () => completeRead(entry));
+
+    expect(copyButton().props.disabled).toBe(false);
+    expect(onCopy).toHaveBeenCalledWith(entry);
+  });
+
   it("keeps the empty state disabled and truthful", async () => {
     mocks.getLastEntry.mockResolvedValue(null);
     await render();

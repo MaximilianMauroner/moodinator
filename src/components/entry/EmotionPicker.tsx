@@ -4,7 +4,6 @@ import Animated, {
     useSharedValue,
     useAnimatedStyle,
     withSpring,
-    FadeIn,
 } from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
 import { useThemeColors, getThemedColor } from "@/constants/colors";
@@ -269,10 +268,11 @@ export const EmotionPicker: React.FC<EmotionPickerProps> = ({
 
     return (
         <View>
-            <View className="mb-2" style={{ minHeight: 34, justifyContent: "center" }}>
+            <View className="flex-row items-center gap-3 mb-2" style={{ minHeight: 34 }}>
                 {selected.length > 0 ? (
                     <ScrollView
                         horizontal
+                        style={{ flex: 1 }}
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={{
                             flexDirection: "row",
@@ -294,19 +294,17 @@ export const EmotionPicker: React.FC<EmotionPickerProps> = ({
                         })}
                     </ScrollView>
                 ) : (
-                    <Animated.View entering={FadeIn.duration(160)}>
-                        <Text
-                            className="text-xs"
-                            style={{
-                                color: labelColor,
-                                fontStyle: "italic",
-                                opacity: 0.95,
-                            }}
-                        >
-                            Pick up to {maxSelections}
-                        </Text>
-                    </Animated.View>
+                    <Text className="flex-1 text-xs" style={{ color: labelColor }} accessible={false}>
+                        Optional
+                    </Text>
                 )}
+                <Text
+                    className="text-xs"
+                    style={{ color: labelColor }}
+                    accessibilityLabel={`Emotions are optional. ${selected.length} of ${maxSelections} selected.`}
+                >
+                    {selected.length} of {maxSelections} selected
+                </Text>
             </View>
 
             {/* Energy bands. Colour still carries valence, so both axes read at once. */}

@@ -161,13 +161,16 @@ describe.each(["android", "ios"])("entry field feedback on %s", (platform) => {
   });
   it("selects, deselects, and removes emotions with one feedback event per change", async () => {
     await render(<EmotionForm />);
+    expect(renderer.root.findByProps({ accessibilityLabel: "Emotions are optional. 0 of 3 selected." })).toBeTruthy();
     await press("emotion-option-Happy");
     expect(button("emotion-option-Happy").props.accessibilityState.selected).toBe(true);
+    expect(renderer.root.findByProps({ accessibilityLabel: "Emotions are optional. 1 of 3 selected." })).toBeTruthy();
     await press("emotion-option-Happy");
     expect(button("emotion-option-Happy").props.accessibilityState.selected).toBe(false);
     await press("emotion-option-Calm");
     await press("emotion-remove-Calm");
     expect(button("emotion-option-Calm").props.accessibilityState.selected).toBe(false);
+    expect(renderer.root.findByProps({ accessibilityLabel: "Emotions are optional. 0 of 3 selected." })).toBeTruthy();
     expect(nativeFeedback.selectionAsync).toHaveBeenCalledTimes(4);
   });
 
@@ -177,10 +180,13 @@ describe.each(["android", "ios"])("entry field feedback on %s", (platform) => {
     expect(button("emotion-option-Sad").props.disabled).toBe(true);
     await press("emotion-option-Sad");
     expect(button("emotion-option-Sad").props.accessibilityState.selected).toBe(false);
+    expect(renderer.root.findByProps({ accessibilityLabel: "Emotions are optional. 3 of 3 selected." })).toBeTruthy();
     expect(nativeFeedback.selectionAsync).toHaveBeenCalledTimes(3);
     await press("emotion-remove-Happy");
+    expect(renderer.root.findByProps({ accessibilityLabel: "Emotions are optional. 2 of 3 selected." })).toBeTruthy();
     await press("emotion-option-Sad");
     expect(button("emotion-option-Sad").props.accessibilityState.selected).toBe(true);
+    expect(renderer.root.findByProps({ accessibilityLabel: "Emotions are optional. 3 of 3 selected." })).toBeTruthy();
     expect(nativeFeedback.selectionAsync).toHaveBeenCalledTimes(5);
   });
 

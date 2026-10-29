@@ -186,8 +186,10 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
       <Pressable
         onPress={handleRetry}
         disabled={loading}
-        className="flex-row items-center px-3 py-2 rounded-xl"
+        className="flex-row items-center justify-center px-3 py-2 rounded-xl"
         style={{
+          minHeight: 48,
+          maxWidth: "100%",
           backgroundColor: isDark ? colors.sand.bgHover.dark : colors.sand.bg.light,
           opacity: loading ? 0.6 : 1,
         }}
@@ -204,7 +206,7 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
         />
         <Text
           className="text-[11px] font-medium"
-          style={{ color: get("textMuted") }}
+          style={{ color: get("textMuted"), flexShrink: 1 }}
         >
           Could not load last entry · Retry
         </Text>
@@ -216,8 +218,10 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
     return (
       <Pressable
         disabled
-        className="flex-row items-center px-3 py-2 rounded-xl"
+        className="flex-row items-center justify-center px-3 py-2 rounded-xl"
         style={{
+          minHeight: 48,
+          maxWidth: "100%",
           backgroundColor: isDark ? colors.sand.bgHover.dark : colors.sand.bg.light,
           opacity: 0.5,
         }}
@@ -234,7 +238,7 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
         />
         <Text
           className="text-[11px] font-medium"
-          style={{ color: get("textMuted") }}
+          style={{ color: get("textMuted"), flexShrink: 1 }}
         >
           No previous entry
         </Text>
@@ -249,8 +253,10 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
         onLongPress={handleLongPress}
         delayLongPress={400}
         disabled={loading}
-        className="flex-row items-center px-3.5 py-2.5 rounded-xl"
+        className="flex-row items-center justify-center px-3.5 py-2.5 rounded-xl"
         style={{
+          minHeight: 48,
+          maxWidth: "100%",
           backgroundColor: isDark ? colors.primaryBg.dark : colors.primaryBg.light,
           borderWidth: 1,
           borderColor: isDark ? "rgba(91, 138, 91, 0.3)" : "rgba(91, 138, 91, 0.2)",
@@ -267,23 +273,21 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
         accessibilityState={{ disabled: loading }}
       >
         {loading ? (
-          <ActivityIndicator size="small" color={get("primary")} />
+          <ActivityIndicator size="small" color={get("primary")} style={{ marginRight: 5 }} />
         ) : (
-          <>
-            <Ionicons
-              name="copy-outline"
-              size={14}
-              color={get("primary")}
-              style={{ marginRight: 5 }}
-            />
-            <Text
-              className="text-[11px] font-bold tracking-wide"
-              style={{ color: isDark ? get("primary") : colors.positive.textDark.light }}
-            >
-              Copy last entry
-            </Text>
-          </>
+          <Ionicons
+            name="copy-outline"
+            size={14}
+            color={get("primary")}
+            style={{ marginRight: 5 }}
+          />
         )}
+        <Text
+          className="text-[11px] font-bold tracking-wide"
+          style={{ color: isDark ? get("primary") : colors.positive.textDark.light, flexShrink: 1 }}
+        >
+          Copy last entry
+        </Text>
       </Pressable>
 
       {/* Preview Modal */}
