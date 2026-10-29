@@ -989,7 +989,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                 }}
                             >
                                 {/* Drag handle */}
-                                <View className="items-center pt-2 pb-1">
+                                <View className="items-center pt-[4px] pb-1">
                                     <View
                                         style={{
                                             width: 36,
@@ -1064,7 +1064,7 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                     </View>
                                 ) : (
                                     <>
-                                    <View className="px-4 pb-4">
+                                    <View className="px-4 pb-[16px]">
                                         <MoodAdjustRow
                                             mood={mood}
                                             onAdjust={setMood}
