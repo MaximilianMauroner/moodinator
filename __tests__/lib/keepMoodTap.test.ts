@@ -70,27 +70,25 @@ describe("keepMoodTap", () => {
   it.each([true, false])("keeps a severe rating before support, then offers Undo via Not now (detail fields: %s)", async (offersDetail) => {
     vi.useFakeTimers();
     const deps = setup({ offersDetail });
-    const followUp = "showUndoToast";
 
     // A support action such as Call 988 never calls Not now, so the rating is kept before the sheet.
-    const saves = 1;
     await keepMoodTap(9, deps);
     expect(deps.showSupport).not.toHaveBeenCalled();
     await keepMoodTap(9, deps);
-    expect(deps.create).toHaveBeenCalledTimes(saves);
+    expect(deps.create).toHaveBeenCalledTimes(1);
 
     vi.advanceTimersByTime(SUPPORT_SHEET_DELAY_MS);
     expect(deps.showSupport).toHaveBeenCalledTimes(1);
-    expect(deps[followUp]).not.toHaveBeenCalled();
+    expect(deps.showUndoToast).not.toHaveBeenCalled();
     expect(deps.state.inFlight).toBe(false);
 
     vi.mocked(deps.showSupport).mock.calls[0]![0]();
-    expect(deps[followUp]).not.toHaveBeenCalled();
+    expect(deps.showUndoToast).not.toHaveBeenCalled();
     await keepMoodTap(4, deps);
-    expect(deps.create).toHaveBeenCalledTimes(saves);
+    expect(deps.create).toHaveBeenCalledTimes(1);
 
     vi.advanceTimersByTime(SUPPORT_HANDOFF_MS);
-    expect(deps[followUp]).toHaveBeenCalledTimes(1);
+    expect(deps.showUndoToast).toHaveBeenCalledTimes(1);
     expect(deps.openDetail).not.toHaveBeenCalled();
     expect(deps.state.inFlight).toBe(false);
   });
