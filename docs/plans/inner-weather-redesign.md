@@ -26,6 +26,10 @@ The stored 0 to 10 value does not change. No data migration.
 1. Tap behavior: one tap saves the entry, then a detail sheet offers feelings,
    context, energy, and a note, with Undo. Long press opens the full entry
    modal.
+   Changed 2026-10-30 by Max: when the detail sheet opens, the tap saves
+   nothing until Done, so closing the sheet never leaves an entry the user
+   did not mean to keep. With every quick-entry field off, the tap still
+   saves at once with Undo.
 2. Tabs: Today, History, and Insights. Settings moves behind a gear in the
    header.
 

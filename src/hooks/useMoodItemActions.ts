@@ -22,7 +22,14 @@ export function useMoodItemActions({
   const handleDeleteMood = useCallback(
     async (mood: MoodEntry) => {
       haptics.reject();
-      const removed = await removeMood(mood.id);
+      let removed: MoodEntry | null | undefined;
+      try {
+        removed = await removeMood(mood.id);
+      } catch (error) {
+        console.error("Failed to delete mood entry:", error);
+        toastService.error("Delete failed", "The entry was not removed.");
+        return;
+      }
       toastService.showDeletedMood(removed ?? mood, async (deletedMood) => {
         haptics.commit();
         await restoreMood({
