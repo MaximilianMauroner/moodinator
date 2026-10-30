@@ -32,7 +32,7 @@ export function getMoodButtonLabel(moodValue: number, moodLabel: string): string
  * Get accessibility hint for a mood button.
  */
 export function getMoodButtonHint(): string {
-  return "Tap to log this mood, long press for detailed entry";
+  return "Tap to choose this mood, long press for detailed entry";
 }
 
 /**
