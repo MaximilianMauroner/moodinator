@@ -8,11 +8,17 @@ import { useThemeColors } from "@/constants/colors";
 import { getMoodRatingDisplay } from "@/constants/moodScaleInterpretation";
 import { MOOD_WEATHER_ROWS, getMoodWeatherColor, getMoodWeatherIcon } from "@/constants/moodWeather";
 
+const WEATHER_LEVELS = MOOD_WEATHER_ROWS.flat();
+const DOCK_WEATHER_ROWS = Array.from(
+  { length: Math.ceil(WEATHER_LEVELS.length / 3) },
+  (_, index) => WEATHER_LEVELS.slice(index * 3, index * 3 + 3),
+);
+
 const SIZES = {
   /** Inside the entry form, where a tap only selects the level. */
   form: { minHeight: 68, icon: 24, number: 17 },
   /** Docked on Today, where a tap keeps the entry. */
-  dock: { minHeight: 80, icon: 30, number: 18 },
+  dock: { minHeight: 60, icon: 26, number: 18 },
 };
 
 type WeatherMoodGridProps = {
@@ -24,21 +30,41 @@ type WeatherMoodGridProps = {
   size?: keyof typeof SIZES;
 };
 
-/**
- * The 4/3/4 weather picker: clear (0 to 3), cloudy (4 to 6), and rain (7 to
- * 10), with the middle row centered. Tiles grow with the system text size.
- */
 export function WeatherMoodGrid({ selected, onPress, onLongPress, size = "form" }: WeatherMoodGridProps) {
   const { isDark, get } = useThemeColors();
   const dims = SIZES[size];
+  const isDock = size === "dock";
+  const rows = isDock ? DOCK_WEATHER_ROWS : MOOD_WEATHER_ROWS;
 
   return (
-    <View style={{ gap: 8 }}>
-      {MOOD_WEATHER_ROWS.map((row) => (
+    <View style={{ gap: isDock ? 6 : 8 }}>
+      {rows.map((row) => (
         <View key={row[0]} style={{ flexDirection: "row", justifyContent: "center" }}>
           {row.map((level) => {
             const display = getMoodRatingDisplay(level, isDark);
             const isSelected = level === selected;
+            const weatherIcon = (
+              <Ionicons
+                name={getMoodWeatherIcon(level)}
+                size={dims.icon}
+                color={getMoodWeatherColor(level, isDark)}
+              />
+            );
+            const levelNumber = (
+              <Text
+                style={{
+                  marginTop: isDock ? 0 : 2,
+                  marginLeft: isDock ? 6 : 0,
+                  fontSize: dims.number,
+                  fontWeight: "700",
+                  fontVariant: ["tabular-nums"],
+                  color: get("text"),
+                }}
+                maxFontSizeMultiplier={1.5}
+              >
+                {level}
+              </Text>
+            );
             return (
               <HapticTab
                 key={level}
@@ -46,10 +72,10 @@ export function WeatherMoodGrid({ selected, onPress, onLongPress, size = "form" 
                 onLongPress={onLongPress ? () => onLongPress(level) : undefined}
                 delayLongPress={500}
                 style={{
-                  width: "23.5%",
+                  width: isDock ? "31.5%" : "23.5%",
                   marginHorizontal: "0.75%",
                   minHeight: dims.minHeight,
-                  paddingVertical: 8,
+                  paddingVertical: isDock ? 6 : 8,
                   paddingHorizontal: 2,
                   alignItems: "center",
                   justifyContent: "center",
@@ -63,27 +89,21 @@ export function WeatherMoodGrid({ selected, onPress, onLongPress, size = "form" 
                 accessibilityHint={onLongPress ? getMoodButtonHint() : undefined}
                 accessibilityState={selected === undefined ? undefined : { selected: isSelected }}
               >
-                <Ionicons
-                  name={getMoodWeatherIcon(level)}
-                  size={dims.icon}
-                  color={getMoodWeatherColor(level, isDark)}
-                />
+                {isDock ? (
+                  <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 2 }}>
+                    {weatherIcon}
+                    {levelNumber}
+                  </View>
+                ) : (
+                  <>
+                    {weatherIcon}
+                    {levelNumber}
+                  </>
+                )}
                 <Text
-                  style={{
-                    marginTop: 2,
-                    fontSize: dims.number,
-                    fontWeight: "700",
-                    fontVariant: ["tabular-nums"],
-                    color: get("text"),
-                  }}
-                  maxFontSizeMultiplier={1.5}
-                >
-                  {level}
-                </Text>
-                <Text
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.75}
+                  numberOfLines={isDock ? undefined : 1}
+                  adjustsFontSizeToFit={!isDock}
+                  minimumFontScale={isDock ? undefined : 0.75}
                   maxFontSizeMultiplier={1.5}
                   style={{ fontSize: 11, fontWeight: "500", color: get("textSubtle"), alignSelf: "stretch", textAlign: "center" }}
                 >

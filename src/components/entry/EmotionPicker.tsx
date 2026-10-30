@@ -4,7 +4,6 @@ import Animated, {
     useSharedValue,
     useAnimatedStyle,
     withSpring,
-    FadeIn,
 } from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
 import { useThemeColors, getThemedColor } from "@/constants/colors";
@@ -22,6 +21,8 @@ interface EmotionPickerProps {
     selected: Emotion[];
     onChange: (emotions: Emotion[]) => void;
     maxSelections?: number;
+    /** Control shown at the end of the selection line, for example Add. */
+    action?: React.ReactNode;
 }
 
 // Chips are drawn at 36 and the press target is extended to 48 with hitSlop, so
@@ -206,6 +207,7 @@ export const EmotionPicker: React.FC<EmotionPickerProps> = ({
     selected,
     onChange,
     maxSelections = 3,
+    action,
 }) => {
     const { isDark, getCategoryColors } = useThemeColors();
 
@@ -217,7 +219,7 @@ export const EmotionPicker: React.FC<EmotionPickerProps> = ({
 
     const labelColor = getThemedColor("textSubtle", isDark);
     const meterDimColor = isDark ? "rgba(158, 184, 148, 0.28)" : "rgba(122, 107, 85, 0.25)";
-    const ruleColor = isDark ? "rgba(61, 53, 42, 0.25)" : "rgba(229, 217, 191, 0.5)";
+    const ruleColor = getThemedColor("border", isDark);
 
     const grouped = useMemo(() => {
         const map: Record<EmotionGroup, Emotion[]> = {
@@ -269,12 +271,11 @@ export const EmotionPicker: React.FC<EmotionPickerProps> = ({
 
     return (
         <View>
-            {/* Selected summary. Fixed height so the grid never shifts when the
-                selection changes, but only one row tall. */}
-            <View style={{ height: 34, justifyContent: "center" }}>
+            <View className="flex-row items-center gap-3" style={{ minHeight: 34 }}>
                 {selected.length > 0 ? (
                     <ScrollView
                         horizontal
+                        style={{ flex: 1, alignSelf: "stretch" }}
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={{
                             flexDirection: "row",
@@ -296,31 +297,18 @@ export const EmotionPicker: React.FC<EmotionPickerProps> = ({
                         })}
                     </ScrollView>
                 ) : (
-                    <Animated.View entering={FadeIn.duration(160)}>
-                        <Text
-                            className="text-xs"
-                            style={{
-                                color: labelColor,
-                                fontStyle: "italic",
-                                opacity: 0.95,
-                            }}
-                        >
-                            Pick up to {maxSelections}
-                        </Text>
-                    </Animated.View>
+                    <Text className="flex-1 text-sm" style={{ color: labelColor }} accessible={false}>
+                        Optional
+                    </Text>
                 )}
-            </View>
-
-            {/* Reserved line, so reaching the limit never shifts the bands below. */}
-            <View className="mb-3" style={{ height: 15, justifyContent: "center" }}>
-                {atLimit && (
-                    <Animated.Text
-                        entering={FadeIn.duration(160)}
-                        style={{ fontSize: 12, color: labelColor, fontStyle: "italic" }}
-                    >
-                        Tap a selected emotion to remove it
-                    </Animated.Text>
-                )}
+                <Text
+                    className="text-sm"
+                    style={{ color: labelColor }}
+                    accessibilityLabel={`Emotions are optional. ${selected.length} of ${maxSelections} selected.`}
+                >
+                    {selected.length} of {maxSelections} selected
+                </Text>
+                {action}
             </View>
 
             {/* Energy bands. Colour still carries valence, so both axes read at once. */}
@@ -347,7 +335,7 @@ export const EmotionPicker: React.FC<EmotionPickerProps> = ({
                             >
                                 {GROUP_LABELS[group]}
                             </Text>
-                            <Text style={{ fontSize: 11, color: labelColor, opacity: 0.7 }}>
+                            <Text style={{ fontSize: 12, color: labelColor }}>
                                 {list.length}
                             </Text>
                             <View

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { MoodEntry, MoodEntryInput } from "@db/types";
 import { createMockMoodEntry } from "../db/mockClient";
 import { SUPPORT_HANDOFF_MS, SUPPORT_SHEET_DELAY_MS } from "@/lib/keepMoodTap";
+import { toastService } from "@/services/toastService";
 
 const mocks = vi.hoisted(() => ({
   detailedLabels: true,
@@ -39,7 +40,7 @@ vi.mock("@/components/ErrorBoundary", () => ({ ErrorBoundary: "ErrorBoundary" })
 vi.mock("@/components/ScreenErrorFallback", () => ({ createScreenErrorFallback: () => "ScreenFallback" }));
 vi.mock("@/components/DateTimePickerModal", () => ({ DateTimePickerModal: "DateTimePicker" }));
 vi.mock("@/components/MoodEntryModal", () => ({
-  DetailedMoodEntryModal: "DetailedEntry", EditMoodEntryModal: "EditEntry", KeptEntryDetailModal: "KeptDetail",
+  DetailedMoodEntryModal: "DetailedEntry", EditMoodEntryModal: "EditEntry", QuickEntryDetailModal: "QuickDetail",
 }));
 vi.mock("@/components/ui/EmptyState", () => ({ EmptyState: "EmptyState" }));
 vi.mock("@/components/layout/ScreenBackgroundAccent", () => ({ ScreenBackgroundAccent: "Accent" }));
@@ -73,6 +74,7 @@ let renderer: ReactTestRenderer;
 const host = (type: string) => renderer.root.findAll((node) => node.type === type)[0]!;
 
 beforeEach(() => {
+  vi.mocked(toastService.showKeptMood).mockClear();
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   vi.useFakeTimers();
   mocks.detailedLabels = true;
@@ -86,7 +88,7 @@ afterEach(async () => {
   vi.useRealTimers();
 });
 
-it.each(["DetailedPicker", "WeatherPicker"])("does not reopen an old kept entry while a newer %s form is being filled", async (picker) => {
+it.each(["DetailedPicker", "WeatherPicker"])("does not resume an old severe follow-up while a newer %s form is being filled", async (picker) => {
   mocks.detailedLabels = picker === "DetailedPicker";
   await act(async () => { renderer = create(<HomeScreen />); });
   await act(async () => host(picker).props[picker === "DetailedPicker" ? "onMoodPress" : "onPress"](9));
@@ -100,7 +102,8 @@ it.each(["DetailedPicker", "WeatherPicker"])("does not reopen an old kept entry 
     vi.advanceTimersByTime(SUPPORT_HANDOFF_MS * 2);
   });
 
-  expect(host("KeptDetail").props.visible).toBe(false);
+  expect(host("QuickDetail").props.visible).toBe(false);
+  expect(toastService.showKeptMood).not.toHaveBeenCalled();
   expect(host("DetailedEntry").props.visible).toBe(true);
   await act(async () => {
     await host("DetailedEntry").props.onSubmit({
@@ -108,14 +111,16 @@ it.each(["DetailedPicker", "WeatherPicker"])("does not reopen an old kept entry 
     });
     host("DetailedEntry").props.onClose();
   });
+  // The severe tap kept its rating before support; the newer form saved the second entry.
   expect(mocks.store.create).toHaveBeenCalledTimes(2);
   expect(host("DetailedEntry").props.visible).toBe(false);
-  expect(host("KeptDetail").props.visible).toBe(false);
+  expect(host("QuickDetail").props.visible).toBe(false);
+  expect(toastService.showKeptMood).not.toHaveBeenCalled();
 });
 
 
 it.each(["TodayNow", "EarlierToday"])(
-  "does not reopen old detail after a %s date or edit flow opens",
+  "does not resume an old severe follow-up after a %s date or edit flow opens",
   async (overview) => {
     await act(async () => { renderer = create(<HomeScreen />); });
     await act(async () => host("DetailedPicker").props.onMoodPress(9));
@@ -128,15 +133,19 @@ it.each(["TodayNow", "EarlierToday"])(
       oldDecline();
       vi.advanceTimersByTime(SUPPORT_HANDOFF_MS * 2);
     });
-    expect(host("KeptDetail").props.visible).toBe(false);
+    expect(host("QuickDetail").props.visible).toBe(false);
+    expect(toastService.showKeptMood).not.toHaveBeenCalled();
+  expect(toastService.showKeptMood).not.toHaveBeenCalled();
     expect(host("DateTimePicker").props.visible).toBe(true);
     await act(async () => host("DateTimePicker").props.onEdit(entry));
     expect(host("EditEntry").props.visible).toBe(true);
-    expect(host("KeptDetail").props.visible).toBe(false);
+    expect(host("QuickDetail").props.visible).toBe(false);
+    expect(toastService.showKeptMood).not.toHaveBeenCalled();
+  expect(toastService.showKeptMood).not.toHaveBeenCalled();
   }
 );
 
-it("does not resume old support detail after Home loses focus", async () => {
+it("does not resume an old severe follow-up after Home loses focus", async () => {
   await act(async () => { renderer = create(<HomeScreen />); });
   await act(async () => host("DetailedPicker").props.onMoodPress(9));
   await act(async () => { vi.advanceTimersByTime(SUPPORT_SHEET_DELAY_MS); });
@@ -146,5 +155,6 @@ it("does not resume old support detail after Home loses focus", async () => {
     mocks.blur!();
     vi.advanceTimersByTime(SUPPORT_HANDOFF_MS * 2);
   });
-  expect(host("KeptDetail").props.visible).toBe(false);
+  expect(host("QuickDetail").props.visible).toBe(false);
+  expect(toastService.showKeptMood).not.toHaveBeenCalled();
 });

@@ -67,11 +67,11 @@ export function PresetSettingsScreen({
           onPress={onAdd}
           accessibilityRole="button"
           accessibilityLabel={addButtonLabel}
-          style={({ pressed }) => [
+          className="active:opacity-70"
+          style={[
             presetListStyles.fab,
             {
               backgroundColor: addButtonColor,
-              transform: [{ scale: pressed ? 0.95 : 1 }],
               shadowColor: addButtonShadowColor,
             },
           ]}

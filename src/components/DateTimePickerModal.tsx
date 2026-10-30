@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef } from "react";
-import { View, Text, Pressable, Platform, ScrollView } from "react-native";
+import { View, Text, Pressable, Platform, ScrollView, useWindowDimensions } from "react-native";
 import type { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
 import { MoodEntry } from "@db/types";
@@ -7,7 +7,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { PrivateModal } from "@/components/ui/PrivateModal";
 import { PrivateDateTimePicker } from "@/components/ui/PrivateDateTimePicker";
 import { getMoodRatingDisplay } from "@/constants/moodScaleInterpretation";
-import { useThemeColors, colors } from "@/constants/colors";
+import { useThemeColors, colors, getThemedColor } from "@/constants/colors";
 import { haptics } from "@/lib/haptics";
 import { Alert } from "@/components/ui/AppAlert";
 import { commitThenRunPostCommitEffects } from "@/lib/moodEntryPersistence";
@@ -27,6 +27,7 @@ interface Props {
     utcOffsetMinutes?: number | null,
   ) => Promise<void> | void;
   onEdit?: (mood: MoodEntry) => void;
+  onDelete?: (mood: MoodEntry) => void;
 }
 
 function getPickerDate(parts: EntryLocalDateParts, recordedOffset = false): Date {
@@ -112,8 +113,11 @@ export const DateTimePickerModal: React.FC<Props> = ({
   onClose,
   onSave,
   onEdit,
+  onDelete,
 }) => {
   const { isDark, get, getCategoryColors } = useThemeColors();
+  // Scale with the system font size so large text puts date and time on separate rows.
+  const pickerBasis = 120 * useWindowDimensions().fontScale;
   const recordedOffset = mood ? getRecordedOffset(mood) !== undefined : false;
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [wallClockParts, setWallClockParts] = useState<EntryLocalDateParts | null>(null);
@@ -255,6 +259,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
     wallClockParts && (!originalParts || !sameWallClock(wallClockParts, originalParts)),
   );
   const canSave = hasChanged && !saving && !saveConsumed;
+  const hasDetails = Boolean(mood.note) || sortedEmotions.length > 0 || (mood.contextTags?.length ?? 0) > 0;
 
   return (
     <SafeAreaView>
@@ -273,6 +278,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
           <View
             className="rounded-3xl w-full max-w-sm overflow-hidden"
             style={{
+              maxHeight: "90%",
               backgroundColor: get("surface"),
               shadowColor: isDark ? "#000" : colors.sand.text.light,
               shadowOffset: { width: 0, height: 8 },
@@ -293,20 +299,22 @@ export const DateTimePickerModal: React.FC<Props> = ({
                 >
                   Entry Details
                 </Text>
-                <Pressable
-                  onPress={handleCancel}
-                  disabled={saving}
-                  className="h-11 w-11 items-center justify-center rounded-full"
-                  accessibilityRole="button"
-                  accessibilityLabel="Close entry details"
-                  accessibilityState={{ disabled: saving }}
-                >
-                  <Ionicons
-                    name="close-circle"
-                    size={24}
-                    color={get("textMuted")}
-                  />
-                </Pressable>
+                <View className="flex-row items-center">
+                  <Pressable
+                    onPress={handleCancel}
+                    disabled={saving}
+                    className="h-[48px] w-[48px] items-center justify-center rounded-full"
+                    accessibilityRole="button"
+                    accessibilityLabel="Close entry details"
+                    accessibilityState={{ disabled: saving }}
+                  >
+                    <Ionicons
+                      name="close-circle"
+                      size={24}
+                      color={get("textMuted")}
+                    />
+                  </Pressable>
+                </View>
               </View>
 
               {/* Mood pill */}
@@ -356,7 +364,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
 
             <ScrollView
               className="px-5"
-              style={{ maxHeight: 400 }}
+              style={{ flexGrow: 0, flexShrink: 1 }}
               showsVerticalScrollIndicator={false}
             >
               {/* Note */}
@@ -368,7 +376,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
                   >
                     <Text
                       className="text-sm leading-5"
-                      style={{ color: get("textSubtle") }}
+                      style={{ color: get("text") }}
                     >
                       {mood.note}
                     </Text>
@@ -452,14 +460,15 @@ export const DateTimePickerModal: React.FC<Props> = ({
                 </View>
               )}
 
-              {/* Divider */}
-              <View
-                className="h-px my-5"
-                style={{ backgroundColor: get("border") }}
-              />
+              {hasDetails ? (
+                <View
+                  className="h-px my-5"
+                  style={{ backgroundColor: get("border") }}
+                />
+              ) : null}
 
               {/* Date & Time Section */}
-              <View className="mb-4">
+              <View className={hasDetails ? "mb-4" : "mt-5 mb-4"}>
                 <View className="flex-row items-center mb-3">
                   <Ionicons
                     name="calendar"
@@ -492,8 +501,9 @@ export const DateTimePickerModal: React.FC<Props> = ({
                   <Pressable
                     onPress={() => setShowDatePicker(true)}
                     disabled={saving}
-                    className="grow shrink basis-[120px] max-w-full min-w-0 flex-row items-center p-3 rounded-xl"
+                    className="grow shrink max-w-full min-w-0 flex-row items-center p-3 rounded-xl"
                     style={{
+                      flexBasis: pickerBasis,
                       backgroundColor: get("surfaceAlt"),
                       borderWidth: 1.5,
                       borderColor: get("border"),
@@ -532,8 +542,9 @@ export const DateTimePickerModal: React.FC<Props> = ({
                   <Pressable
                     onPress={() => setShowTimePicker(true)}
                     disabled={saving}
-                    className="grow shrink basis-[120px] max-w-full min-w-0 flex-row items-center p-3 rounded-xl"
+                    className="grow shrink max-w-full min-w-0 flex-row items-center p-3 rounded-xl"
                     style={{
+                      flexBasis: pickerBasis,
                       backgroundColor: get("surfaceAlt"),
                       borderWidth: 1.5,
                       borderColor: get("border"),
@@ -568,6 +579,30 @@ export const DateTimePickerModal: React.FC<Props> = ({
                   </Pressable>
                 </View>
               </View>
+
+              {/* Kept away from Close so one wrong tap does not delete; Undo follows. */}
+              {onDelete ? (
+                <Pressable
+                  onPress={() => {
+                    if (saving) return;
+                    onClose();
+                    onDelete(mood);
+                  }}
+                  disabled={saving}
+                  className="min-h-[48px] mb-2 flex-row items-center justify-center self-center px-4 rounded-xl"
+                  accessibilityRole="button"
+                  accessibilityLabel="Delete this entry"
+                  accessibilityState={{ disabled: saving }}
+                >
+                  <Ionicons name="trash-outline" size={18} color={getThemedColor("dangerText", isDark)} />
+                  <Text
+                    className="ml-2 text-sm font-semibold"
+                    style={{ color: getThemedColor("dangerText", isDark) }}
+                  >
+                    Delete entry
+                  </Text>
+                </Pressable>
+              ) : null}
             </ScrollView>
 
             {/* Action buttons */}
@@ -578,23 +613,6 @@ export const DateTimePickerModal: React.FC<Props> = ({
                 borderTopColor: get("borderSubtle"),
               }}
             >
-              <Pressable
-                onPress={handleCancel}
-                disabled={saving}
-                className="flex-1 py-3.5 rounded-xl items-center"
-                style={{ backgroundColor: get("surfaceAlt") }}
-                accessibilityRole="button"
-                accessibilityLabel="Cancel date and time changes"
-                accessibilityState={{ disabled: saving }}
-              >
-                <Text
-                  className="font-semibold text-sm"
-                  style={{ color: get("textSubtle") }}
-                >
-                  Cancel
-                </Text>
-              </Pressable>
-
               {onEdit ? (
                 <Pressable
                   onPress={() => {
@@ -603,7 +621,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
                     onEdit(mood);
                   }}
                   disabled={saving}
-                  className="flex-1 py-3.5 rounded-xl items-center"
+                  className="flex-1 min-h-[48px] py-3.5 rounded-xl items-center justify-center"
                   style={{ backgroundColor: get("surfaceAlt") }}
                   accessibilityRole="button"
                   accessibilityLabel="Edit this entry"
@@ -618,7 +636,7 @@ export const DateTimePickerModal: React.FC<Props> = ({
               <Pressable
                 onPress={handleSave}
                 disabled={!canSave}
-                className="flex-1 py-3.5 rounded-xl items-center"
+                className="flex-1 min-h-[48px] py-3.5 rounded-xl items-center justify-center"
                 style={{
                   backgroundColor: canSave
                     ? (isDark ? colors.primary.dark : colors.primary.light)

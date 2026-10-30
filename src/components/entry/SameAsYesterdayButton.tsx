@@ -28,6 +28,9 @@ interface SameAsYesterdayButtonProps {
 }
 
 // Get readable time ago string
+/** A text button: no fill, border, or shadow, so it does not compete with the step title. */
+const QUIET_BUTTON = "flex-row items-center justify-center px-2 rounded-xl active:opacity-70";
+
 const getTimeAgo = (timestamp: number | null): string => {
   if (!timestamp) return "";
 
@@ -52,6 +55,7 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
   excludeEntryId,
 }) => {
   const { isDark, get } = useThemeColors();
+  const linkColor = isDark ? get("primary") : colors.positive.textDark.light;
   const { width: windowWidth } = useWindowDimensions();
   const [loading, setLoading] = useState(false);
   const [noEntry, setNoEntry] = useState(false);
@@ -186,11 +190,8 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
       <Pressable
         onPress={handleRetry}
         disabled={loading}
-        className="flex-row items-center px-3 py-2 rounded-xl"
-        style={{
-          backgroundColor: isDark ? colors.sand.bgHover.dark : colors.sand.bg.light,
-          opacity: loading ? 0.6 : 1,
-        }}
+        className={QUIET_BUTTON}
+        style={{ minHeight: 48, maxWidth: "100%", opacity: loading ? 0.6 : 1 }}
         accessibilityRole="button"
         accessibilityLabel="Retry copying last entry"
         accessibilityHint="The previous entry could not be loaded. Tap to try again."
@@ -198,13 +199,13 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
       >
         <Ionicons
           name="refresh-outline"
-          size={14}
+          size={16}
           color={get("textMuted")}
-          style={{ marginRight: 5 }}
+          style={{ marginRight: 6 }}
         />
         <Text
-          className="text-[11px] font-medium"
-          style={{ color: get("textMuted") }}
+          className="text-sm font-medium"
+          style={{ color: get("textMuted"), flexShrink: 1 }}
         >
           Could not load last entry · Retry
         </Text>
@@ -216,11 +217,8 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
     return (
       <Pressable
         disabled
-        className="flex-row items-center px-3 py-2 rounded-xl"
-        style={{
-          backgroundColor: isDark ? colors.sand.bgHover.dark : colors.sand.bg.light,
-          opacity: 0.5,
-        }}
+        className={QUIET_BUTTON}
+        style={{ minHeight: 48, maxWidth: "100%", opacity: 0.6 }}
         accessibilityRole="button"
         accessibilityLabel="Copy last entry"
         accessibilityHint="No previous entry is available"
@@ -228,13 +226,13 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
       >
         <Ionicons
           name="document-outline"
-          size={14}
+          size={16}
           color={get("textMuted")}
-          style={{ marginRight: 5 }}
+          style={{ marginRight: 6 }}
         />
         <Text
-          className="text-[11px] font-medium"
-          style={{ color: get("textMuted") }}
+          className="text-sm font-medium"
+          style={{ color: get("textMuted"), flexShrink: 1 }}
         >
           No previous entry
         </Text>
@@ -249,41 +247,23 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
         onLongPress={handleLongPress}
         delayLongPress={400}
         disabled={loading}
-        className="flex-row items-center px-3.5 py-2.5 rounded-xl"
-        style={{
-          backgroundColor: isDark ? colors.primaryBg.dark : colors.primaryBg.light,
-          borderWidth: 1,
-          borderColor: isDark ? "rgba(91, 138, 91, 0.3)" : "rgba(91, 138, 91, 0.2)",
-          opacity: loading ? 0.6 : 1,
-          shadowColor: colors.primary.light,
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: isDark ? 0.15 : 0.1,
-          shadowRadius: 4,
-          elevation: 2,
-        }}
+        className={QUIET_BUTTON}
+        style={{ minHeight: 48, maxWidth: "100%", opacity: loading ? 0.6 : 1 }}
         accessibilityRole="button"
         accessibilityLabel="Copy last entry"
         accessibilityHint="Tap to copy the previous entry into this draft. Long press to preview it."
-        accessibilityState={{ disabled: loading }}
+        accessibilityState={{ disabled: loading, busy: loading }}
       >
-        {loading ? (
-          <ActivityIndicator size="small" color={get("primary")} />
-        ) : (
-          <>
-            <Ionicons
-              name="copy-outline"
-              size={14}
-              color={get("primary")}
-              style={{ marginRight: 5 }}
-            />
-            <Text
-              className="text-[11px] font-bold tracking-wide"
-              style={{ color: isDark ? get("primary") : colors.positive.textDark.light }}
-            >
-              Copy last entry
-            </Text>
-          </>
-        )}
+        <View style={{ width: 20, height: 20, marginRight: 6, alignItems: "center", justifyContent: "center" }}>
+          {loading ? (
+            <ActivityIndicator size="small" color={get("primary")} />
+          ) : (
+            <Ionicons name="copy-outline" size={16} color={linkColor} />
+          )}
+        </View>
+        <Text className="text-sm font-semibold" style={{ color: linkColor, flexShrink: 1 }}>
+          Copy last entry
+        </Text>
       </Pressable>
 
       {/* Preview Modal */}

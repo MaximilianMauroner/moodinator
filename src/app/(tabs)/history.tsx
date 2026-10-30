@@ -114,7 +114,10 @@ function HistoryScreenContent() {
 
   const header = (
     <View style={{ gap: 14, paddingBottom: 12 }}>
-      <View className="flex-row items-center justify-between gap-2.5 pt-4">
+      <View
+        className="flex-row items-center justify-between gap-2.5 pt-4"
+        style={view === "month" ? { marginHorizontal: 12 } : undefined}
+      >
         {/* Let large text wrap here so the settings gear stays on screen. */}
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={[typography.titleMd, { color: get("text"), fontSize: 24, lineHeight: 28 }]}>History</Text>
@@ -124,7 +127,14 @@ function HistoryScreenContent() {
         </View>
         <SettingsGearButton />
       </View>
-      <SegmentedControl value={view} items={VIEWS} onChange={setView} variant="primary" padding={4} />
+      <SegmentedControl
+        value={view}
+        items={VIEWS}
+        onChange={setView}
+        variant="primary"
+        padding={4}
+        style={view === "month" ? { marginLeft: 26, marginRight: 26 } : undefined}
+      />
       {view === "days" ? (
         <>
           {recent.error ? (
@@ -195,7 +205,7 @@ function HistoryScreenContent() {
                 progressBackgroundColor={getThemedColor("surface", isDark)}
               />
             }
-            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}
+            contentContainerStyle={{ paddingHorizontal: view === "month" ? 4 : 16, paddingBottom: 100 }}
             showsVerticalScrollIndicator
           />
         </SafeAreaView>
@@ -223,6 +233,7 @@ function HistoryScreenContent() {
             modals.closeDateModal();
             modals.setEditingEntry(mood);
           }}
+          onDelete={itemActions.handleDeleteMood}
         />
       )}
       <EditMoodEntryModal

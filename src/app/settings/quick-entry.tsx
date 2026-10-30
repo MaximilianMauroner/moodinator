@@ -55,7 +55,7 @@ export default function QuickEntrySettingsScreen() {
             </Text>
           </View>
           <Text className="text-xs text-paper-700 dark:text-sand-400">
-            A tap on a weather tile saves your mood at once. These fields then appear so you can add detail, or skip it. With all fields off, a short note with Undo confirms the entry. Long-press a tile for detailed entry with all fields.
+            A tap on a weather tile shows these fields for your mood. Tap Done to save it, with or without detail; Close saves nothing. With all fields off, a tap saves at once and a short note with Undo confirms it. A severe rating also saves at once, before support. Long-press a tile for detailed entry with all fields.
           </Text>
         </View>
 

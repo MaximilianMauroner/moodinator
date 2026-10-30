@@ -45,10 +45,12 @@ describe("mood weather", () => {
     ]);
   });
 
-  it("keeps each weather sign at 3:1 contrast against the background", () => {
+  it("keeps each weather sign at 3:1 contrast against the background and raised surface", () => {
     for (const level of LEVELS) {
-      expect(contrast(getMoodWeatherColor(level, false), colors.background.light), `light ${level}`).toBeGreaterThanOrEqual(3);
-      expect(contrast(getMoodWeatherColor(level, true), colors.background.dark), `dark ${level}`).toBeGreaterThanOrEqual(3);
+      for (const surface of [colors.background, colors.surface]) {
+        expect(contrast(getMoodWeatherColor(level, false), surface.light), `light ${level} on ${surface.light}`).toBeGreaterThanOrEqual(3);
+        expect(contrast(getMoodWeatherColor(level, true), surface.dark), `dark ${level} on ${surface.dark}`).toBeGreaterThanOrEqual(3);
+      }
     }
   });
 });

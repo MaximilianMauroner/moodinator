@@ -105,8 +105,8 @@ and backups.
 - No Moodinator account, sign-in, subscription, or access credential is required.
 - App lock is optional and disabled on a fresh install. It does not block review.
 - On first launch, use **Next** to view the four onboarding pages, then choose
-  **Get Started**. Tap a mood on Home to create a quick entry, or press and hold
-  a mood to open the detailed entry form.
+  **Get Started**. Tap a mood on Home, then tap **Done** to save a quick entry,
+  or press and hold a mood to open the detailed entry form.
 - To review the optional local lock, open **Settings > Security > Enable App
   Lock** and create any temporary 4- or 6-digit PIN. No preconfigured PIN is
   supplied. Biometric review appears only when strong biometrics are supported

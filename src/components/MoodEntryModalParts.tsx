@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import { Pressable, Text, View } from "react-native";
-import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from "react-native-reanimated";
+import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring } from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
 import { HapticTab } from "./HapticTab";
 import { colors } from "@/constants/colors";
@@ -67,6 +67,7 @@ const MoodAdjustRow: React.FC<{
     const moodData = getMoodRatingDisplay(mood, isDark);
     const bgHex = moodData.backgroundHex;
     const textHex = moodData.colorHex;
+    const pillBorderWidth = 1;
     const canDecrease = mood > 0;
     const canIncrease = mood < 10;
 
@@ -98,7 +99,7 @@ const MoodAdjustRow: React.FC<{
     }));
 
     return (
-        <View className="flex-row items-center justify-center gap-3 py-2">
+        <View className="flex-row items-center justify-center gap-3">
             {/* Decrease (better) */}
             <Animated.View style={decAnimatedStyle}>
                 <HapticTab
@@ -110,23 +111,24 @@ const MoodAdjustRow: React.FC<{
                         decScale.value = withSpring(1, { damping: 14, stiffness: 350 });
                     }}
                     disabled={!canDecrease}
-                    className="w-9 h-9 rounded-full items-center justify-center"
+                    className="w-[48px] h-[48px] rounded-full items-center justify-center"
                     style={{
                         backgroundColor: isDark
-                            ? "rgba(42, 37, 32, 0.7)"
+                            ? colors.surface.dark
                             : "rgba(245, 241, 232, 0.9)",
                         borderWidth: 1,
                         borderColor: isDark
-                            ? "rgba(61, 53, 42, 0.4)"
+                            ? colors.border.dark
                             : "rgba(229, 217, 191, 0.8)",
                         opacity: canDecrease ? 1 : 0.25,
                     }}
-                    accessibilityLabel={`Decrease mood to ${mood - 1}`}
+                    accessibilityLabel={canDecrease ? `Decrease mood to ${mood - 1}` : `Mood is already ${mood}, ${moodData.label}`}
+                    accessibilityState={{ disabled: !canDecrease }}
                     accessibilityRole="button"
                 >
                     <Ionicons
                         name="chevron-back"
-                        size={16}
+                        size={20}
                         color={isDark ? colors.primary.dark : colors.primary.light}
                     />
                 </HapticTab>
@@ -138,10 +140,17 @@ const MoodAdjustRow: React.FC<{
                     {
                         backgroundColor: bgHex,
                         minWidth: 120,
-                        paddingHorizontal: 20,
-                        paddingVertical: 8,
+                        flexShrink: 1,
+                        paddingHorizontal: 12 - pillBorderWidth,
+                        paddingVertical: 8 - pillBorderWidth,
+                        minHeight: 48,
                         borderRadius: 16,
+                        borderWidth: pillBorderWidth,
+                        borderColor: `${textHex}40`,
+                        flexDirection: "row",
                         alignItems: "center",
+                        justifyContent: "center",
+                        gap: 8,
                         shadowColor: textHex,
                         shadowOffset: { width: 0, height: 3 },
                         shadowOpacity: isDark ? 0.3 : 0.18,
@@ -157,6 +166,7 @@ const MoodAdjustRow: React.FC<{
                         color: textHex,
                         fontSize: 26,
                         lineHeight: 30,
+                        flexShrink: 0,
                     }}
                 >
                     {mood}
@@ -166,7 +176,7 @@ const MoodAdjustRow: React.FC<{
                         fontSize: 12,
                         fontWeight: "600",
                         color: textHex,
-                        marginTop: 1,
+                        flexShrink: 1,
                     }}
                 >
                     {moodData.label}
@@ -184,23 +194,24 @@ const MoodAdjustRow: React.FC<{
                         incScale.value = withSpring(1, { damping: 14, stiffness: 350 });
                     }}
                     disabled={!canIncrease}
-                    className="w-9 h-9 rounded-full items-center justify-center"
+                    className="w-[48px] h-[48px] rounded-full items-center justify-center"
                     style={{
                         backgroundColor: isDark
-                            ? "rgba(42, 37, 32, 0.7)"
+                            ? colors.surface.dark
                             : "rgba(245, 241, 232, 0.9)",
                         borderWidth: 1,
                         borderColor: isDark
-                            ? "rgba(61, 53, 42, 0.4)"
+                            ? colors.border.dark
                             : "rgba(229, 217, 191, 0.8)",
                         opacity: canIncrease ? 1 : 0.25,
                     }}
-                    accessibilityLabel={`Increase mood to ${mood + 1}`}
+                    accessibilityLabel={canIncrease ? `Increase mood to ${mood + 1}` : `Mood is already ${mood}, ${moodData.label}`}
+                    accessibilityState={{ disabled: !canIncrease }}
                     accessibilityRole="button"
                 >
                     <Ionicons
                         name="chevron-forward"
-                        size={16}
+                        size={20}
                         color={isDark ? colors.negative.text.dark : colors.negative.text.light}
                     />
                 </HapticTab>
@@ -215,7 +226,6 @@ const AnimatedDot: React.FC<{ isActive: boolean; isDark: boolean }> = ({
     isDark,
 }) => {
     const width = useSharedValue(isActive ? 16 : 6);
-    const opacity = useSharedValue(isActive ? 1 : 0.35);
 
     useEffect(() => {
         width.value = withSpring(isActive ? 16 : 6, {
@@ -223,12 +233,10 @@ const AnimatedDot: React.FC<{ isActive: boolean; isDark: boolean }> = ({
             stiffness: 380,
             overshootClamping: true,
         });
-        opacity.value = withTiming(isActive ? 1 : 0.35, { duration: 200 });
-    }, [isActive, opacity, width]);
+    }, [isActive, width]);
 
     const animatedStyle = useAnimatedStyle(() => ({
         width: width.value,
-        opacity: opacity.value,
     }));
 
     return (
@@ -255,7 +263,13 @@ const StepDots: React.FC<{
 }> = ({ total, current, isDark }) => {
     if (total <= 1) return null;
     return (
-        <View className="flex-row items-center justify-center gap-1.5 mt-2">
+        <View
+            className="flex-row items-center justify-center gap-1.5"
+            accessible
+            accessibilityRole="progressbar"
+            accessibilityLabel="Entry progress"
+            accessibilityValue={{ min: 1, max: total, now: current + 1, text: `Step ${current + 1} of ${total}` }}
+        >
             {Array.from({ length: total }, (_, i) => (
                 <AnimatedDot key={i} isActive={i === current} isDark={isDark} />
             ))}

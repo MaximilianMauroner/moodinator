@@ -25,14 +25,26 @@ afterEach(() => {
 });
 
 describe("keepMoodTap", () => {
-  it("saves the mood only and opens the detail sheet for that entry", async () => {
+  it("opens the detail sheet for the tapped mood and saves nothing", async () => {
     const deps = setup();
+    await keepMoodTap(4, deps);
+
+    expect(deps.create).not.toHaveBeenCalled();
+    expect(deps.feedback.commit).not.toHaveBeenCalled();
+    expect(deps.openDetail).toHaveBeenCalledExactlyOnceWith(4);
+    expect(deps.state.inFlight).toBe(false);
+  });
+
+  it("saves the mood only and offers Undo when every quick-entry field is off", async () => {
+    const deps = setup({ offersDetail: false });
     await keepMoodTap(4, deps);
 
     expect(deps.create).toHaveBeenCalledWith({
       mood: 4, note: null, emotions: [], contextTags: [], energy: null, basedOnEntryId: null,
     });
-    expect(deps.openDetail).toHaveBeenCalledWith(expect.objectContaining({ id: 11, mood: 4 }));
+    expect(deps.feedback.commit).toHaveBeenCalledTimes(1);
+    expect(deps.showUndoToast).toHaveBeenCalledWith(expect.objectContaining({ id: 11, mood: 4 }));
+    expect(deps.openDetail).not.toHaveBeenCalled();
     expect(deps.state.inFlight).toBe(false);
   });
 
@@ -55,13 +67,11 @@ describe("keepMoodTap", () => {
     await next;
   });
 
-  it.each([
-    [true, "openDetail"],
-    [false, "showUndoToast"],
-  ] as const)("shows support first for a severe rating, then %s via Not now", async (offersDetail, followUp) => {
+  it.each([true, false])("keeps a severe rating before support, then offers Undo via Not now (detail fields: %s)", async (offersDetail) => {
     vi.useFakeTimers();
     const deps = setup({ offersDetail });
 
+    // A support action such as Call 988 never calls Not now, so the rating is kept before the sheet.
     await keepMoodTap(9, deps);
     expect(deps.showSupport).not.toHaveBeenCalled();
     await keepMoodTap(9, deps);
@@ -69,27 +79,28 @@ describe("keepMoodTap", () => {
 
     vi.advanceTimersByTime(SUPPORT_SHEET_DELAY_MS);
     expect(deps.showSupport).toHaveBeenCalledTimes(1);
-    expect(deps[followUp]).not.toHaveBeenCalled();
+    expect(deps.showUndoToast).not.toHaveBeenCalled();
     expect(deps.state.inFlight).toBe(false);
 
     vi.mocked(deps.showSupport).mock.calls[0]![0]();
-    expect(deps[followUp]).not.toHaveBeenCalled();
+    expect(deps.showUndoToast).not.toHaveBeenCalled();
     await keepMoodTap(4, deps);
     expect(deps.create).toHaveBeenCalledTimes(1);
 
     vi.advanceTimersByTime(SUPPORT_HANDOFF_MS);
-    expect(deps[followUp]).toHaveBeenCalledTimes(1);
+    expect(deps.showUndoToast).toHaveBeenCalledTimes(1);
+    expect(deps.openDetail).not.toHaveBeenCalled();
     expect(deps.state.inFlight).toBe(false);
   });
 
   it("reports a failed write and allows another tap", async () => {
-    const deps = setup({ create: vi.fn(async () => { throw new Error("disk full"); }) });
+    const deps = setup({ offersDetail: false, create: vi.fn(async () => { throw new Error("disk full"); }) });
 
     await keepMoodTap(4, deps);
 
     expect(deps.feedback.reject).toHaveBeenCalledTimes(1);
     expect(deps.onSaveError).toHaveBeenCalledTimes(1);
-    expect(deps.openDetail).not.toHaveBeenCalled();
+    expect(deps.showUndoToast).not.toHaveBeenCalled();
     expect(deps.state.inFlight).toBe(false);
   });
 });
@@ -109,15 +120,17 @@ describe("delayed support flow ownership", () => {
     olderDecline();
     vi.advanceTimersByTime(SUPPORT_HANDOFF_MS);
 
-    const followUp = offersDetail ? deps.openDetail : deps.showUndoToast;
-    expect(followUp).toHaveBeenCalledTimes(1);
-    expect(followUp).toHaveBeenCalledWith(expect.objectContaining({ id: 12 }));
+    if (offersDetail) {
+      expect(deps.openDetail).toHaveBeenCalledExactlyOnceWith(4);
+    } else {
+      expect(deps.showUndoToast).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ id: 12 }));
+    }
     expect(deps.state.inFlight).toBe(false);
   });
 
   it("does not take or release the lock of a newer pending save", async () => {
     vi.useFakeTimers();
-    const deps = setup();
+    const deps = setup({ offersDetail: false });
     await keepMoodTap(9, deps);
     vi.advanceTimersByTime(SUPPORT_SHEET_DELAY_MS);
     const olderDecline = vi.mocked(deps.showSupport).mock.calls[0]![0];
@@ -127,11 +140,11 @@ describe("delayed support flow ownership", () => {
 
     olderDecline();
     vi.advanceTimersByTime(SUPPORT_HANDOFF_MS);
-    expect(deps.openDetail).not.toHaveBeenCalled();
+    expect(deps.showUndoToast).not.toHaveBeenCalled();
     expect(deps.state.inFlight).toBe(true);
     finish(createMockMoodEntry({ id: 12, mood: 4 }));
     await newerSave;
-    expect(deps.openDetail).toHaveBeenCalledWith(expect.objectContaining({ id: 12 }));
+    expect(deps.showUndoToast).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ id: 12 }));
   });
 
   it("cancels a scheduled older handoff when a detailed save begins", async () => {
@@ -159,6 +172,6 @@ describe("delayed support flow ownership", () => {
     decline();
     decline();
     vi.advanceTimersByTime(SUPPORT_HANDOFF_MS);
-    expect(deps.openDetail).toHaveBeenCalledTimes(1);
+    expect(deps.showUndoToast).toHaveBeenCalledTimes(1);
   });
 });

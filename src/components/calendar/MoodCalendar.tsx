@@ -254,7 +254,7 @@ export function MoodCalendar({
 
   return (
     <View
-      className="rounded-3xl p-4"
+      className="rounded-3xl py-4"
       style={{
         backgroundColor: get("surface"),
         shadowColor: getThemedColor("shadowSand", isDark),
@@ -264,15 +264,17 @@ export function MoodCalendar({
         elevation: 3,
       }}
     >
-      <CalendarHeader
-        monthName={monthName}
-        year={year}
-        onPrevious={handlePreviousMonth}
-        onNext={handleNextMonth}
-        onToday={handleToday}
-        canGoNext={canGoNext}
-        isCurrentMonth={isCurrentMonth}
-      />
+      <View style={{ marginHorizontal: 26 }}>
+        <CalendarHeader
+          monthName={monthName}
+          year={year}
+          onPrevious={handlePreviousMonth}
+          onNext={handleNextMonth}
+          onToday={handleToday}
+          canGoNext={canGoNext}
+          isCurrentMonth={isCurrentMonth}
+        />
+      </View>
 
       <GestureDetector gesture={swipeGesture}>
         <View style={{ overflow: "hidden" }}>
@@ -283,7 +285,7 @@ export function MoodCalendar({
               <ActivityIndicator size="small" color={get("primary")} />
             </View>
           ) : error && !monthData ? (
-            <View className="items-center justify-center py-12 px-4">
+            <View className="items-center justify-center py-12 px-4" style={{ marginHorizontal: 26 }}>
               <Ionicons name="warning-outline" size={28} color={get("textMuted")} />
               <Text className="mt-3 text-center" style={[typography.bodyMd, { color: get("text") }]}>Calendar could not load</Text>
               <Text className="mt-1 text-center" style={[typography.bodySm, { color: get("textMuted") }]}>{error}</Text>
@@ -321,6 +323,7 @@ export function MoodCalendar({
       {monthData && !loading ? (
         <View
           className="mt-3 flex-row items-center justify-center"
+          style={{ marginHorizontal: 26 }}
           accessible
           accessibilityRole="text"
           accessibilityLabel="Calendar legend: a dot marks a day with multiple entries."
@@ -336,7 +339,7 @@ export function MoodCalendar({
       ) : null}
 
       {error && monthData ? (
-        <View className="mt-3 flex-row items-center rounded-2xl px-3 py-2" style={{ backgroundColor: get("surfaceElevated") }} accessibilityRole="alert">
+        <View className="mt-3 flex-row items-center rounded-2xl px-3 py-2" style={{ marginHorizontal: 26, backgroundColor: get("surfaceElevated") }} accessibilityRole="alert">
           <Ionicons name="warning-outline" size={18} color={get("textMuted")} />
           <Text className="ml-2 flex-1" style={[typography.bodySm, { color: get("textMuted") }]}>Showing saved calendar data.</Text>
           <Pressable onPress={() => void refresh()} accessibilityRole="button" accessibilityLabel="Retry refreshing calendar">
@@ -349,6 +352,7 @@ export function MoodCalendar({
         <View
           className="mt-4 pt-4"
           style={{
+            marginHorizontal: 26,
             borderTopWidth: 1,
             borderTopColor: get("border"),
           }}

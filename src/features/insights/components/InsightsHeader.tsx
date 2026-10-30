@@ -147,13 +147,13 @@ export function InsightsHeader({ moods, totalEntries, onRefresh }: InsightsHeade
 
         <Pressable
           onPress={onRefresh}
-          style={({ pressed }) => [
+          className="active:opacity-70"
+          style={[
             styles.refresh,
             {
               backgroundColor: sage.bg,
               borderColor: sage.border,
             },
-            pressed ? { opacity: 0.7, transform: [{ scale: 0.97 }] } : null,
           ]}
           accessibilityRole="button"
           accessibilityLabel="Refresh insights"

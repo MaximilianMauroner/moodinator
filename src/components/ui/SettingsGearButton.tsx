@@ -11,7 +11,7 @@ export function SettingsGearButton() {
   return (
     <Pressable
       onPress={() => router.push("/settings")}
-      className="h-11 w-11 items-center justify-center rounded-full active:opacity-70"
+      className="h-[48px] w-[48px] items-center justify-center rounded-full active:opacity-70"
       accessibilityRole="button"
       accessibilityLabel="Settings"
       accessibilityHint="Opens app settings"

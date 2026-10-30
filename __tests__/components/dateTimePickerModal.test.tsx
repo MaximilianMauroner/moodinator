@@ -23,6 +23,7 @@ vi.mock("react-native", () => ({
   ScrollView: "ScrollView",
   Text: "Text",
   View: "View",
+  useWindowDimensions: () => ({ width: 400, height: 800, scale: 1, fontScale: 1 }),
 }));
 vi.mock("@react-native-community/datetimepicker", () => ({ default: "DateTimePicker" }));
 vi.mock("@expo/vector-icons", () => ({ Ionicons: "Ionicons" }));
@@ -48,6 +49,7 @@ vi.mock("@/constants/colors", () => ({
     positive: { textDark: { light: "#000" } },
     sand: { text: { dark: "#000", light: "#000" } },
   },
+  getThemedColor: () => "#000",
   useThemeColors: () => ({
     isDark: false,
     get: () => "#000",
@@ -550,11 +552,13 @@ describe("DateTimePickerModal timestamp round trips", () => {
     expect(onSave).toHaveBeenCalledWith(7, normalized.getTime(), 240);
   });
 
-  it("does not write when cancelled", async () => {
+  it("does not write a changed date when closed", async () => {
     process.env.TZ = "UTC";
     const { onSave, onClose } = await renderModal(entry(Date.parse("2026-04-01T12:00:00Z"), 0));
 
-    await act(async () => button("Cancel date and time changes").props.onPress());
+    await act(async () => button("Change entry date").props.onPress());
+    await act(async () => setPickerValue("date", new Date("2026-04-03T12:00:00.000Z")));
+    await act(async () => button("Close entry details").props.onPress());
 
     expect(onSave).not.toHaveBeenCalled();
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -575,5 +579,29 @@ describe("DateTimePickerModal timestamp round trips", () => {
     await act(async () => button("Save date and time changes").props.onPress());
 
     expect(onSave).toHaveBeenCalledWith(7, Date.parse("2026-04-05T07:15:00.000Z"), -120);
+  });
+});
+
+describe("DateTimePickerModal delete", () => {
+  it("closes and deletes the shown entry", async () => {
+    const mood = entry(Date.parse("2026-03-31T12:00:00.000Z"), 0);
+    const onClose = vi.fn();
+    const onDelete = vi.fn();
+    await act(async () => {
+      renderer = create(
+        <DateTimePickerModal visible mood={mood} onClose={onClose} onSave={vi.fn()} onDelete={onDelete} />,
+      );
+    });
+
+    await act(async () => button("Delete this entry").props.onPress());
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onDelete).toHaveBeenCalledWith(mood);
+  });
+
+  it("offers no delete when the screen gives no delete action", async () => {
+    await renderModal(entry(Date.parse("2026-03-31T12:00:00.000Z"), 0));
+
+    expect(renderer.root.findAllByProps({ accessibilityLabel: "Delete this entry" })).toHaveLength(0);
   });
 });
