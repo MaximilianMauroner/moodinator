@@ -45,8 +45,9 @@ export type KeepMoodTapDeps = {
 /**
  * With any quick-entry field on, one tap opens the detail sheet and saves
  * nothing until Done. With every field off, one tap keeps a mood-only entry
- * and shows a toast with Undo. Severe ratings show support first and continue
- * after "Not now"; other ratings continue at once.
+ * and shows a toast with Undo. A severe rating is always kept at once, because
+ * a support action ends the flow before any sheet could save it; support shows
+ * next, and "Not now" continues to the toast with Undo.
  */
 export async function keepMoodTap(mood: number, deps: KeepMoodTapDeps): Promise<void> {
   if (deps.state.inFlight) return;
@@ -57,8 +58,9 @@ export async function keepMoodTap(mood: number, deps: KeepMoodTapDeps): Promise<
     if (ownsFlow()) deps.state.inFlight = false;
   };
 
+  const severe = shouldOfferCrisisSupport(mood);
   let followUp: () => void;
-  if (deps.offersDetail) {
+  if (deps.offersDetail && !severe) {
     followUp = () => deps.openDetail(mood);
   } else {
     let entry: MoodEntry;
@@ -97,7 +99,7 @@ export async function keepMoodTap(mood: number, deps: KeepMoodTapDeps): Promise<
     }, SUPPORT_HANDOFF_MS);
   };
 
-  if (shouldOfferCrisisSupport(mood)) {
+  if (severe) {
     deps.feedback.reject();
     setTimeout(() => {
       try {

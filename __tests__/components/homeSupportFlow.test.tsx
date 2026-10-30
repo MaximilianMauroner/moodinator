@@ -108,8 +108,8 @@ it.each(["DetailedPicker", "WeatherPicker"])("does not reopen an old quick detai
     });
     host("DetailedEntry").props.onClose();
   });
-  // The severe tap opened detail without saving; only the newer form saved.
-  expect(mocks.store.create).toHaveBeenCalledTimes(1);
+  // The severe tap kept its rating before support; the newer form saved the second entry.
+  expect(mocks.store.create).toHaveBeenCalledTimes(2);
   expect(host("DetailedEntry").props.visible).toBe(false);
   expect(host("QuickDetail").props.visible).toBe(false);
 });
