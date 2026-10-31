@@ -1019,11 +1019,12 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
 
                                 {singlePage ? (
                                     <View className="px-4 pb-3">
-                                        <View className="flex-row items-center gap-3">
+                                        <View className="flex-row items-start gap-3">
                                             <Ionicons
                                                 name={getMoodWeatherIcon(mood)}
                                                 size={36}
                                                 color={getMoodWeatherColor(mood, isDark)}
+                                                style={{ marginTop: 4 }}
                                             />
                                             <View className="flex-1">
                                                 <Text style={[typography.titleMd, { color: get("text"), fontSize: 22, lineHeight: 26 }]}>
@@ -1033,10 +1034,10 @@ const BaseMoodEntryModal: React.FC<BaseMoodEntryModalProps> = ({
                                                 <Text style={[typography.bodySm, { color: get("textSubtle") }]}>
                                                     Add detail if you like, then tap Done.
                                                 </Text>
+                                                <View className="items-start -ml-2">
+                                                    <SameAsYesterdayButton onCopy={handleCopyYesterday} excludeEntryId={currentEntryId} />
+                                                </View>
                                             </View>
-                                        </View>
-                                        <View className="items-center mt-1">
-                                            <SameAsYesterdayButton onCopy={handleCopyYesterday} excludeEntryId={currentEntryId} />
                                         </View>
                                     </View>
                                 ) : (
