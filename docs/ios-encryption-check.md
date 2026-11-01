@@ -17,7 +17,7 @@ verification. Earlier patched simulator builds do not accept this reset; do not
 raise the deployment minimum or restore the patch to claim a pass.
 
 Prerequisites are existing Xcode with an installed iOS Simulator runtime,
-CocoaPods, Node 24 and pnpm 10.34.6. If one is missing, return that error; the runner
+CocoaPods, Node 24 and pnpm 11.16.0. If one is missing, return that error; the runner
 does not install runtimes, change device settings or request credentials.
 
 ## Prepare and run
