@@ -4,9 +4,9 @@
     "versionCode": 52
   },
   "latest": {
-    "version": "0.1.16",
-    "versionCode": 51,
-    "sha": "d91fa2c0cf8c41d30180bd79be5e8fe6f0ddecbb"
+    "version": "0.1.17",
+    "versionCode": 52,
+    "sha": "09b56ae56af6153d49a3c629d71382791abbc83d"
   },
   "lastAttemptDay": "2026-11-02",
   "attempts": {
@@ -110,9 +110,9 @@
       "versionCode": 52,
       "sha": "09b56ae56af6153d49a3c629d71382791abbc83d",
       "day": "2026-11-02",
-      "status": "running",
+      "status": "succeeded",
       "id": "10572256-d393-4975-9b0c-39cc9c626d88"
     }
   },
-  "active": "10572256-d393-4975-9b0c-39cc9c626d88"
+  "active": null
 }
