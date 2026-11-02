@@ -145,11 +145,11 @@ export function ExportModal({
     const rangeLabel =
       exportRange === "week" ? "Last 7 days" :
       exportRange === "month" ? "Last 30 days" :
-      exportRange === "full" ? "All Moodinator data" :
+      exportRange === "full" ? "All mood history" :
       `${customStartDate.toLocaleDateString()} to ${customEndDate.toLocaleDateString()}`;
     alert(
       "Review data export",
-      `${rangeLabel}\n\nThis JSON may include sensitive mood entries, notes, presets, and settings. After saving or sharing it, Moodinator cannot control where it is stored or forwarded.`,
+      `${rangeLabel}\n\nThis unencrypted JSON may include sensitive mood entries and notes. It does not include app settings or standalone preset lists. After saving or sharing it, Moodinator cannot control where it is stored or forwarded.`,
       [
         { text: "Back and edit", style: "cancel" },
         { text: "Create export", onPress: () => void performExportShare() },
@@ -208,7 +208,7 @@ export function ExportModal({
                       ? "30 Days"
                       : opt === "custom"
                         ? "Custom"
-                        : "Full Export"}
+                        : "All history"}
                 </Text>
               </Pressable>
             ))}
