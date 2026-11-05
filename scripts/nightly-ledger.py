@@ -43,6 +43,10 @@ def transition(state, action, args, now=None):
         return state, {"seeded": True, **baseline}
     if state is None:
         raise ValueError("Seed the ledger from the latest Play release before building")
+    if action == "check":
+        sha, = args
+        validate_sha(sha)
+        return state, {"needed": sha not in state["attempts"]}
     if action == "reserve":
         sha, = args
         validate_sha(sha)
@@ -77,7 +81,7 @@ def transition(state, action, args, now=None):
         if status == "succeeded":
             state["latest"] = {key: attempt[key] for key in ("version", "versionCode", "sha")}
         return state, {"finished": True, "status": status}
-    raise ValueError("Expected status, seed, reserve, or finish")
+    raise ValueError("Expected status, check, seed, reserve, or finish")
 
 
 def validate_sha(sha):
@@ -191,9 +195,9 @@ def validate_state(state):
 
 
 def execute(storage, action, args, now=None):
-    if action not in ("status", "reserve", "finish"):
-        raise ValueError("Expected status, reserve, or finish; live seed is forbidden")
-    if len(args) != {"status": 0, "reserve": 1, "finish": 2}[action]:
+    if action not in ("status", "check", "reserve", "finish"):
+        raise ValueError("Expected status, check, reserve, or finish; live seed is forbidden")
+    if len(args) != {"status": 0, "check": 1, "reserve": 1, "finish": 2}[action]:
         raise ValueError("Invalid ledger action arguments")
     state, sha = storage.read()
     previous = copy.deepcopy(state)
@@ -207,8 +211,8 @@ def main():
     if len(sys.argv) < 3 or sys.argv[1] != "moodinator":
         raise ValueError("Expected moodinator and a ledger action")
     action, *args = sys.argv[2:]
-    if action not in ("status", "reserve", "finish"):
-        raise ValueError("Expected status, reserve, or finish; live seed is forbidden")
+    if action not in ("status", "check", "reserve", "finish"):
+        raise ValueError("Expected status, check, reserve, or finish; live seed is forbidden")
     result = execute(GitHubStorage(auth_token()), action, args)
     print(json.dumps(result))
 

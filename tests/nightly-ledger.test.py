@@ -85,6 +85,17 @@ class MockStorage:
 
 
 class GitHubLedgerTests(unittest.TestCase):
+    def test_check_is_read_only_and_skips_attempted_revisions(self):
+        storage = MockStorage()
+        self.assertFalse(ledger.execute(storage, "check", ["a" * 40])["needed"])
+        self.assertTrue(ledger.execute(storage, "check", ["b" * 40])["needed"])
+        first = ledger.execute(storage, "reserve", ["b" * 40], moment("2026-09-17"))
+        ledger.execute(storage, "finish", [first["id"], "failed"])
+        self.assertFalse(ledger.execute(storage, "check", ["b" * 40])["needed"])
+        with self.assertRaisesRegex(ValueError, "full Git SHA"):
+            ledger.execute(storage, "check", ["invalid"])
+        self.assertEqual(storage.writes, 2)
+
     def test_concurrent_stale_reservation_fails_cas_without_build_result(self):
         storage = MockStorage()
         original_read = storage.read
