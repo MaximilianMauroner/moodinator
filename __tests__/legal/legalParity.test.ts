@@ -43,9 +43,12 @@ describe("legal document parity", () => {
       expect(source).toContain("database emotion records");
       expect(source).toContain("Emotion List presets");
       expect(source).toContain("no developer-side");
-      expect(source).toContain("prefilled");
-      expect(source).toContain("GitHub");
-      expect(source).toContain("Do not include private mood entries");
+      expect(source).toContain("Report a problem or idea");
+      expect(source).toContain("The app sends nothing until you tap Send");
+      expect(source).toContain(
+        "A report never holds mood entries, notes, emotions, context tags, energy values, settings, or device identifiers."
+      );
+      expect(source).not.toContain("has no developer-operated server,");
       expect(source).not.toContain("does not apply database-level encryption");
     }
   });
@@ -69,9 +72,6 @@ describe("legal document parity", () => {
       expect(source).toContain("Copyright (c) 2026 Moodinator contributors");
       expect(source).toContain("jurisdiction in which the app developer resides");
       expect(source).toContain("https://github.com/MaximilianMauroner/moodinator");
-      expect(source).toContain("Send Feedback");
-      expect(source).toContain("GitHub");
-      expect(source).toContain("Do not include private mood entries");
     }
   });
 

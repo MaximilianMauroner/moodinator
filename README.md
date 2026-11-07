@@ -1,6 +1,6 @@
 # Moodinator
 
-A privacy-focused mood tracking app built with React Native. Record how you feel and review your mood history without a Moodinator account or developer-operated data server.
+A privacy-focused mood tracking app built with React Native. Record how you feel and review your mood history without a Moodinator account or a server for your mood data. You can send an optional problem report from Settings.
 
 ## Features
 
@@ -21,7 +21,8 @@ A privacy-focused mood tracking app built with React Native. Record how you feel
 - **Local-first storage**. No accounts, developer cloud sync, analytics, or ads
 - Mood data stays in the app unless you choose to export, share, copy, or back it up
 - Plaintext JSON exports and backups can be saved to user-selected destinations, including cloud-backed providers
-- Core mood tracking works offline; crisis-support links and user-selected sharing destinations may require connectivity
+- Core mood tracking works offline; crisis-support links, problem reports, and user-selected sharing destinations may require connectivity
+- In-app problem reports send only the text you type, an optional reply email, the app version and build, and the system name and version. They go only when you tap Send and never include mood data, entries, emotions, tags, notes, settings, or device identifiers
 
 ### User Experience
 - **Dark and light mode** with the calm Soft Sage palette
@@ -162,7 +163,7 @@ merge workflow.
 - [Privacy Policy](./PRIVACY_POLICY.md)
 - [Terms of Service](./TERMS_OF_SERVICE.md)
 
-**Your working data is stored locally.** Moodinator has no developer-operated account or data server. Data can leave the app when you deliberately export, share, copy, or back it up to a destination you select. See the Privacy Policy for Android database-encryption, notification, deletion, and platform-backup details.
+**Your working data is stored locally.** Moodinator has no developer-operated account and no server for your mood data. Data can leave the app when you deliberately export, share, copy, or back it up to a destination you select. A problem report you choose to send carries only the text you type, an optional email, and the app and system versions. See the Privacy Policy for Android database-encryption, notification, deletion, and platform-backup details.
 
 ## Contributing
 

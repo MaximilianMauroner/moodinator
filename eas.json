@@ -26,7 +26,10 @@
       }
     },
     "production": {
-      "autoIncrement": false
+      "autoIncrement": false,
+      "env": {
+        "EXPO_PUBLIC_REPORTS_ORIGIN": "https://tools.mauroner.net"
+      }
     },
     "production-apk": {
       "extends": "production",
