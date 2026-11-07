@@ -44,8 +44,6 @@ Moodinator registers a periodic backup task with the operating system. The opera
 
 For ratings 9 and 10, Moodinator offers crisis-support actions. If you choose one, the app asks the operating system to open the phone or messaging app for U.S. 988, or opens Find A Helpline at <https://findahelpline.com/>. These actions are user-initiated. Moodinator does not monitor entries, contact emergency services, or send your mood entry to those services. Your carrier, browser, operating system, or selected service may process information under its own terms and privacy policy.
 
-If you choose **Send Feedback**, Moodinator opens a prefilled issue form on GitHub. The template does not include mood entries, app settings, or device metadata. Anything you add and submit is shared with GitHub and posted publicly in the Moodinator repository, subject to GitHub's terms and privacy policy. Do not include private mood entries or other sensitive information.
-
 ## Problem Reports
 
 If you open **Settings > About > Report a problem or idea** and tap **Send**, Moodinator sends one report to the developer's reports inbox at tools.mauroner.net. The app sends nothing until you tap Send. A report holds only:
