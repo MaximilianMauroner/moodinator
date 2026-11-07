@@ -90,7 +90,7 @@ export default function PrivacyPolicyScreen() {
 
         <Section title="Sharing and Sale">
           <Paragraph>
-            We do not operate servers that receive your mood data or settings, and we do not sell your data. Moodinator does not use advertising or analytics. Data can leave through a deliberate export, share, copy, import, support action, problem report, or feedback submission to GitHub; when an OS-scheduled periodic backup runs after storage is available; or through platform backup or transfer behavior outside our control.
+            We do not operate servers that receive your mood data or settings, and we do not sell your data. Moodinator does not use advertising or analytics. Data can leave through a deliberate export, share, copy, import, support action, or problem report; when an OS-scheduled periodic backup runs after storage is available; or through platform backup or transfer behavior outside our control.
           </Paragraph>
         </Section>
 
@@ -104,7 +104,7 @@ export default function PrivacyPolicyScreen() {
             Uninstalling normally removes app-sandbox data, but external files remain, secure storage and platform backups can behave differently by operating system, and device backup or transfer features may retain or restore data.
           </Paragraph>
           <Paragraph>
-            Because Moodinator has no account and we hold no server-side copy, there is no developer-side account or data-deletion request for us to perform. Delete data in the app, uninstall it, and remove external copies from their destinations.
+            Because Moodinator has no account and we hold no server-side copy of your mood data, there is no developer-side account or mood-data deletion request for us to perform. To delete a problem report you sent, email support.moodinator@lab4code.com with roughly when you sent it and what it said. Delete data in the app, uninstall it, and remove external copies from their destinations.
           </Paragraph>
         </Section>
 

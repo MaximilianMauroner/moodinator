@@ -58,7 +58,7 @@ A report never holds mood entries, notes, emotions, context tags, energy values,
 
 ## Data Sharing and Sale
 
-We do not operate servers that receive your mood data or settings, and we do not sell your data. Moodinator does not use advertising or analytics. Data can leave the app when you deliberately export, share, copy, import, open an external support action, send a problem report, or submit feedback to GitHub; when an OS-scheduled periodic backup runs after backup storage is available; or when the operating system handles device backup or transfer outside our control.
+We do not operate servers that receive your mood data or settings, and we do not sell your data. Moodinator does not use advertising or analytics. Data can leave the app when you deliberately export, share, copy, import, open an external support action, or send a problem report; when an OS-scheduled periodic backup runs after backup storage is available; or when the operating system handles device backup or transfer outside our control.
 
 ## Your Control and Deletion
 
@@ -70,7 +70,7 @@ You can:
 
 "Delete Mood Data" does **not** delete the user-visible Emotion List presets, context-tag presets, other app settings, reminders, app-lock settings or secure-storage PIN hash, or export and backup files saved outside the app. Uninstalling normally removes app-sandbox data, but external files remain, secure storage and platform backups may behave differently by operating system, and platform backup or device-transfer features may retain or restore data. Review and delete external files through the destination where you saved them.
 
-Because Moodinator has no account and we do not hold a server-side copy of your data, there is no developer-side account or data-deletion request for us to perform. Delete data in the app, uninstall it, and remove any external copies from their destinations.
+Because Moodinator has no account and we do not hold a server-side copy of your mood data, there is no developer-side account or mood-data deletion request for us to perform. To delete a problem report you sent, email **support.moodinator@lab4code.com** with roughly when you sent it and what it said. Delete data in the app, uninstall it, and remove any external copies from their destinations.
 
 ## Children's Privacy
 

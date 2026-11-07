@@ -7,7 +7,8 @@ this list so dependency changes cannot silently expand the permission surface.
 ## App behavior
 
 - `INTERNET` and `ACCESS_NETWORK_STATE` are Expo/runtime defaults. Moodinator
-  has no developer-operated API, analytics, advertising, or sync service;
+  has no analytics, advertising, or sync service. Its only developer-operated
+  request is the optional problem report, which the user sends from Settings;
   user-selected external links open outside the app.
 - `USE_BIOMETRIC` and `USE_FINGERPRINT` support the optional local app lock.
 - `VIBRATE`, `POST_NOTIFICATIONS`, `RECEIVE_BOOT_COMPLETED`, and `WAKE_LOCK`

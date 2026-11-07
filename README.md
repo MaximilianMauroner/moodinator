@@ -163,7 +163,7 @@ merge workflow.
 - [Privacy Policy](./PRIVACY_POLICY.md)
 - [Terms of Service](./TERMS_OF_SERVICE.md)
 
-**Your working data is stored locally.** Moodinator has no developer-operated account or data server. Data can leave the app when you deliberately export, share, copy, or back it up to a destination you select. See the Privacy Policy for Android database-encryption, notification, deletion, and platform-backup details.
+**Your working data is stored locally.** Moodinator has no developer-operated account and no server for your mood data. Data can leave the app when you deliberately export, share, copy, or back it up to a destination you select. A problem report you choose to send carries only the text you type, an optional email, and the app and system versions. See the Privacy Policy for Android database-encryption, notification, deletion, and platform-backup details.
 
 ## Contributing
 

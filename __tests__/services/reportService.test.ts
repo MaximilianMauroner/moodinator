@@ -40,14 +40,14 @@ afterEach(() => {
 });
 
 describe("problem report request", () => {
-  it("posts JSON with no credentials to the configured origin", async () => {
+  it("posts JSON with cookies and credentials left out to the configured origin", async () => {
     fetchMock.mockResolvedValue(reply(201, { ok: true }));
     expect(await sendReport!(draft())).toEqual({ kind: "sent" });
     const { url, init } = sent();
     expect(url).toBe("https://reports.test/api/reports");
     expect(init?.method).toBe("POST");
     expect(init?.headers).toEqual({ "Content-Type": "application/json" });
-    expect(init?.credentials).toBeUndefined();
+    expect(init?.credentials).toBe("omit");
   });
 
   it("sends only the typed text, the app version and build, and the system version", async () => {
@@ -114,7 +114,7 @@ describe("problem report outcome", () => {
     ["a message over the limit", { message: "x".repeat(4001) }, "message_too_long"],
     ["details over the limit", { details: "x".repeat(4001) }, "details_too_long"],
     ["an invalid email", { contactEmail: "not-an-email" }, "invalid_email"],
-    ["an email over the limit", { contactEmail: `${"x".repeat(250)}@example.com` }, "invalid_email"],
+    ["an email over the limit", { contactEmail: `${"x".repeat(309)}@example.com` }, "invalid_email"],
   ] as const)("refuses %s on the phone without sending anything", async (_, change, reason) => {
     expect(await sendReport!(draft(change))).toEqual({ kind: "rejected", reason });
     expect(fetchMock).not.toHaveBeenCalled();
@@ -136,6 +136,23 @@ describe("problem report outcome", () => {
     await vi.advanceTimersByTimeAsync(1);
     expect(await pending).toEqual({ kind: "timeout" });
   });
+  it("keeps the deadline while it reads a refusal body that never finishes", async () => {
+    vi.useFakeTimers();
+    fetchMock.mockResolvedValue({ ok: false, status: 400, json: () => new Promise(() => undefined) } as unknown as Response);
+    const pending = sendReport!(draft());
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(await pending).toEqual({ kind: "timeout" });
+    vi.useRealTimers();
+  });
+
+  it("accepts an email at the inbox limit and refuses one past it", async () => {
+    fetchMock.mockResolvedValue(reply(201, { ok: true }));
+    const at = `${"a".repeat(308)}@example.com`;
+    expect(at.length).toBe(320);
+    expect(await sendReport!(draft({ contactEmail: at }))).toEqual({ kind: "sent" });
+    expect(await sendReport!(draft({ contactEmail: `a${at}` }))).toEqual({ kind: "rejected", reason: "invalid_email" });
+  });
+
 
   it.each([
     ["a wrong content type", reply(415, { error: "unsupported" })],
