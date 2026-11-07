@@ -1,6 +1,6 @@
 # Moodinator
 
-A privacy-focused mood tracking app built with React Native. Record how you feel and review your mood history without a Moodinator account or developer-operated data server.
+A privacy-focused mood tracking app built with React Native. Record how you feel and review your mood history without a Moodinator account or a server for your mood data. You can send an optional problem report from Settings.
 
 ## Features
 
