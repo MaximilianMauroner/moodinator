@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last Updated: October 12, 2026**
+**Last Updated: November 7, 2026**
 
 ## Introduction
 
@@ -16,7 +16,7 @@ Moodinator stores information you choose to enter or configure, including:
 - **App lock data:** whether app lock and biometrics are enabled, PIN length, failed-attempt state, and a salted hash of your PIN
 - **Backup metadata:** the selected backup folder and the time of the latest backup
 
-This information is processed and stored locally. Moodinator has no developer-operated server, user account system, cloud synchronization, advertising, or analytics. We do not receive your mood data or app settings.
+This information is processed and stored locally. Moodinator has no user account system, cloud synchronization, advertising, or analytics, and there is no developer-operated server for your mood data. We do not receive your mood data or app settings. The only information we receive is a problem report that you write and send (see Problem Reports).
 
 New entries retain the UTC offset at their recorded time so calendar days remain stable when you travel. Exports and backups include this offset. Older entries without a recorded offset use the current device timezone.
 
@@ -46,9 +46,21 @@ For ratings 9 and 10, Moodinator offers crisis-support actions. If you choose on
 
 If you choose **Send Feedback**, Moodinator opens a prefilled issue form on GitHub. The template does not include mood entries, app settings, or device metadata. Anything you add and submit is shared with GitHub and posted publicly in the Moodinator repository, subject to GitHub's terms and privacy policy. Do not include private mood entries or other sensitive information.
 
+## Problem Reports
+
+If you open **Settings > About > Report a problem or idea** and tap **Send**, Moodinator sends one report to the developer's reports inbox at tools.mauroner.net. The app sends nothing until you tap Send. A report holds only:
+
+- the kind you choose (problem or idea)
+- the text you type
+- an email address for a reply, if you enter one
+- the app version and build number
+- the operating-system name and version
+
+A report never holds mood entries, notes, emotions, context tags, energy values, settings, or device identifiers. It uses no account, token, or cookie. Like any website, the inbox server can receive normal connection data, such as your IP address. Do not include private mood entries or other sensitive information in your text. To ask about or delete a report you sent, contact support.moodinator@lab4code.com.
+
 ## Data Sharing and Sale
 
-We do not operate servers that receive your Moodinator data, and we do not sell it. Moodinator does not use advertising or analytics. Data can leave the app when you deliberately export, share, copy, import, open an external support action, or submit feedback to GitHub; when an OS-scheduled periodic backup runs after backup storage is available; or when the operating system handles device backup or transfer outside our control.
+We do not operate servers that receive your mood data or settings, and we do not sell your data. Moodinator does not use advertising or analytics. Data can leave the app when you deliberately export, share, copy, import, open an external support action, send a problem report, or submit feedback to GitHub; when an OS-scheduled periodic backup runs after backup storage is available; or when the operating system handles device backup or transfer outside our control.
 
 ## Your Control and Deletion
 
@@ -64,7 +76,7 @@ Because Moodinator has no account and we do not hold a server-side copy of your 
 
 ## Children's Privacy
 
-Moodinator is not directed at children under 13. Because we do not receive app data, we do not knowingly collect personal information from children through developer-operated servers.
+Moodinator is not directed at children under 13. We receive only the problem reports that people choose to send, and we do not knowingly collect personal information from children.
 
 ## Changes to This Policy
 

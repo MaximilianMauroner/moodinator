@@ -19,7 +19,7 @@ export default function PrivacyPolicyScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Text className="text-xs text-paper-700 dark:text-sand-400 mb-4">
-          Last Updated: October 12, 2026
+          Last Updated: November 7, 2026
         </Text>
 
         <Section title="Introduction">
@@ -42,7 +42,7 @@ export default function PrivacyPolicyScreen() {
 
           <Subtitle>Local-First, No Account</Subtitle>
           <Paragraph>
-            New entries retain the UTC offset at their recorded time so calendar days remain stable when you travel. Exports and backups include this offset. Older entries without a recorded offset use the current device timezone. Moodinator processes and stores this information locally. It has no developer-operated server, account system, cloud synchronization, advertising, or analytics. We do not receive your mood data or app settings.
+            New entries retain the UTC offset at their recorded time so calendar days remain stable when you travel. Exports and backups include this offset. Older entries without a recorded offset use the current device timezone. Moodinator processes and stores this information locally. It has no account system, cloud synchronization, advertising, or analytics, and there is no developer-operated server for your mood data. We do not receive your mood data or app settings. The only information we receive is a problem report that you write and send.
           </Paragraph>
         </Section>
 
@@ -82,9 +82,18 @@ export default function PrivacyPolicyScreen() {
           </Paragraph>
         </Section>
 
+        <Section title="Problem Reports">
+          <Paragraph>
+            {"If you open Settings > About > Report a problem or idea and tap Send, Moodinator sends one report to the developer's reports inbox at tools.mauroner.net. The app sends nothing until you tap Send. A report holds only the kind you choose, the text you type, an email address for a reply if you enter one, the app version and build number, and the operating-system name and version."}
+          </Paragraph>
+          <Paragraph>
+            A report never holds mood entries, notes, emotions, context tags, energy values, settings, or device identifiers. It uses no account, token, or cookie. Like any website, the inbox server can receive normal connection data, such as your IP address. Do not include private mood entries or other sensitive information. To ask about or delete a report you sent, contact support.moodinator@lab4code.com.
+          </Paragraph>
+        </Section>
+
         <Section title="Sharing and Sale">
           <Paragraph>
-            We do not operate servers that receive your Moodinator data or sell it. Moodinator does not use advertising or analytics. Data can leave through a deliberate export, share, copy, import, support action, or feedback submission to GitHub; when an OS-scheduled periodic backup runs after storage is available; or through platform backup or transfer behavior outside our control.
+            We do not operate servers that receive your mood data or settings, and we do not sell your data. Moodinator does not use advertising or analytics. Data can leave through a deliberate export, share, copy, import, support action, problem report, or feedback submission to GitHub; when an OS-scheduled periodic backup runs after storage is available; or through platform backup or transfer behavior outside our control.
           </Paragraph>
         </Section>
 
@@ -104,7 +113,7 @@ export default function PrivacyPolicyScreen() {
 
         <Section title="Children's Privacy">
           <Paragraph>
-            {"Moodinator is not directed at children under 13. Because we do not receive app data, we do not knowingly collect children's information through developer-operated servers."}
+            {"Moodinator is not directed at children under 13. We receive only the problem reports that people choose to send, and we do not knowingly collect children's information."}
           </Paragraph>
         </Section>
 
@@ -126,7 +135,8 @@ export default function PrivacyPolicyScreen() {
           </Text>
           <BulletList
             items={[
-              "No developer-operated account, data server, analytics, or ads",
+              "No account, analytics, or ads, and no developer server for your mood data",
+              "Problem reports hold only what you type and the app and system versions",
               "Working mood database is encrypted with SQLCipher",
               "JSON and CSV exports and JSON backups are readable plaintext",
               "Delete Mood Data has a limited, documented scope",

@@ -45,6 +45,10 @@ fabricated data only.
   disabled Android Auto Backup; and user-initiated export, share, document
   provider, and external-link flows. Revalidate this answer against every final
   signed candidate and revise it if dependencies or data flows change.
+  Problem reports change this answer. A production build sends a report that
+  the person writes, an optional email, and the app and system versions to the
+  developer's reports inbox. Revise the Data Safety answer before that build is
+  released.
 
 ## Short description
 
@@ -77,7 +81,7 @@ REFLECT ON YOUR HISTORY
 LOCAL-FIRST BY DESIGN
 
 - No Moodinator account
-- No developer-operated data server
+- No developer-operated server for your mood data
 - Moodinator does not use advertising or analytics
 - Core mood tracking works offline
 - Export, share, and back up data only through destinations you select

@@ -12,6 +12,7 @@ import { IconBadge } from "@/components/ui/IconBadge";
 import { typography } from "@/constants/typography";
 import { Alert } from "@/components/ui/AppAlert";
 import { FEEDBACK_ISSUES_URL, getFeedbackIssueUrl } from "@/lib/feedback";
+import { sendReport } from "@/services/reportService";
 
 const SUPPORT_EMAIL = "support.moodinator@lab4code.com";
 const ANDROID_PACKAGE = "com.lab4code.moodinator";
@@ -148,6 +149,14 @@ export default function AboutSettingsScreen() {
         </SettingsSection>
 
         <SettingsSection title="Support">
+          {sendReport && (
+            <SettingRow
+              label="Report a problem or idea"
+              subLabel="Send it from the app"
+              icon="chatbubble-outline"
+              onPress={() => router.push("/settings/report")}
+            />
+          )}
           <SettingRow
             label="Send Feedback"
             subLabel="Open a prefilled GitHub issue"
