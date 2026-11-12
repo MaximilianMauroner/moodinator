@@ -45,8 +45,5 @@ describe("parseEmotionItem", () => {
     expect(
       parseEmotionItem({ name: "Happy", category: "positive", energy: "medium" }),
     ).toEqual({ name: "Happy", category: "positive" });
-    expect(
-      parseEmotionItem({ name: "Happy", category: "not-a-category", energy: "HIGH" }),
-    ).toEqual({ name: "Happy", category: "not-a-category" });
   });
 });

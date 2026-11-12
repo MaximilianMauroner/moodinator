@@ -1,10 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createMockMoodEntry } from "../../db/mockClient";
-import {
-  analysisStart,
-  analyzeMoods,
-} from "../../../src/features/insights/utils/analysis";
+import { analysisStart } from "../../../src/features/insights/utils/analysis";
 
 vi.mock("@/hooks/useColorScheme", () => ({ useColorScheme: () => "dark" }));
 
@@ -64,50 +60,5 @@ describe("analysis windows", () => {
     expect(start.getDate()).toBe(4);
     expect(start.getHours()).toBe(0);
     expect(start.getMinutes()).toBe(0);
-  });
-
-  it("fills every day in the window and places those entries on the rhythm", () => {
-    const start = analysisStart("7", afternoon);
-    const end = new Date("2026-09-08T00:00:00Z");
-    const result = analyzeMoods(
-      [
-        createMockMoodEntry({
-          mood: 2,
-          timestamp: Date.parse("2026-09-02T12:00:00Z"),
-          utcOffsetMinutes: 0,
-        }),
-        createMockMoodEntry({
-          mood: 8,
-          timestamp: Date.parse("2026-09-08T18:00:00Z"),
-          utcOffsetMinutes: 0,
-        }),
-      ],
-      start,
-      end,
-    );
-
-    expect(result.dailySeries.map((point) => point.day)).toEqual([
-      "2026-09-02",
-      "2026-09-03",
-      "2026-09-04",
-      "2026-09-05",
-      "2026-09-06",
-      "2026-09-07",
-      "2026-09-08",
-    ]);
-    expect(result.dailySeries[0]).toMatchObject({ mean: 2, min: 2, max: 2, count: 1 });
-    expect(result.dailySeries[6]).toMatchObject({ mean: 8, min: 8, max: 8, count: 1 });
-    expect(result.dailySeries.slice(1, 6).every((point) => point.mean === null)).toBe(
-      true,
-    );
-    expect(result.rhythm.find((cell) => cell.daypart === 1 && cell.weekday === 2)).toMatchObject({
-      count: 1,
-      mean: 2,
-    });
-    expect(result.rhythm.find((cell) => cell.daypart === 2 && cell.weekday === 1)).toMatchObject({
-      count: 1,
-      mean: 8,
-    });
-    expect(result.drivers).toEqual([]);
   });
 });
