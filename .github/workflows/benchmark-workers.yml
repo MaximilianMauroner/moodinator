@@ -1,0 +1,43 @@
+name: Android worker benchmark
+on:
+  push:
+    branches: [benchmark-android-workers]
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - workers: 2
+            parallel: 'false'
+          - workers: 4
+            parallel: 'true'
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '24.13.1'
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          distribution: temurin
+          java-version: '17'
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm exec expo prebuild --platform android --no-install
+      - name: Build Android bundle
+        working-directory: android
+        env:
+          CMAKE_BUILD_PARALLEL_LEVEL: ${{ matrix.workers }}
+          GRADLE_OPTS: -Dorg.gradle.workers.max=${{ matrix.workers }} -Dorg.gradle.parallel=${{ matrix.parallel }} -Dorg.gradle.jvmargs=-Xmx2048m -Dkotlin.daemon.jvm.options=-Xmx768m
+          NODE_OPTIONS: --max-old-space-size=1536
+        run: |
+          nproc
+          free -h
+          /usr/bin/time -f 'elapsed_seconds=%e exit=%x peak_kib=%M' ./gradlew :app:bundleRelease --no-daemon --no-build-cache
+          test -s app/build/outputs/bundle/release/app-release.aab
