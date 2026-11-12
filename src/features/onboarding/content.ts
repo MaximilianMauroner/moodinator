@@ -22,7 +22,7 @@ export const onboardingPages: OnboardingPage[] = [
     id: "track",
     title: "Track Your Mood",
     subtitle: "Simple and intuitive",
-    description: "Each level is a weather sign, from sun at 0 to a storm at 10. Tap one to choose how you feel, or long-press for a detailed log with emotions, context, energy, and notes. 0 is best and 10 means you need the most support.",
+    description: "Touch the pad to choose your mood and energy, then tap Keep to save. You can add emotions, context, and a note when those fields are on. Tile modes also offer detailed entry with a long press. Mood 0 is best and 10 means you need the most support.",
     icon: "heart",
     accentColor: "#A84335",
     accentColorDark: "#F5A899",
