@@ -97,4 +97,3 @@ export function useMoodModals(onOpen?: () => void) {
   };
 }
 
-export default useMoodModals;

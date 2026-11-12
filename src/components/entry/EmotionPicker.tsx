@@ -356,4 +356,3 @@ export const EmotionPicker: React.FC<EmotionPickerProps> = ({
     );
 };
 
-export default EmotionPicker;

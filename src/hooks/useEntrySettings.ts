@@ -96,4 +96,3 @@ export function useEntrySettings() {
     };
 }
 
-export default useEntrySettings;

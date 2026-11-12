@@ -73,4 +73,3 @@ export function ActiveFilterChips() {
   );
 }
 
-export default ActiveFilterChips;

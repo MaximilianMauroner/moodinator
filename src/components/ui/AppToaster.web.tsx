@@ -35,4 +35,3 @@ export function AppToaster() {
   );
 }
 
-export default AppToaster;

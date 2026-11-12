@@ -201,4 +201,3 @@ export const moodService: MoodServiceInterface = {
   },
 };
 
-export default moodService;

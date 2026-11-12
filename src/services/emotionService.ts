@@ -185,4 +185,3 @@ export const emotionService: EmotionServiceInterface = {
   },
 };
 
-export default emotionService;

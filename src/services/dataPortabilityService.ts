@@ -238,4 +238,3 @@ export const dataPortabilityService = {
   },
 };
 
-export default dataPortabilityService;

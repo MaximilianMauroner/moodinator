@@ -234,4 +234,3 @@ export const EnergySlider: React.FC<EnergySliderProps> = ({ value, onChange }) =
     );
 };
 
-export default EnergySlider;

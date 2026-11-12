@@ -74,4 +74,3 @@ export function useMoodItemActions({
   };
 }
 
-export default useMoodItemActions;

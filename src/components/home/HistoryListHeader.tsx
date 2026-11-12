@@ -47,4 +47,3 @@ export function HistoryListHeader({ title, moodCount, countSuffix, countTestID }
   );
 }
 
-export default HistoryListHeader;

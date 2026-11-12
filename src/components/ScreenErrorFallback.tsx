@@ -155,4 +155,3 @@ export function createScreenErrorFallback(screenTitle: string) {
   };
 }
 
-export default ScreenErrorFallback;

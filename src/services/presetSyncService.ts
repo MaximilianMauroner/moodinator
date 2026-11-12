@@ -183,4 +183,3 @@ export const presetSyncService = {
   },
 };
 
-export default presetSyncService;

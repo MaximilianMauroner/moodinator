@@ -100,4 +100,3 @@ export function HomeHeader() {
 	);
 }
 
-export default HomeHeader;
