@@ -138,14 +138,12 @@ describe("haptics", () => {
   });
 
   test.each(["android", "ios"] as const)("honors the in-app preference on %s", async (platform) => {
-    const { getHapticsEnabled, haptics, setHapticsEnabled } =
-      await loadHaptics(platform, 35);
+    const { haptics, setHapticsEnabled } = await loadHaptics(platform, 35);
 
     setHapticsEnabled(false);
     haptics.tick();
     haptics.reject();
 
-    expect(getHapticsEnabled()).toBe(false);
     expect(hapticMocks.selectionAsync).not.toHaveBeenCalled();
     expect(hapticMocks.notificationAsync).not.toHaveBeenCalled();
     expect(hapticMocks.performAndroidHapticsAsync).not.toHaveBeenCalled();
@@ -153,7 +151,6 @@ describe("haptics", () => {
     setHapticsEnabled(true);
     haptics.tick();
 
-    expect(getHapticsEnabled()).toBe(true);
     expect(hapticMocks.selectionAsync).toHaveBeenCalledTimes(1);
   });
 

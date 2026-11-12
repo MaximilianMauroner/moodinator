@@ -330,13 +330,6 @@ export async function cleanupOldBackups(createdBackupUri?: string): Promise<numb
 }
 
 /**
- * Gets the timestamp of the last backup (exported for background task)
- */
-export async function getLastBackupTime(): Promise<number | null> {
-  return getLastBackupTimestamp();
-}
-
-/**
  * Gets information about existing backups
  */
 export async function getBackupInfo(): Promise<{

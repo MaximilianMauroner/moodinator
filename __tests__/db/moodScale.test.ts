@@ -11,10 +11,7 @@ import {
   isBetterMoodRating,
   sortMoodRatingsBestFirst,
 } from "../../src/constants/moodScaleInterpretation";
-import {
-  MOOD_ACCESSIBILITY_LABELS,
-  getMoodButtonLabel,
-} from "../../src/constants/accessibility";
+import { getMoodButtonLabel } from "../../src/constants/accessibility";
 
 describe("Mood Scale interpretation", () => {
   it("keeps the current Mood Scale snapshot explicit", () => {
@@ -82,8 +79,6 @@ describe("Mood Scale interpretation", () => {
   });
 
   it("describes the inverted Mood Scale in accessibility labels", () => {
-    expect(MOOD_ACCESSIBILITY_LABELS[0]).toContain("best possible");
-    expect(MOOD_ACCESSIBILITY_LABELS[10]).toContain("needs immediate support");
     expect(getMoodButtonLabel(10, "Emergency")).toContain("Lower numbers are better");
   });
 

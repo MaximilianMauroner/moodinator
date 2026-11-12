@@ -1,5 +1,3 @@
-import type { Emotion } from "@db/types";
-
 export type PresetListModelInput<T> = {
   values: T[];
   defaults: T[];
@@ -133,42 +131,4 @@ export function createPresetListModel<T>({
       return removeKeys(new Set([normalizePresetKey(label)]));
     },
   };
-}
-
-export function hasPresetValue(values: string[], candidate: string): boolean {
-  return createPresetListModel({
-    values,
-    defaults: [],
-    getLabel: (value) => value,
-  }).hasDuplicate(candidate);
-}
-
-export function hasEmotionPreset(emotions: Emotion[], candidate: string): boolean {
-  return createPresetListModel({
-    values: emotions,
-    defaults: [],
-    getLabel: (emotion) => emotion.name,
-  }).hasDuplicate(candidate);
-}
-
-export function toggleContextPreset(
-  contexts: string[],
-  defaultContext: string
-): string[] {
-  return createPresetListModel({
-    values: contexts,
-    defaults: [defaultContext],
-    getLabel: (value) => value,
-  }).toggleDefault(defaultContext);
-}
-
-export function toggleEmotionPreset(
-  emotions: Emotion[],
-  defaultEmotion: Emotion
-): Emotion[] {
-  return createPresetListModel({
-    values: emotions,
-    defaults: [defaultEmotion],
-    getLabel: (emotion) => emotion.name,
-  }).toggleDefault(defaultEmotion);
 }

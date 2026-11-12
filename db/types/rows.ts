@@ -49,14 +49,6 @@ export interface CountResult {
 }
 
 /**
- * Result from SQLite run operations
- */
-export interface RunResult {
-  changes: number;
-  lastInsertRowId: number;
-}
-
-/**
  * Raw emotion item that could be a string or object (for migration)
  */
 import type { EmotionEnergyBand } from "../../domain/entrySettings";
