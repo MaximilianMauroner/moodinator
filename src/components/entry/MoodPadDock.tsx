@@ -99,6 +99,7 @@ export function MoodPadDock({
   const label = draft
     ? `${getMoodRatingLabel(draft.mood)} ${draft.mood}, energy ${draft.energy}`
     : "How is it now?";
+  const keepLabel = draft ? `Keep ${label}` : "Touch the pad first";
   const suggested = draft
     ? suggestEmotions(draft.mood, draft.energy, emotionOptions)
     : [];
@@ -371,10 +372,8 @@ export function MoodPadDock({
             }}
             disabled={!draft || saving}
             accessibilityRole="button"
-            accessibilityState={{
-              disabled: !draft || saving,
-              busy: saving,
-            }}
+            accessibilityLabel={keepLabel}
+            accessibilityState={{ disabled: !draft || saving }}
             className="flex-1 items-center justify-center rounded-2xl px-3 py-3"
             style={{
               minHeight: 48,
@@ -392,7 +391,7 @@ export function MoodPadDock({
                 },
               ]}
             >
-              {draft ? `Keep ${label}` : "Touch the pad first"}
+              {keepLabel}
             </Text>
           </Pressable>
           {draft && (

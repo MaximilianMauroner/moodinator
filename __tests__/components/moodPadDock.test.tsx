@@ -72,6 +72,7 @@ afterEach(async () => {
 });
 it("saves nothing until Keep and keeps the note and details across view changes", async () => {
   expect(keepButton().props.disabled).toBe(true);
+  expect(keepButton().props.accessibilityLabel).toBe("Touch the pad first");
   expect(host("MoodPad").props.draft).toBeNull();
   await act(async () => host("MoodPad").props.onChange(6, 1));
   await act(async () => chip("Tired").props.onPress());
@@ -113,6 +114,7 @@ it("saves nothing until Keep and keeps the note and details across view changes"
     expect.any(Function),
   );
   expect(keepButton().props.disabled).toBe(true);
+  expect(keepButton().props.accessibilityLabel).toBe("Touch the pad first");
   expect(host("MoodPad").props.draft).toBeNull();
 });
 it("retains a failed draft, blocks repeated Keep and clears only after commit", async () => {
@@ -136,6 +138,7 @@ it("retains a failed draft, blocks repeated Keep and clears only after commit", 
     energy: 7,
   });
   expect(keepButton().props.disabled).toBe(false);
+  expect(keepButton().props.accessibilityLabel).toBe("Keep Okay 4, energy 7");
   await act(async () => keepButton().props.onPress());
   expect(onKeep).toHaveBeenCalledTimes(2);
   expect(host("MoodPad").props.draft).toBeNull();
