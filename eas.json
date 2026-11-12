@@ -50,13 +50,6 @@
       "android": {
         "buildType": "app-bundle"
       }
-    },
-    "nightly-apk": {
-      "extends": "nightly",
-      "android": {
-        "buildType": "apk"
-      },
-      "autoIncrement": false
     }
   }
 }

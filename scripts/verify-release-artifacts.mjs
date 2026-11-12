@@ -1,6 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync } from 'node:fs';
 import { releaseChildEnvironment } from './release-environment.mjs';
 
 const approvedCertificates = {
@@ -22,23 +21,11 @@ export function assertArtifactIdentity(actual, expected, app) {
   if (actual.certificate !== approvedCertificates[app]) throw new Error('Artifact does not use the approved upload certificate');
 }
 
-export function verifyReleaseArtifacts(apk, aab, expected, app) {
-  const sdk = process.env.ANDROID_HOME ?? process.env.ANDROID_SDK_ROOT;
+export function verifyReleaseArtifacts(aab, expected, app) {
   const bundletool = process.env.ANDROID_BUNDLETOOL_JAR;
-  if (!sdk || !bundletool || !existsSync(bundletool)) {
-    throw new Error('Set ANDROID_HOME and ANDROID_BUNDLETOOL_JAR for artifact verification');
+  if (!bundletool || !existsSync(bundletool)) {
+    throw new Error('Set ANDROID_BUNDLETOOL_JAR for artifact verification');
   }
-  const versions = readdirSync(join(sdk, 'build-tools'), { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && /^\d/.test(entry.name))
-    .map((entry) => entry.name).sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
-  if (!versions.length) throw new Error('Android SDK build-tools are missing');
-  const tools = join(sdk, 'build-tools', versions[0]);
-  const badging = output(join(tools, 'aapt'), ['dump', 'badging', apk]);
-  const match = badging.match(/package: name='([^']+)' versionCode='(\d+)' versionName='([^']*)'/);
-  if (!match) throw new Error('Could not read APK identity');
-  const apkSigner = output(join(tools, 'apksigner'), ['verify', '--print-certs', apk]);
-  const apkCertificate = apkSigner.match(/certificate SHA-256 digest:\s*([a-f0-9]+)/i)?.[1]?.toLowerCase();
-  assertArtifactIdentity({ package: match[1], versionCode: Number(match[2]), version: match[3], certificate: apkCertificate }, expected, app);
   const java = ['-Xmx512m', '-jar', bundletool];
   output('java', [...java, 'validate', `--bundle=${aab}`]);
   const value = (attribute) => output('java', [...java, 'dump', 'manifest', `--bundle=${aab}`, `--xpath=/manifest/@${attribute}`]);
@@ -48,5 +35,5 @@ export function verifyReleaseArtifacts(apk, aab, expected, app) {
   const aabCertificate = aabSigner.match(/SHA256:\s*([a-f0-9:]+)/i)?.[1]?.replaceAll(':', '').toLowerCase();
   assertArtifactIdentity({ package: value('package'), version: value('android:versionName'),
     versionCode: Number(value('android:versionCode')), certificate: aabCertificate }, expected, app);
-  console.log(`Verified APK and AAB: ${expected.version} (${expected.versionCode}), approved upload certificate`);
+  console.log(`Verified AAB: ${expected.version} (${expected.versionCode}), approved upload certificate`);
 }

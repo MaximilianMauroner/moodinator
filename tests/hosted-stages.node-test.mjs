@@ -79,7 +79,7 @@ test('artifact tools receive no credentials and uploader receives only the key p
     ANDROID_HOME: '/sdk', ANDROID_BUNDLETOOL_JAR: '/bundletool', NODE_OPTIONS: '--require=hostile' };
   const captures = [];
   const spawn = (program, args, options) => { captures.push(options.env); return { status: 0 }; };
-  verifyHostedArtifacts('/apk', '/aab', { version: '0.1.6', versionCode: 41 }, 'moodinator', env, spawn);
+  verifyHostedArtifacts('/aab', { version: '0.1.6', versionCode: 41 }, 'moodinator', env, spawn);
   uploadHostedInternal({ aabPath: '/aab', version: '0.1.6', versionCode: 41, keyPath: '/new-key' }, env, spawn);
   assert.deepEqual(captures, [
     { PATH: '/bin', ANDROID_HOME: '/sdk', ANDROID_BUNDLETOOL_JAR: '/bundletool' },

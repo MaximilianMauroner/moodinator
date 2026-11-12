@@ -1,6 +1,6 @@
 # GitHub-hosted Android nightly
 
-Moodinator builds an APK and AAB on a public `ubuntu-24.04` GitHub runner at
+Moodinator builds an AAB on a public `ubuntu-24.04` GitHub runner at
 midnight Europe/Vienna on Monday, Wednesday and Friday, including daylight-saving
 changes. Manual dispatch is
 available on `main` only. The EAS build job has a 90-minute limit, checks have 15 minutes, and publishing
@@ -104,9 +104,9 @@ fixture construction and historical transition compatibility.
 
 ## Artifacts and recovery
 
-Both artifacts must pass the existing package/version/versionCode/approved
+The AAB must pass the existing package/version/versionCode/approved
 certificate verification before upload to the fixed Play `internal` track.
-The workflow retains verified APK/AAB copies and sanitized `release.json` for
+The workflow retains a verified AAB copy and sanitized `release.json` for
 30 days, including verified bundles from a failed upload. Build evidence and final
 publish evidence have distinct artifact names containing both `run_id` and
 `run_attempt`. Immediately after reserve, the build runner uploads a separate
@@ -120,7 +120,7 @@ receipts fail closed and leave the ledger active for explicit reconciliation;
 there is no inferred identity or current-ledger fallback. The receipt is transfer
 evidence, not authoritative state. A failed receipt upload prevents EAS from
 starting and requires reconciliation if publish cannot obtain that receipt.
-The publisher rechecks artifacts against the reservation and
+The publisher rechecks the AAB against the reservation and
 approved certificates before using the Play key. Unverified build
 outputs and raw EAS logs are excluded. EAS logs remain private mode-0600 files
 until cleanup; they can contain credentials and must never become Actions output
