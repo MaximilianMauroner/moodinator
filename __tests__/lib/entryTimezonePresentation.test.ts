@@ -6,6 +6,7 @@ import {
   getEntryLocalDateParts,
   getEntryLocalDayKey,
   getEntryLocalTimeLabel,
+  getTimestampFromEntryLocalDateParts,
 } from "@/lib/entryTimezone";
 
 const timestamp = Date.parse("2026-03-31T23:30:00Z");
@@ -85,6 +86,72 @@ describe("recorded entry time presentation", () => {
       "Unknown date at Unknown time",
     );
     expect(getEntryLocalDateParts({ timestamp: Number.POSITIVE_INFINITY, utcOffsetMinutes: null })).toBeNull();
+  });
+
+  it("turns captured wall-clock parts back into the original instant", () => {
+    const samples = [
+      { timestamp: Date.parse("2026-03-31T23:30:00Z"), utcOffsetMinutes: -120 },
+      { timestamp: Date.parse("2026-03-31T23:30:00Z"), utcOffsetMinutes: 420 },
+      { timestamp: Date.parse("2026-03-31T23:30:00.250Z"), utcOffsetMinutes: -345 },
+      { timestamp: Date.parse("2026-03-08T07:30:00Z"), utcOffsetMinutes: 300 },
+    ];
+
+    for (const timezone of ["America/New_York", "Pacific/Kiritimati"]) {
+      process.env.TZ = timezone;
+      for (const entry of samples) {
+        const parts = getEntryLocalDateParts(entry);
+        expect(parts).not.toBeNull();
+        expect(
+          getTimestampFromEntryLocalDateParts(parts!, entry.utcOffsetMinutes),
+        ).toBe(entry.timestamp);
+      }
+    }
+  });
+
+  it("keeps a daylight-saving gap on the recorded offset instead of the device clock", () => {
+    const parts = {
+      year: 2026,
+      month: 2,
+      day: 8,
+      hour: 2,
+      minute: 30,
+      second: 0,
+      millisecond: 0,
+    };
+    const expected = Date.parse("2026-03-08T07:30:00Z");
+
+    process.env.TZ = "America/New_York";
+    expect(getTimestampFromEntryLocalDateParts(parts, 300)).toBe(expected);
+    process.env.TZ = "Pacific/Kiritimati";
+    expect(getTimestampFromEntryLocalDateParts(parts, 300)).toBe(expected);
+    expect(
+      getTimestampFromEntryLocalDateParts(
+        {
+          year: 2026,
+          month: 3,
+          day: 1,
+          hour: 1,
+          minute: 30,
+          second: 0,
+          millisecond: 0,
+        },
+        -120,
+      ),
+    ).toBe(Date.parse("2026-03-31T23:30:00Z"));
+    expect(
+      getTimestampFromEntryLocalDateParts(
+        {
+          year: 2026,
+          month: 9,
+          day: 8,
+          hour: 20,
+          minute: 45,
+          second: 0,
+          millisecond: 250,
+        },
+        210,
+      ),
+    ).toBe(Date.parse("2026-10-09T00:15:00.250Z"));
   });
 
   it("uses the same canonical labels for the history accessibility announcement", () => {

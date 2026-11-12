@@ -120,6 +120,43 @@ describe("shared insights analysis", () => {
       { x: 150, minY: 0, maxY: 120 },
     ]);
   });
+  it("joins consecutive days into one band and starts a new run after a gap", () => {
+    const geometry = trendGeometry([
+      { day: "2026-09-06", mean: 2, min: 0, max: 4, count: 2 },
+      { day: "2026-09-07", mean: 4, min: 2, max: 6, count: 2 },
+      { day: "2026-09-08", mean: null, min: null, max: null, count: 0 },
+      { day: "2026-09-09", mean: 8, min: 6, max: 10, count: 2 },
+    ]);
+    expect(geometry.lines).toEqual([
+      "M0.00,24.00 L100.00,48.00",
+      "M300.00,96.00",
+    ]);
+    expect(geometry.bands).toEqual([
+      "M0.00,0.00 L100.00,24.00 L100.00,72.00 L0.00,48.00 Z",
+      "M300.00,72.00 L300.00,120.00 Z",
+    ]);
+    expect(geometry.whiskers).toEqual([{ x: 300, minY: 72, maxY: 120 }]);
+    expect(geometry.dots.map((dot) => [dot.x, dot.y, dot.mood])).toEqual([
+      [0, 24, 2],
+      [100, 48, 4],
+      [300, 96, 8],
+    ]);
+  });
+  it("scales the chart to the requested width and height", () => {
+    const geometry = trendGeometry(
+      [
+        { day: "2026-09-06", mean: 0, min: 0, max: 0, count: 1 },
+        { day: "2026-09-07", mean: 10, min: 10, max: 10, count: 1 },
+      ],
+      100,
+      40,
+    );
+    expect(geometry.lines).toEqual(["M0.00,0.00 L100.00,40.00"]);
+    expect(geometry.dots).toEqual([
+      { x: 0, y: 0, mood: 0 },
+      { x: 100, y: 40, mood: 10 },
+    ]);
+  });
 
   it("weights daypart averages by entries rather than weekdays", () => {
     const parts = daypartMeans(rhythm([
