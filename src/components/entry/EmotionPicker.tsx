@@ -21,15 +21,13 @@ interface EmotionPickerProps {
     selected: Emotion[];
     onChange: (emotions: Emotion[]) => void;
     maxSelections?: number;
+    bandOrder?: readonly EmotionEnergyBand[];
     /** Control shown at the end of the selection line, for example Add. */
     action?: React.ReactNode;
 }
 
-// Chips are drawn at 36 and the press target is extended to 48 with hitSlop, so
-// the layout stays dense without shrinking the touch area. The 6dp of slop stays
-// inside the 8dp row gap, so neighbouring targets never overlap.
-const CHIP_HEIGHT = 36;
-const CHIP_HIT_SLOP = { top: 6, bottom: 6, left: 3, right: 3 };
+const CHIP_HEIGHT = 44;
+const CHIP_HIT_SLOP = { top: 0, bottom: 0, left: 3, right: 3 };
 const DISABLED_OPACITY = 0.28;
 
 type EmotionGroup = EmotionEnergyBand;
@@ -152,7 +150,7 @@ const EmotionChip: React.FC<EmotionChipProps> = ({
                         opacity: isSelected ? 1 : 0,
                     }}
                 />
-                <Text className="text-sm font-medium" style={{ color: textColor }}>
+                <Text maxFontSizeMultiplier={1.3} className="text-sm font-medium" style={{ color: textColor }}>
                     {emotion.name}
                 </Text>
             </Pressable>
@@ -184,14 +182,15 @@ const SelectedChip: React.FC<{
                 hitSlop={CHIP_HIT_SLOP}
                 testID={`emotion-remove-${emotion.name}`}
                 className="flex-row items-center justify-center px-2.5 rounded-[9px] gap-1.5"
-                style={{ minHeight: 28, backgroundColor: bgColor }}
+                style={{ minHeight: 44, backgroundColor: bgColor }}
                 accessibilityRole="button"
                 accessibilityLabel={`Remove ${emotion.name}`}
             >
-                <Text className="text-xs font-semibold" style={{ color: textColor }}>
+                <Text maxFontSizeMultiplier={1.3} className="text-xs font-semibold" style={{ color: textColor }}>
                     {emotion.name}
                 </Text>
                 <Text
+                    maxFontSizeMultiplier={1.3}
                     className="text-sm"
                     style={{ color: textColor, lineHeight: 14 }}
                 >
@@ -207,6 +206,7 @@ export const EmotionPicker: React.FC<EmotionPickerProps> = ({
     selected,
     onChange,
     maxSelections = 3,
+    bandOrder = GROUP_ORDER,
     action,
 }) => {
     const { isDark, getCategoryColors } = useThemeColors();
@@ -297,11 +297,12 @@ export const EmotionPicker: React.FC<EmotionPickerProps> = ({
                         })}
                     </ScrollView>
                 ) : (
-                    <Text className="flex-1 text-sm" style={{ color: labelColor }} accessible={false}>
+                    <Text maxFontSizeMultiplier={1.3} className="flex-1 text-sm" style={{ color: labelColor }} accessible={false}>
                         Optional
                     </Text>
                 )}
                 <Text
+                    maxFontSizeMultiplier={1.3}
                     className="text-sm"
                     style={{ color: labelColor }}
                     accessibilityLabel={`Emotions are optional. ${selected.length} of ${maxSelections} selected.`}
@@ -312,7 +313,7 @@ export const EmotionPicker: React.FC<EmotionPickerProps> = ({
             </View>
 
             {/* Energy bands. Colour still carries valence, so both axes read at once. */}
-            {GROUP_ORDER.map((group) => {
+            {bandOrder.map((group) => {
                 const list = grouped[group];
                 if (!list.length) return null;
 
@@ -325,6 +326,7 @@ export const EmotionPicker: React.FC<EmotionPickerProps> = ({
                                 dimColor={meterDimColor}
                             />
                             <Text
+                    maxFontSizeMultiplier={1.3}
                                 style={{
                                     fontSize: 11.5,
                                     fontWeight: "700",
@@ -335,7 +337,7 @@ export const EmotionPicker: React.FC<EmotionPickerProps> = ({
                             >
                                 {GROUP_LABELS[group]}
                             </Text>
-                            <Text style={{ fontSize: 12, color: labelColor }}>
+                            <Text maxFontSizeMultiplier={1.3} style={{ fontSize: 12, color: labelColor }}>
                                 {list.length}
                             </Text>
                             <View

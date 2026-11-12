@@ -14,7 +14,7 @@ const {
   requirePreparedSourceSha,
 } = require("./native-qa-common");
 const { runMaestro: runMaestroWithDiagnostics } = require("./native-qa-runner");
-const { runAdb, returnFromDataSettings, selectDownloadFixture, waitForNode, waitForNodeAndTap } = require("./native-ui");
+const { runAdb, selectMoodPadCell, returnFromDataSettings, selectDownloadFixture, waitForNode, waitForNodeAndTap } = require("./native-ui");
 
 const appId = "com.lab4code.moodinator.qa";
 const root = path.resolve(__dirname, "..");
@@ -212,8 +212,16 @@ async function captureMatrixScreens(serial, outputDirectory, stateName, fixtureC
   };
   // verifyFabricatedFixture leaves History selected; return to Today first.
   await waitForNodeAndTap(serial, { contentDescription: "Today tab, log your mood" });
-  await waitForNode(serial, { contentDescription: "Mood Rating 5 of 10, Neutral. Lower numbers are better." }, { timeoutMs: 15000 });
+  await waitForNode(serial, { testId: "mood-pad" }, { timeoutMs: 15000 });
   capture("today");
+  await selectMoodPadCell(serial, 6, 1);
+  await waitForNode(serial, { text: "Keep Low 6, energy 1" });
+  capture("today-draft");
+  await waitForNodeAndTap(serial, { text: "More" });
+  await waitForNode(serial, { text: "Add detail" });
+  capture("today-more");
+  await waitForNodeAndTap(serial, { text: "Done" });
+  await waitForNodeAndTap(serial, { text: "Clear" });
   await waitForNodeAndTap(serial, { contentDescription: "History tab, view past days and months" });
   await waitForNode(serial, { testId: "history-count" }, { timeoutMs: 15000 });
   // The forecast reads its own range; wait until it has loaded.

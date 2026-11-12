@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useRef } from "react";
-import { Alert, Platform, RefreshControl, ScrollView, Text, View } from "react-native";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Alert, Keyboard, KeyboardAvoidingView, Platform, RefreshControl, ScrollView, Text, View } from "react-native";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useFocusEffect, useRouter } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { createScreenErrorFallback } from "@/components/ScreenErrorFallback";
@@ -14,6 +14,7 @@ import {
   QuickEntryDetailModal,
   MoodEntryFormValues,
 } from "@/components/MoodEntryModal";
+import { MoodPadDock } from "@/components/entry/MoodPadDock";
 import { WeatherMoodGrid } from "@/components/entry/WeatherMoodGrid";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ScreenBackgroundAccent } from "@/components/layout/ScreenBackgroundAccent";
@@ -53,6 +54,22 @@ function HomeScreenContent() {
   const { isDark, get } = useThemeColors();
   const router = useRouter();
   const tabBarHeight = useBottomTabBarHeight();
+  const insets = useSafeAreaInsets();
+  const [androidKeyboardHeight, setAndroidKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    const show = Keyboard.addListener("keyboardDidShow", (event) => {
+      setAndroidKeyboardHeight(event.endCoordinates.height);
+    });
+    const hide = Keyboard.addListener("keyboardDidHide", () => {
+      setAndroidKeyboardHeight(0);
+    });
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
 
   const refreshMoods = useMoodsStore((state) => state.refreshMoods);
   const createMood = useMoodsStore((state) => state.create);
@@ -116,11 +133,12 @@ function HomeScreenContent() {
     quickFields.emotions || quickFields.context || quickFields.energy || quickFields.notes;
 
   const handleMoodTap = useCallback(
-    (mood: number) =>
+    (mood: number, values?: MoodEntryFormValues, onKept?: () => void) =>
       keepMoodTap(mood, {
         state: tapStateRef.current,
         create: createMood,
-        afterCommit: [scrollToTop],
+        afterCommit: onKept ? [scrollToTop, onKept] : [scrollToTop],
+        values,
         offersDetail: offersDetailAfterKeep,
         openDetail: modals.setQuickMood,
         showUndoToast: (entry) =>
@@ -150,82 +168,100 @@ function HomeScreenContent() {
 
   // iOS draws the tab bar over the scene, so the dock pads for it there.
   const dockBottomPadding = 12 + (Platform.OS === "ios" ? tabBarHeight : 0);
+  // Android reports IME height without the bottom inset. The scene ends above the tabs.
+  const keyboardOverlap = androidKeyboardHeight > 0
+    ? Math.max(0, androidKeyboardHeight + insets.bottom - tabBarHeight)
+    : 0;
 
   return (
     <>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaView className="flex-1 bg-paper-100 dark:bg-paper-900" edges={["top", "left", "right"]}>
-          <ScreenBackgroundAccent density="compact" />
-          <ScrollView
-            ref={scrollRef}
-            style={{ flex: 1 }}
-            contentContainerStyle={{ paddingHorizontal: CONTENT_HORIZONTAL_PADDING, paddingTop: 16, paddingBottom: 16, gap: 18 }}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={handlePullToRefresh}
-                tintColor={getThemedColor("primary", isDark)}
-                colors={[getThemedColor("primary", isDark)]}
-                progressBackgroundColor={getThemedColor("surface", isDark)}
-              />
-            }
-          >
-            <HomeHeader />
-            {today.error && !latest ? (
-              <EmptyState
-                icon="warning-outline"
-                tone="coral"
-                title="Today's entries could not load"
-                description="Your local mood history is still on this device. Try loading it again."
-                actionLabel="Try Again"
-                onAction={today.reload}
-              />
-            ) : (
-              <TodayNow latest={latest} loaded={today.loaded} onOpen={modals.openDateModal} />
-            )}
-            <EarlierToday entries={earlier} onOpen={modals.openDateModal} onShowAll={showHistory} />
-            {today.error && latest ? (
-              <EmptyState
-                icon="warning-outline"
-                tone="coral"
-                title="Today's entries could not refresh"
-                description={today.error}
-                actionLabel="Try again"
-                onAction={today.reload}
-              />
-            ) : null}
-          </ScrollView>
-
-          <View
-            style={{
-              // The Detailed list always fills its cap, so a lower cap leaves room for today's entries.
-              maxHeight: entrySettings.showDetailedLabels ? "50%" : "65%",
-              flexShrink: 1,
-              backgroundColor: get("surface"),
-              borderTopLeftRadius: 24,
-              borderTopRightRadius: 24,
-              borderTopWidth: 1,
-              borderColor: get("border"),
-              paddingTop: 14,
-              paddingBottom: dockBottomPadding,
-            }}
-          >
-            <Text accessibilityRole="header" style={[typography.titleMd, { color: get("text"), fontSize: 18, lineHeight: 24, marginHorizontal: 20, marginBottom: 10 }]}>
-              How is it now?
-            </Text>
+          <KeyboardAvoidingView style={{ flex: 1, marginBottom: keyboardOverlap }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+            <ScreenBackgroundAccent density="compact" />
             <ScrollView
-              style={{ flexGrow: 0, flexShrink: 1 }}
-              contentContainerStyle={{ paddingHorizontal: 12 }}
-              showsVerticalScrollIndicator
-              scrollIndicatorInsets={{ right: 0 }}
+              ref={scrollRef}
+              style={{ flex: 1 }}
+              contentContainerStyle={{ paddingHorizontal: CONTENT_HORIZONTAL_PADDING, paddingTop: 16, paddingBottom: 16, gap: 18 }}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={handlePullToRefresh}
+                  tintColor={getThemedColor("primary", isDark)}
+                  colors={[getThemedColor("primary", isDark)]}
+                  progressBackgroundColor={getThemedColor("surface", isDark)}
+                />
+              }
             >
-              {entrySettings.showDetailedLabels ? (
-                <DetailedMoodButtonSelector onMoodPress={handleMoodTap} onLongPress={modals.handleLongPress} />
+              <HomeHeader />
+              {today.error && !latest ? (
+                <EmptyState
+                  icon="warning-outline"
+                  tone="coral"
+                  title="Today's entries could not load"
+                  description="Your local mood history is still on this device. Try loading it again."
+                  actionLabel="Try Again"
+                  onAction={today.reload}
+                />
               ) : (
-                <WeatherMoodGrid size="dock" onPress={handleMoodTap} onLongPress={modals.handleLongPress} />
+                <TodayNow latest={latest} loaded={today.loaded} onOpen={modals.openDateModal} />
               )}
+              <EarlierToday entries={earlier} onOpen={modals.openDateModal} onShowAll={showHistory} />
+              {today.error && latest ? (
+                <EmptyState
+                  icon="warning-outline"
+                  tone="coral"
+                  title="Today's entries could not refresh"
+                  description={today.error}
+                  actionLabel="Try again"
+                  onAction={today.reload}
+                />
+              ) : null}
             </ScrollView>
-          </View>
+
+            <View
+              style={{
+                // The Detailed list always fills its cap, so a lower cap leaves room for today's entries.
+                maxHeight: keyboardOverlap > 0 ? "100%" : entrySettings.showDetailedLabels ? "50%" : "65%",
+                flexShrink: 1,
+                backgroundColor: get("surface"),
+                borderTopLeftRadius: 24,
+                borderTopRightRadius: 24,
+                borderTopWidth: 1,
+                borderColor: get("border"),
+                paddingTop: 14,
+                paddingBottom: dockBottomPadding,
+              }}
+            >
+              {quickFields.energy && !entrySettings.showDetailedLabels ? (
+                <MoodPadDock
+                  fieldConfig={quickFields}
+                  emotionOptions={entrySettings.emotionOptions}
+                  contextOptions={entrySettings.contextOptions}
+                  latestContext={latest?.contextTags[0]}
+                  onKeep={(values, onKept) => handleMoodTap(values.mood, values, onKept)}
+                />
+              ) : (
+                <>
+                  <Text accessibilityRole="header" style={[typography.titleMd, { color: get("text"), fontSize: 18, lineHeight: 24, marginHorizontal: 20, marginBottom: 10 }]}>
+                    How is it now?
+                  </Text>
+                  <ScrollView
+                    style={{ flexGrow: 0, flexShrink: 1 }}
+                    contentContainerStyle={{ paddingHorizontal: 12 }}
+                    showsVerticalScrollIndicator
+                    scrollIndicatorInsets={{ right: 0 }}
+                  >
+                    {entrySettings.showDetailedLabels ? (
+                      <DetailedMoodButtonSelector onMoodPress={handleMoodTap} onLongPress={modals.handleLongPress} />
+                    ) : (
+                      <WeatherMoodGrid size="dock" onPress={handleMoodTap} onLongPress={modals.handleLongPress} />
+                    )}
+                  </ScrollView>
+                </>
+              )}
+            </View>
+          </KeyboardAvoidingView>
         </SafeAreaView>
       </GestureHandlerRootView>
 

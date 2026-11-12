@@ -1,46 +1,40 @@
 appId: com.lab4code.moodinator.qa
 name: Isolated Android entry lifecycle
 ---
-# Destructive only to the separately installed QA app. Use bun run qa:smoke.
+# Run only with the isolated QA app.
 - launchApp:
     clearState: true
 - runFlow: flows/onboarding.yaml
-# Exercise the one-tap path before the existing detailed-entry journey.
-# The tap opens detail and saves only on Done, so Close leaves the fixture
-# count at one after the detailed entry below.
-- tapOn: "Mood Rating 5 of 10, Neutral. Lower numbers are better."
-- assertVisible: "Add detail"
-- tapOn: "Close Add detail"
+- tapOn:
+    id: "open-settings"
+- tapOn: "Quick Entry"
+- tapOn: "Notes"
+- back
+- back
+- assertVisible: "Touch the pad first"
+- tapOn:
+    id: "mood-pad"
+- tapOn: "Clear"
 - assertVisible: "No check-in yet today"
-- longPressOn: "Mood Rating 5 of 10, Neutral. Lower numbers are better."
-- assertVisible: "(?i)Emotions"
+- tapOn:
+    id: "mood-pad"
+- tapOn: "More"
+- assertVisible: "Add detail"
 - scrollUntilVisible:
     element:
       id: "emotion-option-Happy"
     direction: DOWN
 - tapOn:
     id: "emotion-option-Happy"
-- tapOn: "Next step"
-- assertVisible: "(?i)Any more context[?]"
-- scrollUntilVisible:
-    element:
-      id: "energy-level-6"
-    direction: DOWN
+- tapOn: "Done"
+- assertVisible: "No check-in yet today"
+- tapOn: "Note"
 - tapOn:
-    id: "energy-level-6"
-- scrollUntilVisible:
-    element:
-      text: "Average · 6/10"
-    direction: DOWN
-- scrollUntilVisible:
-    element:
-      id: "entry-notes"
-    direction: DOWN
-- tapOn:
-    id: "entry-notes"
+    id: "mood-pad-note"
 - inputText: "QA smoke original note"
 - hideKeyboard
-- tapOn: "Save entry"
+- tapOn:
+    id: "mood-pad-keep"
 - tapOn: "History tab, view past days and months"
 - assertVisible:
     id: "mood-entry-actions-.*"
@@ -59,7 +53,7 @@ name: Isolated Android entry lifecycle
 - tapOn: "Next step"
 - scrollUntilVisible:
     element:
-      text: "Average · 6/10"
+      text: "Average · 5/10"
     direction: DOWN
 - scrollUntilVisible:
     element:

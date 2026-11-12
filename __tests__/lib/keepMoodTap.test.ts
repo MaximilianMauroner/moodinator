@@ -175,3 +175,50 @@ describe("delayed support flow ownership", () => {
     expect(deps.showUndoToast).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("One pad Keep", () => {
+  const values = {
+    mood: 6, energy: 1, emotions: [{ name: "Tired", category: "neutral" as const }],
+    contextTags: ["Home"], note: "A slow evening", basedOnEntryId: null,
+  };
+
+  it("commits the full draft before clearing it and shows Undo without opening detail", async () => {
+    const clearDraft = vi.fn();
+    const deps = setup({ values, afterCommit: [clearDraft] });
+    await keepMoodTap(values.mood, deps);
+    expect(deps.create).toHaveBeenCalledExactlyOnceWith(values);
+    expect(clearDraft).toHaveBeenCalledTimes(1);
+    expect(deps.showUndoToast).toHaveBeenCalledTimes(1);
+    expect(deps.openDetail).not.toHaveBeenCalled();
+    expect(deps.feedback.commit).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserves the draft on failure and accepts a retry", async () => {
+    const clearDraft = vi.fn();
+    const deps = setup({ values, afterCommit: [clearDraft], create: vi.fn().mockRejectedValueOnce(new Error("disk full")).mockResolvedValueOnce(createMockMoodEntry({ mood: 6 })) });
+    await keepMoodTap(values.mood, deps);
+    expect(clearDraft).not.toHaveBeenCalled();
+    expect(deps.onSaveError).toHaveBeenCalledTimes(1);
+    await keepMoodTap(values.mood, deps);
+    expect(clearDraft).toHaveBeenCalledTimes(1);
+    expect(deps.showUndoToast).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores concurrent Keep and saves severe draft details before support", async () => {
+    vi.useFakeTimers();
+    let finish!: (entry: MoodEntry) => void;
+    const deps = setup({ values: { ...values, mood: 10 }, create: vi.fn(() => new Promise<MoodEntry>((resolve) => { finish = resolve; })) });
+    const first = keepMoodTap(10, deps);
+    await keepMoodTap(10, deps);
+    expect(deps.create).toHaveBeenCalledTimes(1);
+    expect(deps.showSupport).not.toHaveBeenCalled();
+    finish(createMockMoodEntry({ mood: 10 }));
+    await first;
+    expect(deps.create).toHaveBeenCalledWith(expect.objectContaining({ energy: 1, note: values.note, mood: 10 }));
+    vi.advanceTimersByTime(SUPPORT_SHEET_DELAY_MS);
+    vi.mocked(deps.showSupport).mock.calls[0]![0]();
+    vi.advanceTimersByTime(SUPPORT_HANDOFF_MS);
+    expect(deps.showUndoToast).toHaveBeenCalledTimes(1);
+    expect(deps.openDetail).not.toHaveBeenCalled();
+  });
+});

@@ -60,6 +60,7 @@ const {
   findNodeByText,
   nodeMatches,
   nodeCenter,
+  moodPadCellPoint,
   parseGfxInfo,
   parseMemInfo,
   parseUiHierarchy,
@@ -2315,4 +2316,14 @@ test("timezone fixture expectation uses its nonzero half-hour recorded offset", 
     ),
     true,
   );
+});
+
+
+test("pad automation selects the requested cell on either energy edge", () => {
+  const pad = { bounds: "[10,20][230,130]" };
+  assert.deepEqual(moodPadCellPoint(pad, 0, 10), { x: 20, y: 25 });
+  assert.deepEqual(moodPadCellPoint(pad, 10, 0), { x: 220, y: 125 });
+  assert.deepEqual(moodPadCellPoint(pad, 6, 1), { x: 140, y: 115 });
+  assert.throws(() => moodPadCellPoint(pad, 11, 1), /whole numbers/);
+  assert.throws(() => moodPadCellPoint({ bounds: "[0,0][0,0]" }, 5, 5), /usable bounds/);
 });

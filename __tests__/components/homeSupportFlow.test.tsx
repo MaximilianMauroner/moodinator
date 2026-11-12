@@ -8,6 +8,7 @@ import { toastService } from "@/services/toastService";
 
 const mocks = vi.hoisted(() => ({
   detailedLabels: true,
+  energy: false,
   blur: undefined as (() => void) | undefined,
   support: vi.fn<(options: { onDecline?: () => void }) => void>(),
   store: {
@@ -24,10 +25,12 @@ vi.mock("expo-router", () => ({
   useFocusEffect: (effect: () => (() => void) | void) => { mocks.blur = effect() || undefined; },
 }));
 vi.mock("react-native", () => ({
-  View: "View", Pressable: "Pressable", RefreshControl: "RefreshControl", ScrollView: "ScrollView", Text: "Text",
+  KeyboardAvoidingView: "KeyboardAvoidingView", View: "View", Pressable: "Pressable", RefreshControl: "RefreshControl", ScrollView: "ScrollView", Text: "Text",
   Alert: { alert: vi.fn() },
+  Keyboard: { addListener: vi.fn(() => ({ remove: vi.fn() })) },
   Platform: { OS: "android", select: (values: Record<string, unknown>) => values.android ?? values.default },
 }));
+vi.mock("@/components/entry/MoodPadDock", () => ({ MoodPadDock: "MoodPadDock" }));
 vi.mock("@/components/entry/WeatherMoodGrid", () => ({ WeatherMoodGrid: "WeatherPicker" }));
 vi.mock("@expo/vector-icons", () => ({ Ionicons: "Ionicons" }));
 vi.mock("@react-navigation/bottom-tabs", () => ({ useBottomTabBarHeight: () => 56 }));
@@ -57,8 +60,8 @@ vi.mock("@/shared/state/moodsStore", () => ({
 vi.mock("@/hooks/useEntrySettings", () => ({
   useEntrySettings: () => ({
     showDetailedLabels: mocks.detailedLabels,
-    quickEntryFieldConfig: { emotions: true, context: false, energy: false, notes: false },
-    detailedFieldConfig: { emotions: true, context: false, energy: false, notes: false },
+    quickEntryFieldConfig: { emotions: true, context: false, energy: mocks.energy, notes: false },
+    detailedFieldConfig: { emotions: true, context: false, energy: mocks.energy, notes: false },
     emotionOptions: [], contextOptions: [], createEmotionOption: vi.fn(), createContextOption: vi.fn(),
   }),
 }));
@@ -78,6 +81,7 @@ beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   vi.useFakeTimers();
   mocks.detailedLabels = true;
+  mocks.energy = false;
   mocks.store.create.mockImplementation(async (input) => createMockMoodEntry({
     id: mocks.store.create.mock.calls.length, mood: input.mood,
   }));
@@ -157,4 +161,23 @@ it("does not resume an old severe follow-up after Home loses focus", async () =>
   });
   expect(host("QuickDetail").props.visible).toBe(false);
   expect(toastService.showKeptMood).not.toHaveBeenCalled();
+});
+
+
+it("uses the pad only with energy on and detailed labels off, and keeps through the shared save path", async () => {
+  mocks.energy = true;
+  mocks.detailedLabels = false;
+  await act(async () => { renderer = create(<HomeScreen />); });
+  expect(renderer.root.findAll((node) => node.type === "WeatherPicker")).toHaveLength(0);
+  const onKept = vi.fn();
+  await act(async () => host("MoodPadDock").props.onKeep({
+    mood: 6, energy: 1, emotions: [], contextTags: ["Home"], note: "Rest", basedOnEntryId: null,
+  }, onKept));
+  expect(mocks.store.create).toHaveBeenCalledWith(expect.objectContaining({ mood: 6, energy: 1, note: "Rest" }));
+  expect(onKept).toHaveBeenCalledTimes(1);
+  expect(toastService.showKeptMood).toHaveBeenCalledTimes(1);
+  const undo = vi.mocked(toastService.showKeptMood).mock.calls[0]![1]!;
+  await undo();
+  expect(mocks.store.remove).toHaveBeenCalledTimes(1);
+  expect(host("QuickDetail").props.visible).toBe(false);
 });

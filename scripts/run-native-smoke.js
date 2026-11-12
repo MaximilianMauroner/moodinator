@@ -69,7 +69,7 @@ async function main(argv = process.argv.slice(2)) {
           captureUtcOffsetMinutes: true,
           emotions: [{ name: "Happy", category: "positive" }],
           contextTags: [],
-          energy: 6,
+          energy: 5,
           moodScale: { version: 1, min: 0, max: 10, lowerIsBetter: true },
         },
         waitOptions: {
