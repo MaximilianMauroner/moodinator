@@ -1,5 +1,5 @@
 import type { MoodEntry, MoodEntryInput } from "@db/types";
-import { createMoodOnlyEntryValues } from "@/components/entry/moodEntryDraft";
+import { createMoodOnlyEntryValues, type MoodEntryFormValues } from "@/components/entry/moodEntryDraft";
 import { shouldOfferCrisisSupport } from "./crisisSupport";
 import { commitThenRunPostCommitEffects, getMoodEntryPersistenceValues } from "./moodEntryPersistence";
 
@@ -33,6 +33,7 @@ export type KeepMoodTapDeps = {
   afterCommit: readonly (() => void)[];
   /** True when any quick-entry field is on. */
   offersDetail: boolean;
+  values?: MoodEntryFormValues;
   /** Opens the detail sheet for the tapped mood; the sheet saves on Done. */
   openDetail: (mood: number) => void;
   showUndoToast: (entry: MoodEntry) => void;
@@ -59,14 +60,15 @@ export async function keepMoodTap(mood: number, deps: KeepMoodTapDeps): Promise<
   };
 
   const severe = shouldOfferCrisisSupport(mood);
+  const opensDetail = deps.offersDetail && !severe && !deps.values;
   let followUp: () => void;
-  if (deps.offersDetail && !severe) {
+  if (opensDetail) {
     followUp = () => deps.openDetail(mood);
   } else {
     let entry: MoodEntry;
     try {
       entry = await commitThenRunPostCommitEffects(
-        () => deps.create(getMoodEntryPersistenceValues(createMoodOnlyEntryValues(mood))),
+        () => deps.create(getMoodEntryPersistenceValues(deps.values ?? createMoodOnlyEntryValues(mood))),
         deps.afterCommit,
       );
     } catch (error) {
@@ -111,7 +113,7 @@ export async function keepMoodTap(mood: number, deps: KeepMoodTapDeps): Promise<
     return;
   }
 
-  if (!deps.offersDetail) deps.feedback.commit();
+  if (!opensDetail) deps.feedback.commit();
   try {
     continueAfterKeep();
   } finally {
