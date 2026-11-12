@@ -87,9 +87,9 @@ function evidence(env, record) {
   writeFileSync(join(directory, 'release.json'), `${JSON.stringify({ app: 'moodinator', ...record }, null, 2)}\n`);
 }
 
-export function verifyHostedArtifacts(apk, aab, expected, app, env = process.env, spawn = spawnSync) {
+export function verifyHostedArtifacts(aab, expected, app, env = process.env, spawn = spawnSync) {
   if (app !== 'moodinator') throw new Error('Invalid artifact app');
-  const result = spawn(process.execPath, [fileURLToPath(import.meta.url), 'verify', apk, aab, JSON.stringify(expected)], {
+  const result = spawn(process.execPath, [fileURLToPath(import.meta.url), 'verify', aab, JSON.stringify(expected)], {
     cwd: root, env: toolEnvironment(env), encoding: 'utf8', timeout: 120000,
   });
   if (result.error || result.status !== 0) throw new Error('Artifact verification failed');
@@ -163,10 +163,9 @@ export async function publishHostedRelease(env = process.env, effects = services
   try {
     if (env.RELEASE_BUILD_RESULT === 'success') {
       const directory = join(artifactsDirectory(env), 'verified');
-      const apk = join(directory, `moodinator-${reservation.version}.apk`);
       const aab = join(directory, `moodinator-${reservation.version}.aab`);
       stage = 'artifact-verify';
-      effects.verify(apk, aab, { package: 'com.lab4code.moodinator', version: reservation.version, versionCode: reservation.versionCode }, 'moodinator', env);
+      effects.verify(aab, { package: 'com.lab4code.moodinator', version: reservation.version, versionCode: reservation.versionCode }, 'moodinator', env);
       stage = 'play-upload';
       keyPath = effects.prepareKey(env);
       await effects.upload({ app: 'moodinator', aabPath: aab, version: reservation.version, versionCode: reservation.versionCode, keyPath }, env);
@@ -194,11 +193,11 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     if (process.argv[2] === 'reserve') reserveHostedRelease();
     else if (process.argv[2] === 'publish') await publishHostedRelease();
     else if (process.argv[2] === 'verify') {
-      const [apk, aab, encoded] = process.argv.slice(3);
+      const [aab, encoded] = process.argv.slice(3);
       const expected = JSON.parse(encoded);
       releaseIdentity(expected.version, expected.versionCode);
       if (expected.package !== 'com.lab4code.moodinator') throw new Error('Invalid artifact package');
-      verifyReleaseArtifacts(apk, aab, expected, 'moodinator');
+      verifyReleaseArtifacts(aab, expected, 'moodinator');
     }
     else throw new Error('Expected reserve or publish');
   } catch (error) { console.error(error.message); process.exitCode = 1; }

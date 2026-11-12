@@ -119,7 +119,7 @@ test('bad certificates are never retained or uploaded; upload failure retains ve
   for (const options of [{ verifyFailure: true }, { uploadFailure: true }]) {
     const { calls, records, error } = await release(options);
     assert.ok(error);
-    assert.equal(calls.filter(([kind]) => kind === 'copy').length, options.verifyFailure ? 0 : 2);
+    assert.equal(calls.filter(([kind]) => kind === 'copy').length, options.verifyFailure ? 0 : 1);
     if (options.verifyFailure) assert.equal(calls.some(([kind]) => kind === 'upload'), false);
     assert.equal(records.at(-1).status, 'failed');
     assert.deepEqual(calls.filter(([kind, action]) => kind === 'ledger' && action === 'finish'), [['ledger', 'finish', 'reservation', 'failed']]);
@@ -132,7 +132,10 @@ test('hosted build uses its checked persisted identity without project checks, l
   assert.equal(calls.some(([kind]) => ['pnpm', 'ledger', 'upload'].includes(kind)), false);
   assert.equal(records.at(-1).status, 'built');
   assert.equal(records.at(-1).sha, 'a'.repeat(40));
-  assert.equal(calls.filter(([kind]) => kind === 'eas').length, 2);
+  const builds = calls.filter(([kind]) => kind === 'eas');
+  assert.equal(builds.length, 1);
+  assert.ok(builds[0].includes('nightly'));
+  assert.ok(builds[0].at(-1).endsWith('.aab'));
 });
 
 test('actual dependency and EAS child calls receive only their operation credentials', async () => {

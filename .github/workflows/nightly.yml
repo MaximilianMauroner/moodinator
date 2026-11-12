@@ -144,7 +144,6 @@ jobs:
         with:
           name: moodinator-internal-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            ${{ runner.temp }}/release-artifacts/verified/*.apk
             ${{ runner.temp }}/release-artifacts/verified/*.aab
             ${{ runner.temp }}/release-artifacts/release.json
           if-no-files-found: ignore

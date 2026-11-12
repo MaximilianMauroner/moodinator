@@ -51,12 +51,9 @@ function ledger(action, args = []) {
 
 function assertProfiles(sourceRoot) {
   const config = JSON.parse(readFileSync(join(sourceRoot, 'eas.json'), 'utf8'));
-  for (const name of ['nightly', 'nightly-apk']) {
-    if (!config.build?.[name] || config.build[name].autoIncrement !== false) {
-      throw new Error(`${name} must explicitly disable autoIncrement`);
-    }
+  if (config.build?.nightly?.autoIncrement !== false) {
+    throw new Error('nightly must explicitly disable autoIncrement');
   }
-
 }
 
 async function buildRelease() {
@@ -113,19 +110,17 @@ async function buildRelease() {
     const logs = join(homedir(), '.local/state/lab4code-releases/logs', app, reservation.id);
     mkdirSync(logs, { recursive: true, mode: 0o700 });
     chmodSync(logs, 0o700);
-    const apk = join(output, `${app}-${reservation.version}.apk`);
     const aab = join(output, `${app}-${reservation.version}.aab`);
-    stage = 'apk-build';
-    await runEas(['build', '--platform', 'android', '--profile', 'nightly-apk', '--local', '--non-interactive', '--freeze-credentials', '--output', apk], sourceRoot, join(logs, 'apk-build.log'));
     stage = 'aab-build';
     checkReleaseResources(sourceRoot);
+    const buildStarted = Date.now();
     await runEas(['build', '--platform', 'android', '--profile', 'nightly', '--local', '--non-interactive', '--freeze-credentials', '--output', aab], sourceRoot, join(logs, 'aab-build.log'));
+    console.log(`AAB build completed in ${Math.round((Date.now() - buildStarted) / 1000)} seconds`);
     stage = 'artifact-verify';
     const stamped = JSON.parse(readFileSync(join(sourceRoot, 'app.json'), 'utf8')).expo;
-    verifyReleaseArtifacts(apk, aab, { package: stamped.android.package, version: reservation.version, versionCode: reservation.versionCode }, app);
+    verifyReleaseArtifacts(aab, { package: stamped.android.package, version: reservation.version, versionCode: reservation.versionCode }, app);
     const verified = join(output, 'verified');
     mkdirSync(verified);
-    copyFileSync(apk, join(verified, `${app}-${reservation.version}.apk`));
     copyFileSync(aab, join(verified, `${app}-${reservation.version}.aab`));
     if (hosted) { outcome = 'built'; return; }
     stage = 'play-upload';
