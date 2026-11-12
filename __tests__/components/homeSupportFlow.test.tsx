@@ -27,6 +27,7 @@ vi.mock("expo-router", () => ({
 vi.mock("react-native", () => ({
   KeyboardAvoidingView: "KeyboardAvoidingView", View: "View", Pressable: "Pressable", RefreshControl: "RefreshControl", ScrollView: "ScrollView", Text: "Text",
   Alert: { alert: vi.fn() },
+  Keyboard: { addListener: vi.fn(() => ({ remove: vi.fn() })) },
   Platform: { OS: "android", select: (values: Record<string, unknown>) => values.android ?? values.default },
 }));
 vi.mock("@/components/entry/MoodPadDock", () => ({ MoodPadDock: "MoodPadDock" }));

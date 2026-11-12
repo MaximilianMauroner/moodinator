@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useRef } from "react";
-import { Alert, KeyboardAvoidingView, Platform, RefreshControl, ScrollView, Text, View } from "react-native";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Alert, Keyboard, KeyboardAvoidingView, Platform, RefreshControl, ScrollView, Text, View } from "react-native";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useFocusEffect, useRouter } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { createScreenErrorFallback } from "@/components/ScreenErrorFallback";
@@ -54,6 +54,22 @@ function HomeScreenContent() {
   const { isDark, get } = useThemeColors();
   const router = useRouter();
   const tabBarHeight = useBottomTabBarHeight();
+  const insets = useSafeAreaInsets();
+  const [androidKeyboardHeight, setAndroidKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    const show = Keyboard.addListener("keyboardDidShow", (event) => {
+      setAndroidKeyboardHeight(event.endCoordinates.height);
+    });
+    const hide = Keyboard.addListener("keyboardDidHide", () => {
+      setAndroidKeyboardHeight(0);
+    });
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
 
   const refreshMoods = useMoodsStore((state) => state.refreshMoods);
   const createMood = useMoodsStore((state) => state.create);
@@ -152,12 +168,16 @@ function HomeScreenContent() {
 
   // iOS draws the tab bar over the scene, so the dock pads for it there.
   const dockBottomPadding = 12 + (Platform.OS === "ios" ? tabBarHeight : 0);
+  // Android reports IME height without the bottom inset. The scene ends above the tabs.
+  const keyboardOverlap = androidKeyboardHeight > 0
+    ? Math.max(0, androidKeyboardHeight + insets.bottom - tabBarHeight)
+    : 0;
 
   return (
     <>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaView className="flex-1 bg-paper-100 dark:bg-paper-900" edges={["top", "left", "right"]}>
-          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+          <KeyboardAvoidingView style={{ flex: 1, marginBottom: keyboardOverlap }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
             <ScreenBackgroundAccent density="compact" />
             <ScrollView
               ref={scrollRef}
@@ -202,7 +222,7 @@ function HomeScreenContent() {
             <View
               style={{
                 // The Detailed list always fills its cap, so a lower cap leaves room for today's entries.
-                maxHeight: entrySettings.showDetailedLabels ? "50%" : "65%",
+                maxHeight: keyboardOverlap > 0 ? "100%" : entrySettings.showDetailedLabels ? "50%" : "65%",
                 flexShrink: 1,
                 backgroundColor: get("surface"),
                 borderTopLeftRadius: 24,
