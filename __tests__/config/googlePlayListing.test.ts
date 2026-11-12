@@ -80,7 +80,7 @@ describe("Google Play listing package", () => {
       join(assetRoot, "feature-graphic-1024x500.png")
     );
 
-    expect(icon).toMatchObject({ width: 512, height: 512, colorType: 6 });
+    expect(icon).toMatchObject({ width: 512, height: 512, colorType: 2 });
     expect(featureGraphic).toMatchObject({
       width: 1024,
       height: 500,

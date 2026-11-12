@@ -22,7 +22,7 @@
       "allowBackup": false,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/app-icons/adaptive-foreground.png",
-        "backgroundColor": "#9EAD7F"
+        "backgroundColor": "#2F4A39"
       },
       "package": "com.lab4code.moodinator",
       "permissions": [
