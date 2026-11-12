@@ -310,8 +310,9 @@ const ContextTagChip: React.FC<{
                 onPressOut={() => {
                     scale.value = withSpring(1, { damping: 18, stiffness: 380 });
                 }}
-                className="px-3 py-2 rounded-xl"
+                className="px-3 py-2 rounded-xl justify-center"
                 style={{
+                    minHeight: 44,
                     backgroundColor: bgColor,
                     borderWidth: 1,
                     borderColor: borderColor,
@@ -337,7 +338,7 @@ const ContextTagChip: React.FC<{
                         opacity: isSelected ? 1 : 0,
                     }}
                 />
-                <Text className="text-sm font-medium" style={{ color: textColor }}>
+                <Text maxFontSizeMultiplier={1.3} className="text-sm font-medium" style={{ color: textColor }}>
                     {label}
                 </Text>
             </Pressable>

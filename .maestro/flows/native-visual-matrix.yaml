@@ -4,4 +4,6 @@ name: Large-font theme and reduced-motion journey
 - launchApp:
     clearState: false
 - tapOn: "Today tab, log your mood"
-- assertVisible: "Mood Rating 5 of 10, Neutral. Lower numbers are better."
+- assertVisible:
+    id: "mood-pad"
+- assertVisible: "Touch the pad first"

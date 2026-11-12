@@ -70,6 +70,25 @@ function nodeCenter(node) {
   };
 }
 
+function moodPadCellPoint(node, mood, energy) {
+  const bounds = parseBounds(node.bounds);
+  if (!bounds) throw new Error("Mood pad did not expose usable bounds.");
+  if (![mood, energy].every((value) => Number.isInteger(value) && value >= 0 && value <= 10)) {
+    throw new Error("Mood and energy must be whole numbers from 0 to 10.");
+  }
+  return {
+    x: Math.round(bounds.left + (mood + 0.5) / 11 * (bounds.right - bounds.left)),
+    y: Math.round(bounds.top + (10 - energy + 0.5) / 11 * (bounds.bottom - bounds.top)),
+  };
+}
+
+async function selectMoodPadCell(serial, mood, energy) {
+  const node = await waitForNode(serial, { testId: "mood-pad" });
+  const point = moodPadCellPoint(node, mood, energy);
+  runAdb(serial, ["shell", "input", "tap", String(point.x), String(point.y)]);
+  return point;
+}
+
 function isVisibleAndEnabled(node) {
   return node["visible-to-user"] !== "false" && node.enabled !== "false";
 }
@@ -412,6 +431,8 @@ function parseMemInfo(output) {
 }
 
 module.exports = {
+  moodPadCellPoint,
+  selectMoodPadCell,
   DEFAULT_DUMP_TIMEOUT_MS,
   DEFAULT_POLL_INTERVAL_MS,
   DEFAULT_WAIT_TIMEOUT_MS,
