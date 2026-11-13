@@ -11,7 +11,6 @@ function fixture(run) {
   try {
     const sdk = join(root, 'sdk');
     mkdirSync(join(sdk, 'build-tools', '36.0.0'), { recursive: true });
-    for (const name of ['aapt', 'apksigner']) writeFileSync(join(sdk, 'build-tools', '36.0.0', name), '#!/bin/sh\nexit 0\n', { mode: 0o700 });
     const jar = join(root, 'bundletool.jar');
     const key = join(root, 'key.json');
     writeFileSync(jar, 'jar');

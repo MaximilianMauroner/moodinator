@@ -60,14 +60,9 @@ export function checkReleaseResources(root) {
 
 export function preflightBuild(root, env = process.env, cliVersion) {
   const environment = buildEnvironment(env);
-  const versions = readdirSync(join(environment.ANDROID_HOME, 'build-tools'), { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && /^\d/.test(entry.name))
-    .map((entry) => entry.name).sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
-  if (!versions.length) throw new Error('Android SDK build-tools are missing');
-  for (const tool of ['aapt', 'apksigner']) {
-    try { accessSync(join(environment.ANDROID_HOME, 'build-tools', versions[0], tool), constants.X_OK); }
-    catch { throw new Error(`Android SDK ${tool} is unavailable`); }
-  }
+  const buildTools = readdirSync(join(environment.ANDROID_HOME, 'build-tools'), { withFileTypes: true })
+    .some((entry) => entry.isDirectory() && /^\d/.test(entry.name));
+  if (!buildTools) throw new Error('Android SDK build-tools are missing');
   const eas = spawnSync(environment.EAS_BIN, ['--version'], {
     cwd: root, env: releaseChildEnvironment('tools', environment), encoding: 'utf8', timeout: 30000,
   });

@@ -14,7 +14,7 @@ release credentials are used, checks tools/resources, and reserves with the GitH
 state token only in the ledger operation. EAS runs with Expo authentication but no
 GitHub write or Play credentials. It necessarily trusts application build code with
 Expo signing access. The upload runner is separate: it executes no project package
-installation or tests, verifies both artifacts again, creates the Play file only
+installation or tests, verifies the AAB again, creates the Play file only
 for upload, and finalizes the ledger. Normal failure finishes failed; cancellation
 leaves an active reservation for explicit reconciliation.
 
