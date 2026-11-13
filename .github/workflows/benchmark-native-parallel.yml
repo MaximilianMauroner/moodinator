@@ -1,4 +1,4 @@
-name: Android Gradle worker experiment
+name: Android build diagnostic
 on:
   push:
     branches: [improve-android-build-speed]
@@ -8,10 +8,6 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
-    strategy:
-      fail-fast: false
-      matrix:
-        workers: [2, 4]
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
@@ -26,26 +22,33 @@ jobs:
           java-version: '17'
       - run: pnpm install --frozen-lockfile --ignore-scripts
       - run: pnpm exec expo prebuild --platform android --no-install
-      - name: Build and time bundle
+      - name: Profile Android build
         working-directory: android
         env:
           CMAKE_BUILD_PARALLEL_LEVEL: '2'
-          GRADLE_OPTS: -Dorg.gradle.workers.max=${{ matrix.workers }} -Dorg.gradle.parallel=false -Dorg.gradle.jvmargs=-Xmx2048m -Dkotlin.daemon.jvm.options=-Xmx768m
+          GRADLE_OPTS: -Dorg.gradle.workers.max=2 -Dorg.gradle.parallel=false -Dorg.gradle.jvmargs=-Xmx2048m -Dkotlin.daemon.jvm.options=-Xmx768m
           NODE_OPTIONS: --max-old-space-size=1536
           EXPO_PUBLIC_REPORTS_ORIGIN: https://tools.mauroner.net
         run: |
-          nproc
-          free -h
-          /usr/bin/time -f 'elapsed_seconds=%e exit=%x peak_kib=%M' ./gradlew :app:bundleRelease --no-daemon --no-build-cache
+          mkdir -p "$RUNNER_TEMP/diagnostic"
+          (while true; do date -u +%FT%TZ; ps -eo pid,ppid,pcpu,rss,comm; vmstat 1 2 | tail -1; sleep 10; done) > "$RUNNER_TEMP/diagnostic/resources.log" &
+          sampler=$!
+          trap 'kill "$sampler" 2>/dev/null || true' EXIT
+          /usr/bin/time -f 'elapsed_seconds=%e exit=%x peak_kib=%M' ./gradlew :app:bundleRelease --no-daemon --no-build-cache --info --profile > "$RUNNER_TEMP/diagnostic/gradle.log" 2>&1
           test -s app/build/outputs/bundle/release/app-release.aab
+          cp -r build/reports/profile "$RUNNER_TEMP/diagnostic/profile"
+          find ../node_modules/.pnpm app -name 'build_command*' -type f -exec cat {} + > "$RUNNER_TEMP/diagnostic/native-commands.log"
+          cat "$RUNNER_TEMP/diagnostic/native-commands.log"
+          tail -5 "$RUNNER_TEMP/diagnostic/gradle.log"
       - name: Validate bundle
         run: |
           curl -fsSL https://github.com/google/bundletool/releases/download/1.18.2/bundletool-all-1.18.2.jar -o "$RUNNER_TEMP/bundletool.jar"
           echo "378b5434cd1378bef6b2bc527b8c7f0ff2584b273830335bce54d6d0813c8584  $RUNNER_TEMP/bundletool.jar" | sha256sum --check
           java -jar "$RUNNER_TEMP/bundletool.jar" validate --bundle=android/app/build/outputs/bundle/release/app-release.aab
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
         with:
-          name: benchmark-workers-${{ matrix.workers }}
-          path: android/app/build/outputs/bundle/release/app-release.aab
+          name: android-build-diagnostic
+          path: ${{ runner.temp }}/diagnostic
           if-no-files-found: error
           retention-days: 3
