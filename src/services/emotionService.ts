@@ -184,4 +184,3 @@ export const emotionService: EmotionServiceInterface = {
     return hasEmotionTableMigrated();
   },
 };
-

@@ -154,4 +154,3 @@ export function EmptyState({
     </View>
   );
 }
-

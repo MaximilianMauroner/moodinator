@@ -233,4 +233,3 @@ export const EnergySlider: React.FC<EnergySliderProps> = ({ value, onChange }) =
         </View>
     );
 };
-

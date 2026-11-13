@@ -46,4 +46,3 @@ export function usePressAnimation(pressedScale: number = DEFAULT_PRESSED_SCALE) 
 
   return { animatedStyle, onPressIn, onPressOut };
 }
-

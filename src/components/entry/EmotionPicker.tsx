@@ -355,4 +355,3 @@ export const EmotionPicker: React.FC<EmotionPickerProps> = ({
         </View>
     );
 };
-

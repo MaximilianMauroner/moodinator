@@ -46,4 +46,3 @@ export function HistoryListHeader({ title, moodCount, countSuffix, countTestID }
     </View>
   );
 }
-
