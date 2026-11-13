@@ -1,4 +1,4 @@
-name: Android native parallelism experiment
+name: Android Gradle worker experiment
 on:
   push:
     branches: [improve-android-build-speed]
@@ -11,7 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        cmake: [2, 4]
+        workers: [2, 4]
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
@@ -29,8 +29,8 @@ jobs:
       - name: Build and time bundle
         working-directory: android
         env:
-          CMAKE_BUILD_PARALLEL_LEVEL: ${{ matrix.cmake }}
-          GRADLE_OPTS: -Dorg.gradle.workers.max=2 -Dorg.gradle.parallel=false -Dorg.gradle.jvmargs=-Xmx2048m -Dkotlin.daemon.jvm.options=-Xmx768m
+          CMAKE_BUILD_PARALLEL_LEVEL: '2'
+          GRADLE_OPTS: -Dorg.gradle.workers.max=${{ matrix.workers }} -Dorg.gradle.parallel=false -Dorg.gradle.jvmargs=-Xmx2048m -Dkotlin.daemon.jvm.options=-Xmx768m
           NODE_OPTIONS: --max-old-space-size=1536
           EXPO_PUBLIC_REPORTS_ORIGIN: https://tools.mauroner.net
         run: |
@@ -45,7 +45,7 @@ jobs:
           java -jar "$RUNNER_TEMP/bundletool.jar" validate --bundle=android/app/build/outputs/bundle/release/app-release.aab
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: benchmark-cmake-${{ matrix.cmake }}
+          name: benchmark-workers-${{ matrix.workers }}
           path: android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
           retention-days: 3
