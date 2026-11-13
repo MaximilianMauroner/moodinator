@@ -53,7 +53,7 @@ describe("analysis windows", () => {
 
   it("keeps a seven-day window on calendar dates across the spring-forward", () => {
     process.env.TZ = "America/New_York";
-    const start = analysisStart("7", new Date("2026-03-10T15:00:00-04:00"));
+    const start = analysisStart("7", new Date("2026-03-10T00:00:00-04:00"));
 
     expect(start.getFullYear()).toBe(2026);
     expect(start.getMonth()).toBe(2);
