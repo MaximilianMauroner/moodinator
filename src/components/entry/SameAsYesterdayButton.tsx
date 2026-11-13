@@ -534,5 +534,3 @@ export const SameAsYesterdayButton: React.FC<SameAsYesterdayButtonProps> = ({
     </>
   );
 };
-
-export default SameAsYesterdayButton;

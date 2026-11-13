@@ -237,5 +237,3 @@ export const dataPortabilityService = {
     await setBackupFolder(uri);
   },
 };
-
-export default dataPortabilityService;

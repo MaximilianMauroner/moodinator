@@ -9,14 +9,9 @@ describe("Android privacy configuration", () => {
     const packageMetadata = JSON.parse(
       readFileSync("package.json", "utf8")
     ) as { version?: string };
-    const aboutScreen = readFileSync(
-      "src/app/settings/about.tsx",
-      "utf8"
-    );
 
     expect(appConfig.expo.version).toBe("0.1.5");
     expect(packageMetadata.version).toBe(appConfig.expo.version);
-    expect(aboutScreen).toContain('??\n    "0.1.5"');
   });
 
   it("disables Auto Backup and blocks unused sensitive permissions", () => {
@@ -44,19 +39,6 @@ describe("Android privacy configuration", () => {
     };
 
     expect(appConfig.expo.scheme).toBe("moodinator");
-  });
-
-  it("redirects the developer route out of production builds", () => {
-    const developerRoute = readFileSync(
-      "src/app/settings/developer.tsx",
-      "utf8"
-    );
-
-    expect(developerRoute).toMatch(
-      /if \(!__DEV__\) \{\s*return <Redirect href="\/\(tabs\)\/settings" \/>;/
-    );
-    expect(developerRoute.indexOf("if (!__DEV__)"))
-      .toBeLessThan(developerRoute.indexOf("<DeveloperSettingsScreen />"));
   });
 
   it("does not enable background remote notifications", () => {

@@ -197,5 +197,3 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
   },
 });
-
-export default SegmentedControl;

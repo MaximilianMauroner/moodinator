@@ -48,5 +48,3 @@ export function useReducedMotion(): boolean {
 
   return reduced;
 }
-
-export default useReducedMotion;

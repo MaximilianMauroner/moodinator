@@ -39,7 +39,3 @@ export function getSupportedMoodScaleSnapshot(value: unknown): MoodScaleSnapshot
 
   return scale ? { ...scale } : null;
 }
-
-export function isSupportedMoodScaleSnapshot(value: unknown): value is MoodScaleSnapshot {
-  return getSupportedMoodScaleSnapshot(value) !== null;
-}

@@ -32,5 +32,3 @@ export const toast = {
     });
   },
 };
-
-export default toast;

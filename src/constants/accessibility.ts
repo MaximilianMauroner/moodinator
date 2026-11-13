@@ -4,24 +4,6 @@
  */
 
 /**
- * Mood level accessibility labels.
- * Maps numeric mood values (0-10) to descriptive labels.
- */
-export const MOOD_ACCESSIBILITY_LABELS: Record<number, string> = {
-  0: "Elated, best possible",
-  1: "Very Happy, high spirits",
-  2: "Good, feeling well",
-  3: "Positive, generally fine",
-  4: "Okay, some good moments",
-  5: "Neutral, neither good nor bad",
-  6: "Low, motivation dipping",
-  7: "Struggling, intense distress",
-  8: "Overwhelmed, tasks feel impossible",
-  9: "Crisis, needs support",
-  10: "Emergency, needs immediate support",
-};
-
-/**
  * Get accessibility label for a mood button.
  */
 export function getMoodButtonLabel(moodValue: number, moodLabel: string): string {
@@ -64,34 +46,6 @@ export function getMoodItemHint(): string {
 }
 
 /**
- * Emotion category accessibility labels.
- */
-export const EMOTION_CATEGORY_LABELS = {
-  positive: "Positive emotion",
-  neutral: "Neutral emotion",
-  negative: "Negative emotion",
-} as const;
-
-/**
- * Get accessibility label for an emotion chip.
- */
-export function getEmotionChipLabel(
-  emotionName: string,
-  category: "positive" | "neutral" | "negative",
-  isSelected: boolean
-): string {
-  const selectionStatus = isSelected ? "selected" : "not selected";
-  return `${emotionName}, ${EMOTION_CATEGORY_LABELS[category]}, ${selectionStatus}`;
-}
-
-/**
- * Get accessibility hint for an emotion chip.
- */
-export function getEmotionChipHint(isSelected: boolean): string {
-  return isSelected ? "Tap to deselect this emotion" : "Tap to select this emotion";
-}
-
-/**
  * Energy level accessibility labels.
  */
 export function getEnergyLevelLabel(value: number, isSelected: boolean): string {
@@ -100,40 +54,16 @@ export function getEnergyLevelLabel(value: number, isSelected: boolean): string 
 }
 
 /**
- * Modal accessibility properties.
- */
-export const MODAL_ACCESSIBILITY = {
-  moodEntry: {
-    label: "Mood entry form",
-    hint: "Fill in the form to log your mood entry",
-  },
-  datePicker: {
-    label: "Date and time picker",
-    hint: "Change the date and time for this mood entry",
-  },
-} as const;
-
-/**
  * Common button accessibility hints.
  */
 export const BUTTON_HINTS = {
   save: "Tap to save your changes",
-  cancel: "Tap to cancel and close",
-  delete: "Tap to delete this item",
-  edit: "Tap to edit this item",
-  add: "Tap to add a new item",
-  refresh: "Tap to refresh the data",
-  clear: "Tap to clear this selection",
-  undo: "Tap to undo the last action",
-  goBack: "Tap to go back to the previous screen",
 } as const;
 
 /**
  * Settings accessibility labels.
  */
 export const SETTINGS_ACCESSIBILITY = {
-  toggle: (isEnabled: boolean, settingName: string) =>
-    `${settingName}, ${isEnabled ? "enabled" : "disabled"}`,
   toggleHint: (isEnabled: boolean) =>
     `Tap to ${isEnabled ? "disable" : "enable"} this setting`,
 } as const;

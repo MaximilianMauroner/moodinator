@@ -123,8 +123,6 @@ export function AppToaster() {
   );
 }
 
-export default AppToaster;
-
 const styles = StyleSheet.create({
   overlaySafeArea: {
     ...StyleSheet.absoluteFillObject,

@@ -99,5 +99,3 @@ export function HomeHeader() {
 		</View>
 	);
 }
-
-export default HomeHeader;

@@ -23,10 +23,6 @@ export function setHapticsEnabled(enabled: boolean): void {
   hapticsEnabled = enabled;
 }
 
-export function getHapticsEnabled(): boolean {
-  return hapticsEnabled;
-}
-
 type AndroidFeedback =
   | Haptics.AndroidHaptics
   | {
@@ -131,7 +127,3 @@ function reject(): void {
 }
 
 export const haptics = { tick, tap, commit, reject };
-
-export type HapticLevel = keyof typeof haptics;
-
-export default haptics;

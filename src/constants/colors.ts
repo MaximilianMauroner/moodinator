@@ -185,9 +185,6 @@ export const colors = {
   onSupportAction: { light: "#FFFFFF", dark: "#2A0E08" },
 } as const;
 
-export type ColorKey = keyof typeof colors;
-export type ThemeMode = "light" | "dark";
-
 export const semanticToneColors = {
   sage: {
     light: { bg: "#E8EFE8", fg: "#476D47", ring: "rgba(91, 138, 91, 0.16)", border: "#D1DFD1" },
@@ -225,15 +222,6 @@ export const effectColors = {
 } as const;
 
 export type SemanticTone = keyof typeof semanticToneColors;
-
-/** Fill color for energy UI (slider segment, detail bar) for index 0–10 */
-export function getEnergySegmentColor(level: number, isDark: boolean): string {
-  const i = Math.max(0, Math.min(10, Math.round(level)));
-  const stops = isDark
-    ? colors.energySegmentColors.dark
-    : colors.energySegmentColors.light;
-  return stops[i] ?? stops[stops.length - 1];
-}
 
 /**
  * Hook to access theme colors based on current color scheme

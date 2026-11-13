@@ -2,7 +2,6 @@ import React from "react";
 import { View, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useColorScheme } from "nativewind";
-import { getMoodTrendDirection } from "@/constants/moodScaleInterpretation";
 
 export type TrendDirection = "up" | "down" | "stable";
 
@@ -79,8 +78,4 @@ export function TrendIndicator({
       )}
     </View>
   );
-}
-
-export function getTrendDirection(change: number, threshold = 0.1): TrendDirection {
-  return getMoodTrendDirection(change, threshold);
 }

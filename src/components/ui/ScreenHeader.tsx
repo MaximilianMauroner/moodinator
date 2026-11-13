@@ -90,5 +90,3 @@ export function ScreenHeader({
     </View>
   );
 }
-
-export default ScreenHeader;

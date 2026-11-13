@@ -95,5 +95,3 @@ export function useEntrySettings() {
         createContextOption,
     };
 }
-
-export default useEntrySettings;

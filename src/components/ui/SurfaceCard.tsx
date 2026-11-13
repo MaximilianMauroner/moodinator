@@ -71,5 +71,3 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 5 },
   },
 });
-
-export default SurfaceCard;

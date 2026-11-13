@@ -154,5 +154,3 @@ export function createScreenErrorFallback(screenTitle: string) {
     return <ScreenErrorFallback {...props} screenTitle={screenTitle} />;
   };
 }
-
-export default ScreenErrorFallback;

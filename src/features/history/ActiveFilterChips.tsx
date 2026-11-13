@@ -72,5 +72,3 @@ export function ActiveFilterChips() {
     </ScrollView>
   );
 }
-
-export default ActiveFilterChips;

@@ -62,5 +62,3 @@ export function useCountUp(value: number, decimals: number = 0): number {
 
   return reducedMotion ? value : animated;
 }
-
-export default useCountUp;

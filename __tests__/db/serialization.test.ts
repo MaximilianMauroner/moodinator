@@ -15,7 +15,6 @@ import {
   sanitizeImportedEmotions,
   sanitizeEnergy,
   sanitizeImportedMoodScale,
-  isValidMoodScaleSnapshot,
 } from "../../db/moods/serialization";
 import type { Emotion, MoodEntryInput } from "../../db/types";
 
@@ -575,7 +574,6 @@ describe("sanitizeImportedMoodScale", () => {
       lowerIsBetter: false,
     };
 
-    expect(isValidMoodScaleSnapshot(legacyHigherIsBetter)).toBe(true);
     expect(sanitizeImportedMoodScale(legacyHigherIsBetter)).toEqual(
       legacyHigherIsBetter
     );

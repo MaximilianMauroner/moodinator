@@ -200,5 +200,3 @@ export const moodService: MoodServiceInterface = {
     return getContextTagsFromMoods();
   },
 };
-
-export default moodService;

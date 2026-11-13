@@ -79,7 +79,5 @@ export const typography = {
   } satisfies TextStyle,
 };
 
-export type TypographyKey = keyof typeof typography;
-
 export { fontFamilies };
 

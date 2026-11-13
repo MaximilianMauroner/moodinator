@@ -96,5 +96,3 @@ export function useMoodModals(onOpen?: () => void) {
     handleLongPress,
   };
 }
-
-export default useMoodModals;

@@ -21,11 +21,7 @@ type StreakBadgeSharedProps = {
   longest: number;
 };
 
-type StreakBadgeBaseProps = StreakBadgeSharedProps & {
-  compact: boolean;
-};
-
-function StreakBadgeBase({ current, longest, compact }: StreakBadgeBaseProps) {
+function StreakBadgeBase({ current, longest }: StreakBadgeSharedProps) {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === "dark";
   const reducedMotion = useReducedMotion();
@@ -57,28 +53,6 @@ function StreakBadgeBase({ current, longest, compact }: StreakBadgeBaseProps) {
   const sage = semanticToneColors.sage[mode];
   const neutral = semanticToneColors.neutral[mode];
   const tone = isOnStreak ? sand : neutral;
-
-  if (compact) {
-    return (
-      <SurfaceCard
-        tone={isOnStreak ? "sand" : "neutral"}
-        padding={12}
-        style={{ backgroundColor: tone.bg }}
-      >
-        <View className="flex-row items-center">
-          <IconBadge
-            icon={isOnStreak ? "flame-outline" : "moon-outline"}
-            tone={isOnStreak ? "sand" : "neutral"}
-            size="sm"
-            style={{ marginRight: 8 }}
-          />
-          <Text style={{ ...typography.bodyMd, fontWeight: "700", color: tone.fg }}>
-            {current} {current === 1 ? "day" : "days"}
-          </Text>
-        </View>
-      </SurfaceCard>
-    );
-  }
 
   return (
     <SurfaceCard tone="sand" accentColor={tone.fg} accentHeight={4}>
@@ -213,9 +187,5 @@ function StreakBadgeBase({ current, longest, compact }: StreakBadgeBaseProps) {
 export type StreakBadgeProps = StreakBadgeSharedProps;
 
 export function StreakBadge(props: StreakBadgeProps) {
-  return <StreakBadgeBase {...props} compact={false} />;
-}
-
-export function CompactStreakBadge(props: StreakBadgeProps) {
-  return <StreakBadgeBase {...props} compact={true} />;
+  return <StreakBadgeBase {...props} />;
 }

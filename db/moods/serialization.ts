@@ -33,10 +33,6 @@ export function serializeMoodScale(value?: MoodScaleSnapshot): string {
   return JSON.stringify(value ?? CURRENT_MOOD_SCALE_SNAPSHOT);
 }
 
-export function isValidMoodScaleSnapshot(value: unknown): value is MoodScaleSnapshot {
-  return getSupportedMoodScaleSnapshot(value) !== null;
-}
-
 function deserializeArray(value: unknown): string[] {
   if (typeof value !== "string" || value.length === 0) {
     return [];

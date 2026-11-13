@@ -466,5 +466,3 @@ export function HistoryFilterSheet() {
     </>
   );
 }
-
-export default HistoryFilterSheet;

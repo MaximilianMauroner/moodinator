@@ -97,5 +97,3 @@ const styles = StyleSheet.create({
     borderRadius: DOT_SIZE / 2,
   },
 });
-
-export default SettingsHeader;

@@ -123,29 +123,6 @@ export function getMoodRatingLabel(
   return getMoodRatingScaleItem(value, sourceScale).label;
 }
 
-export function getMoodRatingTextClass(
-  value: number,
-  sourceScale: MoodScaleSnapshot = CURRENT_MOOD_SCALE
-): string {
-  return getMoodRatingScaleItem(value, sourceScale).color;
-}
-
-export function getMoodRatingBgClass(
-  value: number,
-  sourceScale: MoodScaleSnapshot = CURRENT_MOOD_SCALE
-): string {
-  return getMoodRatingScaleItem(value, sourceScale).bg;
-}
-
-export function getMoodRatingTextHex(
-  value: number,
-  dark = false,
-  sourceScale: MoodScaleSnapshot = CURRENT_MOOD_SCALE
-): string {
-  const item = getMoodRatingScaleItem(value, sourceScale);
-  return (dark ? item.textHexDark : item.textHex) ?? "#64748b";
-}
-
 export type MoodTrendDirection = "up" | "down" | "stable";
 
 export function getMoodTrendDirection(change: number, threshold = 0.1): MoodTrendDirection {

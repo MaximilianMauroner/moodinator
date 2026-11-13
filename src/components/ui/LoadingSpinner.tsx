@@ -48,5 +48,3 @@ export function LoadingSpinner({
     </View>
   );
 }
-
-export default LoadingSpinner;

@@ -24,5 +24,3 @@ export const toast = {
     return webToast.custom((id) => render(id), options);
   },
 };
-
-export default toast;

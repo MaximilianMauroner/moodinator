@@ -73,5 +73,3 @@ export function useMoodItemActions({
     handleMoodItemLongPress,
   };
 }
-
-export default useMoodItemActions;
