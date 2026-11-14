@@ -21,6 +21,21 @@ export function assertArtifactIdentity(actual, expected, app) {
   if (actual.certificate !== approvedCertificates[app]) throw new Error('Artifact does not use the approved upload certificate');
 }
 
+export function assertBundleAbis(entries) {
+  const abis = new Set();
+  const baseAbis = new Set();
+  for (const entry of entries) {
+    const match = /^([^/]+)\/lib\/([^/]+)\/[^/]+\.so$/.exec(entry);
+    if (!match) continue;
+    abis.add(match[2]);
+    if (match[1] === 'base') baseAbis.add(match[2]);
+  }
+  const expected = ['armeabi-v7a', 'arm64-v8a'];
+  if (abis.size !== expected.length || expected.some((abi) => !abis.has(abi) || !baseAbis.has(abi))) {
+    throw new Error(`Unexpected bundle ABIs: ${[...abis].sort().join(', ') || 'none'}`);
+  }
+}
+
 export function verifyReleaseArtifacts(aab, expected, app) {
   const bundletool = process.env.ANDROID_BUNDLETOOL_JAR;
   if (!bundletool || !existsSync(bundletool)) {
@@ -28,6 +43,7 @@ export function verifyReleaseArtifacts(aab, expected, app) {
   }
   const java = ['-Xmx512m', '-jar', bundletool];
   output('java', [...java, 'validate', `--bundle=${aab}`]);
+  if (app === 'moodinator') assertBundleAbis(output('jar', ['tf', aab]).split('\n'));
   const value = (attribute) => output('java', [...java, 'dump', 'manifest', `--bundle=${aab}`, `--xpath=/manifest/@${attribute}`]);
   const signature = output('jarsigner', ['-J-Duser.language=en', '-J-Duser.country=US', '-verify', aab]);
   if (!signature.includes('jar verified.')) throw new Error('AAB signature verification failed');
