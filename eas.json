@@ -45,7 +45,8 @@
       "env": {
         "CMAKE_BUILD_PARALLEL_LEVEL": "2",
         "GRADLE_OPTS": "-Dorg.gradle.workers.max=2 -Dorg.gradle.parallel=false -Dorg.gradle.jvmargs=-Xmx2048m -Dkotlin.daemon.jvm.options=-Xmx768m",
-        "NODE_OPTIONS": "--max-old-space-size=1536"
+        "NODE_OPTIONS": "--max-old-space-size=1536",
+        "ORG_GRADLE_PROJECT_reactNativeArchitectures": "armeabi-v7a,arm64-v8a"
       },
       "android": {
         "buildType": "app-bundle"
