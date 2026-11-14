@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { releaseIdentity, stampRelease } from '../scripts/stamp-nightly-version.mjs';
-import { assertArtifactIdentity } from '../scripts/verify-release-artifacts.mjs';
+import { assertArtifactIdentity, assertBundleAbis } from '../scripts/verify-release-artifacts.mjs';
 
 test('rejects identities Google Play cannot accept', () => {
   for (const version of ['0.1.5-nightly.20260917', '0.2.0', '1.0', '0.1.-1']) {
@@ -44,4 +44,14 @@ test('upload gate rejects stale artifacts and unapproved signing certificates', 
   assert.throws(() => assertArtifactIdentity({ ...actual, version: '0.1.5' }, expected, 'zen-mode'), /version mismatch/);
   assert.throws(() => assertArtifactIdentity({ ...actual, package: 'com.lab4code.other' }, expected, 'zen-mode'), /package mismatch/);
   assert.throws(() => assertArtifactIdentity({ ...actual, certificate: 'f'.repeat(64) }, expected, 'zen-mode'), /approved upload certificate/);
+});
+
+test('upload gate requires both ARM ABIs and rejects other native architectures', () => {
+  const arm = ['base/lib/armeabi-v7a/libapp.so', 'base/lib/arm64-v8a/libapp.so'];
+  assert.doesNotThrow(() => assertBundleAbis([...arm, 'base/manifest/AndroidManifest.xml']));
+  assert.throws(() => assertBundleAbis([]), /Unexpected bundle ABIs/);
+  assert.throws(() => assertBundleAbis([arm[0]]), /Unexpected bundle ABIs/);
+  assert.throws(() => assertBundleAbis([...arm, 'base/lib/x86_64/libapp.so']), /Unexpected bundle ABIs/);
+  assert.throws(() => assertBundleAbis([...arm, 'feature/lib/x86/libfeature.so']), /Unexpected bundle ABIs/);
+  assert.throws(() => assertBundleAbis([arm[0], 'feature/lib/arm64-v8a/libapp.so']), /Unexpected bundle ABIs/);
 });
