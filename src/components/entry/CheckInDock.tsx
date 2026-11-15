@@ -1,18 +1,20 @@
-import React, { useCallback, useReducer, useRef, useState } from "react";
+import React, { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import {
   BackHandler,
   Keyboard,
   Pressable,
+  ScrollView,
   Text,
   View,
 } from "react-native";
 import { useFocusEffect } from "expo-router";
-import Animated, { FadeIn, ReduceMotion } from "react-native-reanimated";
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import type { Emotion } from "@db/types";
 import { useThemeColors } from "@/constants/colors";
 import { getMoodRatingLabel } from "@/constants/moodScaleInterpretation";
 import { typography } from "@/constants/typography";
 import { haptics } from "@/lib/haptics";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 import {
   buildMoodEntrySubmitValues,
   type MoodEntryFieldConfig,
@@ -50,6 +52,17 @@ export function CheckInDock({
     state.stage === "feelings" && !fieldConfig.emotions
       ? "context"
       : state.stage;
+  const reducedMotion = useReducedMotion();
+  const opacity = useSharedValue(1);
+  const stageStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
+  useEffect(() => {
+    if (reducedMotion) {
+      opacity.value = 1;
+      return;
+    }
+    opacity.value = 0;
+    opacity.value = withTiming(1, { duration: 160 });
+  }, [opacity, reducedMotion, stage]);
   const back = useCallback(() => {
     if (savingRef.current) return true;
     if (state.sheet) {
@@ -154,9 +167,8 @@ export function CheckInDock({
               )}
           </View>
         )}
-        <Animated.ScrollView
+        <ScrollView
           key={stage}
-          entering={FadeIn.duration(160).reduceMotion(ReduceMotion.System)}
           keyboardShouldPersistTaps="handled"
           style={{ flexGrow: 0, flexShrink: 1 }}
           contentContainerStyle={{
@@ -165,130 +177,132 @@ export function CheckInDock({
             minHeight: 256,
           }}
         >
-          {stage === "mood" && (
-            <>
-              <WeatherMoodGrid
-                size="checkin"
-                selected={draft?.mood}
-                onPress={(mood) =>
-                  dispatch({ type: "mood", mood, fields: fieldConfig })
-                }
-              />
-              {previews.length > 0 && (
-                <Text style={[typography.bodySm, { color: get("textMuted"), marginTop: 8 }]}>
-                  {previews.join(" · ")}
-                </Text>
-              )}
-            </>
-          )}
-          {stage === "feelings" && draft && (
-            <>
-              <Text
-                accessibilityLiveRegion="polite"
-                style={[
-                  typography.bodySm,
-                  { color: get("textMuted"), marginBottom: 10 },
-                ]}
-              >
-                {draft.emotions.length}/3 selected. Aim for 2–3, or continue
-                with fewer.
-              </Text>
-              <View className="flex-row flex-wrap gap-2">
-                {feelings.map((emotion) => {
-                  const selected = draft.emotions.some(
-                    (other) => other.name === emotion.name,
-                  );
-                  return (
-                    <CheckInChip
-                      key={emotion.name}
-                      label={emotion.name}
-                      selected={selected}
-                      disabled={
-                        !selected &&
-                        draft.emotions.length >= MAX_CHECK_IN_FEELINGS
-                      }
-                      onPress={() => {
-                        haptics.tick();
-                        dispatch({
-                          type: "emotions",
-                          emotions: selected
-                            ? draft.emotions.filter(
-                                (other) => other.name !== emotion.name,
-                              )
-                            : [...draft.emotions, emotion],
-                        });
-                      }}
-                    />
-                  );
-                })}
-                <CheckInChip
-                  label="All feelings"
-                  onPress={() => dispatch({ type: "sheet", sheet: "feelings" })}
+          <Animated.View style={stageStyle}>
+            {stage === "mood" && (
+              <>
+                <WeatherMoodGrid
+                  size="checkin"
+                  selected={draft?.mood}
+                  onPress={(mood) =>
+                    dispatch({ type: "mood", mood, fields: fieldConfig })
+                  }
                 />
-              </View>
-            </>
-          )}
-          {stage === "context" && draft && (
-            <>
-              {fieldConfig.context && (
-                <>
-                  <Text
-                    style={[
-                      typography.bodySm,
-                      { color: get("textMuted"), marginBottom: 10 },
-                    ]}
-                  >
-                    Choose what fits. Context is optional.
+                {previews.length > 0 && (
+                  <Text style={[typography.bodySm, { color: get("textMuted"), marginTop: 8 }]}>
+                    {previews.join(" · ")}
                   </Text>
-                  <View className="flex-row flex-wrap gap-2">
-                    {Array.from(
-                      new Set([...contextOptions, ...draft.contextTags]),
-                    ).map((context) => (
+                )}
+              </>
+            )}
+            {stage === "feelings" && draft && (
+              <>
+                <Text
+                  accessibilityLiveRegion="polite"
+                  style={[
+                    typography.bodySm,
+                    { color: get("textMuted"), marginBottom: 10 },
+                  ]}
+                >
+                  {draft.emotions.length}/3 selected. Aim for 2–3, or continue
+                  with fewer.
+                </Text>
+                <View className="flex-row flex-wrap gap-2">
+                  {feelings.map((emotion) => {
+                    const selected = draft.emotions.some(
+                      (other) => other.name === emotion.name,
+                    );
+                    return (
                       <CheckInChip
-                        key={context}
-                        label={`#${context}`}
-                        selected={draft.contextTags.includes(context)}
+                        key={emotion.name}
+                        label={emotion.name}
+                        selected={selected}
+                        disabled={
+                          !selected &&
+                          draft.emotions.length >= MAX_CHECK_IN_FEELINGS
+                        }
                         onPress={() => {
                           haptics.tick();
-                          dispatch({ type: "context", context });
+                          dispatch({
+                            type: "emotions",
+                            emotions: selected
+                              ? draft.emotions.filter(
+                                  (other) => other.name !== emotion.name,
+                                )
+                              : [...draft.emotions, emotion],
+                          });
                         }}
                       />
-                    ))}
-                  </View>
-                </>
-              )}
-              {(fieldConfig.energy || fieldConfig.notes) && (
-                <View className="mt-3 gap-2">
+                    );
+                  })}
                   <CheckInChip
-                    label={
-                      fieldConfig.energy && fieldConfig.notes
-                        ? "Energy & note (optional)"
-                        : fieldConfig.energy
-                          ? "Energy (optional)"
-                          : "Note (optional)"
-                    }
-                    onPress={() => dispatch({ type: "sheet", sheet: "extras" })}
+                    label="All feelings"
+                    onPress={() => dispatch({ type: "sheet", sheet: "feelings" })}
                   />
-                  {fieldConfig.energy && draft.energy !== null && (
-                    <Text
-                      style={[typography.bodySm, { color: get("textMuted") }]}
-                    >
-                      Energy {draft.energy}
-                    </Text>
-                  )}
-                  {fieldConfig.notes && !!draft.note.trim() && (
-                    <Text
-                      numberOfLines={2}
-                      style={[typography.bodySm, { color: get("textMuted") }]}
-                    >
-                      {draft.note.trim()}
-                    </Text>
-                  )}
                 </View>
-              )}
-            </>
-          )}
-        </Animated.ScrollView>
+              </>
+            )}
+            {stage === "context" && draft && (
+              <>
+                {fieldConfig.context && (
+                  <>
+                    <Text
+                      style={[
+                        typography.bodySm,
+                        { color: get("textMuted"), marginBottom: 10 },
+                      ]}
+                    >
+                      Choose what fits. Context is optional.
+                    </Text>
+                    <View className="flex-row flex-wrap gap-2">
+                      {Array.from(
+                        new Set([...contextOptions, ...draft.contextTags]),
+                      ).map((context) => (
+                        <CheckInChip
+                          key={context}
+                          label={`#${context}`}
+                          selected={draft.contextTags.includes(context)}
+                          onPress={() => {
+                            haptics.tick();
+                            dispatch({ type: "context", context });
+                          }}
+                        />
+                      ))}
+                    </View>
+                  </>
+                )}
+                {(fieldConfig.energy || fieldConfig.notes) && (
+                  <View className="mt-3 gap-2">
+                    <CheckInChip
+                      label={
+                        fieldConfig.energy && fieldConfig.notes
+                          ? "Energy & note (optional)"
+                          : fieldConfig.energy
+                            ? "Energy (optional)"
+                            : "Note (optional)"
+                      }
+                      onPress={() => dispatch({ type: "sheet", sheet: "extras" })}
+                    />
+                    {fieldConfig.energy && draft.energy !== null && (
+                      <Text
+                        style={[typography.bodySm, { color: get("textMuted") }]}
+                      >
+                        Energy {draft.energy}
+                      </Text>
+                    )}
+                    {fieldConfig.notes && !!draft.note.trim() && (
+                      <Text
+                        numberOfLines={2}
+                        style={[typography.bodySm, { color: get("textMuted") }]}
+                      >
+                        {draft.note.trim()}
+                      </Text>
+                    )}
+                  </View>
+                )}
+              </>
+            )}
+          </Animated.View>
+        </ScrollView>
         {draft && (
           <View className="flex-row items-center gap-2 px-5 pt-2">
             {stage !== "mood" && (

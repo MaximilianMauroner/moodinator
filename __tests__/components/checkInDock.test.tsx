@@ -31,10 +31,12 @@ vi.mock("react-native", () => ({
 }));
 vi.mock("expo-router", () => ({ useFocusEffect: React.useEffect }));
 vi.mock("@/lib/haptics", () => ({ haptics: { tick: mocks.tick } }));
+vi.mock("@/hooks/useReducedMotion", () => ({ useReducedMotion: () => true }));
 vi.mock("react-native-reanimated", () => ({
-  default: { ScrollView: "ScrollView" },
-  FadeIn: { duration: () => ({ reduceMotion: () => undefined }) },
-  ReduceMotion: { System: "system" },
+  default: { View: "View" },
+  useAnimatedStyle: (style: () => unknown) => style(),
+  useSharedValue: (value: number) => ({ value }),
+  withTiming: (value: number) => value,
 }));
 vi.mock("@expo/vector-icons", () => ({ Ionicons: "Ionicons" }));
 vi.mock("@/hooks/useColorScheme", () => ({ useColorScheme: () => "light" }));
