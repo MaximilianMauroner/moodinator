@@ -14,7 +14,7 @@ const {
   requirePreparedSourceSha,
 } = require("./native-qa-common");
 const { runMaestro: runMaestroWithDiagnostics } = require("./native-qa-runner");
-const { runAdb, selectMoodPadCell, returnFromDataSettings, selectDownloadFixture, waitForNode, waitForNodeAndTap } = require("./native-ui");
+const { runAdb, returnFromDataSettings, selectDownloadFixture, waitForNode, waitForNodeAndTap } = require("./native-ui");
 
 const appId = "com.lab4code.moodinator.qa";
 const root = path.resolve(__dirname, "..");
@@ -212,16 +212,29 @@ async function captureMatrixScreens(serial, outputDirectory, stateName, fixtureC
   };
   // verifyFabricatedFixture leaves History selected; return to Today first.
   await waitForNodeAndTap(serial, { contentDescription: "Today tab, log your mood" });
-  await waitForNode(serial, { testId: "mood-pad" }, { timeoutMs: 15000 });
+  await waitForNode(serial, { text: "Choose a mood" }, { timeoutMs: 15000 });
+  await waitForNode(serial, { contentDescription: "Mood Rating 10 of 10, Emergency. Lower numbers are better." });
   capture("today");
-  await selectMoodPadCell(serial, 6, 1);
-  await waitForNode(serial, { text: "Keep Low 6, energy 1" });
+  await waitForNodeAndTap(serial, { contentDescription: "Mood Rating 6 of 10, Low. Lower numbers are better." });
+  await waitForNode(serial, { text: "Choose feelings" });
+  capture("today-feelings");
+  await waitForNodeAndTap(serial, { contentDescription: "Tired" });
+  await waitForNodeAndTap(serial, { contentDescription: "All feelings" });
+  await waitForNode(serial, { text: "All feelings" });
+  capture("today-all-feelings");
+  await waitForNodeAndTap(serial, { contentDescription: "Done with details" });
+  await waitForNodeAndTap(serial, { contentDescription: "Next · Context" });
+  await waitForNode(serial, { text: "Add context" });
   capture("today-draft");
-  await waitForNodeAndTap(serial, { text: "More" });
-  await waitForNode(serial, { text: "Add detail" });
-  capture("today-more");
-  await waitForNodeAndTap(serial, { text: "Done" });
-  await waitForNodeAndTap(serial, { text: "Clear" });
+  await waitForNodeAndTap(serial, { anyOf: [
+    { contentDescription: "Energy (optional)" },
+    { contentDescription: "Energy & note (optional)" },
+  ] });
+  await waitForNodeAndTap(serial, { contentDescription: "Energy 1" });
+  await waitForNode(serial, { text: "Optional details" });
+  capture("today-details");
+  await waitForNodeAndTap(serial, { contentDescription: "Done with details" });
+  await waitForNodeAndTap(serial, { contentDescription: "Clear" });
   await waitForNodeAndTap(serial, { contentDescription: "History tab, view past days and months" });
   await waitForNode(serial, { testId: "history-count" }, { timeoutMs: 15000 });
   // The forecast reads its own range; wait until it has loaded.

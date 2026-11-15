@@ -6,7 +6,7 @@ A privacy-focused mood tracking app built with React Native. Record how you feel
 
 ### Mood Tracking
 - **11-level mood scale** from Elated (0) to Emergency (10), each shown as a weather sign from sun to storm
-- **One pad check-in**: touch or drag to pick mood and energy, add optional details, then Keep with Undo. Available when quick energy is on and detailed labels are off.
+- **Guided check-in**: choose from all 11 moods, add up to three feelings, then context in the same lower tray. Energy and notes are optional. Keep saves with Undo. Available when quick energy is on and detailed labels are off.
 - **Tile entry**: a tap picks the mood and Done saves it with optional detail. With every detail field off, or for a severe tile rating, the tap saves at once with Undo
 - **Detailed entry** with long-press in tile modes for comprehensive records
 - Attach **emotions**, **context tags**, **energy**, and **notes**

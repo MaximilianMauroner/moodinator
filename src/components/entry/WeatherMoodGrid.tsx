@@ -19,6 +19,7 @@ const SIZES = {
   form: { minHeight: 68, icon: 24, number: 17 },
   /** Docked on Today, where a tap keeps the entry. */
   dock: { minHeight: 60, icon: 26, number: 18 },
+  checkin: { minHeight: 48, icon: 18, number: 13 },
 };
 
 type WeatherMoodGridProps = {
@@ -33,7 +34,7 @@ type WeatherMoodGridProps = {
 export function WeatherMoodGrid({ selected, onPress, onLongPress, size = "form" }: WeatherMoodGridProps) {
   const { isDark, get } = useThemeColors();
   const dims = SIZES[size];
-  const isDock = size === "dock";
+  const isDock = size !== "form";
   const rows = isDock ? DOCK_WEATHER_ROWS : MOOD_WEATHER_ROWS;
 
   return (
@@ -75,7 +76,7 @@ export function WeatherMoodGrid({ selected, onPress, onLongPress, size = "form" 
                   width: isDock ? "31.5%" : "23.5%",
                   marginHorizontal: "0.75%",
                   minHeight: dims.minHeight,
-                  paddingVertical: isDock ? 6 : 8,
+                  paddingVertical: size === "checkin" ? 4 : isDock ? 6 : 8,
                   paddingHorizontal: 2,
                   alignItems: "center",
                   justifyContent: "center",

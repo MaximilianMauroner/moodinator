@@ -35,21 +35,20 @@ Stop only owned emulator/build processes, uninstall owned QA app, and remove onl
 its prepared workspace/AVD after evidence is retained. Preserve redacted captures
 outside disposable state. Human approval is required by AGENTS.md before merge.
 
-## One pad recording
+## Guided recording
 
-With quick energy on and detailed labels off, Today uses the One pad dock.
-Start with no thumb and a disabled Keep button. Touch or drag across the pad.
-Left is mood 0 and right is mood 10. Top is energy 10 and bottom is energy 0.
-Use the mood-pad test ID and scripts/native-ui.js cell-coordinate helper in
-native runners. Use the device tool session for manual input and captures.
+With quick energy on and detailed labels off, Today shows the guided check-in.
+Choose a named mood, select up to three feelings, and continue to context in the
+same lower tray. Verify that no context is selected by default. Use the configured
+emotion and context options, including custom options. Feelings, context, energy,
+and notes remain optional.
 
-Test Clear, note folding with the keyboard, More and Done without saving,
-three-emotion limits, context selection, Keep and Undo. Check a severe draft
-saves before support, then Not now shows Undo. Switch tabs and return before
-Keep to check draft retention. Test screen-reader mood and energy adjustments,
-light and dark themes, and large system text. Capture the empty pad, selected
-pad, note, More and kept entry. Enable Notes in Quick Entry settings for note
-coverage. Restore settings after the journey.
+Check Change mood, Back, Clear, All feelings, optional energy and note, Keep, and
+Undo. Keep a severe rating and confirm that support appears only after the save;
+Not now then shows Undo. Switch tabs and return before Keep to check draft
+retention. Check the Android Back action and screen-reader labels, light and dark
+themes, and large system text. Capture the mood, feelings, context, optional
+details, and kept states. Enable Notes in Quick Entry settings for note coverage.
+Restore settings after the journey.
 
-The pad has no long press to detailed entry. Check detailed-entry journeys in
-tile modes, with energy off or detailed labels on.
+Check detailed-entry journeys in tile modes, with energy off or detailed labels on.
