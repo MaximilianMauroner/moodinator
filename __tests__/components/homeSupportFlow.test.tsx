@@ -30,7 +30,7 @@ vi.mock("react-native", () => ({
   Keyboard: { addListener: vi.fn(() => ({ remove: vi.fn() })) },
   Platform: { OS: "android", select: (values: Record<string, unknown>) => values.android ?? values.default },
 }));
-vi.mock("@/components/entry/MoodPadDock", () => ({ MoodPadDock: "MoodPadDock" }));
+vi.mock("@/components/entry/CheckInDock", () => ({ CheckInDock: "CheckInDock" }));
 vi.mock("@/components/entry/WeatherMoodGrid", () => ({ WeatherMoodGrid: "WeatherPicker" }));
 vi.mock("@expo/vector-icons", () => ({ Ionicons: "Ionicons" }));
 vi.mock("@react-navigation/bottom-tabs", () => ({ useBottomTabBarHeight: () => 56 }));
@@ -164,13 +164,13 @@ it("does not resume an old severe follow-up after Home loses focus", async () =>
 });
 
 
-it("uses the pad only with energy on and detailed labels off, and keeps through the shared save path", async () => {
+it("uses the staged check-in only with energy on and detailed labels off, and keeps through the shared save path", async () => {
   mocks.energy = true;
   mocks.detailedLabels = false;
   await act(async () => { renderer = create(<HomeScreen />); });
   expect(renderer.root.findAll((node) => node.type === "WeatherPicker")).toHaveLength(0);
   const onKept = vi.fn();
-  await act(async () => host("MoodPadDock").props.onKeep({
+  await act(async () => host("CheckInDock").props.onKeep({
     mood: 6, energy: 1, emotions: [], contextTags: ["Home"], note: "Rest", basedOnEntryId: null,
   }, onKept));
   expect(mocks.store.create).toHaveBeenCalledWith(expect.objectContaining({ mood: 6, energy: 1, note: "Rest" }));
@@ -180,4 +180,40 @@ it("uses the pad only with energy on and detailed labels off, and keeps through 
   await undo();
   expect(mocks.store.remove).toHaveBeenCalledTimes(1);
   expect(host("QuickDetail").props.visible).toBe(false);
+});
+
+
+it.each([9, 10])("saves the full severe check-in %s before support and offers Undo after Not now", async (mood) => {
+  mocks.energy = true;
+  mocks.detailedLabels = false;
+  let finish!: (entry: MoodEntry) => void;
+  mocks.store.create.mockImplementationOnce(() => new Promise<MoodEntry>((resolve) => { finish = resolve; }));
+  await act(async () => { renderer = create(<HomeScreen />); });
+  const onKept = vi.fn();
+  const values = {
+    mood, energy: null, emotions: [{ name: "Sad", category: "negative" }],
+    contextTags: ["My place"], note: "Need some rest", basedOnEntryId: null,
+  };
+  let pending!: Promise<void>;
+  await act(async () => { pending = host("CheckInDock").props.onKeep(values, onKept); });
+  expect(mocks.store.create).toHaveBeenCalledExactlyOnceWith(values);
+  expect(onKept).not.toHaveBeenCalled();
+  expect(mocks.support).not.toHaveBeenCalled();
+  await act(async () => {
+    finish(createMockMoodEntry({ mood }));
+    await pending;
+  });
+  expect(onKept).toHaveBeenCalledTimes(1);
+  expect(mocks.support).not.toHaveBeenCalled();
+  expect(toastService.showKeptMood).not.toHaveBeenCalled();
+  await act(async () => { vi.advanceTimersByTime(SUPPORT_SHEET_DELAY_MS); });
+  expect(mocks.support).toHaveBeenCalledTimes(1);
+  await act(async () => {
+    mocks.support.mock.calls[0]![0].onDecline!();
+    vi.advanceTimersByTime(SUPPORT_HANDOFF_MS);
+  });
+  expect(toastService.showKeptMood).toHaveBeenCalledTimes(1);
+  expect(host("QuickDetail").props.visible).toBe(false);
+  await vi.mocked(toastService.showKeptMood).mock.calls[0]![1]!();
+  expect(mocks.store.remove).toHaveBeenCalledTimes(1);
 });

@@ -176,7 +176,7 @@ describe("delayed support flow ownership", () => {
   });
 });
 
-describe("One pad Keep", () => {
+describe("Check-in Keep", () => {
   const values = {
     mood: 6, energy: 1, emotions: [{ name: "Tired", category: "neutral" as const }],
     contextTags: ["Home"], note: "A slow evening", basedOnEntryId: null,

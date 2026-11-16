@@ -11,30 +11,31 @@ name: Isolated Android entry lifecycle
 - tapOn: "Notes"
 - back
 - back
-- assertVisible: "Touch the pad first"
-- tapOn:
-    id: "mood-pad"
+- assertVisible: "Choose a mood"
+- assertVisible: "Mood Rating 0 of 10, Elated. Lower numbers are better."
+- assertVisible: "Mood Rating 10 of 10, Emergency. Lower numbers are better."
+- tapOn: "Mood Rating 5 of 10, Neutral. Lower numbers are better."
 - tapOn: "Clear"
 - assertVisible: "No check-in yet today"
-- tapOn:
-    id: "mood-pad"
-- tapOn: "More"
-- assertVisible: "Add detail"
+- tapOn: "Mood Rating 5 of 10, Neutral. Lower numbers are better."
+- tapOn: "All feelings"
 - scrollUntilVisible:
     element:
       id: "emotion-option-Happy"
     direction: DOWN
 - tapOn:
     id: "emotion-option-Happy"
-- tapOn: "Done"
+- tapOn: "Done with details"
 - assertVisible: "No check-in yet today"
+- tapOn: "Next · Context"
+- tapOn: "Energy & note (optional)"
+- tapOn: "Energy 5"
 - tapOn: "Note"
-- tapOn:
-    id: "mood-pad-note"
 - inputText: "QA smoke original note"
 - hideKeyboard
+- tapOn: "Done with details"
 - tapOn:
-    id: "mood-pad-keep"
+    id: "check-in-keep"
 - tapOn: "History tab, view past days and months"
 - assertVisible:
     id: "mood-entry-actions-.*"

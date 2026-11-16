@@ -14,7 +14,7 @@ import {
   QuickEntryDetailModal,
   MoodEntryFormValues,
 } from "@/components/MoodEntryModal";
-import { MoodPadDock } from "@/components/entry/MoodPadDock";
+import { CheckInDock } from "@/components/entry/CheckInDock";
 import { WeatherMoodGrid } from "@/components/entry/WeatherMoodGrid";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ScreenBackgroundAccent } from "@/components/layout/ScreenBackgroundAccent";
@@ -234,11 +234,10 @@ function HomeScreenContent() {
               }}
             >
               {quickFields.energy && !entrySettings.showDetailedLabels ? (
-                <MoodPadDock
+                <CheckInDock
                   fieldConfig={quickFields}
                   emotionOptions={entrySettings.emotionOptions}
                   contextOptions={entrySettings.contextOptions}
-                  latestContext={latest?.contextTags[0]}
                   onKeep={(values, onKept) => handleMoodTap(values.mood, values, onKept)}
                 />
               ) : (
