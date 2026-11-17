@@ -218,32 +218,34 @@ process.exit(1);
 });
 
 test("dump and read share one hierarchy timeout budget", () => {
-  const directory = mkdtempSync(join(tmpdir(), "moodinator-slow-dump-adb-"));
-  const adb = join(directory, "adb.mjs");
-  const calls = join(directory, "calls.jsonl");
-  writeFileSync(adb, `#!/usr/bin/env node
-import { appendFileSync } from "node:fs";
-const args = process.argv.slice(2);
-appendFileSync(${JSON.stringify(calls)}, JSON.stringify(args) + "\\n");
-if (args.includes("rm")) process.exit(0);
-await new Promise((resolve) => setTimeout(resolve, 300));
-if (args.includes("cat")) process.stdout.write(${JSON.stringify(hierarchy)});
-`);
-  chmodSync(adb, 0o755);
+  let now = 1000;
+  const calls = [];
+  const module = { exports: {} };
+  const source = readFileSync(new URL("../scripts/native-ui.js", import.meta.url), "utf8");
+  runInNewContext(source, {
+    module,
+    Date: { now: () => now },
+    require(specifier) {
+      if (specifier !== "node:child_process") return require(specifier);
+      return {
+        spawnSync(_adb, args, { timeout }) {
+          calls.push({ args, timeout });
+          if (args.includes("rm")) return { status: 0, stdout: "" };
+          now += Math.min(300, timeout);
+          if (timeout < 300) return { error: new Error("spawnSync adb ETIMEDOUT") };
+          return { status: 0, stdout: args.includes("cat") ? hierarchy : "" };
+        },
+      };
+    },
+  }, { filename: "native-ui.js" });
 
-  try {
-    assert.throws(() => dumpUiHierarchy("emulator-5554", {
-      adbPath: adb,
-      timeoutMs: 500,
-    }), /ETIMEDOUT/);
-    const inspections = readFileSync(calls, "utf8").trim().split("\n").map(JSON.parse)
-      .filter((args) => !args.includes("rm"));
-    assert.equal(inspections.length, 2);
-    assert.ok(inspections[0].includes("uiautomator"));
-    assert.ok(inspections[1].includes("cat"));
-  } finally {
-    rmSync(directory, { recursive: true, force: true });
-  }
+  assert.throws(() => module.exports.dumpUiHierarchy("emulator-5554", {
+    timeoutMs: 500,
+  }), /ETIMEDOUT/);
+  assert.equal(calls.length, 2);
+  assert.ok(calls[0].args.includes("uiautomator"));
+  assert.ok(calls[1].args.includes("cat"));
+  assert.deepEqual(calls.map(({ timeout }) => timeout), [500, 200]);
 });
 
 const timezoneHierarchy = `
