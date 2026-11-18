@@ -9,6 +9,11 @@ import { join } from "node:path";
 import test from "node:test";
 import { runInNewContext } from "node:vm";
 
+// A git hook exports GIT_DIR. Without this, the temporary repositories below commit into the pushed repository.
+for (const name of Object.keys(process.env)) {
+  if (name.startsWith("GIT_")) delete process.env[name];
+}
+
 const require = createRequire(import.meta.url);
 const {
   QA_SOURCE_METADATA,
