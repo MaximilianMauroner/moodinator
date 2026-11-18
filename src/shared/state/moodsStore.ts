@@ -58,6 +58,10 @@ export const useMoodsStore = create<MoodsStore>((set, get) => {
     options?: { clearError?: boolean },
   ) => {
     if (activeHydrationPromise) {
+      // A load joining a refresh has already cleared the rows, so it must not show as a refresh.
+      if (nextStatus === "loading") {
+        set({ status: nextStatus, ...(options?.clearError ? { error: null } : {}) });
+      }
       return activeHydrationPromise;
     }
 
