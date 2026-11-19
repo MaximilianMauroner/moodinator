@@ -57,6 +57,13 @@ class StateDatabase implements EncryptionDatabase {
   async closeAsync() { this.db.close(); this.closed(); }
 }
 
+function openFixtureDatabase(file: string) {
+  const db = new DatabaseSync(file);
+  // The startup code sets its own durability pragmas on the connections it uses.
+  db.exec("PRAGMA synchronous = OFF;");
+  return db;
+}
+
 function fixture({ key = null, version = "4.7.0 community" }: { key?: string | null; version?: string | null } = {}) {
   const root = mkdtempSync(path.join(tmpdir(), "moodinator-encryption-state-"));
   roots.push(root);
@@ -69,7 +76,7 @@ function fixture({ key = null, version = "4.7.0 community" }: { key?: string | n
     exists: async (name) => existsSync(file(name)),
     open: async (name) => {
       opened.push(name);
-      const db = new DatabaseSync(file(name));
+      const db = openFixtureDatabase(file(name));
       handles.add(db);
       return new StateDatabase(db, version, () => handles.delete(db));
     },
@@ -83,30 +90,26 @@ function fixture({ key = null, version = "4.7.0 community" }: { key?: string | n
     initialize: vi.fn(async () => {}),
   };
   function seed(name: string) {
-    const db = new DatabaseSync(file(name));
+    const db = openFixtureDatabase(file(name));
     db.exec("CREATE TABLE retained (id INTEGER PRIMARY KEY, note TEXT); INSERT INTO retained VALUES (1, 'Fabricated original');");
     db.close();
   }
   function state(status: string, source = "plaintext", stateVersion = 2) {
-    const db = new DatabaseSync(file(DATABASE_FILES.coordinator));
+    const db = openFixtureDatabase(file(DATABASE_FILES.coordinator));
     db.exec("CREATE TABLE encryption_state (id INTEGER PRIMARY KEY, version INTEGER, status TEXT, source TEXT);");
     db.prepare("INSERT INTO encryption_state VALUES (1, ?, ?, ?)").run(stateVersion, status, source);
     db.close();
   }
   function seedLegacyLinks(name: string, schema = LEGACY_FIXTURE) {
-    const db = new DatabaseSync(file(name));
+    const db = openFixtureDatabase(file(name));
     try {
       db.exec(schema);
       // Same deletes as the pre-encryption app, with its FK-off connection.
-      db.exec(`PRAGMA foreign_keys = OFF;
-        BEGIN;
-        DELETE FROM moods WHERE id = 1;
-        DELETE FROM emotions WHERE name = 'Tired';
-        COMMIT;`);
+      db.exec("PRAGMA foreign_keys = OFF; DELETE FROM moods WHERE id = 1; DELETE FROM emotions WHERE name = 'Tired';");
     } finally { db.close(); }
   }
   function recordedState() {
-    const db = new DatabaseSync(file(DATABASE_FILES.coordinator));
+    const db = openFixtureDatabase(file(DATABASE_FILES.coordinator));
     try { return { ...db.prepare("SELECT version, status, source FROM encryption_state").get() }; }
     finally { db.close(); }
   }
@@ -134,7 +137,7 @@ describe("database key and SQLCipher admission", () => {
 
 it("snapshot comparison retains int64, NUL text, BLOBs, close real values and sequence state before the JS bridge", async () => {
   const { file, storage, handles } = fixture();
-  const seeded = new DatabaseSync(file("snapshot.db"));
+  const seeded = openFixtureDatabase(file("snapshot.db"));
   seeded.exec(`CREATE TABLE values_to_retain (id INTEGER PRIMARY KEY AUTOINCREMENT, integer_value INTEGER, text_value TEXT, blob_value BLOB, real_value REAL);
     INSERT INTO values_to_retain VALUES (1, 9007199254740993, 'before' || char(0) || 'after', x'00ff80', 0.125);
     UPDATE sqlite_sequence SET seq = 99;
@@ -162,7 +165,7 @@ it.each([
   { name: "schema", sql: "DROP INDEX retained_index;" },
 ])("rejects exact $name loss without JavaScript numeric or text coercion", async ({ sql }) => {
   const f = fixture();
-  const seeded = new DatabaseSync(f.file("actual.db"));
+  const seeded = openFixtureDatabase(f.file("actual.db"));
   seeded.exec(`CREATE TABLE exact_values (id INTEGER PRIMARY KEY AUTOINCREMENT, integer_value INTEGER,
     text_value TEXT, blob_value BLOB, untyped_value);
     CREATE INDEX retained_index ON exact_values(integer_value);
@@ -183,7 +186,7 @@ it("compares individual multi-chunk text/BLOB values with bounded bridge results
   const chunkBytes = 256 * 1024;
   const payloadBytes = chunkBytes + 1;
   const f = fixture();
-  const seeded = new DatabaseSync(f.file("actual.db"));
+  const seeded = openFixtureDatabase(f.file("actual.db"));
   seeded.exec(`CREATE TABLE payload (id INTEGER PRIMARY KEY, text_value TEXT, blob_value BLOB);
     INSERT INTO payload VALUES (1, 'before' || char(0) || printf('%.*c', ${payloadBytes}, 'z'), zeroblob(${payloadBytes}));`);
   seeded.close();
@@ -218,7 +221,7 @@ it.each([
   { name: "WITHOUT ROWID", schema: "CREATE TABLE content (a TEXT, b INTEGER, value BLOB, PRIMARY KEY(a, b)) WITHOUT /* retained comment */ ROWID;", values: "('a', 1, x'00ff'), ('A', 2, x'0080')", move: "" },
 ])("retains exact $name and ignores hidden row identity", async ({ schema, values, move }) => {
   const f = fixture();
-  const seeded = new DatabaseSync(f.file("actual.db"));
+  const seeded = openFixtureDatabase(f.file("actual.db"));
   seeded.exec(`${schema} INSERT INTO content VALUES ${values};`);
   seeded.close();
   copyFileSync(f.file("actual.db"), f.file("expected.db"));
@@ -234,7 +237,7 @@ it.each([
 
 it.each(["VIRTUAL", "STORED"])("compares %s generated-column tables without unsupported native blob reads", async (mode) => {
   const f = fixture();
-  const seeded = new DatabaseSync(f.file("actual.db"));
+  const seeded = openFixtureDatabase(f.file("actual.db"));
   seeded.exec(`CREATE TABLE generated (id INTEGER PRIMARY KEY, value TEXT,
     derived TEXT GENERATED ALWAYS AS (value || '-suffix') ${mode});
     INSERT INTO generated(id, value) VALUES (1, 'before' || char(0) || 'after');`);
