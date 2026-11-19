@@ -334,6 +334,23 @@ describe("windowed history", () => {
     });
   });
 
+  test("a filter change during a refresh reports loading until the filtered rows arrive", async () => {
+    const resolvers: ((value: unknown) => void)[] = [];
+    moodServiceMock.getPaginated.mockImplementation(
+      () => new Promise((resolve) => resolvers.push(resolve)),
+    );
+    const refresh = useMoodsStore.getState().refreshMoods();
+    const filtering = useMoodsStore.getState().setFilters({ minMood: 7 });
+    expect(useMoodsStore.getState()).toMatchObject({ moods: [], status: "loading" });
+    const match = makeMood(1, 100);
+    resolvers[0]!({ data: [], total: 0, hasMore: false });
+    await flushMicrotasks();
+    expect(useMoodsStore.getState().status).toBe("loading");
+    resolvers[1]!({ data: [match], total: 1, hasMore: false });
+    await Promise.all([refresh, filtering]);
+    expect(useMoodsStore.getState()).toMatchObject({ moods: [match], status: "idle" });
+  });
+
   test("empty filters results settle to idle and filtered mutations requery SQL", async () => {
     moodServiceMock.getPaginated.mockResolvedValue({
       data: [],
