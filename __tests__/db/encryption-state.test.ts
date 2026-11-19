@@ -57,6 +57,13 @@ class StateDatabase implements EncryptionDatabase {
   async closeAsync() { this.db.close(); this.closed(); }
 }
 
+function openFixtureDatabase(file: string) {
+  const db = new DatabaseSync(file);
+  // Fixture writes do not need to survive a system crash.
+  db.exec("PRAGMA synchronous = OFF;");
+  return db;
+}
+
 function fixture({ key = null, version = "4.7.0 community" }: { key?: string | null; version?: string | null } = {}) {
   const root = mkdtempSync(path.join(tmpdir(), "moodinator-encryption-state-"));
   roots.push(root);
@@ -64,14 +71,19 @@ function fixture({ key = null, version = "4.7.0 community" }: { key?: string | n
   const handles = new Set<DatabaseSync>();
   const opened: string[] = [];
   const file = (name: string) => path.join(root, name);
+  function track(db: DatabaseSync) {
+    handles.add(db);
+    return new StateDatabase(db, version, () => handles.delete(db));
+  }
+  function openSnapshot(name: string) {
+    return track(openFixtureDatabase(file(name)));
+  }
   const storage: EncryptionStorage<StateDatabase> = {
     path: file,
     exists: async (name) => existsSync(file(name)),
     open: async (name) => {
       opened.push(name);
-      const db = new DatabaseSync(file(name));
-      handles.add(db);
-      return new StateDatabase(db, version, () => handles.delete(db));
+      return track(new DatabaseSync(file(name)));
     },
     copy: vi.fn(async (source, target) => { copyFileSync(file(source), file(target)); }),
     remove: vi.fn(async (name) => { unlinkSync(file(name)); }),
@@ -83,18 +95,18 @@ function fixture({ key = null, version = "4.7.0 community" }: { key?: string | n
     initialize: vi.fn(async () => {}),
   };
   function seed(name: string) {
-    const db = new DatabaseSync(file(name));
+    const db = openFixtureDatabase(file(name));
     db.exec("CREATE TABLE retained (id INTEGER PRIMARY KEY, note TEXT); INSERT INTO retained VALUES (1, 'Fabricated original');");
     db.close();
   }
   function state(status: string, source = "plaintext", stateVersion = 2) {
-    const db = new DatabaseSync(file(DATABASE_FILES.coordinator));
+    const db = openFixtureDatabase(file(DATABASE_FILES.coordinator));
     db.exec("CREATE TABLE encryption_state (id INTEGER PRIMARY KEY, version INTEGER, status TEXT, source TEXT);");
     db.prepare("INSERT INTO encryption_state VALUES (1, ?, ?, ?)").run(stateVersion, status, source);
     db.close();
   }
   function seedLegacyLinks(name: string, schema = LEGACY_FIXTURE) {
-    const db = new DatabaseSync(file(name));
+    const db = openFixtureDatabase(file(name));
     try {
       db.exec(schema);
       // Same deletes as the pre-encryption app, with its FK-off connection.
@@ -102,11 +114,11 @@ function fixture({ key = null, version = "4.7.0 community" }: { key?: string | n
     } finally { db.close(); }
   }
   function recordedState() {
-    const db = new DatabaseSync(file(DATABASE_FILES.coordinator));
+    const db = openFixtureDatabase(file(DATABASE_FILES.coordinator));
     try { return { ...db.prepare("SELECT version, status, source FROM encryption_state").get() }; }
     finally { db.close(); }
   }
-  return { root, file, storage, handles, opened, seed, seedLegacyLinks, state, recordedState };
+  return { root, file, storage, openSnapshot, handles, opened, seed, seedLegacyLinks, state, recordedState };
 }
 
 describe("database key and SQLCipher admission", () => {
@@ -129,17 +141,17 @@ describe("database key and SQLCipher admission", () => {
 });
 
 it("snapshot comparison retains int64, NUL text, BLOBs, close real values and sequence state before the JS bridge", async () => {
-  const { file, storage, handles } = fixture();
-  const seeded = new DatabaseSync(file("snapshot.db"));
+  const { file, openSnapshot, handles } = fixture();
+  const seeded = openFixtureDatabase(file("snapshot.db"));
   seeded.exec(`CREATE TABLE values_to_retain (id INTEGER PRIMARY KEY AUTOINCREMENT, integer_value INTEGER, text_value TEXT, blob_value BLOB, real_value REAL);
     INSERT INTO values_to_retain VALUES (1, 9007199254740993, 'before' || char(0) || 'after', x'00ff80', 0.125);
     UPDATE sqlite_sequence SET seq = 99;
     PRAGMA user_version = 7; PRAGMA application_id = 1297040452;`);
   seeded.close();
-  const db = await storage.open("snapshot.db");
+  const db = openSnapshot("snapshot.db");
   try {
     copyFileSync(file("snapshot.db"), file("expected.db"));
-    const expected = await storage.open("expected.db");
+    const expected = openSnapshot("expected.db");
     try {
       await requireMatchingDatabases(db, expected);
       await db.execAsync("UPDATE values_to_retain SET real_value = 0.12500000000000003;");
@@ -158,7 +170,7 @@ it.each([
   { name: "schema", sql: "DROP INDEX retained_index;" },
 ])("rejects exact $name loss without JavaScript numeric or text coercion", async ({ sql }) => {
   const f = fixture();
-  const seeded = new DatabaseSync(f.file("actual.db"));
+  const seeded = openFixtureDatabase(f.file("actual.db"));
   seeded.exec(`CREATE TABLE exact_values (id INTEGER PRIMARY KEY AUTOINCREMENT, integer_value INTEGER,
     text_value TEXT, blob_value BLOB, untyped_value);
     CREATE INDEX retained_index ON exact_values(integer_value);
@@ -166,8 +178,8 @@ it.each([
     UPDATE sqlite_sequence SET seq = 99;`);
   seeded.close();
   copyFileSync(f.file("actual.db"), f.file("expected.db"));
-  const actual = await f.storage.open("actual.db");
-  const expected = await f.storage.open("expected.db");
+  const actual = f.openSnapshot("actual.db");
+  const expected = f.openSnapshot("expected.db");
   try {
     await requireMatchingDatabases(actual, expected);
     await actual.execAsync(sql);
@@ -179,13 +191,13 @@ it("compares individual multi-chunk text/BLOB values with bounded bridge results
   const chunkBytes = 256 * 1024;
   const payloadBytes = chunkBytes + 1;
   const f = fixture();
-  const seeded = new DatabaseSync(f.file("actual.db"));
+  const seeded = openFixtureDatabase(f.file("actual.db"));
   seeded.exec(`CREATE TABLE payload (id INTEGER PRIMARY KEY, text_value TEXT, blob_value BLOB);
     INSERT INTO payload VALUES (1, 'before' || char(0) || printf('%.*c', ${payloadBytes}, 'z'), zeroblob(${payloadBytes}));`);
   seeded.close();
   copyFileSync(f.file("actual.db"), f.file("expected.db"));
-  const actual = await f.storage.open("actual.db");
-  const expected = await f.storage.open("expected.db");
+  const actual = f.openSnapshot("actual.db");
+  const expected = f.openSnapshot("expected.db");
   const nativeRead = actual.getFirstAsync.bind(actual);
   let chunks = 0;
   let largestRequestedChunk = 0;
@@ -214,12 +226,12 @@ it.each([
   { name: "WITHOUT ROWID", schema: "CREATE TABLE content (a TEXT, b INTEGER, value BLOB, PRIMARY KEY(a, b)) WITHOUT /* retained comment */ ROWID;", values: "('a', 1, x'00ff'), ('A', 2, x'0080')", move: "" },
 ])("retains exact $name and ignores hidden row identity", async ({ schema, values, move }) => {
   const f = fixture();
-  const seeded = new DatabaseSync(f.file("actual.db"));
+  const seeded = openFixtureDatabase(f.file("actual.db"));
   seeded.exec(`${schema} INSERT INTO content VALUES ${values};`);
   seeded.close();
   copyFileSync(f.file("actual.db"), f.file("expected.db"));
-  const actual = await f.storage.open("actual.db");
-  const expected = await f.storage.open("expected.db");
+  const actual = f.openSnapshot("actual.db");
+  const expected = f.openSnapshot("expected.db");
   try {
     if (move) await actual.execAsync(move);
     await requireMatchingDatabases(actual, expected);
@@ -230,14 +242,14 @@ it.each([
 
 it.each(["VIRTUAL", "STORED"])("compares %s generated-column tables without unsupported native blob reads", async (mode) => {
   const f = fixture();
-  const seeded = new DatabaseSync(f.file("actual.db"));
+  const seeded = openFixtureDatabase(f.file("actual.db"));
   seeded.exec(`CREATE TABLE generated (id INTEGER PRIMARY KEY, value TEXT,
     derived TEXT GENERATED ALWAYS AS (value || '-suffix') ${mode});
     INSERT INTO generated(id, value) VALUES (1, 'before' || char(0) || 'after');`);
   seeded.close();
   copyFileSync(f.file("actual.db"), f.file("expected.db"));
-  const actual = await f.storage.open("actual.db");
-  const expected = await f.storage.open("expected.db");
+  const actual = f.openSnapshot("actual.db");
+  const expected = f.openSnapshot("expected.db");
   try {
     await requireMatchingDatabases(actual, expected);
     await actual.execAsync("UPDATE generated SET value = 'before' || char(0) || 'changed';");
@@ -249,7 +261,7 @@ describe("legacy relationship preservation", () => {
   it("retains known orphan rows from FK-off mood and emotion deletion", async () => {
     const f = fixture();
     f.seedLegacyLinks("relations.db");
-    const db = await f.storage.open("relations.db");
+    const db = f.openSnapshot("relations.db");
     try {
       const snapshot = await inspectDatabase(db);
       expect(snapshot.legacyForeignKeyViolations.map(({ parent, count }) => ({ parent, count }))).toEqual([
@@ -265,10 +277,10 @@ describe("legacy relationship preservation", () => {
   it("compares equivalent relationship rows despite reassigned hidden rowids", async () => {
     const f = fixture();
     f.seedLegacyLinks("relations.db");
-    const db = await f.storage.open("relations.db");
+    const db = f.openSnapshot("relations.db");
     try {
       copyFileSync(f.file("relations.db"), f.file("expected.db"));
-      const expected = await f.storage.open("expected.db");
+      const expected = f.openSnapshot("expected.db");
       try {
         const before = await db.getAllAsync("PRAGMA foreign_key_check;");
         await db.execAsync("UPDATE mood_emotions SET rowid = rowid + 100;");
@@ -284,10 +296,10 @@ describe("legacy relationship preservation", () => {
   ])("rejects $loss orphan row contents even when physical integrity remains valid", async ({ sql, loss }) => {
     const f = fixture();
     f.seedLegacyLinks("relations.db");
-    const db = await f.storage.open("relations.db");
+    const db = f.openSnapshot("relations.db");
     try {
       copyFileSync(f.file("relations.db"), f.file("expected.db"));
-      const expected = await f.storage.open("expected.db");
+      const expected = f.openSnapshot("expected.db");
       try {
         const original = await inspectDatabase(expected);
         await db.execAsync(`PRAGMA foreign_keys = OFF; ${sql}`);
@@ -301,7 +313,7 @@ describe("legacy relationship preservation", () => {
   it("keeps unrelated foreign-key violations fatal", async () => {
     const f = fixture();
     f.seedLegacyLinks("relations.db");
-    const db = await f.storage.open("relations.db");
+    const db = f.openSnapshot("relations.db");
     try {
       await db.execAsync(`PRAGMA foreign_keys = OFF;
         CREATE TABLE unknown_relationship (parent_id INTEGER REFERENCES moods(id) ON DELETE CASCADE);
@@ -318,7 +330,7 @@ describe("legacy relationship preservation", () => {
     f.seedLegacyLinks("relations.db", LEGACY_FIXTURE.replace(
       "FOREIGN KEY (mood_id) REFERENCES moods(id) ON DELETE CASCADE", replacement
     ));
-    const db = await f.storage.open("relations.db");
+    const db = f.openSnapshot("relations.db");
     try { await expect(inspectDatabase(db)).rejects.toThrow("relationship verification failed"); }
     finally { await db.closeAsync(); }
   });
@@ -450,7 +462,9 @@ describe("fail-closed startup state", () => {
     f.state("completed");
     f.seed(DATABASE_FILES.original);
     writeFileSync(f.file(DATABASE_FILES.active), "Fabricated corrupt target");
+    using integrity = vi.spyOn(StateDatabase.prototype, "getEachAsync");
     await expect(openEncryptedDatabase(f.storage)).rejects.toThrow();
+    expect(integrity).toHaveBeenCalledWith("PRAGMA integrity_check;");
     expect(f.opened).toEqual([DATABASE_FILES.coordinator, DATABASE_FILES.active]);
     expect(f.storage.remove).not.toHaveBeenCalled();
     expect(f.storage.createKey).not.toHaveBeenCalled();

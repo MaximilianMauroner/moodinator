@@ -1,4 +1,6 @@
-import { addDays, format, startOfDay } from "date-fns";
+import { addDays } from "date-fns/addDays";
+import { format } from "date-fns/format";
+import { startOfDay } from "date-fns/startOfDay";
 import { getEntryLocalDayKey } from "@/lib/entryTimezone";
 import type { MoodEntry } from "@db/types";
 import { getInterpretedMoodRating } from "@/constants/moodScaleInterpretation";

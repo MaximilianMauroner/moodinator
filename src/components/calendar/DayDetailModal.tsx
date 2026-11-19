@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, Pressable, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { format } from "date-fns";
+import { format } from "date-fns/format";
 import { PrivateModal } from "@/components/ui/PrivateModal";
 import { useThemeColors, colors, getThemedColor } from "@/constants/colors";
 import { getMoodRatingDisplay } from "@/constants/moodScaleInterpretation";
