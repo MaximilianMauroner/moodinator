@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { addDays, format, endOfDay, startOfDay } from "date-fns";
+import { addDays } from "date-fns/addDays";
+import { endOfDay } from "date-fns/endOfDay";
+import { format } from "date-fns/format";
+import { startOfDay } from "date-fns/startOfDay";
 import { AppState } from "react-native";
 import { useFocusEffect } from "expo-router";
 import type { MoodEntry, MoodScaleSnapshot } from "@db/types";

@@ -1,6 +1,7 @@
 import type { MoodEntry } from "@db/types";
 import { getEntryLocalDayKey } from "@/lib/entryTimezone";
-import { format, subDays } from "date-fns";
+import { format } from "date-fns/format";
+import { subDays } from "date-fns/subDays";
 
 /**
  * Calculate current streak (consecutive days with entries)

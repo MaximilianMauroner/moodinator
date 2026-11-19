@@ -9,8 +9,8 @@
     "web": "expo start --web",
     "test": "vitest",
     "test:run": "vitest run",
-    "lint": "expo lint",
-    "typecheck": "node node_modules/typescript/bin/tsc --noEmit",
+    "lint": "eslint src --cache --cache-location .expo/cache/eslint/ --concurrency=2",
+    "typecheck": "node node_modules/typescript-native/bin/tsc --noEmit",
     "doctor": "expo-doctor",
     "verify": "pnpm run lint && pnpm run typecheck && pnpm run test:run && pnpm run test:qa && pnpm run doctor && pnpm run verify:android-release-config && pnpm run verify:color-tokens",
     "verify:android-release-config": "node scripts/check-android-release-config.js",
@@ -101,6 +101,7 @@
     "expo-doctor": "1.20.4",
     "react-test-renderer": "19.2.0",
     "typescript": "6.0.3",
+    "typescript-native": "npm:typescript@7.0.2",
     "vitest": "^4.1.5",
     "tsx": "4.21.0"
   },

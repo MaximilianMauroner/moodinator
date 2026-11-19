@@ -1,4 +1,5 @@
-import { startOfDay, subDays } from "date-fns";
+import { startOfDay } from "date-fns/startOfDay";
+import { subDays } from "date-fns/subDays";
 import type { MoodEntry } from "@db/types";
 import { dailySeries } from "./dailySeries";
 import { drivers } from "./drivers";

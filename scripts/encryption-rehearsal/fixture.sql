@@ -2,6 +2,7 @@
 PRAGMA foreign_keys = ON;
 PRAGMA user_version = 7;
 PRAGMA application_id = 1297040452;
+BEGIN;
 CREATE TABLE moods (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   mood INTEGER NOT NULL,
@@ -58,3 +59,4 @@ INSERT INTO moods (mood, note) VALUES (5, 'Fabricated NUL: ' || char(0) || 'suff
 INSERT INTO moods (id, mood) VALUES (99, 5);
 DELETE FROM moods WHERE id = 99;
 DELETE FROM fixture_audit WHERE mood_id = 99;
+COMMIT;

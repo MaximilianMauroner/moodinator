@@ -98,7 +98,11 @@ function fixture({ key = null, version = "4.7.0 community" }: { key?: string | n
     try {
       db.exec(schema);
       // Same deletes as the pre-encryption app, with its FK-off connection.
-      db.exec("PRAGMA foreign_keys = OFF; DELETE FROM moods WHERE id = 1; DELETE FROM emotions WHERE name = 'Tired';");
+      db.exec(`PRAGMA foreign_keys = OFF;
+        BEGIN;
+        DELETE FROM moods WHERE id = 1;
+        DELETE FROM emotions WHERE name = 'Tired';
+        COMMIT;`);
     } finally { db.close(); }
   }
   function recordedState() {
