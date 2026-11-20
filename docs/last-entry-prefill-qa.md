@@ -6,7 +6,7 @@ prove Android touch geometry or persisted native values.
 
 Use a disposable Android emulator and the separate
 `com.lab4code.moodinator.qa` package. Never use personal data. Prepare from clean
-committed source with `bun run qa:prepare`, install frozen dependencies, generate
+committed source with `pnpm run qa:prepare`, install frozen dependencies, generate
 and seal Android through Native QA, and build a nondebuggable QA release. Record
 the source revision, sealed inputs, installed APK checksum, API level, screen and
 navigation mode. Check the actual merged QA release manifest. Confirm the app's
