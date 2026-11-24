@@ -222,18 +222,13 @@ async function captureMatrixScreens(serial, outputDirectory, stateName, fixtureC
   await waitForNodeAndTap(serial, { contentDescription: "All feelings" });
   await waitForNode(serial, { text: "All feelings" });
   capture("today-all-feelings");
-  await waitForNodeAndTap(serial, { contentDescription: "Done with details" });
-  await waitForNodeAndTap(serial, { contentDescription: "Next · Context" });
-  await waitForNode(serial, { text: "Add context" });
+  await waitForNodeAndTap(serial, { contentDescription: "Done with feelings" });
+  await waitForNodeAndTap(serial, { testId: "check-in-next" });
+  await waitForNode(serial, { text: "Energy & context" });
   capture("today-draft");
-  await waitForNodeAndTap(serial, { anyOf: [
-    { contentDescription: "Energy (optional)" },
-    { contentDescription: "Energy & note (optional)" },
-  ] });
-  await waitForNodeAndTap(serial, { contentDescription: "Energy 1" });
-  await waitForNode(serial, { text: "Optional details" });
+  await waitForNodeAndTap(serial, { testId: "energy-level-1" });
+  await waitForNode(serial, { text: "Very low · 1/10" });
   capture("today-details");
-  await waitForNodeAndTap(serial, { contentDescription: "Done with details" });
   await waitForNodeAndTap(serial, { contentDescription: "Clear" });
   await waitForNodeAndTap(serial, { contentDescription: "History tab, view past days and months" });
   await waitForNode(serial, { testId: "history-count" }, { timeoutMs: 15000 });

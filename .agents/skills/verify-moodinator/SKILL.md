@@ -38,13 +38,13 @@ outside disposable state. Human approval is required by AGENTS.md before merge.
 ## Guided recording
 
 With quick energy on and detailed labels off, Today shows the guided check-in.
-Choose a named mood, select up to three feelings, and continue to context in the
-same lower tray. Verify that no context is selected by default. Use the configured
-emotion and context options, including custom options. Feelings, context, energy,
-and notes remain optional.
+Choose a named mood, select up to three feelings, and continue to energy and context in the
+same lower tray. Verify that energy is directly selectable inline without opening a note sheet,
+and that no context is selected by default. Use the configured emotion and context options,
+including custom options. Feelings, energy, context, and notes remain optional.
 
-Check Change mood, Back, Clear, All feelings, optional energy and note, Keep, and
-Undo. Keep a severe rating and confirm that support appears only after the save;
+Check Change mood, Back, Clear, All feelings, inline energy (0–10 and Clear), separate Note
+sheet, Keep, and Undo. Keep a severe rating and confirm that support appears only after the save;
 Not now then shows Undo. Switch tabs and return before Keep to check draft
 retention. Check the Android Back action and screen-reader labels, light and dark
 themes, and large system text. Capture the mood, feelings, context, optional

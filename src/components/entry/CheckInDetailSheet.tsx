@@ -16,14 +16,16 @@ import { typography } from "@/constants/typography";
 import { haptics } from "@/lib/haptics";
 import type { Emotion } from "@db/types";
 import { EmotionPicker } from "./EmotionPicker";
-import { CheckInChip } from "./CheckInChip";
 import {
   MAX_CHECK_IN_FEELINGS,
   type CheckInAction,
   type CheckInDraft,
   type CheckInSheet,
 } from "./checkInDraft";
-import type { MoodEntryFieldConfig } from "./moodEntryDraft";
+import {
+  getNotesPlaceholder,
+  type MoodEntryFieldConfig,
+} from "./moodEntryDraft";
 
 type Props = {
   draft: CheckInDraft;
@@ -42,6 +44,9 @@ export function CheckInDetailSheet({
 }: Props) {
   const { get } = useThemeColors();
   const insets = useSafeAreaInsets();
+  const isFeelings = sheet === "feelings";
+  const isNote = sheet === "note";
+  const hasNote = draft.note.trim().length > 0;
   const close = () => {
     Keyboard.dismiss();
     dispatch({ type: "sheet", sheet: null });
@@ -59,7 +64,7 @@ export function CheckInDetailSheet({
         style={{ backgroundColor: colors.overlay, paddingTop: insets.top + 16 }}
       >
         <Pressable
-          accessibilityLabel="Close details"
+          accessibilityLabel={isFeelings ? "Close feelings" : "Close note"}
           accessibilityRole="button"
           onPress={close}
           style={{ flex: 1, minHeight: 44 }}
@@ -75,21 +80,46 @@ export function CheckInDetailSheet({
             backgroundColor: get("surface"),
           }}
         >
-          <Text
-            accessibilityRole="header"
-            style={[
-              typography.titleMd,
-              { color: get("text"), marginBottom: 12 },
-            ]}
-          >
-            {sheet === "feelings" ? "All feelings" : "Optional details"}
-          </Text>
+          <View className="flex-row items-center justify-between mb-3">
+            <Text
+              accessibilityRole="header"
+              style={[typography.titleMd, { color: get("text") }]}
+            >
+              {isFeelings ? "All feelings" : "Note"}
+            </Text>
+            {isNote && hasNote && (
+              <Pressable
+                onPress={() => {
+                  haptics.tick();
+                  dispatch({ type: "note", note: "" });
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Clear note"
+                className="justify-center px-3 rounded-xl"
+                style={{
+                  minHeight: 44,
+                  backgroundColor: get("surfaceAlt"),
+                  borderWidth: 1,
+                  borderColor: get("border"),
+                }}
+              >
+                <Text
+                  style={[
+                    typography.bodySm,
+                    { color: get("textMuted"), fontWeight: "500" },
+                  ]}
+                >
+                  Clear note
+                </Text>
+              </Pressable>
+            )}
+          </View>
           <ScrollView
             keyboardShouldPersistTaps="handled"
             style={{ flexShrink: 1 }}
             contentContainerStyle={{ paddingBottom: 16 }}
           >
-            {sheet === "feelings" && fieldConfig.emotions && (
+            {isFeelings && fieldConfig.emotions && (
               <EmotionPicker
                 options={emotionOptions}
                 selected={draft.emotions}
@@ -99,51 +129,25 @@ export function CheckInDetailSheet({
                 }
               />
             )}
-            {sheet === "extras" && fieldConfig.energy && (
-              <View className="gap-2 mb-4">
-                <Text
-                  accessibilityRole="header"
-                  style={[typography.bodyMd, { color: get("text") }]}
-                >
-                  Energy (optional)
-                </Text>
-                <Text style={[typography.bodySm, { color: get("textMuted") }]}>
-                  0 is drained. 10 is wired.
-                </Text>
-                <View className="flex-row flex-wrap gap-2">
-                  {Array.from({ length: 11 }, (_, energy) => (
-                    <CheckInChip
-                      key={energy}
-                      label={`Energy ${energy}`}
-                      selected={draft.energy === energy}
-                      onPress={() => {
-                        haptics.tick();
-                        dispatch({
-                          type: "energy",
-                          energy: draft.energy === energy ? null : energy,
-                        });
-                      }}
-                    />
-                  ))}
-                </View>
-              </View>
-            )}
-            {sheet === "extras" && fieldConfig.notes && (
+            {isNote && fieldConfig.notes && (
               <TextInput
                 multiline
+                autoFocus
+                testID="check-in-note-input"
                 accessibilityLabel="Note"
-                placeholder="Anything else on your mind?"
+                placeholder={getNotesPlaceholder(draft.mood)}
                 placeholderTextColor={get("textSubtle")}
                 value={draft.note}
                 onChangeText={(note) => dispatch({ type: "note", note })}
+                cursorColor={get("primary")}
                 style={[
                   typography.bodyMd,
                   {
-                    minHeight: 100,
-                    maxHeight: 180,
+                    minHeight: 120,
+                    maxHeight: 200,
                     textAlignVertical: "top",
-                    padding: 12,
-                    borderRadius: 12,
+                    padding: 14,
+                    borderRadius: 14,
                     borderWidth: 1,
                     borderColor: get("border"),
                     color: get("text"),
@@ -156,11 +160,16 @@ export function CheckInDetailSheet({
           <Pressable
             onPress={close}
             accessibilityRole="button"
-            accessibilityLabel="Done with details"
+            accessibilityLabel={isFeelings ? "Done with feelings" : "Done with note"}
             className="items-center justify-center rounded-2xl px-4 mt-2"
             style={{ minHeight: 48, backgroundColor: get("primary") }}
           >
-            <Text style={[typography.bodyMd, { color: get("onPrimary") }]}>
+            <Text
+              style={[
+                typography.bodyMd,
+                { color: get("onPrimary"), fontWeight: "600" },
+              ]}
+            >
               Done
             </Text>
           </Pressable>

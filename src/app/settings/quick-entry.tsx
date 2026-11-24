@@ -55,7 +55,7 @@ export default function QuickEntrySettingsScreen() {
             </Text>
           </View>
           <Text className="text-xs text-paper-700 dark:text-sand-400">
-            With Energy on and detailed labels off, choose a mood, then optional feelings and context in the lower tray. Energy and notes are optional. Keep saves your draft. Clear saves nothing. In tile modes, a tap opens the enabled fields and Done saves. With all fields off, a tap saves at once. Severe ratings save before support. Long-press is available in tile modes for detailed entry.
+            With Energy on and detailed labels off, choose a mood, then optional feelings, energy, and context directly in the lower tray. Notes stay separate and optional. Keep saves your draft. Clear saves nothing. In tile modes, a tap opens the enabled fields and Done saves. With all fields off, a tap saves at once. Severe ratings save before support. Long-press is available in tile modes for detailed entry.
           </Text>
         </View>
 

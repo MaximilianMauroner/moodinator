@@ -25,15 +25,19 @@ name: Isolated Android entry lifecycle
     direction: DOWN
 - tapOn:
     id: "emotion-option-Happy"
-- tapOn: "Done with details"
+- tapOn: "Done with feelings"
 - assertVisible: "No check-in yet today"
-- tapOn: "Next · Context"
-- tapOn: "Energy & note (optional)"
-- tapOn: "Energy 5"
-- tapOn: "Note"
+- tapOn:
+    id: "check-in-next"
+- tapOn:
+    id: "energy-level-5"
+- tapOn:
+    id: "check-in-note-trigger"
+- tapOn:
+    id: "check-in-note-input"
 - inputText: "QA smoke original note"
 - hideKeyboard
-- tapOn: "Done with details"
+- tapOn: "Done with note"
 - tapOn:
     id: "check-in-keep"
 - tapOn: "History tab, view past days and months"

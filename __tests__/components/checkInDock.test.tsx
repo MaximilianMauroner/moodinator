@@ -33,10 +33,13 @@ vi.mock("expo-router", () => ({ useFocusEffect: React.useEffect }));
 vi.mock("@/lib/haptics", () => ({ haptics: { tick: mocks.tick } }));
 vi.mock("@/hooks/useReducedMotion", () => ({ useReducedMotion: () => true }));
 vi.mock("react-native-reanimated", () => ({
-  default: { View: "View" },
+  default: { View: "View", Text: "Text" },
   useAnimatedStyle: (style: () => unknown) => style(),
   useSharedValue: (value: number) => ({ value }),
   withTiming: (value: number) => value,
+  withSpring: (value: number) => value,
+  FadeIn: { duration: () => undefined },
+  FadeOut: { duration: () => undefined },
 }));
 vi.mock("@expo/vector-icons", () => ({ Ionicons: "Ionicons" }));
 vi.mock("@/hooks/useColorScheme", () => ({ useColorScheme: () => "light" }));
@@ -72,12 +75,17 @@ const buttons = () =>
   renderer.root.findAll((node) => node.type === "Pressable");
 const button = (label: string) =>
   buttons().find((node) => node.props.accessibilityLabel === label)!;
+const byTestId = (testID: string) =>
+  renderer.root.findAll((node) => node.props.testID === testID)[0]!;
 const moodButton = (mood: number) =>
   buttons().find((node) =>
     node.props.accessibilityLabel?.startsWith(`Mood Rating ${mood} of 10,`),
   )!;
 const press = async (label: string) => {
   await act(async () => button(label).props.onPress());
+};
+const pressTestId = async (testID: string) => {
+  await act(async () => byTestId(testID).props.onPress());
 };
 const host = (type: string) =>
   renderer.root.findAll((node) => node.type === type)[0]!;
@@ -97,28 +105,35 @@ afterEach(async () => {
   await act(async () => renderer.unmount());
 });
 
-it("shows all 11 labelled moods, reuses the tray, and saves only on Keep with the selected values", async () => {
+it("shows all 11 labelled moods, allows inline energy without opening a note sheet, and saves only on Keep", async () => {
   for (let mood = 0; mood <= 10; mood++) expect(moodButton(mood)).toBeDefined();
   const preview = renderer.root.findAll(
     (node) => node.type === "Text" && typeof node.props.children === "string" && node.props.children.startsWith("Feelings:"),
   )[0];
+  expect(preview.props.children).toContain("Energy: 0–10");
   expect(preview.props.children).toContain("Context: Home, Work");
   await chooseMood(6);
   expect(moodButton(0)).toBeUndefined();
   await press("Tired");
   await press("Anxious");
   expect(mocks.tick).toHaveBeenCalledTimes(2);
-  await press("Next · Context");
+  await press("Next · Energy & context");
   expect(button("#Home").props.accessibilityState.selected).toBe(false);
   expect(button("#Work").props.accessibilityState.selected).toBe(false);
+  // Energy is directly selectable inline with no modal open.
+  expect(renderer.root.findAll((node) => node.type === "PrivateModal")).toHaveLength(0);
+  await pressTestId("energy-level-1");
+  expect(byTestId("energy-level-1").props.accessibilityState.selected).toBe(true);
   await press("#My place");
-  await press("Energy & note (optional)");
-  await press("Energy 1");
   expect(mocks.tick).toHaveBeenCalledTimes(4);
+  // Note lives behind its own dedicated optional trigger and sheet.
+  await press("Add a note (optional)");
+  expect(renderer.root.findAll((node) => node.type === "PrivateModal")).toHaveLength(1);
   await act(async () =>
     host("TextInput").props.onChangeText("  Rest tonight  "),
   );
-  await press("Done with details");
+  await press("Done with note");
+  expect(button("Edit note")).toBeDefined();
   expect(onKeep).not.toHaveBeenCalled();
   await press("Keep Low 6");
   expect(onKeep.mock.calls[0]![0]).toEqual({
@@ -135,33 +150,62 @@ it("shows all 11 labelled moods, reuses the tray, and saves only on Keep with th
   expect(moodButton(0)).toBeDefined();
 });
 
-it("keeps custom feelings and optional details through Back, Change mood and Android back", async () => {
+it("lets users set, toggle, and clear energy inline without any note UI when notes are off", async () => {
+  await act(async () => {
+    renderer.update(
+      renderDock({ emotions: true, context: true, energy: true, notes: false }),
+    );
+  });
+  await chooseMood(3);
+  await press("Next · Energy & context");
+  expect(byTestId("check-in-note-trigger")).toBeUndefined();
+  await pressTestId("energy-level-0");
+  expect(byTestId("energy-level-0").props.accessibilityState.selected).toBe(true);
+  await pressTestId("energy-level-0");
+  expect(byTestId("energy-clear")).toBeUndefined();
+  await pressTestId("energy-level-8");
+  expect(byTestId("energy-level-8").props.accessibilityState.selected).toBe(true);
+  await pressTestId("energy-clear");
+  expect(byTestId("energy-level-8").props.accessibilityState.selected).toBe(false);
+  await pressTestId("energy-level-7");
+  await press("Keep Positive 3");
+  expect(onKeep.mock.calls[0]![0]).toMatchObject({
+    mood: 3,
+    energy: 7,
+    note: "",
+  });
+});
+
+it("keeps custom feelings, inline energy, and context through Back, Change mood and Android back", async () => {
   await chooseMood(2);
   await press("All feelings");
   expect(host("EmotionPicker").props.options).toContainEqual(custom);
   await act(async () => host("EmotionPicker").props.onChange([custom]));
   await act(async () => host("PrivateModal").props.onRequestClose());
   expect(button("My feeling").props.accessibilityState.selected).toBe(true);
-  await press("Next · Context");
+  await press("Next · Energy & context");
+  await pressTestId("energy-level-6");
   await press("#Home");
   await press("Back");
   expect(button("My feeling").props.accessibilityState.selected).toBe(true);
+  expect(button("Energy 6/10 · Change energy")).toBeDefined();
   await press("Good 2 · Change mood");
   await chooseMood(8);
   expect(button("My feeling").props.accessibilityState.selected).toBe(true);
-  await press("Next · Context");
+  await press("Next · Energy & context");
+  expect(byTestId("energy-level-6").props.accessibilityState.selected).toBe(true);
   expect(button("#Home").props.accessibilityState.selected).toBe(true);
   await act(async () => {
     expect(mocks.back!()).toBe(true);
   });
   expect(button("My feeling")).toBeDefined();
-  await press("Next · Context");
+  await press("Next · Energy & context");
   await press("Keep Overwhelmed 8");
   expect(onKeep.mock.calls[0]![0]).toMatchObject({
     mood: 8,
     emotions: [custom],
     contextTags: ["Home"],
-    energy: null,
+    energy: 6,
   });
 });
 
@@ -186,7 +230,7 @@ it("preserves an unsaved draft after a failed save and prevents duplicate Keep",
       }),
   );
   await chooseMood(4);
-  await press("Next · Context");
+  await press("Next · Energy & context");
   await act(async () => {
     button("Keep Okay 4").props.onPress();
     button("Keep Okay 4").props.onPress();
@@ -200,15 +244,18 @@ it("preserves an unsaved draft after a failed save and prevents duplicate Keep",
   expect(moodButton(0)).toBeDefined();
 });
 
-it("respects settings that change during a draft and allows every optional field to stay unanswered", async () => {
+it("allows clearing a draft note in the note sheet and respects settings that change during a draft", async () => {
   await chooseMood(6);
   await press("Tired");
-  await press("Next · Context");
+  await press("Next · Energy & context");
   await press("#Home");
-  await press("Energy & note (optional)");
-  await press("Energy 3");
+  await pressTestId("energy-level-3");
+  await press("Add a note (optional)");
   await act(async () => host("TextInput").props.onChangeText("Draft note"));
-  await press("Done with details");
+  await press("Clear note");
+  expect(host("TextInput").props.value).toBe("");
+  await act(async () => host("TextInput").props.onChangeText("Kept draft note"));
+  await press("Done with note");
   await act(async () =>
     renderer.update(
       renderDock({
@@ -220,7 +267,8 @@ it("respects settings that change during a draft and allows every optional field
     ),
   );
   expect(button("#Home")).toBeUndefined();
-  expect(button("Energy & note (optional)")).toBeUndefined();
+  expect(byTestId("energy-level-3")).toBeUndefined();
+  expect(byTestId("check-in-note-trigger")).toBeUndefined();
   await press("Keep Low 6");
   expect(onKeep.mock.calls[0]![0]).toEqual({
     mood: 6,
@@ -231,7 +279,7 @@ it("respects settings that change during a draft and allows every optional field
     basedOnEntryId: null,
   });
   await chooseMood(0);
-  expect(button("Next · Context")).toBeUndefined();
+  expect(byTestId("check-in-next")).toBeUndefined();
   await press("Keep Elated 0");
   expect(onKeep.mock.calls[1]![0]).toMatchObject({
     mood: 0,
