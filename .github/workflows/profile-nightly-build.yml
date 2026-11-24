@@ -47,14 +47,22 @@ jobs:
           set -euo pipefail
           out="$RUNNER_TEMP/profile"
           mkdir -p "$out"
-          nproc | tee "$out/host.txt"
-          free -h | tee -a "$out/host.txt"
+          {
+            echo "nproc=$(nproc)"
+            echo "CMAKE_BUILD_PARALLEL_LEVEL=${CMAKE_BUILD_PARALLEL_LEVEL}"
+            echo "GRADLE_OPTS=${GRADLE_OPTS}"
+            free -h
+          } | tee "$out/host.txt"
           (
             while true; do
               printf '%s ' "$(date -u +%H:%M:%S)"
               ps -eo args | grep -m1 '[n]inja ' || printf 'ninja-command-not-seen '
-              printf 'ninja=%s clang=%s cc1plus=%s ' \
+              printf '| '
+              ps -eo args | grep -m1 '[c]make --build' || printf 'cmake-build-not-seen '
+              printf 'ninja=%s cmake=%s make=%s clang=%s cc1plus=%s ' \
                 "$(pgrep -c -x ninja || true)" \
+                "$(pgrep -c -x cmake || true)" \
+                "$(pgrep -c -x make || true)" \
                 "$(pgrep -c -x clang++ || true)" \
                 "$(pgrep -c -x cc1plus || true)"
               free -m | awk '/^Mem:/ {print "used_mb="$3" available_mb="$7}'
@@ -70,6 +78,47 @@ jobs:
           kill "$sampler" 2>/dev/null || true
           trap - EXIT
           cp build/reports/profile/*.html "$out/" || true
+          python3 - "$out" <<'PY'
+          import pathlib, re, sys
+          root = pathlib.Path(sys.argv[1])
+          samples = (root / 'samples.log').read_text(errors='replace').splitlines()
+          ninja, cmake, make, clang, cc1 = [], [], [], [], []
+          ninja_cmds, cmake_cmds = set(), set()
+          counts = re.compile(
+              r'ninja=(\d+) cmake=(\d+) make=(\d+) clang=(\d+) cc1plus=(\d+)'
+          )
+          for line in samples:
+              match = counts.search(line)
+              if match:
+                  ninja.append(int(match.group(1)))
+                  cmake.append(int(match.group(2)))
+                  make.append(int(match.group(3)))
+                  clang.append(int(match.group(4)))
+                  cc1.append(int(match.group(5)))
+              head, _, _ = line.partition(' ninja=')
+              _, _, rest = head.partition(' ')
+              if 'ninja-command-not-seen' not in rest and '/ninja' in rest:
+                  ninja_cmds.add(rest.split(' | ', 1)[0].strip())
+              if 'cmake --build' in rest:
+                  cmake_cmds.add(rest.split(' | ', 1)[-1].strip())
+          lines = [
+              f'samples={len(samples)}',
+              f'max_ninja={max(ninja, default=0)}',
+              f'max_cmake={max(cmake, default=0)}',
+              f'max_make={max(make, default=0)}',
+              f'max_clang={max(clang, default=0)}',
+              f'max_cc1plus={max(cc1, default=0)}',
+              'ninja_commands:',
+              *(sorted(ninja_cmds) or ['(none sampled)']),
+              'cmake_build_commands:',
+              *(sorted(cmake_cmds) or ['(none sampled)']),
+          ]
+          text = '\n'.join(lines) + '\n'
+          (root / 'summary.txt').write_text(text)
+          print(text, end='')
+          PY
+          echo '--- time ---'
+          cat "$out/time.txt"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
