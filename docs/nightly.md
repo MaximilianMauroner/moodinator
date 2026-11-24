@@ -43,6 +43,8 @@ The workflow pins action commit SHAs, Node 24.13.1, pnpm 11.16.0, Java 17,
 EAS 20.5.1, Android build-tools 36, and bundletool 1.18.2 with a SHA-256 check.
 It checks actual disk/RAM and removes only unused tool bundles on the disposable
 runner if disk is low. Preflight still requires 15 GiB free disk and 8 GiB RAM.
+The nightly profile allows four CMake compile jobs, one per hosted vCPU. Gradle
+project execution stays serial to bound memory.
 
 The main-only build job restores an exact-key cache of public Android 36 SDK
 packages, npm's download cache and Gradle wrapper distributions. The key includes
