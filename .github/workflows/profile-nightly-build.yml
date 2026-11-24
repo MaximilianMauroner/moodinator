@@ -1,0 +1,79 @@
+name: Profile nightly AAB build
+
+on:
+  push:
+    branches: [perf/nightly-build-cores]
+
+permissions:
+  contents: read
+
+jobs:
+  profile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.13.1'
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Prepare public Android tools
+        run: bash scripts/setup-hosted-android.sh verify
+      - name: Install dependencies and prebuild
+        env:
+          NODE_OPTIONS: --max-old-space-size=1536
+          EXPO_PUBLIC_REPORTS_ORIGIN: https://tools.mauroner.net
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile --ignore-scripts
+          pnpm exec expo prebuild --platform android --no-install
+      - name: Download the Gradle distribution
+        run: |
+          gradle_wrapper=$(node -p "require.resolve('@react-native/gradle-plugin/gradlew', { paths: [require.resolve('react-native/package.json')] })")
+          "$gradle_wrapper" --version --no-daemon
+      - name: Build with Gradle profile
+        env:
+          NODE_OPTIONS: --max-old-space-size=1536
+          CMAKE_BUILD_PARALLEL_LEVEL: '2'
+          GRADLE_OPTS: -Dorg.gradle.workers.max=2 -Dorg.gradle.parallel=false -Dorg.gradle.jvmargs=-Xmx2048m -Dkotlin.daemon.jvm.options=-Xmx768m
+          ORG_GRADLE_PROJECT_reactNativeArchitectures: armeabi-v7a,arm64-v8a
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/profile"
+          mkdir -p "$out"
+          nproc | tee "$out/host.txt"
+          free -h | tee -a "$out/host.txt"
+          (
+            while true; do
+              printf '%s ' "$(date -u +%H:%M:%S)"
+              ps -eo args | grep -m1 '[n]inja ' || printf 'ninja-command-not-seen '
+              printf 'ninja=%s clang=%s cc1plus=%s ' \
+                "$(pgrep -c -x ninja || true)" \
+                "$(pgrep -c -x clang++ || true)" \
+                "$(pgrep -c -x cc1plus || true)"
+              free -m | awk '/^Mem:/ {print "used_mb="$3" available_mb="$7}'
+              sleep 10
+            done
+          ) > "$out/samples.log" 2>&1 &
+          sampler=$!
+          trap 'kill "$sampler" 2>/dev/null || true' EXIT
+          cd android
+          /usr/bin/time -f 'elapsed=%e user=%U sys=%S peak_kib=%M' -o "$out/time.txt" \
+            ./gradlew :app:bundleRelease --no-daemon --no-build-cache --profile --console=plain \
+            > "$out/gradle.log" 2>&1
+          kill "$sampler" 2>/dev/null || true
+          trap - EXIT
+          cp build/reports/profile/*.html "$out/" || true
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: nightly-build-profile
+          path: ${{ runner.temp }}/profile
+          if-no-files-found: warn
+          retention-days: 3
