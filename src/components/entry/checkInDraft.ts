@@ -5,7 +5,7 @@ import type {
 } from "./moodEntryDraft";
 
 export type CheckInStage = "mood" | "feelings" | "context";
-export type CheckInSheet = "feelings" | "extras" | null;
+export type CheckInSheet = "feelings" | "note" | null;
 export type CheckInDraft = MoodEntryFormValues;
 export type CheckInState =
   | { stage: "mood"; draft: null; sheet: null }
